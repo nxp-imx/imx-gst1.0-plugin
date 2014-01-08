@@ -527,7 +527,7 @@ fsl_player_s32 display_thread_fun(fsl_player_handle handle)
                            str_player_state_rate/*str_player_state[player_state]*/,prepeated_mode/*(brepeated?"(Repeated)":"")*/, str_volume,
                            (fsl_player_s32)hour, (fsl_player_s32)minute, (fsl_player_s32)second,
                            (fsl_player_s32)hour_d, (fsl_player_s32)minute_d, (fsl_player_s32)second_d,
-                           0);
+                           0.0);
 
             fflush (stdout);
         }

@@ -1062,6 +1062,7 @@ gst_vpu_dec_object_set_vpu_input_buf (GstVpuDecObject * vpu_dec_object, \
     gst_buffer_map (buffer2, &minfo2, GST_MAP_READ);
     vpu_buffer_node->sCodecData.nSize = minfo2.size;
     vpu_buffer_node->sCodecData.pData = minfo2.data;
+    GST_DEBUG_OBJECT (vpu_dec_object, "codec data size: %d\n", minfo2.size);
     gst_buffer_unmap (buffer2, &minfo2);
   }
 
@@ -1076,7 +1077,7 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
 {
   GstFlowReturn ret = GST_FLOW_OK;
 	VpuDecRetCode dec_ret;
-	VpuBufferNode in_data;
+	VpuBufferNode in_data = {0};
 	int buf_ret;
 
   GST_LOG_OBJECT (vpu_dec_object, "GstVideoCodecFrame: 0x%x\n", frame);
