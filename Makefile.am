@@ -1,0 +1,73 @@
+ACLOCAL_AMFLAGS = -I m4
+
+LIBSDIRS = libs
+
+if USE_AIUR
+AIURDIRS = plugins/aiurdemux
+endif
+
+if USE_BEEP
+#BEEPDIRS = plugins/beepdec
+endif
+
+if USE_V4L_SINK
+V4LSINKDIRS = plugins/v4l2
+endif
+
+if USE_MP3_ENC
+MP3ENC_DIR =    
+endif
+
+if USE_WMA8_ENC
+WMA8ENC_DIR =
+endif
+
+TOOLDIRS =    tools/                      \
+              tools/gplay
+
+BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS)
+              
+if PLATFORM_IS_MX6
+
+if USE_VPU_WRAP
+VPUWRAPDIRS = plugins/vpu
+endif
+
+endif
+
+if PLATFORM_IS_MX6SL
+
+VPUWRAPDIRS =
+
+endif
+
+SUBDIRS =  $(LIBSDIRS) $(BASEDIRS) $(VPUWRAPDIRS) $(WMA8ENC_DIR) $(MP3ENC_DIR) $(TOOLDIRS)
+
+
+
+
+noinst_HEADERS = \
+    ext-includes/fsl_media_types.h \
+    ext-includes/fsl_types.h			 \
+    ext-includes/fsl_parser.h			 \
+    ext-includes/vpu_wrapper.h		 \
+    ext-includes/fsl_unia.h				  
+    
+
+fslmmdocdir = $(docdir)/imx-mm/gstreamer-1.0
+fslmmdoc_DATA = \
+    doc/EULA.txt    
+
+pcverfiles = gstreamer-fsl-@GST_MAJORMINOR@.pc
+### how to generate versioned .pc files from .pc files in this dir
+%-@GST_MAJORMINOR@.pc: %.pc
+	cp $< $@
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = $(pcverfiles)
+
+CLEANFILES = $(pcverfiles)
+pcinfiles = gstreamer-fsl.pc.in
+
+DISTCLEANFILES = $(pcinfiles:.in=)
+
+EXTRA_DIST = autogen.sh $(fslmmdoc_DATA) $(pcinfiles) COPYING-LGPL-2 COPYING-LGPL-2.1

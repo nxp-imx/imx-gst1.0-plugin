@@ -1,0 +1,12 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@/gstreamer-@GST_MAJORMINOR@/gst/imx-mm
+pluginsdir=@libdir@/gstreamer-@GST_MAJORMINOR@
+
+Name: GStreamer Freescale Plugins Libraries
+Description: Streaming media framework, Freescale plugins libraries
+Requires: gstreamer-@GST_MAJORMINOR@ gstreamer-base-@GST_MAJORMINOR@
+Version: @VERSION@
+Libs: -L${libdir} -lgstfsl-@GST_MAJORMINOR@
+Cflags: -I${includedir}
