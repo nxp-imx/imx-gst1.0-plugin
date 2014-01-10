@@ -324,6 +324,12 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     update_pool = FALSE;
   }
 
+  if (pool == NULL && allocator == NULL \
+      && GST_VPU_DEC_NEED_WAIT (dec->vpu_dec_object)) {
+    GST_DEBUG_OBJECT (dec, "no allocator and pool. wait.\n");
+    return FALSE;
+  }
+
   if (allocator == NULL || !GST_IS_ALLOCATOR_PHYMEM (allocator)) {
     /* no allocator or isn't physical memory allocator. VPU need continus
      * physical memory. use VPU memory allocator. */
