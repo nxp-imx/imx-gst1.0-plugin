@@ -37,7 +37,7 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 
-#include "aiurdemux.h"
+#include "aiurregistry.h"
 
 
 #define CORE_QUERY_INTERFACE_API_NAME "FslParserQueryInterface"
@@ -51,8 +51,6 @@
 
 #define AIUR_REGISTRY_FILE_ENV_NAME "AIUR_REGISTRY"
 
-#define KEY_LIB "library"
-#define KEY_MIME "mime"
 #define VERSION "3.0.9"
 
 
@@ -63,6 +61,7 @@ uint32 aiur_core_interface_id_table[] = {
   PARSER_API_GET_VERSION_INFO,
   PARSER_API_CREATE_PARSER,
   PARSER_API_DELETE_PARSER,
+  PARSER_API_CREATE_PARSER2,
 
   PARSER_API_INITIALIZE_INDEX,
   PARSER_API_IMPORT_INDEX,
@@ -115,7 +114,7 @@ uint32 aiur_core_interface_id_table[] = {
 };
 
 
-AiurCoreInterface *
+static AiurCoreInterface *
 _aiur_core_create_interface_from_entry (gchar * dl_name)
 {
   AiurCoreInterface *inf = NULL;
@@ -179,6 +178,77 @@ fail:
   return inf;
 }
 
+static GstCaps * aiur_get_caps_from_entry(GstsutilsEntry * entry)
+{
+  int group_count=0;
+  int index = 0;
+  char* mime = NULL;
+  char* libname = NULL;
+  GstsutilsGroup *group=NULL;
+  void *dlhandle = NULL;
+  GstCaps * caps = NULL;
+  group_count = gstsutils_get_group_count(entry);
+  for(index = 1; index <= group_count; index++){
+    if(!gstsutils_get_group_by_index(entry,index,&group))
+      continue;
+    if(!gstsutils_get_value_by_key(group,FSL_KEY_MIME,&mime)){
+      continue;
+    }
+    if(!gstsutils_get_value_by_key(group,FSL_KEY_LIB,&libname)){
+      continue;
+    }
+    dlhandle = dlopen (libname, RTLD_LAZY);
+    if (!dlhandle) {
+      g_free(mime);
+      g_free(libname);
+      continue;
+    }
+    if (caps) {
+      GstCaps *newcaps = gst_caps_from_string (mime);
+      if (newcaps) {
+        if (!gst_caps_is_subset (newcaps, caps)) { 
+          gst_caps_append (caps, newcaps);
+        } else {
+          gst_caps_unref (newcaps); 
+        }     
+      }      
+    } else {
+      caps = gst_caps_from_string (mime);
+    }
+    dlclose (dlhandle);
+    g_free(mime);
+    g_free(libname);
+  }
+  return caps;
+}
+static GstsutilsGroup * aiur_core_find_caps_group(GstsutilsEntry *entry,GstCaps * caps)
+{
+  int group_count=0;
+  int index = 0;
+  char* mime = NULL;
+  GstsutilsGroup *group=NULL;
+  void *dlhandle = NULL;
+  GstCaps * super_caps = NULL;
+  gboolean found = FALSE;
+  group_count = gstsutils_get_group_count(entry);
+  for(index = 1; index <= group_count; index++){
+    if(found)
+      break;
+    if(!gstsutils_get_group_by_index(entry,index,&group))
+      continue;
+    if(!gstsutils_get_value_by_key(group,FSL_KEY_MIME,&mime)){
+      continue;
+    }
+    super_caps = gst_caps_from_string (mime);
+    if ((super_caps) && (gst_caps_is_subset (caps, super_caps))) {
+      found = TRUE;
+    }
+    if(super_caps)
+      gst_caps_unref (super_caps);
+    g_free(mime);
+  }
+  return group;
+}
 
 GstCaps *
 aiur_core_get_caps ()
@@ -193,7 +263,7 @@ aiur_core_get_caps ()
     g_aiur_caps_entry = gstsutils_init_entry(aiurenv);
   }
 
-  caps = gstsutils_get_caps_from_entry(g_aiur_caps_entry);
+  caps = aiur_get_caps_from_entry(g_aiur_caps_entry);
 
   return caps;
 }
@@ -205,24 +275,32 @@ aiur_core_create_interface_from_caps (GstCaps * caps)
   AiurCoreInterface *inf = NULL;
   GstsutilsGroup * group;
   gchar * libname = NULL;
+  gchar * libname2 = NULL;
   gchar * temp_name;
   gboolean find = FALSE;
+  void *dlhandle = NULL;
 
-  find = gstsutils_get_group_by_value(g_aiur_caps_entry,compare_caps,caps,&group);
-  if (find) {
+  group = aiur_core_find_caps_group(g_aiur_caps_entry,caps);
+  if (group) {
 
-    if(gstsutils_get_value_by_group(group,FSL_KEY_LIB2,&temp_name))
-      libname = temp_name;
-    else if(gstsutils_get_value_by_group(group,FSL_KEY_LIB,&temp_name))
-      libname = temp_name;
+    if(gstsutils_get_value_by_key(group,FSL_KEY_LIB2,&libname2)){
+      dlhandle = dlopen (libname2, RTLD_LAZY);
+      if(dlhandle){
+        libname = libname2;
+        dlclose (dlhandle);
+      }else{
+        g_free(libname2);
+      }
+    }
+    if(libname == NULL)
+      gstsutils_get_value_by_key(group,FSL_KEY_LIB,&libname);
     
     inf = _aiur_core_create_interface_from_entry (libname);
 
     if(libname)
       g_free(libname);
 
-    if(group->name)
-      inf->name = group->name;
+    inf->name = gstsutils_get_group_name(group);
   }
   return inf;
 }
@@ -238,6 +316,7 @@ aiur_core_destroy_interface (AiurCoreInterface * inf)
     dlclose (inf->dl_handle);
   }
 
+  g_free(inf->name);
   g_free (inf);
 }
 

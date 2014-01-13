@@ -33,9 +33,23 @@
 */
 
 #include "gstsutils.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <dlfcn.h>
+
+typedef struct _GstsutilsData
+{
+  char * key;
+  char * value;
+}GstsutilsData;
+struct _GstsutilsGroup
+{
+  GstsutilsData ** data;
+  gint num;
+  gchar * name;
+};
+struct _GstsutilsEntry
+{
+  GstsutilsGroup ** group;
+  gint num;
+};
 
 static gboolean
 g_string_to_boolean (const gchar * str)
@@ -521,7 +535,86 @@ GstsutilsEntry *gstsutils_init_entry (gchar * filename)
   }
   return dlentry;
 }
+int gstsutils_get_group_count(GstsutilsEntry * entry)
+{
+  int num = 0;
+  if(entry)
+    num = entry->num;
+  return num;
+}
+gboolean gstsutils_get_group_by_index (GstsutilsEntry * entry,int index,GstsutilsGroup ** group_out)
+{
 
+  gboolean found = FALSE;
+  GstsutilsGroup *group=NULL;
+  do{
+    if(entry == NULL || group_out == NULL)
+      break;
+    if(index > entry->num && index < 1)
+      break;
+    group = entry->group[index-1];
+    if(group){
+      *group_out = group;
+      found = TRUE;
+    }
+  }while(0);
+  return found;
+}
+int gstsutils_get_data_count_in_group (GstsutilsGroup * group)
+{
+  int num = 0;
+  if(group)
+    num = group->num;
+  return num;
+}
+gchar * gstsutils_get_group_name (GstsutilsGroup * group)
+{
+  gchar * name = NULL;
+  if(group)
+    name = g_strdup(group->name);
+  return name;
+}
+gboolean gstsutils_get_value_by_index(GstsutilsGroup *group,int index, gchar** key_out, gchar**value_out)
+{
+  gboolean found = FALSE;
+  GstsutilsData *data=NULL;
+  do{
+    if(group == NULL || key_out == NULL || value_out == NULL)
+      break;
+    if(index > group->num && index < 1)
+      break;
+    data = group->data[index-1];
+    if(data){
+      *key_out = g_strdup(data->key);
+      *value_out = g_strdup(data->value); 
+      found = TRUE;
+    }
+  }while(0);
+  return found;
+}
+gboolean gstsutils_get_value_by_key(GstsutilsGroup *group,gchar * key, gchar**value_out)
+{
+  gboolean ret = FALSE;
+  GstsutilsData * data = NULL;
+  gchar * value = NULL;
+  gint i = 0;
+  do{
+    if(group == NULL || key == NULL || value_out == NULL)
+      break;
+    *value_out = NULL;
+    for(i = 0; i < group->num; i++){
+      data = group->data[i];
+      if(!data || data->key == NULL || data->value == NULL)
+        continue;
+      if(!strcmp(key,data->key)){
+        *value_out = g_strdup(data->value); 
+        ret = TRUE;
+        break;
+      }
+    }
+  }while(0);
+  return ret;
+}
 void gstsutils_deinit_entry (GstsutilsEntry * entry)
 {
   GstsutilsGroup *group=NULL;
@@ -563,186 +656,60 @@ void gstsutils_deinit_entry (GstsutilsEntry * entry)
   
 }
 
-GstCaps *gstsutils_get_caps_from_entry (GstsutilsEntry * entry)
-{
-  GstCaps *caps = NULL;
-
-  GstsutilsGroup *group = NULL;
-  GstsutilsData *data=NULL;
-
-  gchar * mime = NULL;
-  gchar * library_name = NULL;
-
-  gint i = 0;
-  gint j =0;
-
-  if(entry == NULL || entry->num == 0)
-    return NULL;
 
 
-  for(i = 0; i < entry->num; i++){
-    group = entry->group[i];
 
-    if(group == NULL || group->num == 0)
-      break;
 
-    mime = NULL;
-    library_name = NULL;
 
-    for(j = 0; j < group->num; j++){
 
-      data = group->data[j];
 
-      if(data == NULL)
-        break;
 
-      if(!strcmp(FSL_KEY_MIME,data->key)){
-        mime = data->value;
-      }
-      else if(!strcmp(FSL_KEY_LIB,data->key)){
-        library_name = data->value;
-      }
-    }
 
-    if(mime && library_name){
-      void *dlhandle = NULL;
 
-      dlhandle = dlopen (library_name, RTLD_LAZY);
 
-      if (!dlhandle) {
-        continue;
-      }
+
+
+
+
       
-      if (caps) {
-        GstCaps *newcaps = gst_caps_from_string (mime);
-        if (newcaps) {
-          if (!gst_caps_is_subset (newcaps, caps)) {
-            gst_caps_append (caps, newcaps);
-          } else {
-            gst_caps_unref (newcaps);
-          }
-        }
-      } else {
-        caps = gst_caps_from_string (mime);
-      }
 
-      dlclose (dlhandle);
 
-    }
 
-  }
 
   
-  return caps;
 
-}
 
-gboolean gstsutils_get_group_by_value (GstsutilsEntry * entry,compareFunction compare_function,void* value,GstsutilsGroup ** group_out)
-{
-  GstsutilsGroup *group = NULL;
-  GstsutilsData *data=NULL;
 
-  gint i = 0;
-  gint j =0;
 
-  gboolean found = FALSE;
 
-  if(entry == NULL || compare_function == NULL || group_out == NULL)
-    return found;
 
-  for(i = 0; i < entry->num; i++){
 
-    if(found)
-      break;
     
-    group = entry->group[i];
 
-    if(group == NULL || group->num == 0)
-      break;
 
-    for(j = 0; j < group->num; j++){
     
-      data = group->data[j];
     
-      if(data == NULL)
-        break;
     
-      if(compare_function(data, value)){
-        found = TRUE;
-        break;
-      }
-    }
-
-  }
-
-  if(found){
-    *group_out = group;
-  }
-
-  return found;
-}
-
-gboolean compare_caps(GstsutilsData *data, void* value)
-{
-  gboolean found=FALSE;
-  char* key = NULL;
-  char* mime = NULL;
-  GstCaps * caps = NULL;
-  GstCaps * super_caps = NULL;
 
 
-  if(data == NULL || value == NULL)
-    return found;
 
-  caps = (GstCaps*)value;
-  key = data->key;
-  mime = data->value;
+
+
+
+
 
   
-  if(!strcmp(key,FSL_KEY_MIME)){
 
-    super_caps = gst_caps_from_string (mime);
 
-    if ((super_caps) && (gst_caps_is_subset (caps, super_caps))) {
-      found = TRUE;
-    }
 
-    if(super_caps)
-      gst_caps_unref (super_caps);
-  }
 
-  return found;
-}
-gboolean gstsutils_get_value_by_group(GstsutilsGroup *group,gchar * key, gchar**value_out)
-{
-  gboolean ret = FALSE;
-  GstsutilsData * data = NULL;
-  gchar * value = NULL;
-  gint i = 0;
   
-  do{
 
-    if(group == NULL || key == NULL || value_out == NULL)
-      break;
 
-    *value_out = NULL;
     
-    for(i = 0; i < group->num; i++){
-      data = group->data[i];
 
-      if(!data || data->key == NULL || data->value == NULL)
-        continue;
 
-      if(!strcmp(key,data->key)){
-        *value_out = g_strdup(data->value);
-        ret = TRUE;
-        break;
-      }
       
-    }
 
-  }while(0);
   
-  return ret;
-}
 

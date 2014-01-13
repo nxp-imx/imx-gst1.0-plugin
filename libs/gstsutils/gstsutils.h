@@ -79,27 +79,12 @@ typedef struct
 } GstsutilsOptionEntry;
 
 
-typedef struct
-{
-  char * key;
-  char * value;
-}GstsutilsData;
-
-typedef struct
-{
-  GstsutilsData ** data;
-  gint num;
-  gchar * name;
-}GstsutilsGroup;
-
-typedef struct
-{
-  GstsutilsGroup ** group;
-  gint num;
-}GstsutilsEntry;
 
 
-typedef gboolean (*compareFunction)(GstsutilsData* data, void * value);
+typedef struct _GstsutilsGroup GstsutilsGroup;
+typedef struct _GstsutilsEntry GstsutilsEntry;
+
+
 
 void
 gstsutils_options_install_properties_by_options (GstsutilsOptionEntry * table,
@@ -120,13 +105,15 @@ gstsutils_elementutil_get_int (gchar * filename, gchar * group, gchar * field,
 
 
 GstsutilsEntry *gstsutils_init_entry (gchar * filename);
+int gstsutils_get_group_count(GstsutilsEntry * entry);
+gboolean gstsutils_get_group_by_index (GstsutilsEntry * entry,int index,GstsutilsGroup ** group_out);
+int gstsutils_get_data_count_in_group (GstsutilsGroup * group);
+gchar * gstsutils_get_group_name (GstsutilsGroup * group);
+gboolean gstsutils_get_value_by_index(GstsutilsGroup *group,int index, gchar** key_out, gchar**value_out);
+gboolean gstsutils_get_value_by_key(GstsutilsGroup *group,gchar * key, gchar**value_out);
 void gstsutils_deinit_entry (GstsutilsEntry * entry);
 
-GstCaps *gstsutils_get_caps_from_entry (GstsutilsEntry * entry);
 
-gboolean gstsutils_get_group_by_value (GstsutilsEntry * entry,compareFunction function, void * value,GstsutilsGroup ** group_out);
-gboolean compare_caps(GstsutilsData* data, void * value);
-gboolean gstsutils_get_value_by_group(GstsutilsGroup *group,gchar * key, gchar**value_out);
 
 
 #endif

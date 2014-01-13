@@ -39,7 +39,6 @@
 #include <gst/gst.h>
 #include <gst/base/gstadapter.h>
 #include <gst/tag/tag.h>
-#include "../../libs/gstsutils/gstsutils.h"
 
 //#include "mfw_gst_utils.h"
 
@@ -93,6 +92,7 @@ enum
   PROP_STREAMING_LATENCY,
   PROP_INDEX_ENABLED,
   PROP_MERGE_H264_CODEC,
+  PROP_DISABLE_VORBIS_CODEC_DATA,
 };
 
 
@@ -143,6 +143,7 @@ typedef struct _AiurDemuxOption
   guint8* caps;
   gboolean index_enabled;
   gboolean merge_h264_codec_data;
+  gboolean disable_vorbis_codec_data;
 } AiurDemuxOption;
 
 

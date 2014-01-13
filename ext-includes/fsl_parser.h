@@ -1,6 +1,6 @@
 
 /***********************************************************************
- * Copyright (c) 2009-2013, Freescale Semiconductor, Inc.
+ * Copyright (c) 2009-2014, Freescale Semiconductor, Inc.
  * All modifications are confidential and proprietary information
  * of Freescale Semiconductor, Inc. ALL RIGHTS RESERVED.
  ***********************************************************************/
@@ -208,6 +208,11 @@ enum
 //file source should be read in sequence. You should not read from random position even if the file is seekable
 #define FILE_FLAG_READ_IN_SEQUENCE   0X02
 
+/*********************************************************************
+ * flags for create parse2
+ ********************************************************************/
+//if does not set this flag, h264 alignment will be nal
+#define FALG_H264_ALIGNMENT_AU 0x04
 /*********************************************************************
  * User data ID
  * Some File level metadata
@@ -542,6 +547,13 @@ typedef int32  (*FslCreateParser)(  bool isLive,
 
 typedef int32 (*FslDeleteParser)(FslParserHandle parserHandle);
 
+/* optional */
+typedef int32  (*FslCreateParser2)( uint32 flags,
+                                    FslFileStream * streamOps,
+                                    ParserMemoryOps * memOps,
+                                    ParserOutputBufferOps * outputBufferOps,
+                                    void * context,
+                                    FslParserHandle * parserHandle);
 
 /***************************************************************************************
  *
@@ -764,6 +776,7 @@ enum /* API function ID */
     PARSER_API_GET_VERSION_INFO  = 0,
     PARSER_API_CREATE_PARSER     = 1,
     PARSER_API_DELETE_PARSER     = 2,
+    PARSER_API_CREATE_PARSER2     = 5,
 
     /* index export/import */
     PARSER_API_INITIALIZE_INDEX  = 10,

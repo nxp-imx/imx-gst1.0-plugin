@@ -52,10 +52,10 @@ typedef struct{
 
 
 static AiurdemuxCodecStruct aiurdemux_videocodec_tab[] ={
-  {VIDEO_H263, 0, "H.263", "video/x-h263"},
-  {VIDEO_H264, 0, "H.264/AVC", "video/x-h264, parsed = (boolean)true, alignment=au"},
+  {VIDEO_H263, 0, "H.263", "video/x-h263, variant=(string)itu"},
+  {VIDEO_H264, 0, "H.264/AVC", "video/x-h264, parsed = (boolean)true"},
   {VIDEO_MPEG2, 0, "MPEG2", "video/mpeg, systemstream = (boolean)false, parsed = (boolean)true, mpegversion=(int)2"},
-  {VIDEO_MPEG4, 0, "MPEG4", "video/mpeg, mpegversion=(int)4, parsed = (boolean)true"},
+  {VIDEO_MPEG4, 0, "MPEG4", "video/mpeg, systemstream = (boolean)false, parsed = (boolean)true, mpegversion=(int)4"},
   {VIDEO_JPEG, 0, "JPEG", "image/jpeg"},
   {VIDEO_MJPG, VIDEO_MJPEG_FORMAT_A, "Motion JPEG format A", "image/jpeg"},
   {VIDEO_MJPG, VIDEO_MJPEG_FORMAT_B, "Motion JPEG format B", "image/jpeg"},
@@ -66,10 +66,10 @@ static AiurdemuxCodecStruct aiurdemux_videocodec_tab[] ={
   {VIDEO_DIVX, VIDEO_DIVX5_6, "Divx", "video/x-divx, divxversion=(int)5"},
   {VIDEO_DIVX, 0, "Divx", "video/x-divx, divxversion=(int)5"},
   {VIDEO_XVID, 0, "Xvid", "video/x-xvid"},
-  {VIDEO_WMV, VIDEO_WMV7, "WMV7", "video/x-wmv, wmvversion=(int)1, format=(fourcc)WMV1"},
-  {VIDEO_WMV, VIDEO_WMV8, "WMV8", "video/x-wmv, wmvversion=(int)2, format=(fourcc)WMV2"},
-  {VIDEO_WMV, VIDEO_WMV9, "WMV9", "video/x-wmv, wmvversion=(int)3, format=(fourcc)WMV3"},
-  {VIDEO_WMV, VIDEO_WVC1, "VC1", "video/x-wmv, wmvversion=(int)3, format=(fourcc)WVC1"},
+  {VIDEO_WMV, VIDEO_WMV7, "WMV7", "video/x-wmv, wmvversion=(int)1, format=(string)WMV1"},
+  {VIDEO_WMV, VIDEO_WMV8, "WMV8", "video/x-wmv, wmvversion=(int)2, format=(string)WMV2"},
+  {VIDEO_WMV, VIDEO_WMV9, "WMV9", "video/x-wmv, wmvversion=(int)3, format=(string)WMV3"},
+  {VIDEO_WMV, VIDEO_WVC1, "VC1", "video/x-wmv, wmvversion=(int)3, format=(string)WVC1"},
   {VIDEO_WMV, 0, NULL, NULL},
   {VIDEO_REAL, 0, "RealVideo", "video/x-pn-realvideo"},
   {VIDEO_SORENSON_H263, 0, "Sorenson H.263", "video/x-flash-video"},
@@ -133,6 +133,11 @@ static GstsutilsOptionEntry g_aiurdemux_option_table[] = {
             "whether to merge h264 codec data into the first buffer",
             G_TYPE_BOOLEAN,
             G_STRUCT_OFFSET (AiurDemuxOption, merge_h264_codec_data),
+          "false"},
+    {PROP_DISABLE_VORBIS_CODEC_DATA, "disable_vorbis_codec_data", "do not send vorbis codec data",
+            "whether to parse vorbis codec data to three buffers to send",
+            G_TYPE_BOOLEAN,
+            G_STRUCT_OFFSET (AiurDemuxOption, disable_vorbis_codec_data),
           "true"},
   {-1, NULL, NULL, NULL, 0, 0, NULL}    /* terminator */
 };
@@ -269,6 +274,7 @@ _gst_buffer_copy_into_mem (GstBuffer * dest, gsize offset, const guint8 * src,
 static GstFlowReturn aiurdemux_read_buffer(GstAiurDemux * demux, uint32* track_idx,
     AiurDemuxStream** stream_out);
 static GstFlowReturn aiurdemux_merge_codec_buffer(GstAiurDemux * demux, AiurDemuxStream* stream);
+static GstFlowReturn aiurdemux_parse_vorbis_codec_data(GstAiurDemux * demux, AiurDemuxStream* stream);
 
 static gint aiurdemux_choose_next_stream (GstAiurDemux * demux);
 
@@ -1080,7 +1086,7 @@ aiurdemux_loop_state_init (GstAiurDemux * demux)
   FslFileStream *file_cbks;
   ParserMemoryOps *mem_cbks;
   ParserOutputBufferOps *buf_cbks;
-  
+  uint32 flag;
 
   if (IParser == NULL)
       return GST_FLOW_OK;
@@ -1112,9 +1118,18 @@ aiurdemux_loop_state_init (GstAiurDemux * demux)
 
   isLive = aiurcontent_is_live(demux->content_info);
 
-
+  if(IParser->createParser2){
+    flag = FALG_H264_ALIGNMENT_AU;
+    if(isLive){
+        flag |= FILE_FLAG_NON_SEEKABLE;
+        flag |= FILE_FLAG_READ_IN_SEQUENCE;
+    }
+    parser_result = IParser->createParser2(flag ,file_cbks, mem_cbks,
+      buf_cbks, (void *)(demux->content_info), &core_handle);
+  }else{
   parser_result = IParser->createParser((bool)isLive,file_cbks, mem_cbks,
                               buf_cbks, (void *)(demux->content_info), &core_handle);
+  }
 
   if (parser_result != PARSER_SUCCESS) {
       GST_ERROR_OBJECT(demux,"Failed to create fsl parser! ret=%d",parser_result);
@@ -1323,8 +1338,18 @@ static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
          && (stream->merge_codec_data == TRUE)
          && (stream->codec_data.length)){
       aiurdemux_merge_codec_buffer(demux,stream);
+      stream->merge_codec_data = FALSE;
     }
      
+    //for vorbis codec data
+    if(demux->option.disable_vorbis_codec_data &&
+      (stream->type == MEDIA_AUDIO)
+      && (stream->codec_type == AUDIO_VORBIS)
+      && (stream->send_codec_data == FALSE)
+      && (stream->codec_data.length)){
+      aiurdemux_parse_vorbis_codec_data(demux, stream);
+      stream->send_codec_data = TRUE;
+    }
     //push buffer to pad
     if (demux->interleave_queue_size) {
      stream->buf_queue_size += gst_buffer_get_size(stream->buffer);
@@ -1709,6 +1734,7 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
     memset(stream, 0, sizeof(AiurDemuxStream));
     stream->pid = -1;
     stream->track_idx = i;
+    stream->partial_sample = FALSE;
 
     ret = IParser->getTrackType(handle, i, &stream->type,
         &stream->codec_type, &stream->codec_sub_type);
@@ -1722,9 +1748,11 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
         break;
     stream->track_duration = AIUR_CORETS_2_GSTTS(duration);
 
+    if(IParser->getLanguage){
     ret = IParser->getLanguage(handle, i, (uint8 *)stream->lang);
     if(ret != PARSER_SUCCESS){
         stream->lang[0] = '\0';
+      }
     }
 
     ret = IParser->getBitRate(handle, i, &stream->bitrate);
@@ -1890,6 +1918,13 @@ static void aiurdemux_parse_video (GstAiurDemux * demux, AiurDemuxStream * strea
       stream->merge_codec_data = TRUE;
   }
 
+  if(stream->codec_type == VIDEO_H264){
+    if(IParser->createParser2 != NULL){
+      mime = g_strdup_printf("%s,alignment=(string)au",mime);
+    }else{
+      mime = g_strdup_printf("%s,alignment=(string)nal",mime);
+    }
+  }
   mime =
     g_strdup_printf
     ("%s, width=(int)%ld, height=(int)%ld, framerate=(fraction)%ld/%ld",
@@ -1971,6 +2006,7 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
   if(parser_ret != PARSER_SUCCESS)
       goto bail;
 
+  if(IParser->getAudioBitsPerSample)
   parser_ret = IParser->getAudioBitsPerSample(handle,track_index,&stream->info.audio.sample_width);
 
   if(parser_ret != PARSER_SUCCESS)
@@ -2089,30 +2125,37 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
             width = depth = 8;
             endian = G_BYTE_ORDER;
             sign = FALSE;
+            codec_mime = "format=(string)U8";
             break;
           case AUDIO_PCM_S16LE:
             width = depth = 16;
             endian = G_LITTLE_ENDIAN;
+            codec_mime = "format=(string)S16LE";
             break;
           case AUDIO_PCM_S24LE:
             width = depth = 24;
             endian = G_LITTLE_ENDIAN;
+            codec_mime = "format=(string)S24LE";
             break;
           case AUDIO_PCM_S32LE:
             width = depth = 32;
             endian = G_LITTLE_ENDIAN;
+            codec_mime = "format=(string)S32LE";
             break;
           case AUDIO_PCM_S16BE:
             width = depth = 16;
             endian = G_BIG_ENDIAN;
+            codec_mime = "format=(string)S16BE";
             break;
           case AUDIO_PCM_S24BE:
             width = depth = 24;
             endian = G_BIG_ENDIAN;
+            codec_mime = "format=(string)S24BE";
             break;
           case AUDIO_PCM_S32BE:
             width = depth = 32;
             endian = G_BIG_ENDIAN;
+            codec_mime = "format=(string)S32BE";
             break;
           default:
             goto bail;
@@ -2121,9 +2164,8 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
         codec = "PCM";
         mime =
             g_strdup_printf
-            ("audio/x-raw-int, channels=(int)%ld, rate=(int)%ld, width=(int)%d, depth=(int)%d, endianness=(int)%d, signed=%s",
-            stream->info.audio.n_channels, stream->info.audio.rate, width,
-            depth, endian, (sign ? "true" : "false"));
+            ("audio/x-raw, %s,channels=(int)%ld, rate=(int)%ld,bitrate=(int)%ld",codec_mime,
+            stream->info.audio.n_channels, stream->info.audio.rate,stream->bitrate);
       }
         break;
       case AUDIO_REAL:
@@ -2161,7 +2203,11 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
             ("audio/x-vorbis, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld, framed=(boolean)true",
             stream->info.audio.n_channels, stream->info.audio.rate,
             stream->bitrate);
+        if(demux->option.disable_vorbis_codec_data){
+          stream->send_codec_data = FALSE;
+        }else{
         stream->send_codec_data = TRUE;
+        }
         break;
       case AUDIO_FLAC:
         codec = "FLAC";
@@ -2496,19 +2542,22 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
       goto beach;
     }
 
-    if(gstbuf && buffer_size > 0){
-      GstMapInfo map;
-      gst_buffer_map(gstbuf, &map, GST_MAP_WRITE);
-      map.size = buffer_size;
-      gst_buffer_unmap (gstbuf, &map);
-      stream->adapter_buffer_size += buffer_size;
-      gst_adapter_push (stream->adapter, gstbuf);
-      gstbuf = NULL;
-    }
+  
 
     AIUR_UPDATE_SAMPLE_STAT (stream->sample_stat,
       AIUR_CORETS_2_GSTTS (usStartTime),
       AIUR_COREDURATION_2_GSTDURATION (usDuration), sampleFlags);
+   if(!(sampleFlags & FLAG_SAMPLE_NOT_FINISHED) && stream->partial_sample == FALSE){
+          stream->buffer = gstbuf;
+          GST_LOG_OBJECT(demux,"get stream buffer 1");
+   }else{
+
+      if(buffer_size > 0){
+        stream->adapter_buffer_size += gst_buffer_get_size(gstbuf);
+        gst_adapter_push (stream->adapter, gstbuf);
+        gstbuf = NULL;
+        GST_LOG_OBJECT(demux,"push to adapter 2 ");
+      }
 
     if (sampleFlags & FLAG_SAMPLE_NOT_FINISHED) {
       stream->partial_sample = TRUE;
@@ -2521,22 +2570,24 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
 
         stream->adapter_buffer_size = 0;
         gst_adapter_clear (stream->adapter);
-        
-        if (stream->sample_stat.start == stream->last_start) {
-          stream->sample_stat.start = GST_CLOCK_TIME_NONE;
+            GST_LOG_OBJECT(demux,"get stream buffer 2");
         }
       
-        if (!(stream->sample_stat.flag & FLAG_SYNC_SAMPLE)) {
-          GST_BUFFER_FLAG_SET (stream->buffer, GST_BUFFER_FLAG_DELTA_UNIT);
         }
         
       }
-    }
-
+  
+readend:
+  ;
   }while(sampleFlags & FLAG_SAMPLE_NOT_FINISHED);
+  if(stream->buffer){
+    if (!(stream->sample_stat.flag & FLAG_SYNC_SAMPLE)) {
+      GST_BUFFER_FLAG_SET (stream->buffer, GST_BUFFER_FLAG_DELTA_UNIT);
+    }
 
   if (demux->play_mode != AIUR_PLAY_MODE_NORMAL && stream->buffer) {
       GST_BUFFER_FLAG_SET (stream->buffer, GST_BUFFER_FLAG_DISCONT);
+    }
   }
 
   *stream_out = stream;
@@ -2594,7 +2645,38 @@ static GstFlowReturn aiurdemux_merge_codec_buffer(GstAiurDemux * demux, AiurDemu
   gst_buffer_unref (stream->buffer);
   
   stream->buffer = newbuf;
-  stream->merge_codec_data = FALSE;
+  return GST_FLOW_OK;
+}
+static GstFlowReturn aiurdemux_parse_vorbis_codec_data(GstAiurDemux * demux, AiurDemuxStream* stream)
+{
+  int i = 0;
+  int num = 0;
+  int len = 0;
+  int offset = 0;
+  num = (int)*(stream->codec_data.codec_data);
+  offset = num+1;
+  if(demux == NULL || stream == NULL)
+    return GST_FLOW_ERROR;
+  if(stream->codec_data.length == 0 || stream->codec_data.codec_data == NULL)
+    return GST_FLOW_ERROR;
+  GST_DEBUG_OBJECT (demux, "vorbis lace num=%d",num);
+  for( i = 1; i <= num; i++){
+    GstBuffer *gstbuf;
+    len = (int)*(stream->codec_data.codec_data+i);
+    gstbuf = gst_buffer_new_and_alloc (len);
+    gst_buffer_fill(gstbuf,0,(guint8 *)stream->codec_data.codec_data+offset,len);
+    gst_pad_push (stream->pad, gstbuf);
+    offset +=len;
+    GST_DEBUG_OBJECT (demux, "push vorbis codec buffer %d len=%d",i,len);
+  }
+  if(offset < stream->codec_data.length){
+    GstBuffer *gstbuf;
+    len = stream->codec_data.length - offset;
+    gstbuf = gst_buffer_new_and_alloc (len);
+    gst_buffer_fill(gstbuf,0,(guint8 *)stream->codec_data.codec_data+offset,len);
+    gst_pad_push (stream->pad, gstbuf);
+    GST_DEBUG_OBJECT (demux, "push vorbis codec buffer last len=%d",len);
+  }
 
   return GST_FLOW_OK;
 }

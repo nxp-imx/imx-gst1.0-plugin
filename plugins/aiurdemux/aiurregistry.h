@@ -34,6 +34,11 @@
 
 #ifndef __AIURREGISTRY_H__
 #define __AIURREGISTRY_H__
+#include <gst/gst.h>
+#include <gst/base/gstadapter.h>
+#include <gst/tag/tag.h>
+#include "fsl_parser.h"
+#include "../../libs/gstsutils/gstsutils.h"
 
 typedef struct
 {
@@ -41,6 +46,7 @@ typedef struct
   FslParserVersionInfo getVersionInfo;
   FslCreateParser createParser;
   FslDeleteParser deleteParser;
+  FslCreateParser2 createParser2;
 
   /* index export/import */
   FslParserInitializeIndex initializeIndex;
