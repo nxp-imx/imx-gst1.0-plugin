@@ -24,7 +24,11 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <string.h>
+
 #include <linux/fb.h>
+#include <linux/mxcfb.h>
+#include <linux/ipu.h>
+#include <linux/mxc_v4l2.h>
 
 #include <gst/video/gstvideosink.h>
 #include "gstimxv4l2.h"
@@ -32,15 +36,6 @@
 GST_DEBUG_CATEGORY_EXTERN (imxv4l2_debug);
 #define GST_CAT_DEFAULT imxv4l2_debug
 
-//#include <linux/ipu.h> FIXME: copy the definition here
-#define fourcc(a, b, c, d)\
-           (((__u32)(a)<<0)|((__u32)(b)<<8)|((__u32)(c)<<16)|((__u32)(d)<<24))
-#define IPU_PIX_FMT_YUV444P fourcc('4', '4', '4', 'P')  /*!< 24 YUV 4:4:4 */
-#define IPU_PIX_FMT_TILED_NV12    fourcc('T', 'N', 'V', 'P')
-#define IPU_PIX_FMT_TILED_NV12F   fourcc('T', 'N', 'V', 'F')
-
-//#include <linux/mxc_v4l2.h> FIXME: copy the definition here
-#define V4L2_CID_MXC_MOTION             (V4L2_CID_PRIVATE_BASE + 3)
 
 
 #define MAX_BUFFER (32)
@@ -228,8 +223,14 @@ gst_imx_v4l2output_set_default_res (IMXV4l2Handle *handle)
       handle->disp_h = DEFAULTH;
     }
 
-    //set gblobal alpha to 0 to show video
-    //TODO:
+    {
+      //set gblobal alpha to 0 to show video
+      struct mxcfb_gbl_alpha galpha;
+      galpha.alpha = 0; //overlay transparent
+      galpha.enable = 1;
+      if (ioctl(fd, MXCFB_SET_GBL_ALPHA, &galpha) < 0)
+        GST_ERROR ("Set %s global alpha failed.", g_device_maps[handle->device_map_id].bg_fb_name);
+    }
 
     close (fd);
 
