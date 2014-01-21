@@ -504,7 +504,7 @@ GstsutilsEntry *gstsutils_init_entry (gchar * filename)
     dlentry->num = 0;
 
     groups = g_key_file_get_groups(keyfile,&num);
-    if(groups == NULL || num == NULL)
+    if(groups == NULL || num == 0)
       break;
 
     group_char = groups;
@@ -655,61 +655,74 @@ void gstsutils_deinit_entry (GstsutilsEntry * entry)
   g_free(entry);
   
 }
+void gstsutils_load_default_property(gstsutils_property * table,GstObject* dec,
+    const gchar * filename, const gchar * group)
+{
+    GKeyFile *keyfile = NULL;
+    gboolean ret = FALSE;
 
+    if (filename == NULL)
+      goto bail;
 
+    if((keyfile = g_key_file_new ())
+        && (g_key_file_load_from_file (keyfile, filename, G_KEY_FILE_NONE, NULL))){
+          gstsutils_property *p = table;
 
+          while (p->name != NULL) {
+            if (g_key_file_has_key (keyfile, group, p->name, NULL) && p->set_func) {
+                switch (p->gtype) {
+                    case G_TYPE_BOOLEAN:
+                       {
+                       gboolean value;
+                       value = g_key_file_get_boolean(keyfile,group,p->name,NULL);
+                       p->set_func(dec,(gboolean)value);
+                       break;
+                       }
+                    case G_TYPE_UINT64:
+                       {
+                       guint64 value;
+                       value = g_key_file_get_uint64(keyfile,group,p->name,NULL);
+                       p->set_func(dec,(guint64)value);
+                       break;
+                       }
+                    case G_TYPE_INT64:
+                       {
+                       gint64 value;
+                       value = g_key_file_get_int64(keyfile,group,p->name,NULL);
+                       p->set_func(dec,(gint64)value);
+                       break;
+                       }
+                    case G_TYPE_INT:
+                       {
+                       gint value;
+                       value = g_key_file_get_integer(keyfile,group,p->name,NULL);
+                       p->set_func(dec,(gint)value);
+                       break;
+                       }
+                    case G_TYPE_STRING:
+                        {
+                        char * value;
+                        value = g_key_file_get_string(keyfile,group,p->name,NULL);
+                        if(value){
+                            p->set_func(dec,(gchar *)value);
+                            g_free(value);
+                            }
+                        break;
+                        }
+                    default:
+                        break;
+                }
+            }
+            p++;
 
+          };
+          ret = TRUE;
 
-
-
-
-
-
-
-
-
-
-
-
-      
-
-
-
-
-  
-
-
-
-
-
-
-
-    
-
-
-    
-    
-    
-
-
-
-
-
-
-
-
-  
-
-
-
-
-  
-
-
-    
-
-
-      
-
-  
+     }
+    bail:
+      if (keyfile) {
+        g_key_file_free (keyfile);
+      }
+      return ret;
+}
 

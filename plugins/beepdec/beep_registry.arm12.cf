@@ -1,0 +1,38 @@
+# beep registry file
+
+[aac]
+longname = AAC LC decoder
+description = Decode AAC LC compressed audio to raw data
+mime= audio/mpeg, mpegversion=(int){2,4}
+library = /usr/lib/imx-mm/audio-codec/wrap/lib_aacd_wrap_arm12_elinux.so.3
+library2 = /usr/lib/imx-mm/audio-codec/wrap/lib_aacplusd_wrap_arm12_elinux.so.3;
+[mp3]
+longname = MP3 decoder
+description = Decode MP3 compressed audio to raw data
+mime = audio/mpeg, mpegversion = (int)1
+library = /usr/lib/imx-mm/audio-codec/wrap/lib_mp3d_wrap_arm12_elinux.so.3
+
+[wma]
+longname = WMA decoder
+description = Decode WMA compressed audio to raw data
+mime = audio/x-wma, wmaversion = (int)[ 1, 4 ]
+library = /usr/lib/imx-mm/audio-codec/wrap/lib_wma10d_wrap_arm12_elinux.so.3.fhw
+
+[ac3]
+longname = AC3 decoder
+description = Decode AC3 compressed audio to raw data
+mime = audio/x-ac3; audio/x-3ca
+library = /usr/lib/imx-mm/audio-codec/wrap/lib_ac3d_wrap_arm12_elinux.so.3
+
+[vorbis]
+longname = Vorbis decoder
+description = Decode Vorbis compressed audio to raw data
+rank = 259
+mime = audio/x-vorbis
+library = /usr/lib/imx-mm/audio-codec/wrap/lib_vorbisd_wrap_arm12_elinux.so.3
+
+[ddplus]
+longname = DDplus decoder
+description = Decode Dobly Digital Plus audio to raw data
+mime = audio/eac3
+library = /usr/lib/imx-mm/audio-codec/wrap/lib_ddpd_wrap_arm12_elinux.so.1

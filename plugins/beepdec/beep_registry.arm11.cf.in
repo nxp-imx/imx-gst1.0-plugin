@@ -1,0 +1,32 @@
+# beep registry file
+
+[aac]
+longname = AAC LC decoder
+description = Decode AAC LC compressed audio to raw data
+mime= audio/mpeg, mpegversion=(int){2,4}
+library = @aacplusd_arm11_SONAME@; @aacd_arm11_SONAME@
+
+[mp3]
+longname = MP3 decoder
+description = Decode MP3 compressed audio to raw data
+mime = audio/mpeg, mpegversion = (int)1
+library = @mp3d_arm11_SONAME@
+
+[wma]
+longname = WMA decoder
+description = Decode WMA compressed audio to raw data
+mime = audio/x-wma, wmaversion = (int)[ 1, 4 ]
+library = @wma10d_arm11_SONAME@
+
+[ac3]
+longname = AC3 decoder
+description = Decode AC3 compressed audio to raw data
+mime = audio/x-ac3; audio/x-3ca
+library = @ac3d_arm11_SONAME@
+
+[vorbis]
+longname = Vorbis decoder
+description = Decode Vorbis compressed audio to raw data
+rank = 259
+mime = audio/x-vorbis
+library = @vorbisd_arm11_SONAME@

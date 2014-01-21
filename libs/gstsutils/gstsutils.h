@@ -78,6 +78,15 @@ typedef struct
   gtype_func typefunc;
 } GstsutilsOptionEntry;
 
+typedef void (*gstsutils_set_func) (GstObject* obj, ...);
+typedef struct
+{
+    const gchar * name;
+    GType gtype;
+    gstsutils_set_func set_func;
+}gstsutils_property;
+void gstsutils_load_default_property(gstsutils_property * table,GstObject * dec,
+    const gchar * filename, const gchar * group);
 
 
 

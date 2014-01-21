@@ -267,6 +267,7 @@ Makefile
 gstreamer-fsl.pc
 libs/Makefile
 plugins/aiurdemux/Makefile
+plugins/beepdec/Makefile
 plugins/v4l2/Makefile
 plugins/vpu/Makefile
 tools/Makefile
