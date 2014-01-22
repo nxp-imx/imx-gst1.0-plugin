@@ -390,6 +390,10 @@ gst_vpu_dec_object_allocate_mv_buffer (GstVpuDecObject * vpu_dec_object)
 
   vpu_dec_object->vpuframebuffers = (VpuFrameBuffer *)g_malloc ( \
       sizeof (VpuFrameBuffer) * vpu_dec_object->actual_buf_cnt);
+  if (vpu_dec_object->vpuframebuffers == NULL) {
+    GST_ERROR_OBJECT (vpu_dec_object, "Could not allocate memory");
+    return FALSE;
+  }
   memset (vpu_dec_object->vpuframebuffers, 0, sizeof (VpuFrameBuffer) \
       * vpu_dec_object->actual_buf_cnt);
 

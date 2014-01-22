@@ -42,7 +42,7 @@ typedef struct _GstVpuDecObjectClass GstVpuDecObjectClass;
 #define GST_VPU_DEC_LOW_LATENCY(o)           ((o)->low_latency)
 #define GST_VPU_DEC_OUTPUT_FORMAT(o)         ((o)->output_format)
 #define GST_VPU_DEC_FRAME_DROP(o)            ((o)->frame_drop)
-#define GST_VPU_DEC_FRAMES_PLUS(o)           ((o)->frames_plus)
+#define GST_VPU_DEC_FRAMES_PLUS(o)           ((o)->frame_plus)
 #define GST_VPU_DEC_MIN_BUF_CNT(o)           ((o)->min_buf_cnt)
 #define GST_VPU_DEC_ACTUAL_BUF_CNT(o)        ((o)->actual_buf_cnt)
 #define GST_VPU_DEC_BUF_ALIGNMENT(o)         ((o)->buf_align)
@@ -66,7 +66,7 @@ struct _GstVpuDecObject {
   gboolean low_latency;
   guint output_format;
   gboolean frame_drop;
-  guint frames_plus;
+  guint frame_plus;
   guint min_buf_cnt;
   guint actual_buf_cnt;
   guint buf_align;

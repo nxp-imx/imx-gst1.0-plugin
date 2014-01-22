@@ -328,7 +328,7 @@ gst_imx_v4l2_allocator_cb (gpointer user_data, gint *count)
 
     gst_buffer_pool_config_get_params (config, NULL, NULL, &min, &max);
     GST_DEBUG_OBJECT (v4l2sink, "need allocate %d buffers.\n", max);
-    if (gst_imx_v4l2_set_buffer_count (v4l2sink->v4l2handle, max) < 0)
+    if (gst_imx_v4l2_set_buffer_count (v4l2sink->v4l2handle, max, V4L2_MEMORY_MMAP) < 0)
       return -1;
 
     *count = max;

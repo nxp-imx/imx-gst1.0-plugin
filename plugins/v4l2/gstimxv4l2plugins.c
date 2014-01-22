@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2014, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -22,6 +22,7 @@
 #endif
 
 #include "gstimxv4l2sink.h"
+#include "gstimxv4l2src.h"
 
 //used in imx v4l2 core debug
 GST_DEBUG_CATEGORY (imxv4l2_debug);
@@ -38,7 +39,11 @@ plugin_init (GstPlugin * plugin)
         GST_TYPE_IMX_V4L2SINK))
     return FALSE;
 
+  if (!gst_element_register (plugin, "imxv4l2src", IMX_GST_PLUGIN_RANK,
+        GST_TYPE_IMX_V4L2SRC))
+    return FALSE;
+
   return TRUE;
 }
 
-IMX_GST_PLUGIN_DEFINE (imxv4l2sink, "IMX SoC v4l2-based video sink", plugin_init);
+IMX_GST_PLUGIN_DEFINE (imxv4l2, "IMX SoC v4l2-based video source/sink", plugin_init);

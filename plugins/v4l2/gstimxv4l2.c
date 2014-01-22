@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2014, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -46,6 +46,11 @@ GST_DEBUG_CATEGORY_EXTERN (imxv4l2_debug);
 #define INVISIBLE_IN (0x1)
 #define INVISIBLE_OUT (0x2)
 
+#define MXC_V4L2_CAPTURE_NAME "mxc_v4l2"
+#define MXC_V4L2_CAPTURE_CAMERA_NAME "ov"
+#define MXC_V4L2_CAPTURE_TVIN_NAME "adv"
+#define PXP_V4L2_CAPTURE_NAME "csi_v4l2"
+
 extern CHIP_CODE gimx_chip;
 
 typedef struct {
@@ -53,14 +58,19 @@ typedef struct {
   GstBuffer *gstbuffer;
 } IMXV4l2BufferPair;
 
-typedef gint (*V4l2outConfigInput) (void *handle, guint fmt, guint w, guint h, IMXV4l2Rect *crop);
+typedef gint (*V4l2outConfigInput) (void *handle, guint fmt, guint w, guint h, \
+    IMXV4l2Rect *crop);
 typedef gint (*V4l2outConfigOutput) (void *handle, struct v4l2_crop *crop);
 typedef gint (*V4l2outConfigRotate) (void *handle, gint rotate);
+typedef gint (*V4l2captureConfig) (void *handle, guint fmt, guint w, guint h, \
+    guint fps_n, guint fps_d);
+static GstCaps *gst_imx_v4l2capture_get_device_caps ();
 
 typedef struct {
   V4l2outConfigInput v4l2out_config_input;
   V4l2outConfigOutput v4l2out_config_output;
   V4l2outConfigRotate v4l2out_config_rotate;
+  V4l2captureConfig v4l2capture_config;
 } IMXV4l2DeviceItf;
 
 typedef struct {
@@ -109,6 +119,14 @@ static IMXV4l2FmtMap g_imxv4l2fmt_maps[] = {
   {GST_VIDEO_CAPS_MAKE("RGB"), V4L2_PIX_FMT_RGB24, GST_VIDEO_FORMAT_RGB, 24, 0},
   {GST_VIDEO_CAPS_MAKE("BGR"), V4L2_PIX_FMT_BGR24, GST_VIDEO_FORMAT_RGB, 24, 0},
   {GST_VIDEO_CAPS_MAKE("RGB16"), V4L2_PIX_FMT_RGB565, GST_VIDEO_FORMAT_RGB16, 16, 0},
+};
+
+static guint g_camera_format[] = {
+  V4L2_PIX_FMT_YUV420,
+  V4L2_PIX_FMT_NV12,
+  V4L2_PIX_FMT_YUYV,
+  V4L2_PIX_FMT_UYVY,
+  0,
 };
 
 //ipu device iterfaces
@@ -332,6 +350,10 @@ gst_imx_v4l2_get_device_caps (gint type)
   gint i;
   GstCaps *caps = NULL;
 
+  if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+    return gst_imx_v4l2capture_get_device_caps();
+  }
+
   devname = gst_imx_v4l2_get_default_device_name (type);
   fd = open(devname, O_RDWR | O_NONBLOCK, 0);
   if (fd <= 0) {
@@ -359,6 +381,69 @@ gst_imx_v4l2_get_device_caps (gint type)
   close (fd);
 
   return caps;
+}
+
+GstCaps *
+gst_imx_v4l2_get_caps (gpointer v4l2handle)
+{
+	struct v4l2_fmtdesc fmt;
+	struct v4l2_frmsizeenum frmsize;
+	struct v4l2_frmivalenum frmival;
+  gint i, vformat;
+  GstCaps *caps = NULL;
+  IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
+
+  if (handle->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+    fmt.index = 0;
+    fmt.type = handle->type;
+    //while (ioctl(handle->v4l2_fd, VIDIOC_ENUM_FMT, &fmt) >= 0) {
+    while (g_camera_format[fmt.index]) {
+      fmt.pixelformat = g_camera_format[fmt.index];
+      vformat = fmt.pixelformat;
+      GST_INFO ("frame format: %c%c%c%c",	vformat & 0xff, (vformat >> 8) & 0xff,
+					(vformat >> 16) & 0xff, (vformat >> 24) & 0xff);
+      frmsize.pixel_format = fmt.pixelformat;
+      frmsize.index = 0;
+      while (ioctl(handle->v4l2_fd, VIDIOC_ENUM_FRAMESIZES, &frmsize) >= 0) {
+        GST_INFO ("frame size: %dx%d", frmsize.discrete.width, frmsize.discrete.height);
+        GST_INFO ("frame size type: %d", frmsize.type);
+        //FIXME: driver haven't set type.
+        //if (frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE) {
+          frmival.index = 0;
+          frmival.pixel_format = fmt.pixelformat;
+          frmival.width = frmsize.discrete.width;
+          frmival.height = frmsize.discrete.height;
+          //FIXME: workaround for driver can't support VIDIOC_ENUM_FRAMEINTERVALS.
+          //while (ioctl(handle->v4l2_fd, VIDIOC_ENUM_FRAMEINTERVALS, &frmival) >= 0) {
+          frmival.discrete.numerator = 30;
+          frmival.discrete.denominator = 1;
+            GST_INFO ("frame rate: %d/%d", frmival.discrete.numerator, frmival.discrete.denominator);
+            for (i=0; i<sizeof(g_imxv4l2fmt_maps)/sizeof(IMXV4l2FmtMap); i++) {
+              if (fmt.pixelformat == g_imxv4l2fmt_maps[i].v4l2fmt) {
+                if (!caps)
+                  caps = gst_caps_new_empty ();
+                if (caps) {
+                  GstStructure * structure = gst_structure_from_string( \
+                      g_imxv4l2fmt_maps[i].caps_str, NULL);
+                  gst_structure_set (structure, "width", G_TYPE_INT, frmsize.discrete.width, NULL);
+                  gst_structure_set (structure, "height", G_TYPE_INT, frmsize.discrete.height, NULL);
+                  gst_structure_set (structure, "framerate", GST_TYPE_FRACTION, \
+                      frmival.discrete.numerator, frmival.discrete.denominator, NULL);
+                  gst_caps_append_structure (caps, structure);
+                  GST_INFO ("Added one caps\n");
+                }
+              }
+            }
+          //  frmival.index++;
+          //}
+        //}
+        frmsize.index++;
+      }
+      fmt.index++;
+    }
+  }
+
+  return gst_caps_simplify(caps);
 }
 
 guint
@@ -479,16 +564,220 @@ gst_imx_v4l2output_set_default_res (IMXV4l2Handle *handle)
   return;
 }
 
+static gint 
+gst_imx_v4l2capture_config_usb_camera (IMXV4l2Handle *handle, guint fmt, guint w, guint h, guint fps_n, guint fps_d)
+{
+  struct v4l2_format v4l2_fmt = {0};
+  struct v4l2_streamparm parm = {0};
+  struct v4l2_frmsizeenum fszenum = {0};
+  gint capture_mode = -1;
+
+  fszenum.index = 0;
+  while (ioctl (handle->v4l2_fd, VIDIOC_ENUM_FRAMESIZES, &fszenum) >= 0){
+    if (fszenum.discrete.width >= w && fszenum.discrete.height >= h) {
+      capture_mode = fszenum.index;
+      break;
+    }
+    fszenum.index ++;
+  }
+  if (capture_mode < 0) {
+    GST_ERROR ("can't support resolution.");
+    return -1;
+  }
+
+  GST_INFO ("capture mode %d: %dx%d", capture_mode, w, h);
+
+  parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  parm.parm.capture.timeperframe.numerator = fps_d;
+  parm.parm.capture.timeperframe.denominator = fps_n;
+  parm.parm.capture.capturemode = capture_mode;
+
+  if (ioctl (handle->v4l2_fd, VIDIOC_S_PARM, &parm) < 0) {
+    GST_ERROR ("VIDIOC_S_PARM failed");
+    return -1;
+  }
+
+  v4l2_fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  v4l2_fmt.fmt.pix.pixelformat = fmt;
+  v4l2_fmt.fmt.pix.width = w;
+  v4l2_fmt.fmt.pix.height = h;
+
+  if (ioctl (handle->v4l2_fd, VIDIOC_S_FMT, &v4l2_fmt) < 0) {
+    GST_ERROR ("VIDIOC_S_FMT failed");
+    return -1;
+  }
+
+  return 0;
+}
+
+static gint 
+gst_imx_v4l2capture_config_pxp (IMXV4l2Handle *handle, guint fmt, guint w, guint h, guint fps_n, guint fps_d)
+{
+	struct v4l2_crop crop = {0};
+
+  if (gst_imx_v4l2capture_config_usb_camera (handle, fmt, w, h, fps_n, fps_d) < 0) {
+    GST_ERROR ("camera config failed\n");
+    return -1;
+  }
+
+  crop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  if (ioctl(handle->v4l2_fd, VIDIOC_G_CROP, &crop) < 0) {
+    GST_ERROR ("VIDIOC_G_CROP failed\n");
+    return -1;
+  }
+
+  crop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  crop.c.width = w;
+  crop.c.height = h;
+  crop.c.top = 0;
+  crop.c.left = 0;
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_CROP, &crop) < 0) {
+    GST_ERROR ("VIDIOC_S_CROP failed\n");
+    return -1;
+  }
+
+  return 0;
+}
+
+static gint 
+gst_imx_v4l2capture_config_camera (IMXV4l2Handle *handle, guint fmt, guint w, guint h, guint fps_n, guint fps_d)
+{
+  gint input = 1;
+
+  if (ioctl (handle->v4l2_fd, VIDIOC_S_INPUT, &input) < 0) {
+    GST_ERROR ("VIDIOC_S_INPUT failed");
+    return -1;
+  }
+
+  return gst_imx_v4l2capture_config_pxp (handle, fmt, w, h, fps_n, fps_d);
+}
+
+static gint 
+gst_imx_v4l2capture_config_tvin (IMXV4l2Handle *handle, guint fmt, guint w, guint h, guint fps_n, guint fps_d)
+{
+  struct v4l2_format v4l2_fmt = {0};
+  struct v4l2_streamparm parm = {0};
+  v4l2_std_id id;
+  //FIXME:
+  gint capture_mode = 2;
+
+  if (ioctl (handle->v4l2_fd, VIDIOC_G_STD, &id) < 0) {
+    GST_ERROR ("VIDIOC_G_STD failed\n");
+    return -1;
+  }
+
+  if (ioctl (handle->v4l2_fd, VIDIOC_S_STD, &id) < 0) {
+    GST_ERROR ("VIDIOC_S_STD failed\n");
+    return -1;
+  }
+
+  parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  parm.parm.capture.timeperframe.numerator = fps_d;
+  parm.parm.capture.timeperframe.denominator = fps_n;
+  parm.parm.capture.capturemode = capture_mode;
+  /*
+  if ((v4l_src->tv_in) || (parm.parm.capture.capturemode >= 4)) {
+    gint input = 1;
+    GST_ERROR ("should set the input to 1\n");
+    if (ioctl (handle->v4l2_fd, VIDIOC_S_INPUT, &input) < 0) {
+      GST_ERROR ("VIDIOC_S_INPUT failed");
+      return -1;
+    }
+  }
+  */
+
+  if (ioctl (handle->v4l2_fd, VIDIOC_S_PARM, &parm) < 0) {
+    GST_ERROR ("VIDIOC_S_PARM failed");
+    return -1;
+  }
+
+  v4l2_fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  v4l2_fmt.fmt.pix.pixelformat = fmt;
+  v4l2_fmt.fmt.pix.width = 0;
+  v4l2_fmt.fmt.pix.height = 0;
+
+  if (ioctl (handle->v4l2_fd, VIDIOC_S_FMT, &v4l2_fmt) < 0) {
+    GST_ERROR ("set format failed");
+    return -1;
+  }
+
+  if (ioctl (handle->v4l2_fd, VIDIOC_G_FMT, &v4l2_fmt) < 0) {
+    GST_ERROR ("VIDIOC_G_FMT failed\n");
+    return -1;
+  }
+
+  return 0;
+}
+
+static gint 
+gst_imx_v4l2capture_set_function (IMXV4l2Handle *handle)
+{
+  struct v4l2_capability cap;
+
+  if (ioctl(handle->v4l2_fd, VIDIOC_QUERYCAP, &cap) < 0) {
+    GST_ERROR ("VIDIOC_QUERYCAP error.");
+    return -1;
+  }
+
+  if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
+    GST_ERROR ("device can't capture.");
+    return -1;
+  }
+
+  if (!strcmp (cap.driver, MXC_V4L2_CAPTURE_NAME)) {
+    struct v4l2_dbg_chip_ident chip;
+    if (ioctl(handle->v4l2_fd, VIDIOC_DBG_G_CHIP_IDENT, &chip)) {
+      GST_ERROR ("VIDIOC_DBG_G_CHIP_IDENT failed.\n");
+      return -1;
+    }
+    GST_INFO ("sensor chip is %s\n", chip.match.name);
+    
+    if (!strncmp (chip.match.name, MXC_V4L2_CAPTURE_CAMERA_NAME, 2)) {
+      handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_camera;
+    } else if (!strncmp (chip.match.name, MXC_V4L2_CAPTURE_TVIN_NAME, 3)) {
+      handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_tvin;
+    } else {
+      GST_ERROR ("can't identify capture sensor type.\n");
+      return -1;
+    }
+  } else if (!strcmp (cap.driver, PXP_V4L2_CAPTURE_NAME)) {
+      handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_pxp;
+  } else {
+      handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_usb_camera;
+  }
+
+  return 0;
+}
+
 gpointer gst_imx_v4l2_open_device (gchar *device, int type)
 {
   int fd;
+  struct v4l2_capability cap;
   IMXV4l2Handle *handle = NULL;
 
-  fd = open(device, O_RDWR | O_NONBLOCK, 0); if (fd < 0) {
-    GST_ERROR ("Can't open %s.\n", device);
+  GST_INFO ("device name: %s", device);
+  if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+    fd = open(device, O_RDWR, 0); 
+  } else {
+    fd = open(device, O_RDWR | O_NONBLOCK, 0); 
+  }
+  if (fd < 0) {
+    GST_DEBUG ("Can't open %s.\n", device);
     return NULL;
   }
 
+  if (ioctl(fd, VIDIOC_QUERYCAP, &cap) < 0) {
+    GST_ERROR ("VIDIOC_QUERYCAP error.");
+    close (fd);
+    return NULL;
+  }
+
+  if (!(cap.capabilities & type)) {
+    GST_DEBUG ("device can't capture.");
+    close (fd);
+    return NULL;
+  }
+ 
   handle = (IMXV4l2Handle*) g_slice_alloc (sizeof(IMXV4l2Handle));
   if (!handle) {
     GST_ERROR ("allocate for IMXV4l2Handle failed.\n");
@@ -517,6 +806,15 @@ gpointer gst_imx_v4l2_open_device (gchar *device, int type)
     }
 
     gst_imx_v4l2output_set_default_res (handle);
+  }
+
+  if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+    if (gst_imx_v4l2capture_set_function (handle) < 0) {
+      GST_ERROR ("v4l2 capture set function failed.\n");
+      close (fd);
+      return NULL;
+    }
+    handle->streamon_count = 2;
   }
 
   return (gpointer) handle;
@@ -566,6 +864,33 @@ gint gst_imx_v4l2_close_device (gpointer v4l2handle)
   return 0;
 }
 
+static GstCaps *
+gst_imx_v4l2capture_get_device_caps ()
+{
+#define V4L2_DEVICE_MAX 32
+  gint i;
+  char devname[20];
+  GstCaps *caps = NULL;
+  gpointer v4l2handle;
+
+  for (i=0; i<V4L2_DEVICE_MAX; i++){
+    sprintf(devname, "/dev/video%d", i);
+    v4l2handle = gst_imx_v4l2_open_device (devname, \
+        V4L2_BUF_TYPE_VIDEO_CAPTURE);
+    if (v4l2handle){
+      if (!caps)
+        caps = gst_caps_new_empty ();
+      if (caps) {
+        gst_caps_append (caps, gst_imx_v4l2_get_caps(v4l2handle));
+      }
+      gst_imx_v4l2_close_device (v4l2handle);
+      v4l2handle = NULL;
+    }
+  }
+
+  return caps;
+}
+
 gint gst_imx_v4l2out_get_res (gpointer v4l2handle, guint *w, guint *h)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
@@ -578,6 +903,11 @@ gint gst_imx_v4l2out_get_res (gpointer v4l2handle, guint *w, guint *h)
   return 0;
 }
 
+gint gst_imx_v4l2capture_config (gpointer v4l2handle, guint fmt, guint w, guint h, guint fps_n, guint fps_d)
+{
+  IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
+  return (*handle->dev_itf.v4l2capture_config) (v4l2handle, fmt, w, h, fps_n, fps_d);
+}
 
 gint gst_imx_v4l2out_config_input (gpointer v4l2handle, guint fmt, guint w, guint h, IMXV4l2Rect *crop)
 {
@@ -764,7 +1094,7 @@ gint gst_imx_v4l2_config_deinterlace (gpointer v4l2handle, gboolean do_deinterla
   return 0;
 }
 
-gint gst_imx_v4l2_set_buffer_count (gpointer v4l2handle, guint count)
+gint gst_imx_v4l2_set_buffer_count (gpointer v4l2handle, guint count, guint memory_mode)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
   struct v4l2_requestbuffers buf_req;
@@ -775,7 +1105,7 @@ gint gst_imx_v4l2_set_buffer_count (gpointer v4l2handle, guint count)
 
   buf_req.type = handle->type;
   buf_req.count = count;
-  buf_req.memory = V4L2_MEMORY_MMAP;
+  buf_req.memory = memory_mode;
   if (ioctl(handle->v4l2_fd, VIDIOC_REQBUFS, &buf_req) < 0) {
     GST_ERROR("Request %d buffers failed\n", count);
     return -1;
@@ -821,6 +1151,36 @@ gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   }
   memblk->paddr = (guint8*) v4l2buf->m.offset;
   memblk->user_data = (gpointer) v4l2buf;
+
+  GST_DEBUG ("Allocated v4l2buffer(%p), index(%d).", v4l2buf, handle->allocated - 1);
+
+  return 0;
+}
+
+gint gst_imx_v4l2_register_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
+{
+  IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
+  struct v4l2_buffer *v4l2buf;
+
+  if (handle->allocated >= handle->buffer_count) {
+    GST_ERROR ("No more v4l2 buffer for allocating.\n");
+    return -1;
+  }
+
+  v4l2buf = &handle->buffer_pair[handle->allocated].v4l2buffer;
+  memset (v4l2buf, 0, sizeof(struct v4l2_buffer));
+  v4l2buf->type = handle->type;
+  v4l2buf->memory = V4L2_MEMORY_USERPTR;
+  v4l2buf->index = handle->allocated;
+  v4l2buf->m.offset = memblk->paddr;
+  v4l2buf->length = memblk->size;
+
+  if (ioctl(handle->v4l2_fd, VIDIOC_QUERYBUF, v4l2buf) < 0) {
+    GST_ERROR ("VIDIOC_QUERYBUF error.");
+    return -1;
+  }
+
+  handle->allocated ++;
 
   GST_DEBUG ("Allocated v4l2buffer(%p), index(%d).", v4l2buf, handle->allocated - 1);
 
