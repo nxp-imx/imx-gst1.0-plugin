@@ -53,9 +53,6 @@
 
 #define BEEP_REGISTRY_FILE_ENV_NAME "BEEP_REGISTRY"
 
-#define VERSION "3.0.9"
-
-
 static GstsutilsEntry *g_beep_caps_entry = NULL;
 
 /* id table for all core apis, the same order with BeepCoreInterface */
@@ -115,7 +112,7 @@ _beep_core_create_interface_from_entry (gchar * dl_name)
   if (inf->getVersionInfo) {
     inf->coreid = (inf->getVersionInfo) ();
     if (inf->coreid) {
-      g_print ("Aiur: %s \nCore: %s\n file: %s\n",
+      g_print ("Beep: %s \nCore: %s\n file: %s\n",
               VERSION, inf->coreid, dl_name);
     }
   }

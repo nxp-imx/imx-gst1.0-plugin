@@ -51,8 +51,6 @@
 
 #define AIUR_REGISTRY_FILE_ENV_NAME "AIUR_REGISTRY"
 
-#define VERSION "3.0.9"
-
 
 static GstsutilsEntry *g_aiur_caps_entry = NULL;
 

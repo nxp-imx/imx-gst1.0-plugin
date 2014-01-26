@@ -723,6 +723,6 @@ void gstsutils_load_default_property(gstsutils_property * table,GstObject* dec,
       if (keyfile) {
         g_key_file_free (keyfile);
       }
-      return ret;
+      return;
 }
 

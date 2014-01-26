@@ -7,7 +7,7 @@ AIURDIRS = plugins/aiurdemux
 endif
 
 if USE_BEEP
-#BEEPDIRS = plugins/beepdec
+BEEPDIRS = plugins/beepdec
 endif
 
 if USE_V4L_SINK

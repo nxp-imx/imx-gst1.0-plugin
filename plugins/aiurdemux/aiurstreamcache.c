@@ -39,10 +39,9 @@
 
 #define WAIT_COND_TIMEOUT(cond, mutex, timeout) \
     do{\
-        GTimeVal now;\
-        g_get_current_time(&now);\
-        g_time_val_add(&now, (glong)(timeout));\
-        g_cond_timed_wait((cond),(mutex),&now);\
+        gint64 end_time;\
+        end_time = g_get_monotonic_time () + timeout;\
+        g_cond_wait_until((cond),(mutex),end_time);\
     }while(0)
 
 
@@ -59,7 +58,7 @@
             gst_adapter_flush((cache)->adapter, flush);\
             (cache)->offset =(cache)->threshold_pre;\
             (cache)->start+=flush;\
-            g_cond_signal((cache)->consume_cond);\
+            g_cond_signal(&(cache)->consume_cond);\
         }\
     }while(0)
 
@@ -92,15 +91,8 @@ gst_aiur_stream_cache_finalize (GstAiurStreamCache * cache)
     cache->adapter = NULL;
   }
 
-  if (cache->produce_cond) {
-    g_cond_free (cache->produce_cond);
-    cache->produce_cond = NULL;
-  }
-
-  if (cache->consume_cond) {
-    g_cond_free (cache->consume_cond);
-    cache->consume_cond = NULL;
-  }
+  g_cond_clear (&cache->produce_cond);
+  g_cond_clear (&cache->consume_cond);
 
   g_mutex_clear (&cache->mutex);
 
@@ -140,8 +132,8 @@ gst_aiur_stream_cache_new (guint64 threshold_max, guint64 threshold_pre,
 
   cache->adapter = gst_adapter_new ();
   g_mutex_init (&cache->mutex);
-  cache->consume_cond = g_cond_new ();
-  cache->produce_cond = g_cond_new ();
+  g_cond_init (&cache->consume_cond);
+  g_cond_init (&cache->produce_cond);
 
   cache->threshold_max = threshold_max;
   cache->threshold_pre = threshold_pre;
@@ -206,7 +198,7 @@ gst_aiur_stream_cache_set_segment (GstAiurStreamCache * cache, guint64 start,
     gst_adapter_clear (cache->adapter);
     cache->eos = FALSE;
 
-    g_cond_signal (cache->consume_cond);
+    g_cond_signal (&cache->consume_cond);
 
     g_mutex_unlock (&cache->mutex);
   }
@@ -252,7 +244,7 @@ gst_aiur_stream_cache_add_buffer (GstAiurStreamCache * cache,
   }
 
   gst_adapter_push (cache->adapter, buffer);
-  g_cond_signal (cache->produce_cond);
+  g_cond_signal (&cache->produce_cond);
 
   buffer = NULL;
 
@@ -269,7 +261,7 @@ gst_aiur_stream_cache_add_buffer (GstAiurStreamCache * cache,
         GST_WARNING ("wait push try %d SIZE %d %lld", trycnt,
             gst_adapter_available (cache->adapter), cache->threshold_max);
       }
-      WAIT_COND_TIMEOUT (cache->consume_cond, &cache->mutex, 1000000);
+      WAIT_COND_TIMEOUT (&cache->consume_cond, &cache->mutex, 1000000);
     }
 
     if (cache->seeking) {
@@ -295,7 +287,7 @@ gst_aiur_stream_cache_seteos (GstAiurStreamCache * cache, gboolean eos)
   if (cache) {
     g_mutex_lock (&cache->mutex);
     cache->eos = eos;
-    g_cond_signal (cache->produce_cond);
+    g_cond_signal (&cache->produce_cond);
     g_mutex_unlock (&cache->mutex);
   }
 }
@@ -351,7 +343,7 @@ tryseek:
     cache->start = addr;
     cache->offset = 0;
     gst_adapter_clear (cache->adapter);
-    g_cond_signal ((cache)->consume_cond);
+    g_cond_signal (&cache->consume_cond);
   } else {
     goto trysendseek;
   }
@@ -376,7 +368,7 @@ trysendseek:
       gst_pad_push_event (cache->pad, gst_event_new_seek ((gdouble) 1,
           GST_FORMAT_BYTES, GST_SEEK_FLAG_FLUSH, GST_SEEK_TYPE_SET,
           (gint64) addr, GST_SEEK_TYPE_NONE, (gint64) (-1)));
-  g_cond_signal (cache->consume_cond);
+  g_cond_signal (&cache->consume_cond);
 
 
   if (ret == FALSE) {
@@ -421,7 +413,7 @@ try_read:
       && (cache->threshold_max < size + cache->threshold_pre)) {
     cache->threshold_max = size + cache->threshold_pre;
     /* enlarge maxsize means consumed */
-    g_cond_signal (cache->consume_cond);
+    g_cond_signal (&cache->consume_cond);
   }
 
   if (size > AVAIL_BYTES (cache)) {
@@ -443,7 +435,7 @@ try_read:
 
 not_enough_bytes:
   //g_print("not enough %lld, try %d\n", size, retrycnt++);
-  WAIT_COND_TIMEOUT (cache->produce_cond, &cache->mutex, 1000000);
+  WAIT_COND_TIMEOUT (&cache->produce_cond, &cache->mutex, 1000000);
   g_mutex_unlock (&cache->mutex);
 
   goto try_read;

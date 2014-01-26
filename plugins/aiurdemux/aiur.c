@@ -53,4 +53,4 @@ plugin_init (GstPlugin * plugin)
 
 }
 
-IMX_GST_PLUGIN_DEFINE ("aiur", "aiur universal demux", plugin_init);
+IMX_GST_PLUGIN_DEFINE (aiur, "aiur universal demux", plugin_init);

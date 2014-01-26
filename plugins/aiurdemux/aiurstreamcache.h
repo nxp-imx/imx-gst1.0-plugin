@@ -66,8 +66,8 @@ struct _GstAiurStreamCache
   GstPad *pad;
   GstAdapter *adapter;
   GMutex mutex;
-  GCond *consume_cond;
-  GCond *produce_cond;
+  GCond consume_cond;
+  GCond produce_cond;
 
   guint64 start;
   guint64 offset;
