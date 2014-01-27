@@ -777,14 +777,14 @@ gst_aiurdemux_push_tags (GstAiurDemux * demux, AiurDemuxStream * stream)
       stream->pending_tags = NULL;
     }
 
-    if (demux->tag_list) {
-
-      GST_DEBUG_OBJECT (demux,
-          "Sending global tags %" GST_PTR_FORMAT, demux->tag_list);
-
+    if (G_UNLIKELY (stream->send_global_tags && demux->tag_list)) {
+      GST_DEBUG_OBJECT (demux, "Sending global tags %" GST_PTR_FORMAT,
+          demux->tag_list);
       gst_pad_push_event (stream->pad,
           gst_event_new_tag (gst_tag_list_ref (demux->tag_list)));
+      stream->send_global_tags = FALSE;
     }
+
   }
 }
 
@@ -1172,6 +1172,7 @@ static GstFlowReturn aiurdemux_loop_state_header (GstAiurDemux * demux)
   FslParserHandle handle = demux->core_handle;
   uint64 start_time_us = 0;
   int32 i = 0;
+  uint64 duration = 0;
   gboolean need_init_index = TRUE;
   gchar * index_file = NULL;
 
@@ -1217,7 +1218,8 @@ static GstFlowReturn aiurdemux_loop_state_header (GstAiurDemux * demux)
         break;
 
     demux->movie_duration = GST_CLOCK_TIME_NONE;
-    parser_result = IParser->getMovieDuration(handle,&demux->movie_duration);
+    parser_result = IParser->getMovieDuration(handle,&duration);
+        demux->movie_duration = AIUR_CORETS_2_GSTTS (duration);
     if(parser_result != PARSER_SUCCESS)
         break;
 
@@ -1821,6 +1823,9 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
             GST_OBJECT_NAME (stream->pad), stream->pad, demux,gst_caps_to_string(stream->caps));
       gst_element_add_pad (GST_ELEMENT_CAST (demux), stream->pad);
 
+      // global tags go on each pad anyway
+      stream->send_global_tags = TRUE;
+
       stream->mask = (1 << demux->n_streams);
       stream->adapter = gst_adapter_new ();
 
@@ -2293,8 +2298,7 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
     demux->n_audio_streams++;
   
     stream->pending_tags = gst_tag_list_new (GST_TAG_AUDIO_CODEC, codec, NULL);
-  //  gst_tag_list_add (stream->pending_tags, GST_TAG_MERGE_REPLACE,
-  //      GST_TAG_CODEC, codec, NULL);
+
     if (stream->lang[0] != '\0') {
       gst_tag_list_add (stream->pending_tags, GST_TAG_MERGE_REPLACE,
           GST_TAG_LANGUAGE_CODE, stream->lang, NULL);

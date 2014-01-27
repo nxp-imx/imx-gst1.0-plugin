@@ -236,6 +236,7 @@ struct _AiurDemuxStream
 
     AiurDemuxCodecData codec_data;
     GstTagList *pending_tags;
+    gboolean send_global_tags;
 
     GstBuffer *buffer;
 
