@@ -1332,6 +1332,17 @@ static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
       gst_aiurdemux_push_tags (demux, stream);
     }
 
+    //block audio when seek
+    if (stream->block) {
+      if ((GST_CLOCK_TIME_IS_VALID (GST_BUFFER_TIMESTAMP (stream->buffer)))
+          && (GST_BUFFER_TIMESTAMP (stream->buffer) +
+              GST_BUFFER_DURATION (stream->buffer) <
+              stream->time_position)) {
+        goto beach;
+      }
+      stream->block = FALSE;
+    }
+
     //merge h264 codec data to buffer
      if(demux->option.merge_h264_codec_data &&
       (stream->type == MEDIA_VIDEO)
@@ -1737,6 +1748,7 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
     stream->pid = -1;
     stream->track_idx = i;
     stream->partial_sample = FALSE;
+    stream->interleave = FALSE;
 
     ret = IParser->getTrackType(handle, i, &stream->type,
         &stream->codec_type, &stream->codec_sub_type);
@@ -2426,8 +2438,10 @@ static void aiurdemux_check_interleave_stream_eos (GstAiurDemux * demux)
       }
   }
   if(bQueueFull && (min_stream->buf_queue) && (g_queue_is_empty (min_stream->buf_queue))){
-      MARK_STREAM_EOS (demux, min_stream);
-      GST_ERROR_OBJECT(demux,"file mode interleave detect !!! send EOS to track%d",track_num);
+      if(!min_stream->block || min_stream->interleave){
+        MARK_STREAM_EOS (demux, min_stream);
+        GST_ERROR_OBJECT(demux,"file mode interleave detect !!! send EOS to track%d",track_num);
+      }
   }
   return;
 
@@ -2592,6 +2606,11 @@ readend:
   if (demux->play_mode != AIUR_PLAY_MODE_NORMAL && stream->buffer) {
       GST_BUFFER_FLAG_SET (stream->buffer, GST_BUFFER_FLAG_DISCONT);
     }
+  }
+  
+  if (stream->sample_stat.start == stream->last_start
+      && !(stream->type == MEDIA_VIDEO && stream->codec_type == VIDEO_ON2_VP)) {
+    stream->sample_stat.start = GST_CLOCK_TIME_NONE;
   }
 
   *stream_out = stream;
@@ -3013,7 +3032,8 @@ static void aiurdemux_reset_stream (GstAiurDemux * demux, AiurDemuxStream * stre
     stream->last_stop = 0;
     stream->last_start = GST_CLOCK_TIME_NONE;
     stream->pending_eos = FALSE;
-    
+    stream->block = FALSE;
+
     if (stream->buffer) {
       gst_buffer_unref (stream->buffer);
       stream->buffer = NULL;

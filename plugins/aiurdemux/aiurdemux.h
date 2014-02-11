@@ -244,6 +244,8 @@ struct _AiurDemuxStream
     gboolean sent_eos;
     gboolean bad_stream;
     gboolean block;
+    gboolean interleave;
+
     gboolean pending_eos;
     gboolean new_segment;
     gboolean partial_sample;
