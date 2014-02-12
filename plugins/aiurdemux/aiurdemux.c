@@ -39,6 +39,11 @@
      
 #include "aiurdemux.h"
 
+#define GST_TAG_VIDEO_FRAMERATE "frame_rate"
+#define GST_TAG_VIDEO_BITRATE "video_bitrate"
+#define GST_TAG_VIDEO_WIDTH "image_width"
+#define GST_TAG_VIDEO_HEIGHT "image_height"
+
 GST_DEBUG_CATEGORY (aiurdemux_debug);
 
 typedef struct{
@@ -491,6 +496,15 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
   switch (transition) {
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       GST_DEBUG_OBJECT(demux,"change_state READY_TO_PAUSED");
+
+      gst_tag_register (GST_TAG_VIDEO_FRAMERATE, GST_TAG_FLAG_META,
+          G_TYPE_UINT, "frame rate", "frame rate", NULL);
+      gst_tag_register (GST_TAG_VIDEO_BITRATE, GST_TAG_FLAG_META,
+          G_TYPE_UINT, "video bitrate", "video bitrate", NULL);
+      gst_tag_register (GST_TAG_VIDEO_WIDTH, GST_TAG_FLAG_DECODED,
+          G_TYPE_UINT, "image width", "image width", NULL);
+      gst_tag_register (GST_TAG_VIDEO_HEIGHT, GST_TAG_FLAG_DECODED,
+          G_TYPE_UINT, "image height", "image height", NULL);
 
       demux->clock_offset = GST_CLOCK_TIME_NONE;
       demux->start_time = GST_CLOCK_TIME_NONE;
@@ -1965,7 +1979,7 @@ static void aiurdemux_parse_video (GstAiurDemux * demux, AiurDemuxStream * strea
 
   demux->n_video_streams++;
 
-  stream->pending_tags = gst_tag_list_new (GST_TAG_VIDEO_CODEC, codec, NULL);
+  stream->pending_tags = gst_tag_list_new (GST_TAG_CODEC, codec, NULL);
 
   if (stream->lang[0] != '\0') {
   gst_tag_list_add (stream->pending_tags, GST_TAG_MERGE_REPLACE,
@@ -1979,14 +1993,25 @@ static void aiurdemux_parse_video (GstAiurDemux * demux, AiurDemuxStream * strea
   }
 
   if (demux->tag_list) {
-  gchar *codec = NULL;
-  gboolean ret = gst_tag_list_get_string (demux->tag_list,
-      GST_TAG_VIDEO_CODEC, &codec);
-  if (ret && stream->pending_tags)
-    gst_tag_list_add (stream->pending_tags,
-        GST_TAG_MERGE_REPLACE, GST_TAG_CODEC, codec, NULL);
-  if (codec)
-    g_free (codec);
+
+    gst_tag_list_add (demux->tag_list, GST_TAG_MERGE_REPLACE, GST_TAG_VIDEO_CODEC,
+        codec, NULL);
+
+    if ((stream->info.video.fps_n > 0) && (stream->info.video.fps_d > 0)) {
+        gst_tag_list_add (demux->tag_list, GST_TAG_MERGE_REPLACE, GST_TAG_VIDEO_FRAMERATE,
+            stream->info.video.fps_n / stream->info.video.fps_d, NULL);
+    }
+
+    if (stream->bitrate) {
+        gst_tag_list_add (demux->tag_list, GST_TAG_MERGE_REPLACE, GST_TAG_VIDEO_BITRATE,
+            stream->bitrate, NULL);
+    }
+
+    gst_tag_list_add (demux->tag_list, GST_TAG_MERGE_REPLACE, GST_TAG_VIDEO_WIDTH,
+      stream->info.video.width, NULL);
+    gst_tag_list_add (demux->tag_list, GST_TAG_MERGE_REPLACE, GST_TAG_VIDEO_HEIGHT,
+      stream->info.video.height, NULL);
+
   }
 
   return;
@@ -2309,7 +2334,7 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
   
     demux->n_audio_streams++;
   
-    stream->pending_tags = gst_tag_list_new (GST_TAG_AUDIO_CODEC, codec, NULL);
+    stream->pending_tags = gst_tag_list_new (GST_TAG_CODEC, codec, NULL);
 
     if (stream->lang[0] != '\0') {
       gst_tag_list_add (stream->pending_tags, GST_TAG_MERGE_REPLACE,
@@ -2322,14 +2347,8 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
     }
     
     if (demux->tag_list) {
-      gchar *codec = NULL;
-      gboolean ret = gst_tag_list_get_string (demux->tag_list,
-          GST_TAG_AUDIO_CODEC, &codec);
-      if (ret && stream->pending_tags)
-        gst_tag_list_add (stream->pending_tags,
-            GST_TAG_MERGE_REPLACE, GST_TAG_CODEC, codec, NULL);
-      if (codec)
-        g_free (codec);
+        gst_tag_list_add (demux->tag_list,
+            GST_TAG_MERGE_REPLACE, GST_TAG_AUDIO_CODEC, codec, NULL);
     }
 
   return;
