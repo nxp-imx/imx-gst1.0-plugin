@@ -16,7 +16,6 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  */
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -31,6 +30,8 @@
 #include <linux/mxc_v4l2.h>
 
 #include <gst/video/gstvideosink.h>
+
+#include "gstimxcommon.h"
 #include "gstimxv4l2.h"
 
 GST_DEBUG_CATEGORY_EXTERN (imxv4l2_debug);
@@ -45,10 +46,22 @@ GST_DEBUG_CATEGORY_EXTERN (imxv4l2_debug);
 #define INVISIBLE_IN (0x1)
 #define INVISIBLE_OUT (0x2)
 
+extern CHIP_CODE gimx_chip;
+
 typedef struct {
   struct v4l2_buffer v4l2buffer;
   GstBuffer *gstbuffer;
 } IMXV4l2BufferPair;
+
+typedef gint (*V4l2outConfigInput) (void *handle, guint fmt, guint w, guint h, IMXV4l2Rect *crop);
+typedef gint (*V4l2outConfigOutput) (void *handle, struct v4l2_crop *crop);
+typedef gint (*V4l2outConfigRotate) (void *handle, gint rotate);
+
+typedef struct {
+  V4l2outConfigInput v4l2out_config_input;
+  V4l2outConfigOutput v4l2out_config_output;
+  V4l2outConfigRotate v4l2out_config_rotate;
+} IMXV4l2DeviceItf;
 
 typedef struct {
   gchar *device;
@@ -70,6 +83,7 @@ typedef struct {
   gint allocated;
   IMXV4l2BufferPair buffer_pair[MAX_BUFFER];
   gint rotate;
+  IMXV4l2DeviceItf dev_itf;
 } IMXV4l2Handle;
 
 typedef struct {
@@ -97,6 +111,218 @@ static IMXV4l2FmtMap g_imxv4l2fmt_maps[] = {
   {GST_VIDEO_CAPS_MAKE("RGB16"), V4L2_PIX_FMT_RGB565, GST_VIDEO_FORMAT_RGB16, 16, 0},
 };
 
+//ipu device iterfaces
+static gint
+imx_ipu_v4l2out_config_input (IMXV4l2Handle *handle, guint fmt, guint w, guint h, IMXV4l2Rect *crop)
+{
+  struct v4l2_format v4l2fmt;
+  struct v4l2_rect icrop;
+
+  if (gst_imx_v4l2_reset_device ((gpointer)handle) < 0)
+    return -1;
+
+  GST_DEBUG ("config in, fmt(%x), res(%dx%d), crop((%d,%d) -> (%d,%d))",
+      fmt, w, h, crop->left, crop->top, crop->width, crop->height);
+
+  //align to 8 pixel for IPU limitation
+  crop->left = UPALIGNTO8 (crop->left);
+  crop->top = UPALIGNTO8 (crop->top);
+  crop->width = DOWNALIGNTO8 (crop->width); 
+  crop->height = DOWNALIGNTO8 (crop->height);
+
+  if (crop->width <=0 || crop->height <= 0) {
+    return 1;
+  }
+
+  memset(&v4l2fmt, 0, sizeof(struct v4l2_format));
+  v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+  v4l2fmt.fmt.pix.width = handle->in_w = w;
+  v4l2fmt.fmt.pix.height = handle->in_h = h;
+  v4l2fmt.fmt.pix.pixelformat = handle->in_fmt = fmt;
+  icrop.left = crop->left;
+  icrop.top = crop->top;
+  icrop.width = crop->width;
+  icrop.height = crop->height;
+  v4l2fmt.fmt.pix.priv = (unsigned int)&icrop;
+
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_FMT, &v4l2fmt) < 0) {
+    GST_ERROR ("Set format failed.");
+    return -1;
+  }
+
+  if (ioctl(handle->v4l2_fd, VIDIOC_G_FMT, &v4l2fmt) < 0) {
+    GST_ERROR ("Get format failed.");
+    return -1;
+  }
+
+  return 0;
+}
+
+static gint
+imx_ipu_v4l2out_config_output(IMXV4l2Handle *handle, struct v4l2_crop *crop)
+{
+  struct v4l2_cropcap cropcap;
+
+  memset(&cropcap, 0, sizeof(cropcap));
+  cropcap.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+  if (ioctl(handle->v4l2_fd, VIDIOC_CROPCAP, &cropcap) < 0) {
+    GST_ERROR ("Get crop capability failed.");
+    return -1;
+  }
+
+  crop->type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_CROP, crop) < 0) {
+    GST_ERROR ("Set crop failed.");
+    return -1;
+  }
+
+  return 0;
+}
+
+
+static gint
+imx_ipu_v4l2out_config_rotate(IMXV4l2Handle *handle, gint rotate)
+{
+  struct v4l2_control ctrl;
+
+  ctrl.id = V4L2_CID_ROTATE;
+  ctrl.value = rotate;
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_CTRL, &ctrl) < 0) {
+    GST_ERROR ("Set ctrl rotate failed.");
+    return -1;
+  }
+
+  return 0;
+}
+
+//pxp device iterfaces
+static gint
+imx_pxp_v4l2out_config_input (IMXV4l2Handle *handle, guint fmt, guint w, guint h, IMXV4l2Rect *crop)
+{
+  struct v4l2_format v4l2fmt;
+  struct v4l2_rect icrop;
+  int out_idx = 1;
+
+  if (gst_imx_v4l2_reset_device ((gpointer)handle) < 0)
+    return -1;
+
+  GST_DEBUG ("config in, fmt(%x), res(%dx%d), crop((%d,%d) -> (%d,%d))",
+      fmt, w, h, crop->left, crop->top, crop->width, crop->height);
+
+  if (crop->width <=0 || crop->height <= 0) {
+    return 1;
+  }
+
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_OUTPUT, &out_idx) < 0) {
+    GST_ERROR("Set output failed.");
+    return -1;
+  }
+
+  memset(&v4l2fmt, 0, sizeof(struct v4l2_format));
+  v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+  v4l2fmt.fmt.pix.width = handle->in_w = w;
+  v4l2fmt.fmt.pix.height = handle->in_h = h;
+  v4l2fmt.fmt.pix.pixelformat = handle->in_fmt = fmt;
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_FMT, &v4l2fmt) < 0) {
+    GST_ERROR ("Set format failed.");
+    return -1;
+  }
+
+  {
+    /* Set FB overlay options */
+    struct v4l2_framebuffer fb;
+    fb.flags = V4L2_FBUF_FLAG_OVERLAY;
+    fb.flags |= V4L2_FBUF_FLAG_GLOBAL_ALPHA;
+    if (ioctl(handle->v4l2_fd, VIDIOC_S_FBUF, &fb) < 0) {
+      GST_ERROR ("VIDIOC_S_FBUF failed.");
+      return -1;
+    }
+  }
+
+  /* Set overlay source window */
+  memset(&v4l2fmt, 0, sizeof(struct v4l2_format));
+  v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY;
+  v4l2fmt.fmt.win.global_alpha = 0;
+  v4l2fmt.fmt.win.chromakey = 0;
+  v4l2fmt.fmt.win.w.left = 0;
+  v4l2fmt.fmt.win.w.top = 0;
+  v4l2fmt.fmt.win.w.width = handle->in_w;
+  v4l2fmt.fmt.win.w.height = handle->in_h;
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_FMT, &v4l2fmt) < 0) {
+    GST_ERROR ("Set VIDIOC_S_FMT output overlay failed.");
+    return -1;
+  }
+
+  /* Set overlay source window */
+  memset(&v4l2fmt, 0, sizeof(struct v4l2_format));
+  v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY;
+  v4l2fmt.fmt.win.global_alpha = 0;
+  v4l2fmt.fmt.win.chromakey = 0;
+  v4l2fmt.fmt.win.w.left = crop->left;
+  v4l2fmt.fmt.win.w.top = crop->top;
+  v4l2fmt.fmt.win.w.width = crop->width;
+  v4l2fmt.fmt.win.w.height = crop->height;
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_FMT, &v4l2fmt) < 0) {
+    GST_ERROR ("Set VIDIOC_S_FMT output overlay failed.");
+    return -1;
+  }
+
+  return 0;
+}
+
+static gint
+imx_pxp_v4l2out_config_output(IMXV4l2Handle *handle, struct v4l2_crop *crop)
+{
+  crop->type = V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY;
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_CROP, crop) < 0) {
+    GST_ERROR ("Set crop failed.");
+    return -1;
+  }
+
+  return 0;
+}
+
+static gint
+imx_pxp_v4l2out_config_rotate(IMXV4l2Handle *handle, gint rotate)
+{
+  struct v4l2_control ctrl;
+
+  ctrl.id = V4L2_CID_PRIVATE_BASE;
+  ctrl.value = rotate;
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_CTRL, &ctrl) < 0) {
+    GST_ERROR ("Set ctrl rotate failed.");
+    return -1;
+  }
+
+  return 0;
+}
+
+gchar *
+gst_imx_v4l2_get_default_device_name (gint type)
+{
+  char * devname;
+
+  if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+    if (gimx_chip == CC_MX6Q)
+      devname = (char*)"/dev/video17";
+    else if (gimx_chip == CC_MX60)
+      devname = (char*)"/dev/video0";
+    else {
+      GST_ERROR ("UNKNOWN imx SoC.");
+      return NULL;
+    }
+  }
+  else if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+    devname = (char*)"/dev/video0";
+  }
+  else {
+    GST_ERROR ("UNKNOWN v4l2 type %d\n", type);
+    devname = NULL;
+  }
+
+  return devname;
+}
+
 GstCaps *
 gst_imx_v4l2_get_device_caps (gint type)
 {
@@ -106,24 +332,14 @@ gst_imx_v4l2_get_device_caps (gint type)
   gint i;
   GstCaps *caps = NULL;
 
-  fmtdesc.type = type;
-  if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-    devname = (char*)"/dev/video17";
-  }
-  else if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
-    devname = (char*)"/dev/video0";
-  }
-  else {
-    GST_ERROR ("UNKNOWN v4l2 type %d\n", type);
-    return NULL;
-  }
-
+  devname = gst_imx_v4l2_get_default_device_name (type);
   fd = open(devname, O_RDWR | O_NONBLOCK, 0);
   if (fd <= 0) {
     GST_ERROR ("Can't open %s\n", devname);
     return NULL;
   }
 
+  fmtdesc.type = type;
   fmtdesc.index = 0;
   while (!(ioctl (fd, VIDIOC_ENUM_FMT, &fmtdesc))) {
     for (i=0; i<sizeof(g_imxv4l2fmt_maps)/sizeof(IMXV4l2FmtMap); i++) {
@@ -176,6 +392,23 @@ gst_imx_v4l2_get_bits_per_pixel (guint v4l2fmt)
   return bits_per_pixel;
 }
 
+gboolean
+gst_imx_v4l2_support_deinterlace (gint type)
+{
+  if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+    if (gimx_chip == CC_MX6Q)
+      return TRUE;
+    else if (gimx_chip == CC_MX60)
+      return FALSE;
+    else {
+      GST_ERROR ("UNKNOWN imx SoC.");
+      return FALSE;
+    }
+  }
+
+  return FALSE;
+}
+
 typedef struct {
   const gchar *name;
   gboolean bg;
@@ -183,6 +416,7 @@ typedef struct {
 } IMXV4l2DeviceMap;
 
 static IMXV4l2DeviceMap g_device_maps[] = {
+  {"/dev/video0", FALSE, "/dev/fb0"},
   {"/dev/video16", TRUE, "/dev/fb0"},
   {"/dev/video17", FALSE, "/dev/fb0"},
   {"/dev/video18", TRUE, "/dev/fb2"},
@@ -214,6 +448,7 @@ gst_imx_v4l2output_set_default_res (IMXV4l2Handle *handle)
     if (ioctl (fd, FBIOGET_VSCREENINFO, &fb_var) >= 0) {
       handle->disp_w = fb_var.xres;
       handle->disp_h = fb_var.yres;
+      GST_DEBUG ("display(%s) resolution is (%dx%d).", g_device_maps[handle->device_map_id].bg_fb_name, fb_var.xres, fb_var.yres);
     }
     else {
 #define DEFAULTW (320)
@@ -231,7 +466,7 @@ gst_imx_v4l2output_set_default_res (IMXV4l2Handle *handle)
       if (ioctl(fd, MXCFB_SET_GBL_ALPHA, &galpha) < 0)
         GST_ERROR ("Set %s global alpha failed.", g_device_maps[handle->device_map_id].bg_fb_name);
     }
-
+    
     close (fd);
 
     rect.left = 0;
@@ -268,8 +503,20 @@ gpointer gst_imx_v4l2_open_device (gchar *device, int type)
   handle->streamon = FALSE;
 
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+    if (gimx_chip == CC_MX6Q) {
+      handle->dev_itf.v4l2out_config_input = (V4l2outConfigInput)imx_ipu_v4l2out_config_input;
+      handle->dev_itf.v4l2out_config_output = (V4l2outConfigOutput)imx_ipu_v4l2out_config_output;
+      handle->dev_itf.v4l2out_config_rotate = (V4l2outConfigRotate)imx_ipu_v4l2out_config_rotate;
+      handle->streamon_count = 1;
+    }
+    else if (gimx_chip == CC_MX60) {
+      handle->dev_itf.v4l2out_config_input = (V4l2outConfigInput)imx_pxp_v4l2out_config_input;
+      handle->dev_itf.v4l2out_config_output = (V4l2outConfigOutput)imx_pxp_v4l2out_config_output;
+      handle->dev_itf.v4l2out_config_rotate = (V4l2outConfigRotate)imx_pxp_v4l2out_config_rotate;
+      handle->streamon_count = 2;
+    }
+
     gst_imx_v4l2output_set_default_res (handle);
-    handle->streamon_count = 1;
   }
 
   return (gpointer) handle;
@@ -331,51 +578,6 @@ gint gst_imx_v4l2out_get_res (gpointer v4l2handle, guint *w, guint *h)
   return 0;
 }
 
-static gint
-gst_imx_v4l2out_do_config_input (IMXV4l2Handle *handle, guint fmt, guint w, guint h, IMXV4l2Rect *crop)
-{
-  struct v4l2_format v4l2fmt;
-  struct v4l2_rect icrop;
-
-  if (gst_imx_v4l2_reset_device ((gpointer)handle) < 0)
-    return -1;
-
-  GST_DEBUG ("config in, fmt(%x), res(%dx%d), crop((%d,%d) -> (%d,%d))",
-      fmt, w, h, crop->left, crop->top, crop->width, crop->height);
-
-  //align to 8 pixel for IPU limitation
-  crop->left = UPALIGNTO8 (crop->left);
-  crop->top = UPALIGNTO8 (crop->top);
-  crop->width = DOWNALIGNTO8 (crop->width); 
-  crop->height = DOWNALIGNTO8 (crop->height);
-
-  if (crop->width <=0 || crop->height <= 0) {
-    return 1;
-  }
-
-  memset(&v4l2fmt, 0, sizeof(struct v4l2_format));
-  v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-  v4l2fmt.fmt.pix.width = handle->in_w = w;
-  v4l2fmt.fmt.pix.height = handle->in_h = h;
-  v4l2fmt.fmt.pix.pixelformat = handle->in_fmt = fmt;
-  icrop.left = crop->left;
-  icrop.top = crop->top;
-  icrop.width = crop->width;
-  icrop.height = crop->height;
-  v4l2fmt.fmt.pix.priv = (unsigned int)&icrop;
-
-  if (ioctl(handle->v4l2_fd, VIDIOC_S_FMT, &v4l2fmt) < 0) {
-    GST_ERROR ("Set format failed.");
-    return -1;
-  }
-
-  if (ioctl(handle->v4l2_fd, VIDIOC_G_FMT, &v4l2fmt) < 0) {
-    GST_ERROR ("Get format failed.");
-    return -1;
-  }
-
-  return 0;
-}
 
 gint gst_imx_v4l2out_config_input (gpointer v4l2handle, guint fmt, guint w, guint h, IMXV4l2Rect *crop)
 {
@@ -383,7 +585,7 @@ gint gst_imx_v4l2out_config_input (gpointer v4l2handle, guint fmt, guint w, guin
   gint ret;
 
   memcpy (&handle->in_crop, crop, sizeof(IMXV4l2Rect));
-  ret = gst_imx_v4l2out_do_config_input (handle, fmt, w, h, crop);
+  ret = (*handle->dev_itf.v4l2out_config_input) (handle, fmt, w, h, crop);
   if (ret == 1) {
     GST_DEBUG ("Video is invisible as all input are cropped.");
     handle->invisible |= INVISIBLE_IN;
@@ -451,19 +653,10 @@ gst_imx_v4l2out_calc_crop (IMXV4l2Handle *handle,
 gint gst_imx_v4l2out_config_output (gpointer v4l2handle, IMXV4l2Rect *overlay, gboolean keep_video_ratio)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
-  struct v4l2_cropcap cropcap;
   struct v4l2_crop crop;
   IMXV4l2Rect *rect = &crop.c;;
   GstVideoRectangle src, dest, result;
   gboolean brotate; 
-
-  memset(&cropcap, 0, sizeof(cropcap));
-  cropcap.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-  if (ioctl(handle->v4l2_fd, VIDIOC_CROPCAP, &cropcap) < 0) {
-    GST_ERROR ("Get crop capability failed.");
-    return -1;
-  }
-
 
   memcpy (rect, overlay, sizeof(IMXV4l2Rect));
 
@@ -499,7 +692,7 @@ gint gst_imx_v4l2out_config_output (gpointer v4l2handle, IMXV4l2Rect *overlay, g
     // only support video out of screen in landscape mode
     IMXV4l2Rect rect_crop;
     if (gst_imx_v4l2out_calc_crop (handle, rect, &result, &rect_crop)) {
-      gint ret = gst_imx_v4l2out_do_config_input (handle, handle->in_fmt, handle->in_w, handle->in_h, &rect_crop);
+      gint ret = (*handle->dev_itf.v4l2out_config_input) (handle, handle->in_fmt, handle->in_w, handle->in_h, &rect_crop);
       if (ret == 1) {
         handle->invisible |= INVISIBLE_OUT;
         GST_DEBUG ("Video is invisible as out of display.");
@@ -535,26 +728,16 @@ gint gst_imx_v4l2out_config_output (gpointer v4l2handle, IMXV4l2Rect *overlay, g
 
   GST_DEBUG ("rect, (%d, %d) -> (%d, %d).", rect->left, rect->top, rect->width, rect->height);
 
-  crop.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-  if (ioctl(handle->v4l2_fd, VIDIOC_S_CROP, &crop) < 0) {
-    GST_ERROR ("Set crop failed.");
-    return -1;
-  }
-
-  return 0;
+  return (*handle->dev_itf.v4l2out_config_output) (handle, &crop);
 }
 
 gint gst_imx_v4l2_config_rotate (gpointer v4l2handle, gint rotate)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
-  struct v4l2_control ctrl;
 
   GST_DEBUG ("set rotation to (%d).", rotate);
 
-  ctrl.id = V4L2_CID_ROTATE;
-  ctrl.value = rotate;
-  if (ioctl(handle->v4l2_fd, VIDIOC_S_CTRL, &ctrl) < 0) {
-    GST_ERROR ("Set ctrl rotate failed.");
+  if ((*handle->dev_itf.v4l2out_config_rotate) (handle, rotate) < 0) {
     return -1;
   }
   handle->rotate = rotate;
@@ -682,6 +865,19 @@ gint gst_imx_v4l2_queue_buffer (gpointer v4l2handle, GstBuffer *buffer, GstVideo
     GST_ERROR ("Can't get physical memory block from gstbuffer.\n");
     return -1;
   }
+
+#if 0
+  {
+    FILE *fp = fopen("dump.yuv", "ab");
+    if(fp) {
+      GstMapInfo info;
+      gst_buffer_map (buffer, &info, GST_MAP_READ);
+      fwrite (info.data, 1, info.size, fp);
+      fclose (fp);
+      gst_buffer_unmap (buffer, &info);
+    }
+  }
+#endif
 
   v4l2buf = (struct v4l2_buffer *) memblk->user_data;
   index = v4l2buf->index;

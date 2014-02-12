@@ -26,10 +26,13 @@
 //used in imx v4l2 core debug
 GST_DEBUG_CATEGORY (imxv4l2_debug);
 
+CHIP_CODE gimx_chip;
+
 static gboolean
 plugin_init (GstPlugin * plugin)
 {
   GST_DEBUG_CATEGORY_INIT (imxv4l2_debug, "imxv4l2", 0, "IMX V4L2 Core");
+  gimx_chip = getChipCode();
 
   if (!gst_element_register (plugin, "imxv4l2sink", IMX_GST_PLUGIN_RANK,
         GST_TYPE_IMX_V4L2SINK))

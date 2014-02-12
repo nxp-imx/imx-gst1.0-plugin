@@ -25,8 +25,6 @@
 GST_DEBUG_CATEGORY (imxv4l2sink_debug);
 #define GST_CAT_DEFAULT imxv4l2sink_debug
 
-#define DEFAULT_DEVICE "/dev/video17"
-
 enum {
   PROP_0,
   PROP_DEVICE,
@@ -628,7 +626,7 @@ gst_imx_v4l2sink_install_properties (GObjectClass *gobject_class)
 {
   g_object_class_install_property (gobject_class, PROP_DEVICE,
       g_param_spec_string ("device", "Device", "Device location",
-        DEFAULT_DEVICE, G_PARAM_READWRITE));
+        gst_imx_v4l2_get_default_device_name(V4L2_BUF_TYPE_VIDEO_OUTPUT), G_PARAM_READWRITE));
 
   g_object_class_install_property (gobject_class, PROP_OVERLAY_TOP,
       g_param_spec_int ("overlay-top", "Overlay top",
@@ -679,16 +677,18 @@ gst_imx_v4l2sink_install_properties (GObjectClass *gobject_class)
         "Change V4L2 configuration while running; overlay position/size/rotation changed.",
         FALSE, G_PARAM_READWRITE));
 
-  g_object_class_install_property (gobject_class,PROP_DEINTERLACE_ENABLE,
-      g_param_spec_boolean ("deinterlace", "deinterlace",
-        "set deinterlace enabled; can't be configed on fly",
-        FALSE, G_PARAM_READWRITE));
+  if (gst_imx_v4l2_support_deinterlace (V4L2_BUF_TYPE_VIDEO_OUTPUT)) {
+    g_object_class_install_property (gobject_class,PROP_DEINTERLACE_ENABLE,
+        g_param_spec_boolean ("deinterlace", "deinterlace",
+          "set deinterlace enabled; can't be configed on fly",
+          FALSE, G_PARAM_READWRITE));
 
-  g_object_class_install_property (gobject_class, PROP_DEINTERLACE_MOTION,
-      g_param_spec_uint ("motion",
-        "set deinterlace motion; can't be configed on fly",
-        "The interlace motion setting: 0 - low motion, 1 - medium motion, 2 - high motion.",
-        0, 2, 2, G_PARAM_READWRITE));
+    g_object_class_install_property (gobject_class, PROP_DEINTERLACE_MOTION,
+        g_param_spec_uint ("motion",
+          "set deinterlace motion; can't be configed on fly",
+          "The interlace motion setting: 0 - low motion, 1 - medium motion, 2 - high motion.",
+          0, 2, 2, G_PARAM_READWRITE));
+  }
 
   return;
 }
@@ -775,7 +775,7 @@ gst_imx_v4l2sink_class_init (GstImxV4l2SinkClass * klass)
 static void
 gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
 {
-  v4l2sink->device = g_strdup (DEFAULT_DEVICE);
+  v4l2sink->device = g_strdup (gst_imx_v4l2_get_default_device_name(V4L2_BUF_TYPE_VIDEO_OUTPUT));
   v4l2sink->rotate = 0;
   v4l2sink->do_deinterlace = FALSE;
   v4l2sink->deinterlace_motion = 0;

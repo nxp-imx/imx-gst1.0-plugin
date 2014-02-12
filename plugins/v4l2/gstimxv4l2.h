@@ -28,9 +28,12 @@
 
 typedef struct v4l2_rect IMXV4l2Rect;
 
+gchar *gst_imx_v4l2_get_default_device_name (gint type);
 GstCaps *gst_imx_v4l2_get_device_caps (gint type);
 guint gst_imx_v4l2_fmt_gst2v4l2 (GstVideoFormat gstfmt);
 guint gst_imx_v4l2_get_bits_per_pixel (guint v4l2fmt);
+gboolean gst_imx_v4l2_support_deinterlace (gint type);
+
 gpointer gst_imx_v4l2_open_device (gchar *device, int type);
 gint gst_imx_v4l2_reset_device (gpointer v4l2handle);
 gint gst_imx_v4l2_close_device (gpointer v4l2handle);
