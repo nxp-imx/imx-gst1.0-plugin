@@ -35,6 +35,7 @@
 
 
 #include <string.h>
+#include <gst/tag/tag.h>
 
 #include "beepdec.h"
 
@@ -44,6 +45,8 @@ GST_DEBUG_CATEGORY (beep_dec_debug);
 #define CORE_STATUS_MASK (~(uint32)0xff)
 #define MAX_PROFILE_ERROR_COUNT 1500 //about 1 second decoding time, 30 seconds' audio data length
 #define VORBIS_HEADER_FRAME 3
+#define GST_TAG_BEEP_SAMPLING_RATE  "sampling_frequency"
+#define GST_TAG_BEEP_CHANNELS       "channels"
 
 static gstsutils_property beep_property[]=
 {
@@ -425,7 +428,12 @@ static gboolean beep_dec_start (GstAudioDecoder * dec)
     beepdec->output_changed = FALSE;
     beepdec->frame_cnt = 0;
     beepdec->send_vorbis_codec_data = FALSE;
-    
+    gst_tag_register (GST_TAG_BEEP_CHANNELS, GST_TAG_FLAG_DECODED,
+        G_TYPE_UINT, "number of channels", "number of channels", NULL);
+    gst_tag_register (GST_TAG_BEEP_SAMPLING_RATE, GST_TAG_FLAG_DECODED,
+        G_TYPE_UINT, "sampling frequency (Hz)", "sampling frequency (Hz)",
+        NULL);
+
     GST_LOG_OBJECT (beepdec,"beep_dec_start called ");
 
     return TRUE;
@@ -528,6 +536,7 @@ static void beep_dec_handle_output_changed(GstBeepDec *beepdec)
     UniACodecParameter parameter = { 0 };
     GstAudioInfo info;
     GstAudioChannelPosition *pos = NULL;
+    GstTagList *list = NULL;
 
     do{
 
@@ -613,6 +622,29 @@ static void beep_dec_handle_output_changed(GstBeepDec *beepdec)
 
         beepdec->output_changed = TRUE;
         gst_audio_decoder_set_output_format (GST_AUDIO_DECODER (beepdec), &beepdec->audio_info);
+
+        list = gst_tag_list_new_empty ();
+
+        gst_tag_list_add (list, GST_TAG_MERGE_REPLACE, GST_TAG_BEEP_CHANNELS,
+            parameter.outputFormat.channels, NULL);
+
+        IDecoder->getDecoderPara(handle,UNIA_BITRATE,&parameter);
+        if(parameter.bitrate > 0){
+            gst_tag_list_add (list, GST_TAG_MERGE_REPLACE, GST_TAG_BITRATE,
+                parameter.bitrate, NULL);
+        }
+
+        IDecoder->getDecoderPara(handle,UNIA_SAMPLERATE,&parameter);
+        gst_tag_list_add (list, GST_TAG_MERGE_REPLACE,
+            GST_TAG_BEEP_SAMPLING_RATE, parameter.samplerate, NULL);
+
+        IDecoder->getDecoderPara(handle,UNIA_CODEC_DESCRIPTION,&parameter);
+        gst_tag_list_add (list, GST_TAG_MERGE_REPLACE, GST_TAG_AUDIO_CODEC,
+            *(parameter.codecDesc), NULL);
+
+        gst_audio_decoder_merge_tags (GST_AUDIO_DECODER_CAST (beepdec), list,
+            GST_TAG_MERGE_REPLACE);
+        gst_tag_list_unref (list);
 
     }while(0);
 
