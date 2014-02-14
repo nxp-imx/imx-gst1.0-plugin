@@ -1346,17 +1346,6 @@ static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
       gst_aiurdemux_push_tags (demux, stream);
     }
 
-    //block audio when seek
-    if (stream->block) {
-      if ((GST_CLOCK_TIME_IS_VALID (GST_BUFFER_TIMESTAMP (stream->buffer)))
-          && (GST_BUFFER_TIMESTAMP (stream->buffer) +
-              GST_BUFFER_DURATION (stream->buffer) <
-              stream->time_position)) {
-        goto beach;
-      }
-      stream->block = FALSE;
-    }
-
     //merge h264 codec data to buffer
      if(demux->option.merge_h264_codec_data &&
       (stream->type == MEDIA_VIDEO)
@@ -1762,7 +1751,6 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
     stream->pid = -1;
     stream->track_idx = i;
     stream->partial_sample = FALSE;
-    stream->interleave = FALSE;
 
     ret = IParser->getTrackType(handle, i, &stream->type,
         &stream->codec_type, &stream->codec_sub_type);
@@ -2457,10 +2445,8 @@ static void aiurdemux_check_interleave_stream_eos (GstAiurDemux * demux)
       }
   }
   if(bQueueFull && (min_stream->buf_queue) && (g_queue_is_empty (min_stream->buf_queue))){
-      if(!min_stream->block || min_stream->interleave){
-        MARK_STREAM_EOS (demux, min_stream);
-        GST_ERROR_OBJECT(demux,"file mode interleave detect !!! send EOS to track%d",track_num);
-      }
+    MARK_STREAM_EOS (demux, min_stream);
+    GST_ERROR_OBJECT(demux,"file mode interleave detect !!! send EOS to track%d",track_num);
   }
   return;
 
@@ -2994,11 +2980,26 @@ static GstFlowReturn aiurdemux_push_pad_buffer (GstAiurDemux * demux, AiurDemuxS
     GstBuffer * buffer)
 {
   GstFlowReturn ret;
+
+  aiurdemux_update_stream_position (demux, stream, buffer);
+
+  if (stream->block) {
+    if ((GST_CLOCK_TIME_IS_VALID (GST_BUFFER_TIMESTAMP (buffer)))
+        && (GST_BUFFER_TIMESTAMP (buffer) +
+            GST_BUFFER_DURATION (buffer) <
+            stream->time_position)) {
+      gst_buffer_unref(buffer);
+      ret = GST_FLOW_OK;
+      GST_LOG("drop %s buffer for block",AIUR_MEDIATYPE2STR (stream->type));
+      goto bail;
+    }
+    stream->block = FALSE;
+  }
+
   GST_DEBUG_OBJECT (demux,"%s push sample %" GST_TIME_FORMAT " size %d",
       AIUR_MEDIATYPE2STR (stream->type),
       GST_TIME_ARGS (GST_BUFFER_TIMESTAMP (buffer)), gst_buffer_get_size (buffer));
 
-  aiurdemux_update_stream_position (demux, stream, buffer);
   ret = gst_pad_push (stream->pad, buffer);
 
   if ((ret != GST_FLOW_OK)) {
