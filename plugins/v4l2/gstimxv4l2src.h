@@ -55,6 +55,7 @@ struct _GstImxV4l2Src {
   GstClockTime duration;
   gboolean stream_on;
   gboolean use_my_allocator;
+  gboolean use_v4l2_memory;
 };
 
 struct _GstImxV4l2SrcClass {

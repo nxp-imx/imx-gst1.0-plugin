@@ -103,7 +103,6 @@ gst_imx_v4l2src_stop (GstBaseSrc * src)
       return FALSE;
     }
     if (v4l2src->pool) {
-      gst_buffer_pool_set_active (v4l2src->pool, FALSE);
       gst_object_unref (v4l2src->pool);
       v4l2src->pool = NULL;
     }
@@ -205,7 +204,6 @@ static gboolean
 gst_imx_v4l2src_reset (GstImxV4l2Src * v4l2src)
 {
   if (v4l2src->pool) {
-    gst_buffer_pool_set_active (v4l2src->pool, FALSE);
     gst_object_unref (v4l2src->pool);
     v4l2src->pool = NULL;
     gst_imx_v4l2_reset_device (v4l2src->v4l2handle);
@@ -375,8 +373,13 @@ gst_imx_v4l2_allocator_cb (gpointer user_data, gint *count)
 
     gst_buffer_pool_config_get_params (config, NULL, NULL, &min, &max);
     GST_DEBUG_OBJECT (v4l2src, "need allocate %d buffers.\n", max);
-    if (gst_imx_v4l2_set_buffer_count (v4l2src->v4l2handle, max, V4L2_MEMORY_USERPTR) < 0)
-      return -1;
+    if (v4l2src->use_my_allocator) {
+      if (gst_imx_v4l2_set_buffer_count (v4l2src->v4l2handle, max, V4L2_MEMORY_MMAP) < 0)
+        return -1;
+    } else {
+      if (gst_imx_v4l2_set_buffer_count (v4l2src->v4l2handle, max, V4L2_MEMORY_USERPTR) < 0)
+        return -1;
+    }
 
     *count = max;
   }
@@ -432,7 +435,11 @@ gst_imx_v4l2src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
     update_pool = FALSE;
   }
 
-  if (allocator == NULL || !GST_IS_ALLOCATOR_PHYMEM (allocator)) {
+  //FIXME: wround around for USB camera can't share buffer with V4L2 sink.
+  //v4l2src->use_v4l2_memory = TRUE;
+  if (allocator == NULL \
+      || !GST_IS_ALLOCATOR_PHYMEM (allocator) \
+      || v4l2src->use_v4l2_memory == TRUE) {
     /* no allocator or isn't physical memory allocator. VPU need continus
      * physical memory. use VPU memory allocator. */
     if (allocator) {
@@ -451,12 +458,16 @@ gst_imx_v4l2src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
     v4l2src->use_my_allocator = TRUE;
   }
 
-  if (pool == NULL) {
+  if (pool == NULL || v4l2src->use_v4l2_memory == TRUE) {
+    if (pool) {
+      gst_object_unref (pool);
+      min = max = 0;
+    }
     /* no pool, we can make our own */
     GST_DEBUG_OBJECT (v4l2src, "no pool, making new pool");
     pool = gst_video_buffer_pool_new ();
-    v4l2src->pool = pool;
   }
+  v4l2src->pool = gst_object_ref (pool);
 
   max = min += DEFAULT_FRAMES_IN_V4L2_CAPTURE \
         + v4l2src->frame_plus;
@@ -736,6 +747,7 @@ gst_imx_v4l2src_init (GstImxV4l2Src * v4l2src)
   v4l2src->duration = 0;
   v4l2src->stream_on = FALSE;
   v4l2src->use_my_allocator = FALSE;
+  v4l2src->use_v4l2_memory = FALSE;
 
   gst_base_src_set_format (GST_BASE_SRC (v4l2src), GST_FORMAT_TIME);
   gst_base_src_set_live (GST_BASE_SRC (v4l2src), TRUE);
