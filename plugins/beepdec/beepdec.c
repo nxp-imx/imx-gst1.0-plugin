@@ -344,6 +344,11 @@ static gboolean beep_dec_set_init_parameter(GstBeepDec * beep_dec,
         }
 
         parameter.framed = FALSE;
+
+        //set framed for all vorbis
+        if(!strcmp(IDecoder->name,"vorbis"))
+            parameter.framed = TRUE;
+
         if(gst_structure_get_boolean(structure, "framed",&framed)){
             parameter.framed |= framed;
         }
@@ -844,7 +849,7 @@ begin:
         out_size = 0;
         core_ret = IDecoder->decode(handle,inbuf,inbuf_size,&offset,&outbuf,&out_size);
 
-        GST_LOG("beep_dec_handle_frame RET=%x input size=%d,used size=%d,output_size=%d"
+        GST_LOG_OBJECT (beepdec,"beep_dec_handle_frame RET=%x input size=%d,used size=%d,output_size=%d"
             ,core_ret,inbuf_size,offset,out_size);
 
         if (ACODEC_ERROR_STREAM == core_ret) {
