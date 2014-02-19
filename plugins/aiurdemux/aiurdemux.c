@@ -2565,6 +2565,9 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
       goto beach;
     }
 
+    if(gst_buffer_get_size(gstbuf) != buffer_size){
+        gst_buffer_set_size(gstbuf,buffer_size);
+    }
   
 
     AIUR_UPDATE_SAMPLE_STAT (stream->sample_stat,
