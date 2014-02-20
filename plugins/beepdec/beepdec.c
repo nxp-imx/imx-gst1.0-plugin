@@ -43,10 +43,12 @@ GST_DEBUG_CATEGORY (beep_dec_debug);
 
 #define CORE_FATAL_ERROR_MASK ((uint32)0xff)
 #define CORE_STATUS_MASK (~(uint32)0xff)
-#define MAX_PROFILE_ERROR_COUNT 1500 //about 1 second decoding time, 30 seconds' audio data length
+#define MAX_PROFILE_ERROR_COUNT 50 //about 1 second decoding time, 1 seconds' audio data length
 #define VORBIS_HEADER_FRAME 3
 #define GST_TAG_BEEP_SAMPLING_RATE  "sampling_frequency"
 #define GST_TAG_BEEP_CHANNELS       "channels"
+
+#define GST_BUFFER_TIMESTAMP GST_BUFFER_PTS
 
 static gstsutils_property beep_property[]=
 {
@@ -203,6 +205,7 @@ gst_beep_dec_class_init (GstBeepDecClass * klass)
 static void
 gst_beep_dec_init (GstBeepDec * dec)
 {
+    gst_audio_decoder_set_tolerance(GST_AUDIO_DECODER_CAST(dec),200000000);
     gstsutils_load_default_property(beep_property,GST_AUDIO_DECODER_CAST(dec),
         FSL_GST_CONF_DEFAULT_FILENAME,"beepdec");
 
@@ -433,6 +436,8 @@ static gboolean beep_dec_start (GstAudioDecoder * dec)
     beepdec->output_changed = FALSE;
     beepdec->frame_cnt = 0;
     beepdec->send_vorbis_codec_data = FALSE;
+    beepdec->in_cnt = 0;
+    
     gst_tag_register (GST_TAG_BEEP_CHANNELS, GST_TAG_FLAG_DECODED,
         G_TYPE_UINT, "number of channels", "number of channels", NULL);
     gst_tag_register (GST_TAG_BEEP_SAMPLING_RATE, GST_TAG_FLAG_DECODED,
@@ -803,9 +808,11 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
     gst_buffer_map(buffer, &map, GST_MAP_READ);
     inbuf = map.data;
     gst_buffer_unmap(buffer, &map);
+    beepdec->in_cnt++;
 
-    GST_LOG_OBJECT (beepdec,"beep_dec_handle_frame BEGIN %d ",inbuf_size);
+    GST_LOG_OBJECT (beepdec,"handle_frame [%d] BEGIN size=%d",beepdec->in_cnt,inbuf_size);
 
+    
     if(!strcmp(IDecoder->name,"mp3"))
         twice = TRUE;
 
@@ -817,6 +824,7 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
             gst_adapter_push (beepdec->adapter, temp_buffer);
             beepdec->frame_cnt ++;
             buffer = NULL;
+            beepdec->in_cnt--;
             gst_audio_decoder_finish_frame (dec, NULL, 1);
             goto bail;
         }else if(beepdec->frame_cnt == VORBIS_HEADER_FRAME){
@@ -849,13 +857,15 @@ begin:
         out_size = 0;
         core_ret = IDecoder->decode(handle,inbuf,inbuf_size,&offset,&outbuf,&out_size);
 
-        GST_LOG_OBJECT (beepdec,"beep_dec_handle_frame RET=%x input size=%d,used size=%d,output_size=%d"
+        GST_LOG_OBJECT (beepdec,"decode RET=%x input size=%d,used size=%d,output_size=%d"
             ,core_ret,inbuf_size,offset,out_size);
 
         if (ACODEC_ERROR_STREAM == core_ret) {
-            GST_WARNING("beep_dec_handle_frame END error = %x\n", core_ret);
+            GST_WARNING("decode END error = %x\n", core_ret);
             IDecoder->resetDecoder(handle);
             //send null frame to delete the timestamp
+            beepdec->in_cnt--;
+            beepdec->err_cnt ++;
             gst_audio_decoder_finish_frame (dec, NULL, 1);
             break;
         }else if(core_ret == ACODEC_PROFILE_NOT_SUPPORT){
@@ -872,13 +882,23 @@ begin:
         }
 
         if(outbuf && out_size > 0){
+
            temp_buffer = gst_audio_decoder_allocate_output_buffer (GST_AUDIO_DECODER (dec),out_size);
            temp_buffer = gst_buffer_make_writable (temp_buffer);
            gst_buffer_fill (temp_buffer, 0, outbuf, out_size);
            gst_audio_buffer_reorder_channels (temp_buffer, beepdec->audio_format,
                beepdec->outputformat.channels, beepdec->core_layout, beepdec->out_layout);
 
-           gst_adapter_push (beepdec->adapter, temp_buffer);
+           if(beepdec->in_cnt > 1)
+           {
+                beepdec->in_cnt--;
+                gst_audio_decoder_finish_frame (dec, temp_buffer, 1);
+                GST_LOG_OBJECT (beepdec,"output one frame[%d] size=%d",beepdec->in_cnt,out_size);
+           }else{
+                gst_adapter_push (beepdec->adapter, temp_buffer);
+           }
+           beepdec->err_cnt = 0;
+
            temp_buffer = NULL;
         }
 
@@ -895,10 +915,11 @@ begin:
 
     if(adapter_size > 0){
         out = gst_adapter_take_buffer (beepdec->adapter, adapter_size);
+        beepdec->in_cnt--;
         gst_audio_decoder_finish_frame (dec, out, 1);
         gst_adapter_clear (beepdec->adapter);
         ret = GST_FLOW_OK;
-        GST_LOG_OBJECT (beepdec,"beep_dec_handle_frame END size=%d",adapter_size);
+        GST_LOG_OBJECT (beepdec,"output frames[%d] size=%d",beepdec->in_cnt,adapter_size);
     }else{
         //gst_audio_decoder_finish_frame (dec, NULL, 1);
         GST_LOG_OBJECT (beepdec,"beep_dec_parse_and_decode ret=%x",ret);
@@ -922,6 +943,8 @@ static void beep_dec_flush (GstAudioDecoder * dec, gboolean hard)
           beepdec->beep_interface->resetDecoder (beepdec->handle);
         }
     }
+    beepdec->in_cnt = 0;
+
     GST_LOG_OBJECT (beepdec,"beep_dec_flush called ");
 }
 

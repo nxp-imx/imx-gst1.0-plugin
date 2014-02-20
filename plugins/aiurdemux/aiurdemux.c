@@ -2565,7 +2565,7 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
       goto beach;
     }
 
-    if(gst_buffer_get_size(gstbuf) != buffer_size){
+    if(gstbuf && gst_buffer_get_size(gstbuf) != buffer_size){
         gst_buffer_set_size(gstbuf,buffer_size);
     }
   
@@ -3016,6 +3016,9 @@ static GstFlowReturn aiurdemux_push_pad_buffer (GstAiurDemux * demux, AiurDemuxS
       }
 
     }
+    if (ret < GST_FLOW_EOS) {
+        goto bail;
+    }
   }
 
   ret = GST_FLOW_OK;
@@ -3030,6 +3033,9 @@ aiurdemux_combine_flows (GstAiurDemux * demux, AiurDemuxStream * stream,
   gint i;
   gboolean unexpected = FALSE, not_linked = TRUE;
   stream->last_ret = ret;
+  if (G_LIKELY (ret != GST_FLOW_EOS && ret != GST_FLOW_NOT_LINKED))
+    goto done;
+
   for (i = 0; i < demux->n_streams; i++) {
     AiurDemuxStream *ostream = demux->streams[i];
     ret = ostream->last_ret;

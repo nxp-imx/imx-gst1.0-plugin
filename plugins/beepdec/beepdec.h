@@ -89,6 +89,7 @@ struct _GstBeepDec
     gboolean output_changed;
     gboolean send_vorbis_codec_data;
     gint frame_cnt;
+    gint in_cnt;
 };
 
 struct _GstBeepDecClass
