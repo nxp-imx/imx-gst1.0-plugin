@@ -793,7 +793,7 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
     gboolean twice = FALSE;
     beepdec = GST_BEEP_DEC (dec);
 
-    if(!beepdec || !buffer )
+    if(!beepdec)
         goto bail;
     
     IDecoder = beepdec->beep_interface;
@@ -802,6 +802,9 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
     if(!IDecoder || !handle){
         goto bail;
     }
+
+    if(!buffer)
+        goto begin;
 
     inbuf_size = gst_buffer_get_size(buffer);
 
@@ -849,10 +852,10 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
     }
 
 
+begin:
 
     do{
 
-begin:
         outbuf = NULL;
         out_size = 0;
         core_ret = IDecoder->decode(handle,inbuf,inbuf_size,&offset,&outbuf,&out_size);
@@ -889,7 +892,7 @@ begin:
            gst_audio_buffer_reorder_channels (temp_buffer, beepdec->audio_format,
                beepdec->outputformat.channels, beepdec->core_layout, beepdec->out_layout);
 
-           if(beepdec->in_cnt > 1)
+           if(beepdec->in_cnt > 1 )
            {
                 beepdec->in_cnt--;
                 gst_audio_decoder_finish_frame (dec, temp_buffer, 1);
@@ -902,14 +905,18 @@ begin:
            temp_buffer = NULL;
         }
 
-        if(outbuf && out_size > 0 && twice){
-            twice = FALSE;
-            goto begin;
-        }
+
 
     } while (((status != ACODEC_NOT_ENOUGH_DATA)
             && (status != ACODEC_END_OF_STREAM) && (((inbuf_size)
                     && (offset < inbuf_size)) || (inbuf_size == 0))));
+
+#if 0
+    if(outbuf && out_size > 0 && twice){
+        twice = FALSE;
+        goto begin;
+    }
+#endif
 
     adapter_size = gst_adapter_available (beepdec->adapter);
 
