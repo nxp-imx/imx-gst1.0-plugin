@@ -1,0 +1,31 @@
+#aiurconfig
+
+[ASF]
+mime= video/x-ms-asf
+library = @asf_arm11_SONAME@
+
+[AVI]
+mime= video/x-msvideo
+library = @avi_arm11_SONAME@
+
+[FlashVideo]
+mime = video/x-flv
+library = @flv_arm11_SONAME@
+
+[MPEG]
+mime= video/mpeg, mpegversion=(int)[1,2]; video/mpegts, systemstream=true; video/x-cdxa
+library = @mpg2_arm11_SONAME@
+
+[MOV/MP4/3GP]
+mime= video/quicktime; audio/x-m4a; application/x-3gp
+library = @mp4_arm11_SONAME@
+
+[Matroska]
+mime= video/x-matroska ; video/webm
+library = @mkv_arm11_SONAME@
+
+[OGG]
+mime= application/ogg; application/x-annodex
+library = @ogg_arm11_SONAME@
+
+

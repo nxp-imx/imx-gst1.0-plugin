@@ -15,8 +15,8 @@ libgstbeepdec_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 # we use the GST_LIBS flags because we might be using plug-in libs
 libgstbeepdec_la_CFLAGS += -O2 -fno-omit-frame-pointer -D_ARM12
 
-registry_file=beep_registry.arm12.cf.in
-reg_inst_file=beep_registry.arm12.cf
+registry_file=beep_registry_1.0.arm12.cf.in
+reg_inst_file=beep_registry_1.0.arm12.cf
 
 # headers we need but don't want installed
 noinst_HEADERS =  beepregistry.h beepdec.h

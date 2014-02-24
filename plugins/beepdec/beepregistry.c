@@ -43,11 +43,11 @@
 #define CORE_QUERY_INTERFACE_API_NAME "UniACodecQueryInterface"
 
 #ifdef _ARM11
-#define BEEP_REGISTRY_FILE_DEFAULT "/usr/share/beep_registry.arm11.cf"
+#define BEEP_REGISTRY_FILE_DEFAULT "/usr/share/beep_registry_1.0.arm11.cf"
 #elif defined (_ARM9)
-#define BEEP_REGISTRY_FILE_DEFAULT "/usr/share/beep_registry.arm9.cf"
+#define BEEP_REGISTRY_FILE_DEFAULT "/usr/share/beep_registry_1.0.arm9.cf"
 #else
-#define BEEP_REGISTRY_FILE_DEFAULT "/usr/share/beep_registry.arm12.cf"
+#define BEEP_REGISTRY_FILE_DEFAULT "/usr/share/beep_registry_1.0.arm12.cf"
 #endif
 
 

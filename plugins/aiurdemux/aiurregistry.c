@@ -42,11 +42,11 @@
 
 #define CORE_QUERY_INTERFACE_API_NAME "FslParserQueryInterface"
 
-#define AIUR_REGISTRY_FILE_DEFAULT "/usr/share/aiur_registry.arm11.cf"
+#define AIUR_REGISTRY_FILE_DEFAULT "/usr/share/aiur_registry_1.0.arm11.cf"
 
 #ifdef _ARM9
 #undef AIUR_REGISTRY_FILE_DEFAULT
-#define AIUR_REGISTRY_FILE_DEFAULT "/usr/share/aiur_registry.arm9.cf"
+#define AIUR_REGISTRY_FILE_DEFAULT "/usr/share/aiur_registry1.0.arm9.cf"
 #endif
 
 #define AIUR_REGISTRY_FILE_ENV_NAME "AIUR_REGISTRY"
