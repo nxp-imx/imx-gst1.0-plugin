@@ -252,6 +252,17 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
         }
         v4l2sink->v4l2handle = NULL;
       }
+
+      {
+        GstClockTime run_time = gst_element_get_start_time (GST_ELEMENT (v4l2sink));
+        if (run_time > 0) {
+          g_print ("Total showed frames (%lld), playing for (%"GST_TIME_FORMAT"), fps (%.3f).\n",
+              v4l2sink->frame_showed, GST_TIME_ARGS (run_time),
+              (gfloat)GST_SECOND * v4l2sink->frame_showed / run_time);
+        }
+      }
+
+
       break;
     default:
       break;
@@ -603,6 +614,8 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     return GST_FLOW_ERROR;
   }
 
+  v4l2sink->frame_showed ++;
+
   buffer = NULL;
   if (gst_imx_v4l2_dequeue_buffer (v4l2sink->v4l2handle, &buffer) < 0) {
     GST_ERROR_OBJECT (v4l2sink, "Dequeue buffer failed.");
@@ -787,5 +800,6 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   memset (&v4l2sink->overlay, 0, sizeof(IMXV4l2Rect));
   memset (&v4l2sink->crop, 0, sizeof(IMXV4l2Rect));
   v4l2sink->keep_video_ratio = TRUE;
+  v4l2sink->frame_showed = 0;
 }
 
