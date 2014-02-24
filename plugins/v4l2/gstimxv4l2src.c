@@ -591,6 +591,7 @@ gst_imx_v4l2src_create (GstPushSrc * src, GstBuffer ** buf)
   GstClock *clock;
   GstClockTime abs_time, base_time, timestamp, duration;
   GstClockTime delay;
+  GstBuffer *buffer;
 
   ret = gst_imx_v4l2src_acquire_buffer (v4l2src, buf);
   if (G_UNLIKELY (ret != GST_FLOW_OK)) {
@@ -598,8 +599,9 @@ gst_imx_v4l2src_create (GstPushSrc * src, GstBuffer ** buf)
         gst_flow_get_name (ret));
     return ret;
   }
+  buffer = *buf;
 
-  timestamp = GST_BUFFER_TIMESTAMP (buf);
+  timestamp = GST_BUFFER_TIMESTAMP (buffer);
   duration = v4l2src->duration;
 
   GST_OBJECT_LOCK (v4l2src);
@@ -658,8 +660,13 @@ gst_imx_v4l2src_create (GstPushSrc * src, GstBuffer ** buf)
     timestamp = GST_CLOCK_TIME_NONE;
   }
 
-  GST_BUFFER_TIMESTAMP (buf) = timestamp;
-  GST_BUFFER_DURATION (buf) = duration;
+  GST_DEBUG_OBJECT (v4l2src, "timestamp: %" GST_TIME_FORMAT " duration: %" GST_TIME_FORMAT
+      , GST_TIME_ARGS (timestamp), GST_TIME_ARGS (duration));
+
+  GST_BUFFER_TIMESTAMP (buffer) = timestamp;
+  GST_BUFFER_PTS (buffer) = timestamp;
+  GST_BUFFER_DTS (buffer) = timestamp;
+  GST_BUFFER_DURATION (buffer) = duration;
 
   return ret;
 }
@@ -686,9 +693,26 @@ gst_imx_v4l2src_install_properties (GObjectClass *gobject_class)
 }
 
 static GstCaps*
+gst_imx_v4l2src_default_caps ()
+{
+  GstCaps *caps = gst_caps_new_empty ();
+  GstStructure *structure = gst_structure_from_string(GST_VIDEO_CAPS_MAKE("I420"), NULL);
+  gst_caps_append_structure (caps, structure);
+
+  return caps;
+}
+
+static GstCaps*
 gst_imx_v4l2src_get_all_caps ()
 {
-  return gst_imx_v4l2_get_device_caps (V4L2_BUF_TYPE_VIDEO_CAPTURE);
+  GstCaps *caps = gst_imx_v4l2_get_device_caps (V4L2_BUF_TYPE_VIDEO_CAPTURE);
+  if(!caps) {
+    g_printf ("Can't get caps from capture device, use the default setting.\n");
+    g_printf ("Perhaps haven't capture device.\n");
+    caps = gst_imx_v4l2src_default_caps ();
+  }
+
+  return caps;
 }
 
 //type functions

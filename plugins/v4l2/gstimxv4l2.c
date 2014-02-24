@@ -1137,7 +1137,7 @@ gint gst_imx_v4l2_register_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   v4l2buf->type = handle->type;
   v4l2buf->memory = V4L2_MEMORY_USERPTR;
   v4l2buf->index = handle->allocated;
-  v4l2buf->m.offset = memblk->paddr;
+  v4l2buf->m.userptr = memblk->paddr;
   v4l2buf->length = memblk->size;
 
   if (ioctl(handle->v4l2_fd, VIDIOC_QUERYBUF, v4l2buf) < 0) {
