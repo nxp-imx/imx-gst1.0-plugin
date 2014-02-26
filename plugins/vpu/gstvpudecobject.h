@@ -97,6 +97,7 @@ struct _GstVpuDecObject {
   gint mosaic_cnt;
   gboolean is_mjpeg;
   gboolean new_segment;
+  gboolean dropping;
   void *tsm;
   TSMGR_MODE tsm_mode;
 };

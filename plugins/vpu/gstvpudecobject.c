@@ -29,6 +29,8 @@ GST_DEBUG_CATEGORY_STATIC(vpu_dec_object_debug);
 #define DEFAULT_FRAME_BUFFER_ALIGNMENT_H 16
 #define DEFAULT_FRAME_BUFFER_ALIGNMENT_V 16
 #define MASAIC_THRESHOLD (30)
+//FIXME: relate with frame plus?
+#define DROP_RESUME (200 * GST_MSECOND)
 #define MAX_RATE_FOR_NORMAL_PLAYBACK (2)
 #define MIN_RATE_FOR_NORMAL_PLAYBACK (0)
 
@@ -176,6 +178,7 @@ gst_vpu_dec_object_init(GstVpuDecObject *vpu_dec_object)
   vpu_dec_object->mv_mem = NULL;
   vpu_dec_object->gstbuffer_in_vpudec = NULL;
   vpu_dec_object->need_wait = FALSE;
+  vpu_dec_object->dropping = FALSE;
 }
 
 static void 
@@ -896,9 +899,48 @@ gst_vpu_dec_object_release_frame_buffer_to_vpu (GstVpuDecObject * vpu_dec_object
   return TRUE;
 }
 
+static gboolean
+gst_vpu_dec_object_process_qos (GstVpuDecObject * vpu_dec_object, \
+    GstVideoDecoder * bdec, GstVideoCodecFrame * frame)
+{
+  int config_param;
+  VpuDecRetCode ret;
+
+  if (frame) {
+    GstClockTimeDiff diff = gst_video_decoder_get_max_decode_time (bdec, frame);
+    GST_DEBUG_OBJECT(vpu_dec_object, "diff: %lld\n", diff);
+    if (diff < 0) {
+      if (vpu_dec_object->dropping == FALSE) { 
+        GST_WARNING_OBJECT(vpu_dec_object, "decoder can't catch up. need drop frame.\n");
+        config_param = VPU_DEC_SKIPB;
+        ret = VPU_DecConfig(vpu_dec_object->handle, VPU_DEC_CONF_SKIPMODE, &config_param);
+        if (ret != VPU_DEC_RET_SUCCESS) {
+          GST_ERROR_OBJECT(vpu_dec_object, "could not configure skip mode: %s", \
+              gst_vpu_dec_object_strerror(ret));
+          return FALSE;
+        }
+        vpu_dec_object->dropping = TRUE;
+      }
+    } else if (vpu_dec_object->dropping == TRUE && diff != G_MAXINT64 \
+        && diff > DROP_RESUME) {
+      config_param = VPU_DEC_SKIPNONE;
+      ret = VPU_DecConfig(vpu_dec_object->handle, VPU_DEC_CONF_SKIPMODE, &config_param);
+      if (ret != VPU_DEC_RET_SUCCESS) {
+        GST_ERROR_OBJECT(vpu_dec_object, "could not configure skip mode: %s", \
+            gst_vpu_dec_object_strerror(ret));
+        return FALSE;
+      }
+      GST_WARNING_OBJECT(vpu_dec_object, "decoder can catch up. needn't drop frame. diff: %lld\n", diff);
+      vpu_dec_object->dropping = FALSE;
+    }
+  }
+
+  return TRUE;
+}
+
 static GstFlowReturn
 gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
-    GstVideoDecoder * bdec)
+    GstVideoDecoder * bdec, gboolean drop)
 {
   GstFlowReturn ret = GST_FLOW_OK;
   VpuDecRetCode dec_ret;
@@ -906,32 +948,14 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   GstVideoCodecFrame *out_frame;
   GstVideoMeta *vmeta;
   GstVideoCropMeta *cmeta;
+  GList *l;
 
-  //FIXME: process QOS.
-  if ((vpu_dec_object->mosaic_cnt != 0)
-      && (vpu_dec_object->mosaic_cnt < MASAIC_THRESHOLD)) {
-        GST_INFO_OBJECT(vpu_dec_object, "drop masaic frame.");
-    TSManagerSend (vpu_dec_object->tsm);
-    //FIXME: should call bdec drop frame.
-    return ret;
+  l = gst_video_decoder_get_frames (bdec);
+  if (g_list_length (l) > vpu_dec_object->actual_buf_cnt) {
+    GST_DEBUG_OBJECT(vpu_dec_object, "video frame list too long: %d \n", \
+        g_list_length (l));
   }
- 
-  dec_ret = VPU_DecGetOutputFrame(vpu_dec_object->handle, &out_frame_info);
-  if (dec_ret != VPU_DEC_RET_SUCCESS) {
-    GST_ERROR_OBJECT(vpu_dec_object, "could not get decoded output frame: %s", \
-        gst_vpu_dec_object_strerror(dec_ret));
-    return GST_FLOW_ERROR;
-  }
-
-  {
-    GList *l;
-    l = gst_video_decoder_get_frames (bdec);
-    if (g_list_length (l) > vpu_dec_object->actual_buf_cnt) {
-      GST_DEBUG_OBJECT(vpu_dec_object, "video frame list too long: %d \n", \
-          g_list_length (l));
-    }
-    g_list_free (l);
-  }
+  g_list_free (l);
 
   out_frame = gst_video_decoder_get_oldest_frame (bdec);
   if (out_frame == NULL) {
@@ -940,6 +964,22 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   }
   GST_LOG_OBJECT (vpu_dec_object, "gst_video_decoder_get_oldest_frame: 0x%x\n", \
       out_frame);
+  gst_vpu_dec_object_process_qos (vpu_dec_object, bdec, out_frame);
+
+  if (((vpu_dec_object->mosaic_cnt != 0)
+      && (vpu_dec_object->mosaic_cnt < MASAIC_THRESHOLD))
+      || drop == TRUE) {
+    GST_INFO_OBJECT(vpu_dec_object, "drop frame.");
+    TSManagerSend (vpu_dec_object->tsm);
+    return gst_video_decoder_drop_frame (bdec, out_frame);
+  }
+ 
+  dec_ret = VPU_DecGetOutputFrame(vpu_dec_object->handle, &out_frame_info);
+  if (dec_ret != VPU_DEC_RET_SUCCESS) {
+    GST_ERROR_OBJECT(vpu_dec_object, "could not get decoded output frame: %s", \
+        gst_vpu_dec_object_strerror(dec_ret));
+    return GST_FLOW_ERROR;
+  }
 
   GST_LOG_OBJECT(vpu_dec_object, "vpu display buffer: 0x%x pbufVirtY: 0x%x\n", \
       out_frame_info.pDisplayFrameBuf, out_frame_info.pDisplayFrameBuf->pbufVirtY);
@@ -1135,7 +1175,7 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
     }
     if (buf_ret & VPU_DEC_OUTPUT_DIS) {
       vpu_dec_object->mosaic_cnt = 0;
-      ret = gst_vpu_dec_object_send_output (vpu_dec_object, bdec);
+      ret = gst_vpu_dec_object_send_output (vpu_dec_object, bdec, FALSE);
       if (ret != GST_FLOW_OK) {
         GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_send_output fail: %s\n", \
             gst_flow_get_name (ret));
@@ -1156,7 +1196,7 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
     }
     if (buf_ret & VPU_DEC_OUTPUT_MOSAIC_DIS) {
       vpu_dec_object->mosaic_cnt++;
-      ret = gst_vpu_dec_object_send_output (vpu_dec_object, bdec);
+      ret = gst_vpu_dec_object_send_output (vpu_dec_object, bdec, FALSE);
       if (ret != GST_FLOW_OK) {
         GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_send_output fail: %s\n", \
             gst_flow_get_name (ret));
@@ -1178,7 +1218,12 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
     }
     if (buf_ret & VPU_DEC_OUTPUT_DROPPED) {
       GST_INFO_OBJECT (vpu_dec_object, "Got drop information!!");
-      TSManagerSend (vpu_dec_object->tsm);
+      ret = gst_vpu_dec_object_send_output (vpu_dec_object, bdec, TRUE);
+      if (ret != GST_FLOW_OK) {
+        GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_send_output fail: %s\n", \
+            gst_flow_get_name (ret));
+        return ret;
+      }
     }
     if (buf_ret & VPU_DEC_SKIP) {
       GST_INFO_OBJECT (vpu_dec_object, "Got skip message!!");
