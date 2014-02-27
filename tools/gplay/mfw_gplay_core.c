@@ -283,7 +283,7 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
 
         if( 0 == i )
         {
-            FSL_PLAYER_PRINT("%15s: %s\n", gst_tag_get_nick(tag), str);
+            //FSL_PLAYER_PRINT("%15s: %s\n", gst_tag_get_nick(tag), str);
 
             if( strncmp(gst_tag_get_nick(tag), "location", 8) == 0 )
             {
@@ -361,7 +361,7 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
         {
             if(str)
             {
-                FSL_PLAYER_PRINT("               : %s\n", str);
+                //FSL_PLAYER_PRINT("               : %s\n", str);
             }
         }
 ignore:
@@ -431,7 +431,7 @@ static gboolean my_bus_callback(GstBus *bus, GstMessage *msg, gpointer data)
 #if 1
             GstTagList *tags;
             gst_message_parse_tag(msg, &tags);
-            FSL_PLAYER_PRINT("FOUND GST_MESSAGE_TAG!\n");
+            //FSL_PLAYER_PRINT("FOUND GST_MESSAGE_TAG!\n");
             gst_tag_list_foreach(tags, get_metadata_tag, data);
             gst_tag_list_free(tags);
 #endif
