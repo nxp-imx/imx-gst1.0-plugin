@@ -423,6 +423,12 @@ gst_vpu_dec_object_stop (GstVpuDecObject * vpu_dec_object)
 {
   VpuDecRetCode dec_ret;
 
+  if (vpu_dec_object->gstbuffer_in_vpudec != NULL) {
+    g_list_foreach (vpu_dec_object->gstbuffer_in_vpudec, (GFunc) gst_memory_unref, NULL);
+    g_list_free (vpu_dec_object->gstbuffer_in_vpudec);
+    vpu_dec_object->gstbuffer_in_vpudec = NULL;
+  }
+
 	if (vpu_dec_object->frame2gstbuffer_table != NULL) {
 		g_hash_table_destroy(vpu_dec_object->frame2gstbuffer_table);
 		vpu_dec_object->frame2gstbuffer_table = NULL;
