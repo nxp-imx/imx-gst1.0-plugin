@@ -91,6 +91,7 @@ struct _GstVpuDecObject {
 	GHashTable *frame2gstbuffer_table;
 	GHashTable *gstbuffer2frame_table;
 	GList * gstbuffer_in_vpudec;
+	GList * system_frame_number_in_vpu;
   gboolean use_new_tsm;
   gint framerate_n;
   gint framerate_d;
@@ -124,7 +125,7 @@ gboolean gst_vpu_dec_object_config (GstVpuDecObject * vpu_dec_object, \
     GstVideoDecoder * bdec, GstVideoCodecState * state);
 GstFlowReturn gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
     GstVideoDecoder * bdec, GstVideoCodecFrame * frame);
-gboolean gst_vpu_dec_object_flush (GstVpuDecObject * vpu_dec_object);
+gboolean gst_vpu_dec_object_flush (GstVideoDecoder * bdec, GstVpuDecObject * vpu_dec_object);
 
 G_END_DECLS
 

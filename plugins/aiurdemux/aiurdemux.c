@@ -2999,9 +2999,11 @@ static GstFlowReturn aiurdemux_push_pad_buffer (GstAiurDemux * demux, AiurDemuxS
     stream->block = FALSE;
   }
 
-  GST_DEBUG_OBJECT (demux,"%s push sample %" GST_TIME_FORMAT " size %d",
+  GST_DEBUG_OBJECT (demux,"%s push sample %" GST_TIME_FORMAT " size %d is discont: %d is delta unit: %d",
       AIUR_MEDIATYPE2STR (stream->type),
-      GST_TIME_ARGS (GST_BUFFER_TIMESTAMP (buffer)), gst_buffer_get_size (buffer));
+      GST_TIME_ARGS (GST_BUFFER_TIMESTAMP (buffer)), gst_buffer_get_size (buffer), \
+      GST_BUFFER_FLAG_IS_SET (buffer, GST_BUFFER_FLAG_DISCONT), \
+      GST_BUFFER_FLAG_IS_SET (buffer, GST_BUFFER_FLAG_DELTA_UNIT));
 
   ret = gst_pad_push (stream->pad, buffer);
 

@@ -177,6 +177,7 @@ gst_vpu_dec_object_init(GstVpuDecObject *vpu_dec_object)
   vpu_dec_object->internal_phy_mem = NULL;
   vpu_dec_object->mv_mem = NULL;
   vpu_dec_object->gstbuffer_in_vpudec = NULL;
+  vpu_dec_object->system_frame_number_in_vpu = NULL;
   vpu_dec_object->need_wait = FALSE;
   vpu_dec_object->dropping = FALSE;
 }
@@ -427,6 +428,11 @@ gst_vpu_dec_object_stop (GstVpuDecObject * vpu_dec_object)
     g_list_foreach (vpu_dec_object->gstbuffer_in_vpudec, (GFunc) gst_memory_unref, NULL);
     g_list_free (vpu_dec_object->gstbuffer_in_vpudec);
     vpu_dec_object->gstbuffer_in_vpudec = NULL;
+  }
+
+  if (vpu_dec_object->system_frame_number_in_vpu != NULL) {
+    g_list_free (vpu_dec_object->system_frame_number_in_vpu);
+    vpu_dec_object->system_frame_number_in_vpu = NULL;
   }
 
 	if (vpu_dec_object->frame2gstbuffer_table != NULL) {
@@ -803,7 +809,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
   else
     fmt = vpu_dec_object->output_format_decided;
 
-  GST_LOG_OBJECT(vpu_dec_object, "using %s as video output format", gst_video_format_to_string(fmt));
+  GST_INFO_OBJECT(vpu_dec_object, "using %s as video output format", gst_video_format_to_string(fmt));
 
   /* Create the output state */
   //FIXME: set max resolution to avoid buffer reallocate when resolution change.
@@ -954,6 +960,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   GstVideoCodecFrame *out_frame;
   GstVideoMeta *vmeta;
   GstVideoCropMeta *cmeta;
+  gint frame_number;
   GList *l;
 
   l = gst_video_decoder_get_frames (bdec);
@@ -963,12 +970,16 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   }
   g_list_free (l);
 
-  out_frame = gst_video_decoder_get_oldest_frame (bdec);
+  frame_number = g_list_nth_data (vpu_dec_object->system_frame_number_in_vpu, 0);
+  vpu_dec_object->system_frame_number_in_vpu = g_list_remove ( \
+      vpu_dec_object->system_frame_number_in_vpu, frame_number);
+
+  out_frame = gst_video_decoder_get_frame (bdec, frame_number);
   if (out_frame == NULL) {
-    GST_ERROR_OBJECT(vpu_dec_object, "gst_video_decoder_get_oldest_frame failed.");
+    GST_ERROR_OBJECT(vpu_dec_object, "gst_video_decoder_get_frame failed.");
     return GST_FLOW_ERROR;
   }
-  GST_LOG_OBJECT (vpu_dec_object, "gst_video_decoder_get_oldest_frame: 0x%x\n", \
+  GST_LOG_OBJECT (vpu_dec_object, "gst_video_decoder_get_frame: 0x%x\n", \
       out_frame);
   gst_vpu_dec_object_process_qos (vpu_dec_object, bdec, out_frame);
 
@@ -1116,6 +1127,11 @@ gst_vpu_dec_object_set_vpu_input_buf (GstVpuDecObject * vpu_dec_object, \
     return TRUE;
   }
 
+  vpu_dec_object->system_frame_number_in_vpu = g_list_append ( \
+      vpu_dec_object->system_frame_number_in_vpu, frame->system_frame_number);
+  GST_DEBUG_OBJECT (vpu_dec_object, "vpu_dec_object received system_frame_number: %d\n", \
+      frame->system_frame_number);
+
   buffer = frame->input_buffer;
   gst_buffer_map (buffer, &minfo, GST_MAP_READ);
 
@@ -1260,9 +1276,10 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
 }
 
 gboolean
-gst_vpu_dec_object_flush (GstVpuDecObject * vpu_dec_object)
+gst_vpu_dec_object_flush (GstVideoDecoder * bdec, GstVpuDecObject * vpu_dec_object)
 {
 	VpuDecRetCode ret;
+  GstBuffer *buffer;
 
   if (vpu_dec_object->state >= STATE_OPENED) {
     ret = VPU_DecFlushAll(vpu_dec_object->handle);
@@ -1273,7 +1290,25 @@ gst_vpu_dec_object_flush (GstVpuDecObject * vpu_dec_object)
     }
   }
   vpu_dec_object->new_segment = TRUE;
+  g_list_free (vpu_dec_object->system_frame_number_in_vpu);
+  vpu_dec_object->system_frame_number_in_vpu = NULL;
+  GST_DEBUG_OBJECT (vpu_dec_object, "system_frame_number_in_vpu list free\n");
 
-	return TRUE;
+  // FIXME: workaround for VP8 seek. VPU will block if VPU need framebuffer
+  // before seek.
+  if (g_list_length (vpu_dec_object->gstbuffer_in_vpudec) \
+      < vpu_dec_object->actual_buf_cnt) {
+    buffer = gst_video_decoder_allocate_output_buffer(bdec);
+    if (G_UNLIKELY (buffer == NULL)) {
+      GST_DEBUG_OBJECT (vpu_dec_object, "could not get buffer.");
+      return GST_FLOW_ERROR;
+    }
+    if (!gst_vpu_dec_object_release_frame_buffer_to_vpu (vpu_dec_object, buffer)) {
+      GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_release_frame_buffer_to_vpu fail.");
+      return GST_FLOW_ERROR;
+    }
+  }
+
+  return TRUE;
 }
 

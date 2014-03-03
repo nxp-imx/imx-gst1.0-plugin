@@ -410,6 +410,10 @@ gst_vpu_dec_reset (GstVideoDecoder * bdec, gboolean hard)
 {
   GstVpuDec *dec = (GstVpuDec *) bdec;
 
-  return gst_vpu_dec_object_flush (dec->vpu_dec_object);
+  if (hard) {
+    return gst_vpu_dec_object_flush (bdec, dec->vpu_dec_object);
+  } else {
+    return TRUE;
+  }
 }
 
