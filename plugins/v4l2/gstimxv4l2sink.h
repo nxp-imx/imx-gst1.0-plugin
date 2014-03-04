@@ -57,6 +57,7 @@ struct _GstImxV4l2Sink {
   GstVideoAlignment video_align;
   gboolean keep_video_ratio;
   guint64 frame_showed;
+  guint min_buffers;
 };
 
 struct _GstImxV4l2SinkClass {

@@ -527,7 +527,7 @@ fsl_player_s32 display_thread_fun(fsl_player_handle handle)
                            str_player_state_rate/*str_player_state[player_state]*/,prepeated_mode/*(brepeated?"(Repeated)":"")*/, str_volume,
                            (fsl_player_s32)hour, (fsl_player_s32)minute, (fsl_player_s32)second,
                            (fsl_player_s32)hour_d, (fsl_player_s32)minute_d, (fsl_player_s32)second_d,
-                           0.0);
+                           0);
 
             fflush (stdout);
         }
@@ -569,6 +569,7 @@ fsl_player_s32 msg_thread_fun(fsl_player_handle handle)
                 case FSL_PLAYER_UI_MSG_EXIT:
                 {
                     printf("FSL_PLAYER_UI_MSG_EXIT\n");
+                    player_exit(handle);
                     fsl_player_ui_msg_free(msg);
                     return 0;
                 }
@@ -688,10 +689,10 @@ static void signal_handler(int sig)
         }
     }
     
-    if(g_pplayer != NULL)
-        player_exit(g_pplayer);
-    
-    exit(ret);
+    if(g_pplayer != NULL){
+        gbexit_main = FSL_PLAYER_TRUE;
+        g_pplayer->klass->send_message_exit(g_pplayer);
+        }
 }
 
 int main(int argc,char *argv[])
@@ -708,12 +709,11 @@ int main(int argc,char *argv[])
     fsl_player_s32 ret;
     fsl_player_s32 volume = 1;
 
-    signal(SIGINT, signal_handler);
-    //signal(SIGTERM, signal_handler);
-    //signal(SIGABRT, signal_handler);
-    //signal(SIGILL,  signal_handler);
-    //signal(SIGFPE,  signal_handler);
-    //signal(SIGSEGV, signal_handler);
+    struct sigaction act;
+    act.sa_handler = signal_handler;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = 0;
+    sigaction(SIGINT, &act, NULL);
 
     if( argc < 2 ) {
         printf("Usage of command line player:\n");
@@ -1141,9 +1141,9 @@ int main(int argc,char *argv[])
                 //pplayer->klass->stop(pplayer);
                 //pplayer->klass->exit_message_loop(pplayer); // flush all messages left in the message queue.
                 //pplayer->klass->send_message_exit(pplayer); // send a exit message.
-                //gbexit_main = FSL_PLAYER_TRUE;
+                gbexit_main = FSL_PLAYER_TRUE;
+                //player_exit(pplayer);
                 pplayer->klass->send_message_exit(pplayer);
-                player_exit(pplayer);
                 break;
             }
 

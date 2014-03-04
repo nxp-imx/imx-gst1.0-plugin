@@ -94,6 +94,7 @@ typedef struct {
   IMXV4l2BufferPair buffer_pair[MAX_BUFFER];
   gint rotate;
   IMXV4l2DeviceItf dev_itf;
+  struct v4l2_buffer * v4lbuf_queued_before_streamon[MAX_BUFFER];
 } IMXV4l2Handle;
 
 typedef struct {
@@ -788,14 +789,17 @@ gpointer gst_imx_v4l2_open_device (gchar *device, int type)
 gint gst_imx_v4l2_reset_device (gpointer v4l2handle)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
+  gint i;
 
-  if (handle && handle->v4l2_fd && handle->streamon) {
-    gint i;
-    if (ioctl (handle->v4l2_fd, VIDIOC_STREAMOFF, &handle->type) < 0) {
-      GST_ERROR ("stream off failed\n");
-      return -1;
+  if (handle && handle->v4l2_fd) {
+    if (handle->streamon) {
+      if (ioctl (handle->v4l2_fd, VIDIOC_STREAMOFF, &handle->type) < 0) {
+        GST_ERROR ("stream off failed\n");
+        return -1;
+      }
+      handle->streamon = FALSE;
+      GST_DEBUG ("V4L2 device is STREAMOFF.");
     }
-    handle->streamon = FALSE;
 
     GST_DEBUG ("V4l2 device hold (%d) buffers when reset.", handle->queued_count);
 
@@ -808,9 +812,7 @@ gint gst_imx_v4l2_reset_device (gpointer v4l2handle)
     }
 
     handle->queued_count = 0;
-
-    GST_DEBUG ("V4L2 device is STREAMOFF.");
-  }
+  } 
 
   return 0;
 }
@@ -1172,13 +1174,34 @@ gint gst_imx_v4l2_free_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   return 0;
 }
 
+gint imx_v4l2_do_queue_buffer (IMXV4l2Handle *handle, struct v4l2_buffer *v4l2buf)
+{
+  struct timeval queuetime;
+
+  if (!v4l2buf) {
+    GST_ERROR ("queue buffer is NULL!!");
+    return -1;
+  }
+
+  /*display immediately */
+  gettimeofday (&queuetime, NULL);
+  v4l2buf->timestamp = queuetime;
+
+  if (ioctl (handle->v4l2_fd, VIDIOC_QBUF, v4l2buf) < 0) {
+    GST_ERROR ("queue v4l2 buffer failed.\n");
+    handle->buffer_pair[v4l2buf->index].gstbuffer = NULL;
+    return -1;
+  }
+
+  return 0;
+}
+
 gint gst_imx_v4l2_queue_buffer (gpointer v4l2handle, GstBuffer *buffer, GstVideoFrameFlags flags)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
   struct v4l2_buffer *v4l2buf;
   PhyMemBlock *memblk;
   gint index;
-  struct timeval queuetime;
 
   if (handle->invisible) {
     gst_buffer_unref (buffer);
@@ -1225,29 +1248,42 @@ gint gst_imx_v4l2_queue_buffer (gpointer v4l2handle, GstBuffer *buffer, GstVideo
       v4l2buf->field = V4L2_FIELD_BOTTOM;
   }
 
-  /*display immediately */
-  gettimeofday (&queuetime, NULL);
-  v4l2buf->timestamp = queuetime;
-
   GST_DEBUG ("queue gstbuffer(%p), flags(%x), v4lbuffer(%p), index(%d).",
       buffer, flags, v4l2buf, index);
 
-  if (ioctl (handle->v4l2_fd, VIDIOC_QBUF, v4l2buf) < 0) {
-    GST_ERROR ("queue v4l2 buffer failed.\n");
-    handle->buffer_pair[index].gstbuffer = NULL;
-    return -1;
-  }
+  if (!handle->streamon) {
+    int i;
+    GST_DEBUG ("streamon count (%d), queue count (%d)\n", handle->streamon_count, handle->queued_count);
 
-  handle->queued_count ++;
+    handle->v4lbuf_queued_before_streamon[handle->queued_count] = v4l2buf;
+    handle->queued_count ++;
+    if (handle->queued_count < handle->streamon_count)
+      return 0;
 
-  if (!handle->streamon && handle->queued_count >= handle->streamon_count) {
+    for (i=0; i<handle->streamon_count; i++) {
+      if (imx_v4l2_do_queue_buffer (handle, handle->v4lbuf_queued_before_streamon[i]) < 0) {
+        GST_ERROR ("queue buffers before streamon failed.");
+        return -1;
+      }
+    }
+
     if (ioctl (handle->v4l2_fd, VIDIOC_STREAMON, &handle->type) < 0) {
       GST_ERROR ("Stream on V4L2 device failed.\n");
       return -1;
     }
     handle->streamon = TRUE;
     GST_DEBUG ("V4L2 device is STREAMON.");
+    return 0;
   }
+
+  if (imx_v4l2_do_queue_buffer (handle, v4l2buf) < 0) {
+    GST_ERROR ("queue buffer failed.");
+    return -1;
+  }
+
+  handle->queued_count ++;
+
+  GST_DEBUG ("queued (%d)\n", handle->queued_count);
 
   return 0;
 }
@@ -1262,7 +1298,7 @@ gint gst_imx_v4l2_dequeue_buffer (gpointer v4l2handle, GstBuffer **buffer)
   struct v4l2_buffer v4l2buf;
   gint trycnt = 0;
 
-  if (handle->queued_count <= V4L2_HOLDED_BUFFERS)
+  if (handle->queued_count <= MAX(V4L2_HOLDED_BUFFERS, handle->streamon_count))
     return 0;
 
   if (handle->invisible) {
@@ -1285,6 +1321,7 @@ gint gst_imx_v4l2_dequeue_buffer (gpointer v4l2handle, GstBuffer **buffer)
 
   *buffer = handle->buffer_pair[v4l2buf.index].gstbuffer;
   handle->buffer_pair[v4l2buf.index].gstbuffer = NULL;
+  handle->queued_count--;
 
   GST_DEBUG ("dequeue gstbuffer(%p), v4l2buffer index(%d).", *buffer, v4l2buf.index);
 

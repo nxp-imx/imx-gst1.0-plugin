@@ -66,7 +66,7 @@ typedef struct
     fsl_player_config config;
 
     fsl_player_u64 duration;
-    fsl_player_u64 elapsed;
+    fsl_player_s64 elapsed;
     fsl_player_u64 elapsed_video;
     fsl_player_u64 elapsed_audio;
 
@@ -97,6 +97,7 @@ typedef struct
     fsl_player_bool fade;
     fsl_player_bool mute_status;
     fsl_player_bool has_mute;
+    fsl_player_bool abort;
 
     fsl_player_s32 timeout;
     
@@ -133,7 +134,7 @@ fsl_player_ret_val fsl_player_exit_message_loop(fsl_player_handle handle);
 fsl_player_ret_val fsl_player_post_eos_semaphore(fsl_player_handle handle);
 
 
-static fsl_player_bool poll_for_state_change(GstState sRecState, GstElement * elem, fsl_player_u32 timeout)
+static fsl_player_bool poll_for_state_change(fsl_player_property* pproperty ,GstState sRecState, GstElement * elem, fsl_player_u32 timeout)
 {
     GTimeVal tfthen, tfnow;
     GstClockTimeDiff diff;
@@ -183,6 +184,10 @@ static fsl_player_bool poll_for_state_change(GstState sRecState, GstElement * el
         }
         usleep(1000000);
         g_print("Wait status change from %d to %d \n", current, sRecState);
+        if(pproperty->abort){
+            pproperty->abort = FSL_PLAYER_FALSE;
+            return FSL_PLAYER_FALSE;
+            }
         }
 
         else{
@@ -532,7 +537,7 @@ static gboolean my_bus_callback(GstBus *bus, GstMessage *msg, gpointer data)
                             if (1){//( current == GST_STATE_PAUSED){
                                 g_print("switch to PLAYING\n");
                                 //gst_element_set_state((pproperty->playbin), GST_STATE_PLAYING);
-                                ret = poll_for_state_change(GST_STATE_PLAYING, (pproperty->playbin), pproperty->timeout);
+                                ret = poll_for_state_change(pproperty,GST_STATE_PLAYING, (pproperty->playbin), pproperty->timeout);
                                 g_print("done\n");
                             }
                             
@@ -828,6 +833,7 @@ fsl_player_handle fsl_player_init(fsl_player_config * config)
 
     pproperty->duration = 0;
     pproperty->elapsed = 0;
+    pproperty->abort = FSL_PLAYER_FALSE;
 
     FSL_PLAYER_MUTEX_INIT( &(pproperty->status_switching_mutex) );
 
@@ -877,7 +883,7 @@ fsl_player_ret_val fsl_player_deinit(fsl_player_handle handle)
     gst_element_get_state(pproperty->playbin, &current, NULL, GST_SECOND);
     if( GST_STATE_NULL != current )
     {
-        ret = poll_for_state_change(GST_STATE_NULL, (pproperty->playbin), pproperty->timeout);
+        ret = poll_for_state_change(pproperty,GST_STATE_NULL, (pproperty->playbin), pproperty->timeout);
     }
 
     gst_object_unref(pproperty->playbin);
@@ -967,11 +973,11 @@ fsl_player_ret_val fsl_player_play(fsl_player_handle handle)
 
     FSL_PLAYER_MUTEX_LOCK( &(pproperty->status_switching_mutex) );
 
-    ret = poll_for_state_change(GST_STATE_PLAYING, (pproperty->playbin), pproperty->timeout);
+    ret = poll_for_state_change(pproperty,GST_STATE_PLAYING, (pproperty->playbin), pproperty->timeout);
     if( FSL_PLAYER_FALSE == ret)
     {
         FSL_PLAYER_PRINT("try to play failed\n");
-        poll_for_state_change(GST_STATE_NULL, (pproperty->playbin), pproperty->timeout);
+        poll_for_state_change(pproperty, GST_STATE_NULL, (pproperty->playbin), pproperty->timeout);
         FSL_PLAYER_MUTEX_UNLOCK( &(pproperty->status_switching_mutex) );
         return FSL_PLAYER_FAILURE;
     }
@@ -1003,7 +1009,7 @@ fsl_player_ret_val fsl_player_pause(fsl_player_handle handle)
     //if( current == GST_STATE_PAUSED )
     {
 
-        ret = poll_for_state_change(GST_STATE_PLAYING, (pproperty->playbin), pproperty->timeout);
+        ret = poll_for_state_change(pproperty, GST_STATE_PLAYING, (pproperty->playbin), pproperty->timeout);
         if( FSL_PLAYER_FALSE == ret )
         {
             FSL_PLAYER_PRINT("try to resume failed\n");
@@ -1026,7 +1032,7 @@ fsl_player_ret_val fsl_player_pause(fsl_player_handle handle)
           _player_mute(handle, TRUE);
           usleep(FADE_TIMEOUT_US);
         }
-        ret = poll_for_state_change(GST_STATE_PAUSED, (pproperty->playbin), pproperty->timeout);
+        ret = poll_for_state_change(pproperty, GST_STATE_PAUSED, (pproperty->playbin), pproperty->timeout);
         if( FSL_PLAYER_FALSE == ret )
         {
             FSL_PLAYER_PRINT("try to pause failed\n");
@@ -1180,7 +1186,7 @@ fsl_player_ret_val fsl_player_stop(fsl_player_handle handle)
       usleep(FADE_TIMEOUT_US);
     }
 
-    ret = poll_for_state_change(GST_STATE_READY/*GST_STATE_NULL*/, (pproperty->playbin), pproperty->timeout);
+    ret = poll_for_state_change(pproperty, GST_STATE_READY/*GST_STATE_NULL*/, (pproperty->playbin), pproperty->timeout);
     if( FSL_PLAYER_FALSE == ret )
     {
         FSL_PLAYER_PRINT("try to stop failed\n");
@@ -2089,6 +2095,7 @@ fsl_player_ret_val fsl_player_send_message_exit(fsl_player_handle handle)
         FSL_PLAYER_PRINT("EOS Message is not sending out.\n");
         return FSL_PLAYER_FAILURE;
     }
+    pproperty->abort = FSL_PLAYER_TRUE;
     pproperty->queue.klass->put( &(pproperty->queue), (void*)/*&*/pui_msg, FSL_PLAYER_FOREVER, FSL_PLAYER_UI_MSG_PUT_NEW);
 
     return FSL_PLAYER_SUCCESS;

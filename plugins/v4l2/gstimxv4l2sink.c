@@ -262,7 +262,6 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
         }
       }
 
-
       break;
     default:
       break;
@@ -378,7 +377,7 @@ gst_imx_v4l2sink_setup_buffer_pool (GstImxV4l2Sink *v4l2sink, GstCaps *caps)
 
   structure = gst_buffer_pool_get_config (v4l2sink->pool);
   size = v4l2sink->w * v4l2sink->h * gst_imx_v4l2_get_bits_per_pixel (v4l2sink->v4l2fmt) / 8;
-  gst_buffer_pool_config_set_params (structure, caps, size, 3, 3);
+  gst_buffer_pool_config_set_params (structure, caps, size, v4l2sink->min_buffers, v4l2sink->min_buffers);
   gst_buffer_pool_config_set_allocator (structure, v4l2sink->allocator, NULL);
   if (!gst_buffer_pool_set_config (v4l2sink->pool, structure)) {
     GST_ERROR_OBJECT (v4l2sink, "set buffer pool failed.\n");
@@ -439,10 +438,10 @@ gst_imx_v4l2sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
   v4l2sink->cropmeta.height = h;
 
   if (v4l2sink->pool) {
+    gst_imx_v4l2_reset_device (v4l2sink->v4l2handle);
     gst_buffer_pool_set_active (v4l2sink->pool, FALSE);
     gst_object_unref (v4l2sink->pool);
     v4l2sink->pool = NULL;
-    gst_imx_v4l2_reset_device (v4l2sink->v4l2handle);
   }
 
   if (gst_imx_v4l2sink_setup_buffer_pool (v4l2sink, caps) < 0)
@@ -489,7 +488,7 @@ gst_imx_v4l2sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
   }
 
   /* we need at least 3 buffers to operate */
-  gst_query_add_allocation_pool (query, pool, size, 3, 3);
+  gst_query_add_allocation_pool (query, pool, size, v4l2sink->min_buffers, v4l2sink->min_buffers);
   gst_query_add_allocation_param (query, allocator, NULL);
 
   /* we also support various metadata */
@@ -558,7 +557,6 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     }
     memcpy (info2.data, info1.data, info1.size);
     gst_buffer_unmap (buffer, &info1);
-    gst_buffer_unref (buffer);
     gst_buffer_unmap (v4l2_buffer, &info2);
     buffer = v4l2_buffer;
   }
@@ -604,7 +602,8 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     v4l2sink->config = FALSE;
   }
 
-  gst_buffer_ref (buffer);
+  if (!not_v4l2buffer)
+    gst_buffer_ref (buffer);
 
   if (vmeta)
     flags = vmeta->flags;
@@ -801,5 +800,6 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   memset (&v4l2sink->crop, 0, sizeof(IMXV4l2Rect));
   v4l2sink->keep_video_ratio = TRUE;
   v4l2sink->frame_showed = 0;
+  v4l2sink->min_buffers = 5;
 }
 
