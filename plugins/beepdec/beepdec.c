@@ -803,8 +803,16 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
         goto bail;
     }
 
-    if(!buffer)
-        goto begin;
+
+    if(!buffer){
+        //audio decoder will send a null frame after 3 codec data buffer
+        //received when playing vorbis audio.
+        //return if in this case.
+        if(beepdec->in_cnt > 0)
+            goto begin;
+        else 
+            goto bail;
+    }
 
     inbuf_size = gst_buffer_get_size(buffer);
 
