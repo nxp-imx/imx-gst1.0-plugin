@@ -134,11 +134,6 @@ static GstsutilsOptionEntry g_aiurdemux_option_table[] = {
             G_TYPE_BOOLEAN,
             G_STRUCT_OFFSET (AiurDemuxOption, index_enabled),
           "false"},
-    {PROP_MERGE_H264_CODEC, "merge_h264_codec", "merge_h264_codec_data",
-            "whether to merge h264 codec data into the first buffer when use nal output",
-            G_TYPE_BOOLEAN,
-            G_STRUCT_OFFSET (AiurDemuxOption, merge_h264_codec_data),
-          "false"},
     {PROP_DISABLE_VORBIS_CODEC_DATA, "disable_vorbis_codec_data", "do not send vorbis codec data",
             "whether to parse vorbis codec data to three buffers to send",
             G_TYPE_BOOLEAN,
@@ -1348,14 +1343,13 @@ static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
     }
 
     //merge h264 codec data to buffer
-     if(demux->option.merge_h264_codec_data && (!IParser->createParser2) &&
-      (stream->type == MEDIA_VIDEO)
+     if((stream->type == MEDIA_VIDEO)
          && (stream->codec_type == VIDEO_H264)
          && (stream->send_codec_data == FALSE)
          && (stream->merge_codec_data == TRUE)
          && (stream->codec_data.length)){
       aiurdemux_merge_codec_buffer(demux,stream);
-      stream->merge_codec_data = FALSE;
+      stream->send_codec_data = TRUE;
     }
      
     //for vorbis codec data
@@ -1933,7 +1927,7 @@ static void aiurdemux_parse_video (GstAiurDemux * demux, AiurDemuxStream * strea
   if(mime == NULL)
       goto bail;
 
-  if(stream->codec_type == VIDEO_H264 && demux->option.merge_h264_codec_data){
+  if(stream->codec_type == VIDEO_H264 && NULL == IParser->createParser2){
       stream->send_codec_data = FALSE;
       stream->merge_codec_data = TRUE;
   }
@@ -2904,8 +2898,8 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
   }
   stream->new_segment = FALSE;
   
-  if(stream->type == MEDIA_VIDEO && stream->codec_type == VIDEO_H264 && demux->option.merge_h264_codec_data){
-    stream->merge_codec_data = TRUE;
+  if(stream->type == MEDIA_VIDEO && stream->codec_type == VIDEO_H264){
+    stream->send_codec_data = FALSE;
     GST_DEBUG("new segment, merge codec data into buffer");
   }
 
