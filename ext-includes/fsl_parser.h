@@ -2,7 +2,7 @@
 /***********************************************************************
  * Copyright (c) 2009-2014, Freescale Semiconductor, Inc.
  * All modifications are confidential and proprietary information
- * of Freescale Semiconductor, Inc. ALL RIGHTS RESERVED.
+ * of Freescale Semiconductor, Inc. 
  ***********************************************************************/
 
 /*
@@ -211,8 +211,10 @@ enum
 /*********************************************************************
  * flags for create parse2
  ********************************************************************/
-//if does not set this flag, h264 alignment will be nal
-#define FALG_H264_ALIGNMENT_AU 0x04
+//if set the flag, stream format was avc if codec data is presented, and format is bytestream if codec data is not found.
+#define FLAG_H264_NO_CONVERT 0x04
+
+
 /*********************************************************************
  * User data ID
  * Some File level metadata

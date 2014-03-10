@@ -58,7 +58,7 @@ typedef struct{
 
 static AiurdemuxCodecStruct aiurdemux_videocodec_tab[] ={
   {VIDEO_H263, 0, "H.263", "video/x-h263, variant=(string)itu"},
-  {VIDEO_H264, 0, "H.264/AVC", "video/x-h264, parsed = (boolean)true"},
+  {VIDEO_H264, 0, "H.264/AVC", "video/x-h264, parsed = (boolean)true, alignment=(string)au"},
   {VIDEO_MPEG2, 0, "MPEG2", "video/mpeg, systemstream = (boolean)false, parsed = (boolean)true, mpegversion=(int)2"},
   {VIDEO_MPEG4, 0, "MPEG4", "video/mpeg, systemstream = (boolean)false, parsed = (boolean)true, mpegversion=(int)4"},
   {VIDEO_JPEG, 0, "JPEG", "image/jpeg"},
@@ -273,7 +273,6 @@ _gst_buffer_copy_into_mem (GstBuffer * dest, gsize offset, const guint8 * src,
 
 static GstFlowReturn aiurdemux_read_buffer(GstAiurDemux * demux, uint32* track_idx,
     AiurDemuxStream** stream_out);
-static GstFlowReturn aiurdemux_merge_codec_buffer(GstAiurDemux * demux, AiurDemuxStream* stream);
 static GstFlowReturn aiurdemux_parse_vorbis_codec_data(GstAiurDemux * demux, AiurDemuxStream* stream);
 
 static gint aiurdemux_choose_next_stream (GstAiurDemux * demux);
@@ -1128,7 +1127,7 @@ aiurdemux_loop_state_init (GstAiurDemux * demux)
   isLive = aiurcontent_is_live(demux->content_info);
 
   if(IParser->createParser2){
-    flag = FALG_H264_ALIGNMENT_AU;
+    flag = FLAG_H264_NO_CONVERT;
     if(isLive){
         flag |= FILE_FLAG_NON_SEEKABLE;
         flag |= FILE_FLAG_READ_IN_SEQUENCE;
@@ -1340,16 +1339,6 @@ static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
       GST_BUFFER_FLAG_SET (stream->buffer, GST_BUFFER_FLAG_DISCONT);
       aiurdemux_send_stream_newsegment (demux, stream);
       gst_aiurdemux_push_tags (demux, stream);
-    }
-
-    //merge h264 codec data to buffer
-     if((stream->type == MEDIA_VIDEO)
-         && (stream->codec_type == VIDEO_H264)
-         && (stream->send_codec_data == FALSE)
-         && (stream->merge_codec_data == TRUE)
-         && (stream->codec_data.length)){
-      aiurdemux_merge_codec_buffer(demux,stream);
-      stream->send_codec_data = TRUE;
     }
      
     //for vorbis codec data
@@ -1927,16 +1916,13 @@ static void aiurdemux_parse_video (GstAiurDemux * demux, AiurDemuxStream * strea
   if(mime == NULL)
       goto bail;
 
-  if(stream->codec_type == VIDEO_H264 && NULL == IParser->createParser2){
-      stream->send_codec_data = FALSE;
-      stream->merge_codec_data = TRUE;
-  }
-
   if(stream->codec_type == VIDEO_H264){
-    if(IParser->createParser2 != NULL){
-      mime = g_strdup_printf("%s,alignment=(string)au",mime);
+    if(stream->codec_data.length > 0 && stream->codec_data.codec_data != NULL){
+      mime = g_strdup_printf("%s,stream-format=(string)avc",mime);
+      stream->send_codec_data = TRUE;
     }else{
-      mime = g_strdup_printf("%s,alignment=(string)nal",mime);
+      mime = g_strdup_printf("%s,stream-format=(string)byte-stream",mime);
+      stream->send_codec_data = FALSE;
     }
   }
   mime =
@@ -2635,44 +2621,6 @@ beach:
   return ret;
 
 }
-static GstFlowReturn aiurdemux_merge_codec_buffer(GstAiurDemux * demux, AiurDemuxStream* stream)
-{
-  GstBuffer *newbuf;
-  uint32 flag = 0;
-  GstMapInfo newBufferMap,streamMap;
-
-  if(demux == NULL || stream == NULL || stream->buffer == NULL)
-    return GST_FLOW_ERROR;
-
-  if(stream->codec_data.length == 0 || stream->codec_data.codec_data == NULL)
-    return GST_FLOW_ERROR;
-
-  gst_buffer_map(stream->buffer, &streamMap, GST_MAP_READ);
-  newbuf =gst_buffer_new_and_alloc(streamMap.size
-      + stream->codec_data.length);
-  gst_buffer_map(newbuf, &newBufferMap, GST_MAP_WRITE);
-  
-  _gst_buffer_copy_into_mem (newbuf, 0, 
-      stream->codec_data.codec_data, stream->codec_data.length);
-  
-  _gst_buffer_copy_into_mem (newbuf, stream->codec_data.length,
-      streamMap.data, streamMap.size);
-  
-  newBufferMap.size = streamMap.size +  stream->codec_data.length;
-  
-  flag = GST_BUFFER_COPY_FLAGS | GST_BUFFER_COPY_TIMESTAMPS;
-  gst_buffer_copy_into(newbuf, stream->buffer,
-   flag , 0, -1);
-  
-  GST_DEBUG_OBJECT(demux,"merge H264 codec data,size=%d",newBufferMap.size);
-  gst_buffer_unmap(stream->buffer, &streamMap);
-  gst_buffer_unmap(newbuf, &newBufferMap);
-  
-  gst_buffer_unref (stream->buffer);
-  
-  stream->buffer = newbuf;
-  return GST_FLOW_OK;
-}
 static GstFlowReturn aiurdemux_parse_vorbis_codec_data(GstAiurDemux * demux, AiurDemuxStream* stream)
 {
   int i = 0;
@@ -2897,11 +2845,6 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
     gst_pad_push_event (stream->pad, gst_event_new_segment (&segment));
   }
   stream->new_segment = FALSE;
-  
-  if(stream->type == MEDIA_VIDEO && stream->codec_type == VIDEO_H264){
-    stream->send_codec_data = FALSE;
-    GST_DEBUG("new segment, merge codec data into buffer");
-  }
 
 }
 static GstFlowReturn
