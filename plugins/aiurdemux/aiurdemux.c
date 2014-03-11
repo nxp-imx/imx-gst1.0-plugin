@@ -472,6 +472,7 @@ static void gst_aiurdemux_finalize (GObject * object)
 
   if (demux->stream_cache) {
     gst_mini_object_unref (GST_MINI_OBJECT_CAST (demux->stream_cache));
+    g_free(demux->stream_cache);
     demux->stream_cache = NULL;
   }
 
@@ -1432,6 +1433,10 @@ static gboolean aiurdemux_set_readmode (GstAiurDemux * demux)
   if(ret && format && strncmp(format,"MPEG",4) == 0){
       isMPEG = TRUE;
   }
+  if(format ){
+    g_free(format);
+    format = NULL;
+  }
   
   //use track mode for local file and file mode for streaming file.
   if(aiurcontent_is_random_access(demux->content_info) && !isMPEG){
@@ -1865,7 +1870,7 @@ static void aiurdemux_parse_video (GstAiurDemux * demux, AiurDemuxStream * strea
 {
   gchar *mime = NULL, *codec = NULL;
   gchar *padname;
-  
+
   int32 parser_ret = PARSER_SUCCESS;
   AiurCoreInterface *IParser = demux->core_interface;
   FslParserHandle handle = demux->core_handle;
@@ -1918,18 +1923,26 @@ static void aiurdemux_parse_video (GstAiurDemux * demux, AiurDemuxStream * strea
 
   if(stream->codec_type == VIDEO_H264){
     if(stream->codec_data.length > 0 && stream->codec_data.codec_data != NULL){
-      mime = g_strdup_printf("%s,stream-format=(string)avc",mime);
+      mime = g_strdup_printf
+    ("%s, stream-format=(string)avc, width=(int)%ld, height=(int)%ld, framerate=(fraction)%ld/%ld",
+    mime, stream->info.video.width, stream->info.video.height,
+    stream->info.video.fps_n, stream->info.video.fps_d);
       stream->send_codec_data = TRUE;
     }else{
-      mime = g_strdup_printf("%s,stream-format=(string)byte-stream",mime);
+      mime =
+    g_strdup_printf
+    ("%s, stream-format=(string)byte-stream, width=(int)%ld, height=(int)%ld, framerate=(fraction)%ld/%ld",
+    mime, stream->info.video.width, stream->info.video.height,
+    stream->info.video.fps_n, stream->info.video.fps_d);
       stream->send_codec_data = FALSE;
     }
-  }
+  }else{
   mime =
     g_strdup_printf
     ("%s, width=(int)%ld, height=(int)%ld, framerate=(fraction)%ld/%ld",
     mime, stream->info.video.width, stream->info.video.height,
     stream->info.video.fps_n, stream->info.video.fps_d);
+  }
   stream->caps = gst_caps_from_string (mime);
   g_free (mime);
 

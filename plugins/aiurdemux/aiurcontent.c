@@ -477,12 +477,13 @@ aiurcontent_callback_release_buffer (uint32 stream_idx, uint8 * pBuffer,
 static gchar* aiurcontent_generate_idx_file(AiurContent * pContent,char * prefix)
 {
     gchar *location = NULL, *buf = NULL;
-
+    gchar * protocal = NULL;
     if(!pContent || !pContent->uri)
         goto bail;
     
     location = g_strdup (pContent->uri);
-    if (strcmp(gst_uri_get_protocol (location), "file")) {
+    protocal = gst_uri_get_protocol (location);
+    if (strcmp(protocal, "file")) {
       goto bail;
     }
     
@@ -502,8 +503,10 @@ static gchar* aiurcontent_generate_idx_file(AiurContent * pContent,char * prefix
     }
 
 bail:
-  if (location)
-    g_free (location);
+  if(location)
+    g_free(location);
+  if(protocal)
+    g_free(protocal);
   return buf;
 
 }
@@ -588,6 +591,9 @@ static void aiurcontent_set_flag (AiurContent *pContent)
       pContent->random_access = TRUE;
   }
 
+  if(uri_protocal){
+    g_free(uri_protocal);
+  }
 }
 
 int aiurcontent_new(AiurContent **pContent)
