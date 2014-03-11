@@ -900,6 +900,7 @@ begin:
            gst_audio_buffer_reorder_channels (temp_buffer, beepdec->audio_format,
                beepdec->outputformat.channels, beepdec->core_layout, beepdec->out_layout);
 
+           g_free(outbuf);
            if(beepdec->in_cnt > 1 )
            {
                 beepdec->in_cnt--;
