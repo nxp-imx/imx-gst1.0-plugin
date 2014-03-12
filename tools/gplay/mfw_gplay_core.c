@@ -720,11 +720,11 @@ fsl_player_handle fsl_player_init(fsl_player_config * config)
         goto init_failed;
     }
 
+    if (!config->video_sink_name)
+      config->video_sink_name = "imxv4l2sink";
 
-    if (config->video_sink_name){
-        g_print("Generate VideoSink %s\n", config->video_sink_name);
-        pproperty->video_sink = gst_parse_launch(config->video_sink_name, NULL);
-    }
+    g_print("Generate VideoSink %s\n", config->video_sink_name);
+    pproperty->video_sink = gst_parse_launch(config->video_sink_name, NULL);
 
     if (config->audio_sink_name){
         g_print("Generate AudioSink %s\n", config->audio_sink_name);

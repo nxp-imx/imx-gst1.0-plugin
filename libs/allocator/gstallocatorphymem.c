@@ -90,8 +90,8 @@ base_alloc (GstAllocator * allocator, gsize size,
     return NULL;
   }
 
-  GST_DEBUG ("allocate params, prefix (%d), padding (%d), align (%d).\n",
-      params->prefix, params->padding, params->align);
+  GST_DEBUG ("allocate params, prefix (%d), padding (%d), align (%d), flags (%x).\n",
+      params->prefix, params->padding, params->align, params->flags);
 
   maxsize = size + params->prefix + params->padding;
   mem->block.size = maxsize;

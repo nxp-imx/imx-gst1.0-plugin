@@ -155,8 +155,8 @@ imx_ipu_v4l2out_config_input (IMXV4l2Handle *handle, guint fmt, guint w, guint h
 
   memset(&v4l2fmt, 0, sizeof(struct v4l2_format));
   v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-  v4l2fmt.fmt.pix.width = handle->in_w = w;
-  v4l2fmt.fmt.pix.height = handle->in_h = h;
+  v4l2fmt.fmt.pix.width = handle->in_w = UPALIGNTO8 (w);
+  v4l2fmt.fmt.pix.height = handle->in_h = UPALIGNTO8 (h);
   v4l2fmt.fmt.pix.pixelformat = handle->in_fmt = fmt;
   icrop.left = crop->left;
   icrop.top = crop->top;
@@ -239,8 +239,8 @@ imx_pxp_v4l2out_config_input (IMXV4l2Handle *handle, guint fmt, guint w, guint h
 
   memset(&v4l2fmt, 0, sizeof(struct v4l2_format));
   v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-  v4l2fmt.fmt.pix.width = handle->in_w = w;
-  v4l2fmt.fmt.pix.height = handle->in_h = h;
+  v4l2fmt.fmt.pix.width = handle->in_w = UPALIGNTO8 (w);
+  v4l2fmt.fmt.pix.height = handle->in_h = UPALIGNTO8 (h);
   v4l2fmt.fmt.pix.pixelformat = handle->in_fmt = fmt;
   if (ioctl(handle->v4l2_fd, VIDIOC_S_FMT, &v4l2fmt) < 0) {
     GST_ERROR ("Set format failed.");
