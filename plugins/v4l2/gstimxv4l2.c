@@ -263,20 +263,6 @@ imx_pxp_v4l2out_config_input (IMXV4l2Handle *handle, guint fmt, guint w, guint h
   v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY;
   v4l2fmt.fmt.win.global_alpha = 0;
   v4l2fmt.fmt.win.chromakey = 0;
-  v4l2fmt.fmt.win.w.left = 0;
-  v4l2fmt.fmt.win.w.top = 0;
-  v4l2fmt.fmt.win.w.width = handle->in_w;
-  v4l2fmt.fmt.win.w.height = handle->in_h;
-  if (ioctl(handle->v4l2_fd, VIDIOC_S_FMT, &v4l2fmt) < 0) {
-    GST_ERROR ("Set VIDIOC_S_FMT output overlay failed.");
-    return -1;
-  }
-
-  /* Set overlay source window */
-  memset(&v4l2fmt, 0, sizeof(struct v4l2_format));
-  v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY;
-  v4l2fmt.fmt.win.global_alpha = 0;
-  v4l2fmt.fmt.win.chromakey = 0;
   v4l2fmt.fmt.win.w.left = crop->left;
   v4l2fmt.fmt.win.w.top = crop->top;
   v4l2fmt.fmt.win.w.width = crop->width;
