@@ -450,7 +450,6 @@ static void gst_aiurdemux_init (GstAiurDemux * demux)
 
   demux->state = AIURDEMUX_STATE_PROBE;
   demux->pullbased = FALSE;
-  demux->caps = NULL;
   demux->core_interface = NULL;
   demux->core_handle = NULL;
 
@@ -1059,10 +1058,6 @@ static gboolean gst_aiurdemux_setcaps(GstPad * pad, GstObject * parent, GstCaps 
   if (demux->core_interface) {
     demux->state = AIURDEMUX_STATE_INITIAL;
 
-    if(demux->caps == NULL){
-        demux->caps = caps;
-    }
-
     return TRUE;
   } else{
     return FALSE;
@@ -1074,11 +1069,17 @@ aiurdemux_loop_state_probe (GstAiurDemux * demux)
 {
   GstBuffer *buffer = NULL;
   GstFlowReturn ret = GST_FLOW_OK;
+  GstCaps * caps;
 
   if (demux->pullbased) {
     gst_pad_pull_range (demux->sinkpad, (guint64) 0,
         AIURDEMUX_INIT_BLOCK_SIZE, &buffer);
     gst_buffer_unref (buffer);
+
+    caps = gst_pad_peer_query_caps (demux->sinkpad, NULL);
+    GST_LOG_OBJECT(demux,"state_probe CAPS=%s",gst_caps_to_string(caps));
+    gst_aiurdemux_setcaps(demux->sinkpad,(GstObject*) demux, caps);
+    gst_caps_unref (caps);
   }
 
   return ret;

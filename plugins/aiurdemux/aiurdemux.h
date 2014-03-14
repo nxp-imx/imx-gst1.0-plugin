@@ -276,7 +276,6 @@ struct _GstAiurDemux
 {
     GstElement element;
     GstPad *sinkpad;
-    GstCaps *caps;
 
     gint state;
     GMutex runmutex;
