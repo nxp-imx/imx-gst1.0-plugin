@@ -1154,7 +1154,8 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
   GST_LOG_OBJECT (vpu_dec_object, "GstVideoCodecFrame: 0x%x\n", frame);
   gst_vpu_dec_object_handle_input_time_stamp (vpu_dec_object, bdec, frame);
   gst_vpu_dec_object_set_vpu_input_buf (vpu_dec_object, frame, &in_data);
-  gst_video_codec_frame_unref (frame);
+  if (frame)
+    gst_video_codec_frame_unref (frame);
 
   while (1) {
 
