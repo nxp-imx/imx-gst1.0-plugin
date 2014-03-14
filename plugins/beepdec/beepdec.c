@@ -466,6 +466,13 @@ static gboolean beep_dec_stop (GstAudioDecoder * dec)
         beepdec->adapter = NULL;
     }
 
+    if(beepdec->core_layout)
+        g_free(beepdec->core_layout);
+
+    if(beepdec->out_layout)
+        g_free(beepdec->out_layout);
+
+
     beep_core_destroy_interface (beepdec->beep_interface);
     beepdec->beep_interface = NULL;
     GST_LOG_OBJECT (beepdec,"beep_dec_stop called ");
