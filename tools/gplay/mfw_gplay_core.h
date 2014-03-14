@@ -104,20 +104,6 @@ typedef enum
     FSL_PLAYER_STATUS_NUMBER = 6
 } fsl_player_state;
 
-/* rotation value */
-typedef enum
-{
-    FSL_PLAYER_ROTATION_NORMAL = 0,
-    FSL_PLAYER_ROTATION_UPSIDE_DOWN_MIRROR = 1,
-    FSL_PLAYER_ROTATION_NORMAL_MIRROR = 2,
-    FSL_PLAYER_ROTATION_UPSIDE_DOWN = 3,
-    FSL_PLAYER_ROTATION_CLOCKWISE_90 = 4,
-    FSL_PLAYER_ROTATION_CLOCKWISE_90_MIRROR = 5,
-    FSL_PLAYER_ROTATION_ANTICLOCKWISE_90_MIRROR = 6,
-    FSL_PLAYER_ROTATION_ANTICLOCKWISE_90 = 7,
-    FSL_PLAYER_ROTATION_NUMBER = 8
-} fsl_player_rotation;
-
 /* video output mode */
 typedef enum
 {
@@ -148,6 +134,7 @@ typedef enum
     FSL_PLAYER_PROPERTY_VIDEO_CROP = 14,
     FSL_PLAYER_PROPERTY_TOTAL_FRAMES = 15,
     FSL_PLAYER_PROPERTY_SEEKABLE = 16,
+    FSL_PLAYER_PROPERTY_ROTATION = 17,
     FSL_PLAYER_PROPERTY_NUMBER
 } fsl_player_property_id;
 
@@ -269,7 +256,7 @@ struct _fsl_player_class
     fsl_player_ret_val (*display_screen_mode)(fsl_player_handle that, fsl_player_s32 mode);
     fsl_player_ret_val (*resize)(fsl_player_handle that, fsl_player_display_parameter display_parameter);
     fsl_player_ret_val (*video_crop)(fsl_player_handle that, fsl_player_video_crop video_crop);
-    fsl_player_ret_val (*rotate)(fsl_player_handle that, fsl_player_rotation rotate_value);
+    fsl_player_ret_val (*rotate)(fsl_player_handle that, fsl_player_s32 rotate_value);
 
     fsl_player_ret_val (*get_property) (fsl_player_handle that, fsl_player_property_id property_id, void* pstructure);
     fsl_player_ret_val (*set_property) (fsl_player_handle that, fsl_player_property_id property_id, void* pstructure);

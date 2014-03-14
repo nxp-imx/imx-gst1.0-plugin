@@ -81,7 +81,7 @@ typedef struct
     fsl_player_s32 tv_mode;
     fsl_player_display_parameter display_parameter;
     fsl_player_video_crop video_crop;
-    fsl_player_rotation rotate_value;
+    fsl_player_s32 rotate_value;
 
     fsl_player_metadata metadata;
 
@@ -122,7 +122,7 @@ fsl_player_ret_val fsl_player_full_screen(fsl_player_handle handle);
 fsl_player_ret_val fsl_player_display_screen_mode(fsl_player_handle handle, fsl_player_s32 mode);
 fsl_player_ret_val fsl_player_resize(fsl_player_handle handle, fsl_player_display_parameter display_parameter);
 fsl_player_ret_val fsl_player_set_video_crop(fsl_player_handle handle, fsl_player_video_crop video_crop);
-fsl_player_ret_val fsl_player_rotate(fsl_player_handle handle, fsl_player_rotation rotate_value);
+fsl_player_ret_val fsl_player_rotate(fsl_player_handle handle, fsl_player_s32 rotate_value);
 
 fsl_player_ret_val fsl_player_get_property(fsl_player_handle handle, fsl_player_property_id property_id, void* pstructure);
 fsl_player_ret_val fsl_player_set_property(fsl_player_handle handle, fsl_player_property_id property_id, void* pstructure);
@@ -820,7 +820,7 @@ fsl_player_handle fsl_player_init(fsl_player_config * config)
     pproperty->display_parameter.offsety = DEFAULT_OFFSET_Y;
     pproperty->display_parameter.disp_width = DEFAULT_DISPLAY_WIDTH;
     pproperty->display_parameter.disp_height = DEFAULT_DISPLAY_HEIGHT;
-    pproperty->rotate_value = FSL_PLAYER_ROTATION_NORMAL;
+    pproperty->rotate_value = 0;
     pproperty->bfullscreen = 0;
 
     fsl_player_s32 fb = 0;
@@ -1653,7 +1653,7 @@ fsl_player_ret_val fsl_player_set_video_crop(fsl_player_handle handle, fsl_playe
     return FSL_PLAYER_SUCCESS;
 }
 
-fsl_player_ret_val fsl_player_rotate(fsl_player_handle handle, fsl_player_rotation rotate_value)
+fsl_player_ret_val fsl_player_rotate(fsl_player_handle handle, fsl_player_s32 rotate_value)
 {
     fsl_player* pplayer = (fsl_player*)handle;
     fsl_player_property* pproperty = (fsl_player_property*)pplayer->property_handle;
@@ -1927,6 +1927,34 @@ fsl_player_ret_val fsl_player_get_property(fsl_player_handle handle, fsl_player_
             gst_query_unref (query);
             break;
         }
+
+        case FSL_PLAYER_PROPERTY_ROTATION:
+        {
+            GstElement* auto_video_sink = NULL;
+            GstElement* actual_video_sink = NULL;
+	        fsl_player_s32 rotate_value = 0;
+            g_object_get(pproperty->playbin, "video-sink", &auto_video_sink, NULL);
+            if( NULL == auto_video_sink )
+            {
+                FSL_PLAYER_PRINT("%s(): Can not find auto_video_sink\n", __FUNCTION__);
+                return FSL_PLAYER_FAILURE;
+            }
+            actual_video_sink = gst_bin_get_by_name((GstBin*)auto_video_sink, "videosink-actual-sink-mfw_v4l");
+            if( NULL == actual_video_sink )
+            {
+                FSL_PLAYER_PRINT("%s(): Can not find actual_video_sink\n", __FUNCTION__);    
+                return FSL_PLAYER_FAILURE;
+            }
+
+            g_object_get(G_OBJECT(actual_video_sink), VIDEO_ROTATE, &(rotate_value), NULL);
+            
+            g_object_unref (actual_video_sink);
+            g_object_unref (auto_video_sink);
+
+            *((fsl_player_s32*)pstructure) = rotate_value;
+	    break;
+	}
+
         default:
         {
             ret_val = FSL_PLAYER_ERROR_NOT_SUPPORT;

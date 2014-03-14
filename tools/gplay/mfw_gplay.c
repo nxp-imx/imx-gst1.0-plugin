@@ -769,6 +769,7 @@ int main(int argc,char *argv[])
     pplayer->klass->play(pplayer);
 
     // Print the help menu to let user know the operation.
+    fflush(stdout);
     print_help(player_handle);
 
     kb_set_raw_term(STDIN_FILENO);
@@ -1099,14 +1100,14 @@ int main(int argc,char *argv[])
             }
             case 't': // Rotate 90 degree every time
             {
-                fsl_player_rotation rotate_value;
-                PRINT("Set rotation between 0, 90, 180, 270: ");
+                fsl_player_s32 rotate_value;
+				PRINT("Set rotation between 0, 90, 180, 270: ");
                 kb_restore_term(STDIN_FILENO);
                 gbdisplay = FSL_PLAYER_FALSE;
                 scanf("%s",sCommand);
                 gbdisplay = FSL_PLAYER_TRUE;
                 kb_set_raw_term(STDIN_FILENO);
-                rotate_value = (fsl_player_rotation)atoi(sCommand);
+                rotate_value = (fsl_player_s32)atoi(sCommand);
                 if( (fsl_player_s32)rotate_value != 0  && (fsl_player_s32)rotate_value != 90 &&  (fsl_player_s32)rotate_value != 180 
                 &&   (fsl_player_s32)rotate_value != 270 )
                 {
@@ -1159,6 +1160,112 @@ int main(int argc,char *argv[])
                 break;
             }
 
+	    
+            case 'q': // Query information
+	    {
+		    PRINT("Input query type[v:has video?, e:seekable?, s:state, p:position, u:duration, z:size, k:crop, t:rotation, c:play rate]:\n");
+
+                kb_restore_term(STDIN_FILENO);
+                gbdisplay = FSL_PLAYER_FALSE;
+                scanf("%s",sCommand);
+                gbdisplay = FSL_PLAYER_TRUE;
+                kb_set_raw_term(STDIN_FILENO);
+
+		switch(sCommand[0])
+	        {
+		    case 'v':
+		    {
+		        fsl_player_s32 video_num = 0;
+			pplayer->klass->get_property(pplayer, FSL_PLAYER_PROPERTY_TOTAL_VIDEO_NO, (void*)(&video_num));
+		        printf("Number of Video Streams : %d\n", video_num);
+			break;
+		    }
+		    case 'e':
+		    {
+		        fsl_player_bool seekable = FSL_PLAYER_FALSE;
+		        pplayer->klass->get_property(pplayer, FSL_PLAYER_PROPERTY_SEEKABLE, (void*)(&seekable));
+		        printf("Seekable : %s\n", seekable ? "Yes" : "No");
+		        break;
+		    }
+		    case 's':
+		    {
+		        fsl_player_state player_state = FSL_PLAYER_STATUS_STOPPED;
+			pplayer->klass->get_property(pplayer, FSL_PLAYER_PROPERTY_PLAYER_STATE, (void*)(&player_state));
+			switch (player_state)
+			{
+			    case FSL_PLAYER_STATUS_STOPPED:
+			        printf("Current State : Stopped\n");
+				break;
+			    case FSL_PLAYER_STATUS_PAUSED:
+			        printf("Current State : Paused\n");
+				break;
+			    case FSL_PLAYER_STATUS_PLAYING:
+			        printf("Current State : Playing\n");
+				break;
+			    case FSL_PLAYER_STATUS_FASTFORWARD:
+			        printf("Current State : Fast Forward\n");
+				break;
+			    case FSL_PLAYER_STATUS_SLOWFORWARD:
+			        printf("Current State : Slow Forward\n");
+				break;
+			    case FSL_PLAYER_STATUS_FASTBACKWARD:
+			        printf("Current State : Fast Backward\n");
+				break;
+			    default:
+			        printf("Current State : Unknown\n");
+				break;
+			}	
+			break;
+		    }
+		    case 'p':
+		    {
+		        fsl_player_u64 pos = 0;
+			pplayer->klass->get_property(pplayer, FSL_PLAYER_PROPERTY_ELAPSED, (void*)(&pos));
+			printf("Current playing position : %lld\n", pos);
+			break;
+		    }
+		    case 'u':
+		    { 
+		        fsl_player_u64 duration = 0;
+			pplayer->klass->get_property(pplayer, FSL_PLAYER_PROPERTY_DURATION, (void*)(&duration));
+			printf("Duration : %lld\n", duration);
+			break;
+		    }
+		    case 'z':
+		    {
+		        fsl_player_display_parameter disp = {0};
+			pplayer->klass->get_property(pplayer, FSL_PLAYER_PROPERTY_DISP_PARA, (void*)(&disp));
+			printf("Current video display area : %d %d %d %d\n", disp.offsetx, disp.offsety, disp.disp_width, disp.disp_height);
+			break;
+		    }
+		    case 'k':
+		    {
+		        fsl_player_video_crop crop = {0};
+		        pplayer->klass->get_property(pplayer, FSL_PLAYER_PROPERTY_VIDEO_CROP, (void*)(&crop));
+			printf("Current video crop : %d %d %d %d\n", crop.left, crop.right, crop.top, crop.bottom);
+			break;
+		    }
+		    case 't':
+		    {
+		        fsl_player_s32 rotation = 0;
+			pplayer->klass->get_property(pplayer, FSL_PLAYER_PROPERTY_ROTATION, (void*)(&rotation));
+			printf("Current rotation : %d\n", rotation);
+			break;
+		    }
+		    case 'c':
+		    {
+		        double playback_rate = 0.0;
+			pplayer->klass->get_property(pplayer, FSL_PLAYER_PROPERTY_PLAYBACK_RATE, (void*)(&playback_rate));
+			printf("Current play rate : %1.1f\n", playback_rate);		    
+			break;
+		    }
+		    default:
+		        printf("Unknown query command\n");
+			break;
+		} 
+		fflush(stdout);
+		break;
+	    }
             default:
                 //printf("Default: Nothing has been done!\n");
                 break;
