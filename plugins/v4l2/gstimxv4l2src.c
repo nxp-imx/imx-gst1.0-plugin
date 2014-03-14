@@ -363,6 +363,10 @@ gst_imx_v4l2_allocator_cb (gpointer user_data, gint *count)
           v4l2src->video_align.padding_right, v4l2src->video_align.padding_bottom);
     }
 
+    gst_buffer_pool_config_get_params (config, NULL, NULL, &min, &max);
+    GST_DEBUG_OBJECT (v4l2src, "need allocate %d buffers.\n", max);
+    gst_structure_free(config);
+
     if (gst_imx_v4l2src_config (v4l2src) < 0) {
       GST_ERROR_OBJECT (v4l2src, "camera configuration failed.\n");
       g_printf ("capture device: %s probed caps: %" GST_PTR_FORMAT, v4l2src->device, \
@@ -371,8 +375,6 @@ gst_imx_v4l2_allocator_cb (gpointer user_data, gint *count)
       return -1;
     }
 
-    gst_buffer_pool_config_get_params (config, NULL, NULL, &min, &max);
-    GST_DEBUG_OBJECT (v4l2src, "need allocate %d buffers.\n", max);
     if (v4l2src->use_my_allocator) {
       if (gst_imx_v4l2_set_buffer_count (v4l2src->v4l2handle, max, V4L2_MEMORY_MMAP) < 0)
         return -1;
@@ -676,6 +678,8 @@ gst_imx_v4l2src_finalize (GstImxV4l2Src * v4l2src)
 {
   if (v4l2src->device)
     g_free (v4l2src->device);
+
+  G_OBJECT_CLASS (parent_class)->finalize ((GObject *) (v4l2src));
 }
 
 static void

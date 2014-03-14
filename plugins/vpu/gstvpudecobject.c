@@ -961,6 +961,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   GstVideoMeta *vmeta;
   GstVideoCropMeta *cmeta;
   gint frame_number;
+#if 0
   GList *l;
 
   l = gst_video_decoder_get_frames (bdec);
@@ -968,9 +969,14 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
     GST_DEBUG_OBJECT(vpu_dec_object, "video frame list too long: %d \n", \
         g_list_length (l));
   }
+
+  g_list_foreach (l, (GFunc) gst_video_codec_frame_unref, NULL);
   g_list_free (l);
+#endif
 
   frame_number = g_list_nth_data (vpu_dec_object->system_frame_number_in_vpu, 0);
+  GST_DEBUG_OBJECT(vpu_dec_object, "system frame number send out: %d list length: %d \n", \
+      frame_number, g_list_length (vpu_dec_object->system_frame_number_in_vpu));
   vpu_dec_object->system_frame_number_in_vpu = g_list_remove ( \
       vpu_dec_object->system_frame_number_in_vpu, frame_number);
 
@@ -1042,7 +1048,6 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
       GST_TIME_FORMAT, GST_TIME_ARGS (out_frame->pts));
 
   ret = gst_video_decoder_finish_frame (bdec, out_frame);
-  gst_buffer_unref (out_frame->output_buffer);
 
   return ret;
 }
@@ -1165,6 +1170,7 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
   GST_LOG_OBJECT (vpu_dec_object, "GstVideoCodecFrame: 0x%x\n", frame);
   gst_vpu_dec_object_handle_input_time_stamp (vpu_dec_object, bdec, frame);
   gst_vpu_dec_object_set_vpu_input_buf (vpu_dec_object, frame, &in_data);
+  gst_video_codec_frame_unref (frame);
 
   while (1) {
 

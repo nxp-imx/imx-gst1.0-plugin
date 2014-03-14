@@ -333,11 +333,13 @@ gst_imx_v4l2_allocator_cb (gpointer user_data, gint *count)
           v4l2sink->video_align.padding_right, v4l2sink->video_align.padding_bottom);
     }
 
+    gst_buffer_pool_config_get_params (config, NULL, NULL, &min, &max);
+    GST_DEBUG_OBJECT (v4l2sink, "need allocate %d buffers.\n", max);
+    gst_structure_free(config);
+
     if (gst_imx_v4l2sink_configure_input (v4l2sink) < 0)
       return -1;
 
-    gst_buffer_pool_config_get_params (config, NULL, NULL, &min, &max);
-    GST_DEBUG_OBJECT (v4l2sink, "need allocate %d buffers.\n", max);
     if (gst_imx_v4l2_set_buffer_count (v4l2sink->v4l2handle, max, V4L2_MEMORY_MMAP) < 0)
       return -1;
 
@@ -631,6 +633,8 @@ gst_imx_v4l2sink_finalize (GstImxV4l2Sink * v4l2sink)
 {
   if (v4l2sink->device)
     g_free (v4l2sink->device);
+
+  G_OBJECT_CLASS (parent_class)->finalize ((GObject *) (v4l2sink));
 }
 
 static void
