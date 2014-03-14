@@ -47,7 +47,6 @@ typedef struct _GstVpuDecObjectClass GstVpuDecObjectClass;
 #define GST_VPU_DEC_ACTUAL_BUF_CNT(o)        ((o)->actual_buf_cnt)
 #define GST_VPU_DEC_BUF_ALIGNMENT(o)         ((o)->buf_align)
 #define GST_VPU_DEC_VIDEO_ALIGNMENT(o)       ((o)->video_align)
-#define GST_VPU_DEC_NEED_WAIT(o)             ((o)->need_wait)
  
 typedef enum {
   STATE_NULL    = 0,
@@ -71,7 +70,6 @@ struct _GstVpuDecObject {
   guint actual_buf_cnt;
   guint buf_align;
   GstVideoAlignment video_align;
-  gboolean need_wait;
 
   GstVideoCodecState *input_state;
   GstVideoCodecState *output_state;

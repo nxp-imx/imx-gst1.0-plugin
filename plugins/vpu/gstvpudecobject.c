@@ -178,7 +178,6 @@ gst_vpu_dec_object_init(GstVpuDecObject *vpu_dec_object)
   vpu_dec_object->mv_mem = NULL;
   vpu_dec_object->gstbuffer_in_vpudec = NULL;
   vpu_dec_object->system_frame_number_in_vpu = NULL;
-  vpu_dec_object->need_wait = FALSE;
   vpu_dec_object->dropping = FALSE;
 }
 
@@ -786,7 +785,6 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
   GstVideoFormat fmt;
   gint height_align;
   GstBuffer *buffer;
-  guint iCnt = 0;
   guint i;
 
   dec_ret = VPU_DecGetInitialInfo(vpu_dec_object->handle, &(vpu_dec_object->init_info));
@@ -847,21 +845,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
       vpu_dec_object->init_info.nPicWidth, vpu_dec_object->init_info.nPicHeight, \
       vpu_dec_object->width_paded, vpu_dec_object->height_paded);
 
-  /* As video decoder base haven’t handle allocation query fail 
-   * and VPU need close to handle reconfigure. Wait until down stream propose 
-   * allocator and pool. Maximum is one second. */
-  vpu_dec_object->need_wait = TRUE;
-  while (!gst_video_decoder_negotiate (bdec)) {
-    g_usleep (10000);
-    if (iCnt++ >= 100) {
-      vpu_dec_object->need_wait = FALSE;
-    }
-    if (iCnt >= 102) {
-      GST_WARNING_OBJECT (vpu_dec_object, "gst_video_decoder_negotiate fail.\n");
-      break;
-    }
-  }
-  vpu_dec_object->need_wait = FALSE;
+  gst_video_decoder_negotiate (bdec);
 
   while (g_list_length (vpu_dec_object->gstbuffer_in_vpudec) \
           < vpu_dec_object->actual_buf_cnt) {
