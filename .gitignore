@@ -61,3 +61,6 @@ Build
 *.trs
 *.log
 
+plugins/aiurdemux/aiur_registry_1.0.arm11.cf
+plugins/beepdec/beep_registry_1.0.arm12.cf
+
