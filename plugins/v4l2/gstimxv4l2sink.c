@@ -804,6 +804,6 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   memset (&v4l2sink->crop, 0, sizeof(IMXV4l2Rect));
   v4l2sink->keep_video_ratio = TRUE;
   v4l2sink->frame_showed = 0;
-  v4l2sink->min_buffers = 5;
+  v4l2sink->min_buffers = gst_imx_v4l2_get_min_buffer_num (V4L2_BUF_TYPE_VIDEO_OUTPUT);
 }
 

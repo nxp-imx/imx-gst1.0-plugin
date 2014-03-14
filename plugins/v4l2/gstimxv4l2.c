@@ -38,6 +38,9 @@ GST_DEBUG_CATEGORY_EXTERN (imxv4l2_debug);
 #define GST_CAT_DEFAULT imxv4l2_debug
 
 
+#define V4L2_HOLDED_BUFFERS (2)
+#define MX6Q_STREAMON_COUNT (1)
+#define MX60_STREAMON_COUNT (2)
 
 #define MAX_BUFFER (32)
 #define UPALIGNTO8(a) ((a + 7) & (~7))
@@ -326,6 +329,24 @@ gst_imx_v4l2_get_default_device_name (gint type)
   }
 
   return devname;
+}
+
+gint
+gst_imx_v4l2_get_min_buffer_num (gint type)
+{
+  gint num;
+  if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+    if (gimx_chip == CC_MX60)
+      num = MAX (10, MAX (V4L2_HOLDED_BUFFERS, MX60_STREAMON_COUNT));
+    else if (gimx_chip == CC_MX6Q)
+      num = MAX (V4L2_HOLDED_BUFFERS, MX60_STREAMON_COUNT);
+    else 
+      num = V4L2_HOLDED_BUFFERS;
+
+    num += 1;
+  }
+
+  return num;
 }
 
 GstCaps *
@@ -748,13 +769,13 @@ gpointer gst_imx_v4l2_open_device (gchar *device, int type)
       handle->dev_itf.v4l2out_config_input = (V4l2outConfigInput)imx_ipu_v4l2out_config_input;
       handle->dev_itf.v4l2out_config_output = (V4l2outConfigOutput)imx_ipu_v4l2out_config_output;
       handle->dev_itf.v4l2out_config_rotate = (V4l2outConfigRotate)imx_ipu_v4l2out_config_rotate;
-      handle->streamon_count = 1;
+      handle->streamon_count = MX6Q_STREAMON_COUNT;
     }
     else if (gimx_chip == CC_MX60) {
       handle->dev_itf.v4l2out_config_input = (V4l2outConfigInput)imx_pxp_v4l2out_config_input;
       handle->dev_itf.v4l2out_config_output = (V4l2outConfigOutput)imx_pxp_v4l2out_config_output;
       handle->dev_itf.v4l2out_config_rotate = (V4l2outConfigRotate)imx_pxp_v4l2out_config_rotate;
-      handle->streamon_count = 2;
+      handle->streamon_count = MX60_STREAMON_COUNT;
     }
 
     gst_imx_v4l2output_set_default_res (handle);
@@ -1274,7 +1295,6 @@ gint gst_imx_v4l2_queue_buffer (gpointer v4l2handle, GstBuffer *buffer, GstVideo
   return 0;
 }
 
-#define V4L2_HOLDED_BUFFERS (2)
 #define TRY_TIMEOUT (500000) //500ms
 #define TRY_INTERVAL (10000) //10ms
 #define MAX_TRY_CNT (TRY_TIMEOUT/TRY_INTERVAL)
