@@ -1685,6 +1685,7 @@ fsl_player_ret_val fsl_player_get_property(fsl_player_handle handle, fsl_player_
     fsl_player* pplayer = (fsl_player*)handle;
     fsl_player_property* pproperty = (fsl_player_property*)pplayer->property_handle;
     fsl_player_ret_val ret_val = FSL_PLAYER_SUCCESS;
+    GstElement* actual_video_sink = NULL;
 
     switch( property_id )
     {
@@ -1748,26 +1749,17 @@ fsl_player_ret_val fsl_player_get_property(fsl_player_handle handle, fsl_player_
         }
         case FSL_PLAYER_PROPERTY_TOTAL_VIDEO_NO:
         {
-            if (pproperty->config.playbin_version==2)
                 g_object_get( G_OBJECT(pproperty->playbin), "n-video", (fsl_player_s32*)pstructure, NULL);
-            else
-                ret_val = FSL_PLAYER_ERROR_NOT_SUPPORT;
             break;
         }
         case FSL_PLAYER_PROPERTY_TOTAL_AUDIO_NO:
         {
-            if (pproperty->config.playbin_version==2)
                 g_object_get( G_OBJECT(pproperty->playbin), "n-audio", (fsl_player_s32*)pstructure, NULL);
-            else
-                ret_val = FSL_PLAYER_ERROR_NOT_SUPPORT;
             break;
         }
         case FSL_PLAYER_PROPERTY_TOTAL_SUBTITLE_NO:
         {
-            if (pproperty->config.playbin_version==2)
                 g_object_get( G_OBJECT(pproperty->playbin), "n-text", (fsl_player_s32*)pstructure, NULL);
-            else
-                ret_val = FSL_PLAYER_ERROR_NOT_SUPPORT;
             break;
         }
         case FSL_PLAYER_PROPERTY_ELAPSED_VIDEO:
@@ -1804,30 +1796,18 @@ fsl_player_ret_val fsl_player_get_property(fsl_player_handle handle, fsl_player_
         }
         case FSL_PLAYER_PROPERTY_DISP_PARA:
         {
-            GstElement* auto_video_sink = NULL;
-            GstElement* actual_video_sink = NULL;
 
-            g_object_get(pproperty->playbin, "video-sink", &auto_video_sink, NULL);
-            if( NULL == auto_video_sink )
-            {
-                FSL_PLAYER_PRINT("%s(): Can not find auto_video_sink\n", __FUNCTION__);
-                return FSL_PLAYER_FAILURE;
-            }
-            actual_video_sink = gst_bin_get_by_name((GstBin*)auto_video_sink, "videosink-actual-sink-mfw_v4l");
-            if( NULL == actual_video_sink )
-            {
-                FSL_PLAYER_PRINT("%s(): Can not find actual_video_sink\n", __FUNCTION__);    
-                return FSL_PLAYER_FAILURE;
-            }
-            FSL_PLAYER_PRINT("%s(): AutoVideoSink=%s : ActualVideoSink=%s\n", __FUNCTION__, GST_OBJECT_NAME(auto_video_sink), GST_OBJECT_NAME(actual_video_sink));
-            g_object_get(G_OBJECT(actual_video_sink), VIDEO_LEFT, &(pproperty->display_parameter.offsetx), NULL);
+          actual_video_sink = get_video_sink (handle);
+          if (!actual_video_sink) {
+            FSL_PLAYER_PRINT("Can't get video sink.\n");
+            return FSL_PLAYER_FAILURE;
+          }
+
+          g_object_get(G_OBJECT(actual_video_sink), VIDEO_LEFT, &(pproperty->display_parameter.offsetx), NULL);
             g_object_get(G_OBJECT(actual_video_sink), VIDEO_TOP, &(pproperty->display_parameter.offsety), NULL);
             g_object_get(G_OBJECT(actual_video_sink), VIDEO_WIDTH, &(pproperty->display_parameter.disp_width), NULL);
             g_object_get(G_OBJECT(actual_video_sink), VIDEO_HEIGHT, &(pproperty->display_parameter.disp_height), NULL);
             
-            g_object_unref (actual_video_sink);
-            g_object_unref (auto_video_sink);
-
             ((fsl_player_display_parameter*)pstructure)->offsetx = pproperty->display_parameter.offsetx;
             ((fsl_player_display_parameter*)pstructure)->offsety = pproperty->display_parameter.offsety;
             ((fsl_player_display_parameter*)pstructure)->disp_width = pproperty->display_parameter.disp_width;
@@ -1837,35 +1817,22 @@ fsl_player_ret_val fsl_player_get_property(fsl_player_handle handle, fsl_player_
         }
         case FSL_PLAYER_PROPERTY_VIDEO_CROP:
         {
-            GstElement* auto_video_sink = NULL;
-            GstElement* actual_video_sink = NULL;
+          actual_video_sink = get_video_sink (handle);
+          if (!actual_video_sink) {
+            FSL_PLAYER_PRINT("Can't get video sink.\n");
+            return FSL_PLAYER_FAILURE;
+          }
 
-            g_object_get(pproperty->playbin, "video-sink", &auto_video_sink, NULL);
-            if( NULL == auto_video_sink )
-            {
-                FSL_PLAYER_PRINT("%s(): Can not find auto_video_sink\n", __FUNCTION__);
-                return FSL_PLAYER_FAILURE;
-            }
-            actual_video_sink = gst_bin_get_by_name((GstBin*)auto_video_sink, "videosink-actual-sink-mfw_v4l");
-            if( NULL == actual_video_sink )
-            {
-                FSL_PLAYER_PRINT("%s(): Can not find actual_video_sink\n", __FUNCTION__);    
-                return FSL_PLAYER_FAILURE;
-            }
-            FSL_PLAYER_PRINT("%s(): AutoVideoSink=%s : ActualVideoSink=%s\n", \
-                    __FUNCTION__, GST_OBJECT_NAME(auto_video_sink), GST_OBJECT_NAME(actual_video_sink));
-            g_object_get(G_OBJECT(actual_video_sink), "crop-left-by-pixel", \
-                    &(pproperty->video_crop.left), NULL);
-            g_object_get(G_OBJECT(actual_video_sink), "crop-right-by-pixel", \
-                    &(pproperty->video_crop.right), NULL);
-            g_object_get(G_OBJECT(actual_video_sink), "crop-top-by-pixel", \
+            g_object_get(G_OBJECT(actual_video_sink), "crop-top", \
                     &(pproperty->video_crop.top), NULL);
-            g_object_get(G_OBJECT(actual_video_sink), "crop-bottom-by-pixel", \
+            g_object_get(G_OBJECT(actual_video_sink), "crop-left", \
+                &(pproperty->video_crop.left), NULL);
+            //FIXME: crop changed.
+            g_object_get(G_OBJECT(actual_video_sink), "crop-width", \
+                    &(pproperty->video_crop.right), NULL);
+            g_object_get(G_OBJECT(actual_video_sink), "crop-height", \
                     &(pproperty->video_crop.bottom), NULL);
-            
-            g_object_unref (actual_video_sink);
-            g_object_unref (auto_video_sink);
-
+           
             ((fsl_player_video_crop*)pstructure)->left = pproperty->video_crop.left;
             ((fsl_player_video_crop*)pstructure)->right = pproperty->video_crop.right;
             ((fsl_player_video_crop*)pstructure)->top = pproperty->video_crop.top;
@@ -1930,30 +1897,18 @@ fsl_player_ret_val fsl_player_get_property(fsl_player_handle handle, fsl_player_
 
         case FSL_PLAYER_PROPERTY_ROTATION:
         {
-            GstElement* auto_video_sink = NULL;
-            GstElement* actual_video_sink = NULL;
-	        fsl_player_s32 rotate_value = 0;
-            g_object_get(pproperty->playbin, "video-sink", &auto_video_sink, NULL);
-            if( NULL == auto_video_sink )
-            {
-                FSL_PLAYER_PRINT("%s(): Can not find auto_video_sink\n", __FUNCTION__);
-                return FSL_PLAYER_FAILURE;
-            }
-            actual_video_sink = gst_bin_get_by_name((GstBin*)auto_video_sink, "videosink-actual-sink-mfw_v4l");
-            if( NULL == actual_video_sink )
-            {
-                FSL_PLAYER_PRINT("%s(): Can not find actual_video_sink\n", __FUNCTION__);    
-                return FSL_PLAYER_FAILURE;
-            }
+          fsl_player_s32 rotate_value = 0;
+          actual_video_sink = get_video_sink (handle);
+          if (!actual_video_sink) {
+            FSL_PLAYER_PRINT("Can't get video sink.\n");
+            return FSL_PLAYER_FAILURE;
+          }
 
-            g_object_get(G_OBJECT(actual_video_sink), VIDEO_ROTATE, &(rotate_value), NULL);
-            
-            g_object_unref (actual_video_sink);
-            g_object_unref (auto_video_sink);
+          g_object_get(G_OBJECT(actual_video_sink), VIDEO_ROTATE, &(rotate_value), NULL);
 
-            *((fsl_player_s32*)pstructure) = rotate_value;
-	    break;
-	}
+          *((fsl_player_s32*)pstructure) = rotate_value;
+          break;
+        }
 
         default:
         {
