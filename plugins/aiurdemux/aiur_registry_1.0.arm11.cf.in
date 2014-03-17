@@ -13,7 +13,7 @@ mime = video/x-flv
 library = @flv_arm11_SONAME@
 
 [MPEG]
-mime= video/mpeg, mpegversion=(int)[1,2]; video/mpegts, systemstream=true; video/x-cdxa
+mime= video/mpeg, mpegversion=(int)[1,2], systemstream=true; video/mpegts, systemstream=true; video/x-cdxa
 library = @mpg2_arm11_SONAME@
 
 [MOV/MP4/3GP]
