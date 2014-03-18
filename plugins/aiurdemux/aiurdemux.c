@@ -2190,7 +2190,7 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
         codec = "PCM";
         mime =
             g_strdup_printf
-            ("audio/x-raw, %s,channels=(int)%ld, rate=(int)%ld,bitrate=(int)%ld",codec_mime,
+            ("audio/x-raw, %s,channels=(int)%ld, layout=(string)interleaved, rate=(int)%ld,bitrate=(int)%ld",codec_mime,
             stream->info.audio.n_channels, stream->info.audio.rate,stream->bitrate);
       }
         break;
@@ -2532,6 +2532,7 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
         if (demux->read_mode == PARSER_READ_MODE_FILE_BASED) {
             aiurdemux_send_stream_eos_all (demux);
             ret = GST_FLOW_EOS;
+            goto beach;
         }else{
             aiurdemux_send_stream_eos (demux, stream);
             if (demux->valid_mask == 0) {
