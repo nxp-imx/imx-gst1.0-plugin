@@ -25,6 +25,8 @@
 GST_DEBUG_CATEGORY (imxv4l2sink_debug);
 #define GST_CAT_DEFAULT imxv4l2sink_debug
 
+extern CHIP_CODE gimx_chip;
+
 enum {
   PROP_0,
   PROP_DEVICE,
@@ -57,6 +59,8 @@ gst_imx_v4l2sink_set_property (GObject * object,
     guint prop_id, const GValue * value, GParamSpec * pspec)
 {
   GstImxV4l2Sink *v4l2sink = GST_IMX_V4L2SINK (object);
+
+  GST_DEBUG_OBJECT (v4l2sink, "set_property (%d).", prop_id);
 
   switch (prop_id) {
     case PROP_DEVICE:
@@ -335,6 +339,7 @@ gst_imx_v4l2_allocator_cb (gpointer user_data, gint *count)
 
     gst_buffer_pool_config_get_params (config, NULL, NULL, &min, &max);
     GST_DEBUG_OBJECT (v4l2sink, "need allocate %d buffers.\n", max);
+    g_print ("v4l2sink need allocate %d buffers.\n", max);
     gst_structure_free(config);
 
     if (gst_imx_v4l2sink_configure_input (v4l2sink) < 0)
@@ -587,7 +592,7 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
         return GST_FLOW_ERROR;
       }
       v4l2sink->config_flag &= ~CONFIG_ROTATE;
-      if (v4l2sink->keep_video_ratio) {
+      if (v4l2sink->keep_video_ratio || gimx_chip == CC_MX60) {
         //need to recalculate output as rotation changed
         v4l2sink->config_flag |= CONFIG_OVERLAY;
       }
@@ -684,9 +689,9 @@ gst_imx_v4l2sink_install_properties (GObjectClass *gobject_class)
         0, G_MAXUINT, 0, G_PARAM_READWRITE));
 
   g_object_class_install_property (gobject_class, PROP_KEEP_VIDEO_RATIO,
-      g_param_spec_boolean ("keep-video-ratio", "Keep video ratio",
-        "Whether to keep the resized video has the same ratio with original one",
-        TRUE, G_PARAM_READWRITE));
+      g_param_spec_boolean ("force-aspect-ratio", "Force aspect ratio",
+        "When enabled, scaling will respect original aspect ratio",
+        FALSE, G_PARAM_READWRITE));
 
   g_object_class_install_property (gobject_class, PROP_CONFIG,
       g_param_spec_boolean ("reconfig", "Reconfig",
@@ -802,7 +807,7 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   v4l2sink->allocator = NULL;
   memset (&v4l2sink->overlay, 0, sizeof(IMXV4l2Rect));
   memset (&v4l2sink->crop, 0, sizeof(IMXV4l2Rect));
-  v4l2sink->keep_video_ratio = TRUE;
+  v4l2sink->keep_video_ratio = FALSE;
   v4l2sink->frame_showed = 0;
   v4l2sink->min_buffers = gst_imx_v4l2_get_min_buffer_num (V4L2_BUF_TYPE_VIDEO_OUTPUT);
 }
