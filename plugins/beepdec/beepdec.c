@@ -629,7 +629,7 @@ static void beep_dec_handle_output_changed(GstBeepDec *beepdec)
         gst_audio_info_set_format (&info,
             beepdec->audio_format,
             beepdec->outputformat.samplerate,
-            beepdec->outputformat.channels, NULL);
+            beepdec->outputformat.channels, beepdec->out_layout);
 
         if (!memcmp (&beepdec->audio_info, &info, sizeof (GstAudioInfo))) {
             break;
