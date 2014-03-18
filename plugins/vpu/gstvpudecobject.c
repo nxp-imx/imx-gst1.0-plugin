@@ -972,6 +972,15 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   GST_LOG_OBJECT (vpu_dec_object, "gst_video_decoder_get_frame: 0x%x\n", \
       out_frame);
   gst_vpu_dec_object_process_qos (vpu_dec_object, bdec, out_frame);
+ 
+  if (drop == FALSE) {
+    dec_ret = VPU_DecGetOutputFrame(vpu_dec_object->handle, &out_frame_info);
+    if (dec_ret != VPU_DEC_RET_SUCCESS) {
+      GST_ERROR_OBJECT(vpu_dec_object, "could not get decoded output frame: %s", \
+          gst_vpu_dec_object_strerror(dec_ret));
+      return GST_FLOW_ERROR;
+    }
+  }
 
   if (((vpu_dec_object->mosaic_cnt != 0)
       && (vpu_dec_object->mosaic_cnt < MASAIC_THRESHOLD))
@@ -979,13 +988,6 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
     GST_INFO_OBJECT(vpu_dec_object, "drop frame.");
     TSManagerSend (vpu_dec_object->tsm);
     return gst_video_decoder_drop_frame (bdec, out_frame);
-  }
- 
-  dec_ret = VPU_DecGetOutputFrame(vpu_dec_object->handle, &out_frame_info);
-  if (dec_ret != VPU_DEC_RET_SUCCESS) {
-    GST_ERROR_OBJECT(vpu_dec_object, "could not get decoded output frame: %s", \
-        gst_vpu_dec_object_strerror(dec_ret));
-    return GST_FLOW_ERROR;
   }
 
   GST_LOG_OBJECT(vpu_dec_object, "vpu display buffer: 0x%x pbufVirtY: 0x%x\n", \
