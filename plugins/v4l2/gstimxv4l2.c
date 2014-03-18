@@ -979,6 +979,15 @@ gint gst_imx_v4l2out_config_output (gpointer v4l2handle, IMXV4l2Rect *overlay, g
   GST_DEBUG ("config output, (%d, %d) -> (%d, %d)",
       rect->left, rect->top, rect->width, rect->height);
 
+  if (handle->rotate != 0) {
+    if (rect->left < 0 || rect->top < 0 
+        || (rect->left + rect->width) > handle->disp_w
+        || (rect->top + rect->height) > handle->disp_h) {
+      g_print ("not support video out of screen if oritation is not landscape.\n");
+      return 0;
+    }
+  }
+
   brotate = (handle->rotate == 90 || handle->rotate == 270) ? TRUE : FALSE;
 
   //keep video ratio with display
