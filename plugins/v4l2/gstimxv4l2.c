@@ -98,6 +98,7 @@ typedef struct {
   gint rotate;
   IMXV4l2DeviceItf dev_itf;
   struct v4l2_buffer * v4lbuf_queued_before_streamon[MAX_BUFFER];
+  gboolean prev_need_crop;
 } IMXV4l2Handle;
 
 typedef struct {
@@ -962,6 +963,11 @@ gst_imx_v4l2out_calc_crop (IMXV4l2Handle *handle,
     rect_out->top += result->y;
     rect_out->height = result->h;
   } 
+
+  if (!need_crop && handle->prev_need_crop)
+    need_crop = TRUE;
+
+  handle->prev_need_crop = need_crop;
 
   return need_crop;
 }
