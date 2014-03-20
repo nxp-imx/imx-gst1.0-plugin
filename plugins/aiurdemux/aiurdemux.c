@@ -82,7 +82,7 @@ static AiurdemuxCodecStruct aiurdemux_videocodec_tab[] ={
   {VIDEO_ON2_VP, VIDEO_VP6A, "VP6 Alpha", "video/x-vp6-alpha"},
   {VIDEO_ON2_VP, VIDEO_VP6, "VP6 Flash", "video/x-vp6-flash"},
   {VIDEO_ON2_VP, VIDEO_VP8, "VP8", "video/x-vp8"},
-  {VIDEO_ON2_VP, 0, NULL, NULL},
+  {VIDEO_ON2_VP, 0, NULL, NULL}
 };
 
 static GstStaticPadTemplate gst_aiurdemux_videosrc_template =
@@ -1905,7 +1905,7 @@ static void aiurdemux_parse_video (GstAiurDemux * demux, AiurDemuxStream * strea
 
   stream->send_codec_data = TRUE;
 
-  for(i = 0; i < sizeof(aiurdemux_videocodec_tab); i++){
+  for(i = 0; i < sizeof(aiurdemux_videocodec_tab)/sizeof(AiurdemuxCodecStruct); i++){
       codec_struct = &aiurdemux_videocodec_tab[i];
       if (stream->codec_type == codec_struct->type){
           if((codec_struct->subtype > 0) && (stream->codec_sub_type == codec_struct->subtype)){
