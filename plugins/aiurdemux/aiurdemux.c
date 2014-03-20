@@ -2279,9 +2279,11 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
             break;
         }
         stream->send_codec_data = TRUE;
+        //only support one channel amr
+        stream->info.audio.n_channels = 1;
         mime =
             g_strdup_printf
-            ("%s, channels=(int)%ld, rate=(int)%ld, depth=(int)%ld, bitrate=(int)%ld",
+            ("%s, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld",
             codec_mime, stream->info.audio.n_channels, stream->info.audio.rate,
             stream->info.audio.sample_width, stream->bitrate);
         break;
