@@ -2849,6 +2849,10 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
     segment.position = segment.time = stream->time_position;
     gst_pad_push_event (stream->pad, gst_event_new_segment (&segment));
   } else {
+    if(stream->type == MEDIA_AUDIO){
+        stream->new_segment = FALSE;
+        return;
+    }
     if (stream->buffer) {
       GST_WARNING ("Pad %s: Send newseg %" GST_TIME_FORMAT " first buffer %"
           GST_TIME_FORMAT " ", AIUR_MEDIATYPE2STR (stream->type),
