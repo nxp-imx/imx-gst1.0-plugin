@@ -789,7 +789,13 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
 
   dec_ret = VPU_DecGetInitialInfo(vpu_dec_object->handle, &(vpu_dec_object->init_info));
   if (dec_ret != VPU_DEC_RET_SUCCESS) {
-    GST_ERROR_OBJECT(vpu_dec_object, "could not get init info: %s", gst_vpu_dec_object_strerror(dec_ret));
+    GST_ERROR_OBJECT(vpu_dec_object, "could not get init info: %s", \
+        gst_vpu_dec_object_strerror(dec_ret));
+    return GST_FLOW_ERROR;
+  }
+
+  if (vpu_dec_object->init_info.nPicWidth <= 0 || vpu_dec_object->init_info.nPicHeight <= 0) {
+    GST_ERROR_OBJECT(vpu_dec_object, "VPU get init info error.");
     return GST_FLOW_ERROR;
   }
 
@@ -891,7 +897,7 @@ gst_vpu_dec_object_release_frame_buffer_to_vpu (GstVpuDecObject * vpu_dec_object
   if (dec_ret != VPU_DEC_RET_SUCCESS) {
     GST_ERROR_OBJECT(vpu_dec_object, "clearing display framebuffer failed: %s", \
         gst_vpu_dec_object_strerror(dec_ret));
-    return GST_FLOW_ERROR;
+    return FALSE;
   }
 
   return TRUE;
@@ -946,6 +952,8 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   GstVideoCodecFrame *out_frame;
   GstVideoMeta *vmeta;
   GstVideoCropMeta *cmeta;
+  GstBuffer *output_buffer = NULL;
+  GstClockTime output_pts = 0;
   gint frame_number;
 #if 0
   GList *l;
@@ -967,13 +975,10 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
       vpu_dec_object->system_frame_number_in_vpu, frame_number);
 
   out_frame = gst_video_decoder_get_frame (bdec, frame_number);
-  if (out_frame == NULL) {
-    GST_ERROR_OBJECT(vpu_dec_object, "gst_video_decoder_get_frame failed.");
-    return GST_FLOW_ERROR;
-  }
   GST_LOG_OBJECT (vpu_dec_object, "gst_video_decoder_get_frame: 0x%x\n", \
       out_frame);
-  gst_vpu_dec_object_process_qos (vpu_dec_object, bdec, out_frame);
+  if (out_frame)
+    gst_vpu_dec_object_process_qos (vpu_dec_object, bdec, out_frame);
  
   if (drop == FALSE) {
     dec_ret = VPU_DecGetOutputFrame(vpu_dec_object->handle, &out_frame_info);
@@ -985,26 +990,50 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
 
     GST_LOG_OBJECT(vpu_dec_object, "vpu display buffer: 0x%x pbufVirtY: 0x%x\n", \
         out_frame_info.pDisplayFrameBuf, out_frame_info.pDisplayFrameBuf->pbufVirtY);
-    out_frame->pts = TSManagerSend2 (vpu_dec_object->tsm, \
+    output_pts = TSManagerSend2 (vpu_dec_object->tsm, \
         out_frame_info.pDisplayFrameBuf);
-    out_frame->output_buffer = g_hash_table_lookup( \
+    output_buffer = g_hash_table_lookup( \
         vpu_dec_object->frame2gstbuffer_table, \
         out_frame_info.pDisplayFrameBuf->pbufVirtY);
     g_hash_table_replace(vpu_dec_object->gstbuffer2frame_table, \
-        (gpointer)(out_frame->output_buffer), \
+        (gpointer)(output_buffer), \
         (gpointer)(out_frame_info.pDisplayFrameBuf));
     vpu_dec_object->gstbuffer_in_vpudec = g_list_remove ( \
-        vpu_dec_object->gstbuffer_in_vpudec, out_frame->output_buffer);
+        vpu_dec_object->gstbuffer_in_vpudec, output_buffer);
   } else {
     TSManagerSend (vpu_dec_object->tsm);
+  }
+
+  if (out_frame == NULL) {
+    //FIXME: workaround for VPU will output more video frame if drop B enabled
+    // for Xvid.
+    GST_WARNING_OBJECT(vpu_dec_object, "gst_video_decoder_get_frame failed.");
+    if (output_buffer) {
+      if (!gst_vpu_dec_object_release_frame_buffer_to_vpu (vpu_dec_object, output_buffer)) {
+        GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_release_frame_buffer_to_vpu fail.");
+        return FALSE;
+      }
+    }
+    return GST_FLOW_OK;
   }
 
   if (((vpu_dec_object->mosaic_cnt != 0)
       && (vpu_dec_object->mosaic_cnt < MASAIC_THRESHOLD))
       || drop == TRUE) {
     GST_INFO_OBJECT(vpu_dec_object, "drop frame.");
+    if (output_buffer) {
+      if (!gst_vpu_dec_object_release_frame_buffer_to_vpu (vpu_dec_object, output_buffer)) {
+        GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_release_frame_buffer_to_vpu fail.");
+        return FALSE;
+      }
+    }
     return gst_video_decoder_drop_frame (bdec, out_frame);
   }
+
+  if (output_pts)
+    out_frame->pts = output_pts;
+  if (output_buffer)
+    out_frame->output_buffer = output_buffer;
 
   vmeta = gst_buffer_get_video_meta (out_frame->output_buffer);
   /* If the buffer pool didn't add the meta already
