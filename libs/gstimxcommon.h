@@ -152,7 +152,8 @@ static SOC_INFO soc_info[] = {
   {CC_MX53, "i.MX53"},
   {CC_MX6Q, "i.MX6DL"},
   {CC_MX6Q, "i.MX6Q"},
-  {CC_MX60, "i.MX6SL"}
+  {CC_MX60, "i.MX6SL"},
+  {CC_MX60, "i.MX6SX"}
 };
 
 static CHIP_CODE
