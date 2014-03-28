@@ -43,7 +43,7 @@ GST_DEBUG_CATEGORY (beep_dec_debug);
 
 #define CORE_FATAL_ERROR_MASK ((uint32)0xff)
 #define CORE_STATUS_MASK (~(uint32)0xff)
-#define MAX_PROFILE_ERROR_COUNT 50 //about 1 second decoding time, 1 seconds' audio data length
+#define MAX_PROFILE_ERROR_COUNT 500 //about 1 second decoding time, 1 seconds' audio data length
 #define VORBIS_HEADER_FRAME 3
 #define GST_TAG_BEEP_SAMPLING_RATE  "sampling_frequency"
 #define GST_TAG_BEEP_CHANNELS       "channels"
@@ -671,120 +671,6 @@ static void beep_dec_handle_output_changed(GstBeepDec *beepdec)
     }while(0);
 
 }
-#if 0
-static GstFlowReturn beep_dec_parse_and_decode (GstAudioDecoder * dec,
-    GstAdapter *adapter,gint *offset, gint *length)
-{
-    GstBeepDec *beepdec;
-    BeepCoreInterface *IDecoder = NULL;
-    UniACodec_Handle handle;
-    GstFlowReturn ret = GST_FLOW_EOS;
-    uint32 core_ret;
-    GstBuffer *gstbuf;
-    uint8 *inbuf = NULL;
-    uint32 inbuf_size;
-    uint32 inbuf_offset = 0;
-
-    uint8 *outbuf = NULL;
-    uint32 outbuf_size;
-
-
-    GstMapInfo map;
-
-    uint32 status;
-
-    beepdec = GST_BEEP_DEC (dec);
-
-    if(!beepdec || !adapter || !offset || !length)
-        goto bail;
-
-    IDecoder = beepdec->beep_interface;
-    handle = beepdec->handle;
-
-    if(!IDecoder || !handle){
-        goto bail;
-    }
-
-    inbuf_size = gst_adapter_available (adapter);
-
-    inbuf = gst_adapter_map (adapter, inbuf_size);
-
-    do{
-
-        core_ret = IDecoder->decode(handle,inbuf,inbuf_size,&inbuf_offset,
-            &outbuf,&outbuf_size);
-
-        GST_LOG("beep_dec_parse_and_decode RET=%x input size=%d,used size=%d,output_size=%d"
-            ,core_ret,inbuf_size,inbuf_offset,outbuf_size);
-
-        status = core_ret & CORE_STATUS_MASK;
-    
-        if (status == ACODEC_CAPIBILITY_CHANGE) {
-            beep_dec_handle_output_changed(beepdec);
-        }
-
-        if (ACODEC_ERROR_STREAM == core_ret) {
-            GST_WARNING("error = %x\n", core_ret);
-            IDecoder->resetDecoder(handle);
-            goto bail;
-        }else if(core_ret == ACODEC_PROFILE_NOT_SUPPORT){
-            beepdec->err_cnt ++;
-            goto bail;
-        }else if(core_ret == ACODEC_NOT_ENOUGH_DATA){
-            beepdec->not_enough_cnt ++;
-            goto bail;
-        }else if(core_ret == ACODEC_END_OF_STREAM){
-            goto bail;
-        }
-
-        if(outbuf && outbuf_size > 0){
-            gstbuf = gst_audio_decoder_allocate_output_buffer (GST_AUDIO_DECODER (dec), outbuf_size);
-            gstbuf = gst_buffer_make_writable (gstbuf);
-            
-            gst_buffer_fill (gstbuf, 0, outbuf, outbuf_size);
-
-            gst_audio_buffer_reorder_channels (gstbuf, beepdec->audio_format,
-                beepdec->outputformat.channels, beepdec->core_layout, beepdec->out_layout);
-
-            gst_adapter_push (beepdec->adapter, gstbuf);
-            beepdec->err_cnt = 0;
-        }
-
-        if(inbuf_offset == inbuf_size && outbuf_size > 0)
-            goto done;
-
-
-    }while(1);
-
-done:
-    *offset = 0;
-    *length = inbuf_offset;
-    
-    GST_LOG("done");
-
-    ret = GST_FLOW_OK;
-    return ret;
-
-bail:
-
-    if(length && offset){
-        *length = inbuf_size;
-        *offset = inbuf_size;
-    }
-
-    if(gst_adapter_available (beepdec->adapter) && offset){
-        GST_LOG("bail , ok");
-        *offset = 0;
-        ret = GST_FLOW_OK;
-    }else{
-        GST_LOG("bail , eos");
-        ret = GST_FLOW_EOS;
-    }
-    return ret;
-
-}
-#endif
-
 static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
     GstBuffer * buffer)
 {
@@ -893,7 +779,7 @@ begin:
             ret = gst_audio_decoder_finish_frame (dec, NULL, 1);
             break;
         }else if(core_ret == ACODEC_PROFILE_NOT_SUPPORT){
-            beepdec->err_cnt ++;
+            beepdec->err_cnt += 10;
             break;
         }else if(core_ret == ACODEC_NOT_ENOUGH_DATA){
             break;
