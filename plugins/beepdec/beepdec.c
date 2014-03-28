@@ -287,7 +287,7 @@ static gboolean beep_dec_set_init_parameter(GstBeepDec * beep_dec,
         }
 
         if (gst_structure_get_int (structure, "bitrate", &intvalue)) {
-            GST_INFO ("Set rate %d", intvalue);
+            GST_INFO ("Set bitrate %d", intvalue);
             parameter.bitrate = intvalue;
             IDecoder->setDecoderPara(handle, UNIA_BITRATE, &parameter);
         }
@@ -298,7 +298,11 @@ static gboolean beep_dec_set_init_parameter(GstBeepDec * beep_dec,
             IDecoder->setDecoderPara(handle, UNIA_CHANNEL, &parameter);
         }
 
-        //TODO:depth
+        if (gst_structure_get_int (structure, "depth", &intvalue)) {
+            GST_INFO ("Set depth %d", intvalue);
+            parameter.depth = intvalue;
+            IDecoder->setDecoderPara(handle, UNIA_DEPTH, &parameter);
+        }
 
         if (gst_structure_get_int (structure, "block_align", &intvalue)) {
             GST_INFO ("Set block align %d", intvalue);
