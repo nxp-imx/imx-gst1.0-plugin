@@ -2072,7 +2072,7 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
         if (stream_type) {
           mime =
               g_strdup_printf
-              ("%s, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld, framed=(boolean)true, stream-format=%s",
+              ("%s, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld, stream-format=%s",
               codec_mime, stream->info.audio.n_channels,
               stream->info.audio.rate, stream->bitrate, stream_type);
         } else {
@@ -2084,7 +2084,7 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
         }
         break;
       case AUDIO_MPEG2_AAC:
-        codec_mime = "audio/mpeg, mpegversion=(int)2, framed=(boolean)true";
+        codec_mime = "audio/mpeg, mpegversion=(int)2";
         codec = "AAC";
         stream->send_codec_data = TRUE;
         mime =
