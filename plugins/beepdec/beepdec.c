@@ -475,6 +475,7 @@ static gboolean beep_dec_stop (GstAudioDecoder * dec)
 
     beep_core_destroy_interface (beepdec->beep_interface);
     beepdec->beep_interface = NULL;
+
     GST_LOG_OBJECT (beepdec,"beep_dec_stop called ");
     return TRUE;
 }
@@ -807,6 +808,7 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
     handle = beepdec->handle;
     
     if(!IDecoder || !handle){
+        ret = GST_FLOW_FLUSHING;
         goto bail;
     }
 
@@ -843,7 +845,7 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
             beepdec->frame_cnt ++;
             buffer = NULL;
             beepdec->in_cnt--;
-            gst_audio_decoder_finish_frame (dec, NULL, 1);
+            ret = gst_audio_decoder_finish_frame (dec, NULL, 1);
             goto bail;
         }else if(beepdec->frame_cnt == VORBIS_HEADER_FRAME){
             UniACodecParameter parameter;
@@ -884,7 +886,7 @@ begin:
             //send null frame to delete the timestamp
             beepdec->in_cnt--;
             beepdec->err_cnt ++;
-            gst_audio_decoder_finish_frame (dec, NULL, 1);
+            ret = gst_audio_decoder_finish_frame (dec, NULL, 1);
             break;
         }else if(core_ret == ACODEC_PROFILE_NOT_SUPPORT){
             beepdec->err_cnt ++;
@@ -911,7 +913,7 @@ begin:
            if(beepdec->in_cnt > 1 )
            {
                 beepdec->in_cnt--;
-                gst_audio_decoder_finish_frame (dec, temp_buffer, 1);
+                ret = gst_audio_decoder_finish_frame (dec, temp_buffer, 1);
                 GST_LOG_OBJECT (beepdec,"output one frame[%d] size=%d",beepdec->in_cnt,out_size);
            }else{
                 gst_adapter_push (beepdec->adapter, temp_buffer);
@@ -939,9 +941,8 @@ begin:
     if(adapter_size > 0){
         out = gst_adapter_take_buffer (beepdec->adapter, adapter_size);
         beepdec->in_cnt--;
-        gst_audio_decoder_finish_frame (dec, out, 1);
+        ret = gst_audio_decoder_finish_frame (dec, out, 1);
         gst_adapter_clear (beepdec->adapter);
-        ret = GST_FLOW_OK;
         GST_LOG_OBJECT (beepdec,"output frames[%d] size=%d",beepdec->in_cnt,adapter_size);
     }else{
         //gst_audio_decoder_finish_frame (dec, NULL, 1);
