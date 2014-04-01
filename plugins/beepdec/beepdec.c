@@ -840,7 +840,7 @@ begin:
     }
 
     if(beepdec->err_cnt > MAX_PROFILE_ERROR_COUNT)
-        ret = GST_FLOW_NOT_SUPPORTED;
+        ret = GST_FLOW_EOS;
 
 bail:
     return ret;
