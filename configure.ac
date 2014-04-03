@@ -98,11 +98,11 @@ if test "x$HAVE_PKGCONFIG" = "xno"; then
 fi
 
 dnl check target type
-if  test "$PLATFORM" = "MX6" || test "$PLATFORM" = "MX6SL" ;
+if  test "$PLATFORM" = "MX6" || test "$PLATFORM" = "MX6SL" || test "$PLATFORM" = "MX6SX" ;
 then
   AC_MSG_NOTICE(build for $PLATFORM)
 else
-  AC_MSG_ERROR(No target platform specified! Use ./configure PLATFORM=(MX6/MX6SL) to retry)
+  AC_MSG_ERROR(No target platform specified! Use ./configure PLATFORM=(MX6/MX6SL/MX6SX) to retry)
 fi
 
 AC_SUBST(PLATFORM)
@@ -238,9 +238,10 @@ dnl set proper LDFLAGS for plugins
 GST_PLUGIN_LDFLAGS='-module -avoid-version -export-symbols-regex [_]*\(gst_\|Gst\|GST_\).*'
 AC_SUBST(GST_PLUGIN_LDFLAGS)
 
-AM_CONDITIONAL(PLATFORM_IS_MX6X, test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6SL")
+AM_CONDITIONAL(PLATFORM_IS_MX6X, test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6SL" || test "x$PLATFORM" = "xMX6SX")
 AM_CONDITIONAL(PLATFORM_IS_MX6, test "x$PLATFORM" = "xMX6")
 AM_CONDITIONAL(PLATFORM_IS_MX6SL, test "x$PLATFORM" = "xMX6SL")
+AM_CONDITIONAL(PLATFORM_IS_MX6SX, test "x$PLATFORM" = "xMX6SX")
 
 
 CHECK_DISABLE_FEATURE(mp3enc, [Disable mp3 encoder plugin], [MP3_ENC], [mp3_enc_interface.h], [plugin: mp3_enc])
