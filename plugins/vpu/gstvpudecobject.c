@@ -1054,6 +1054,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
     case VPU_FIELD_BT: vmeta->flags = GST_VIDEO_FRAME_FLAG_INTERLACED; break;
     default: GST_WARNING_OBJECT(vpu_dec_object, "unknown field type"); break;
   }
+  GST_DEBUG_OBJECT(vpu_dec_object, "field type: %d\n", out_frame_info.eFieldType);
 
   /* set crop info */
   cmeta = gst_buffer_add_video_crop_meta (out_frame->output_buffer);
@@ -1144,6 +1145,9 @@ gst_vpu_dec_object_handle_input_time_stamp (GstVpuDecObject * vpu_dec_object, \
       vpu_dec_object->new_segment = FALSE;
     }
 
+    GST_DEBUG_OBJECT (vpu_dec_object, "vpu dec input time stamp: %" \
+        GST_TIME_FORMAT, GST_TIME_ARGS (GST_BUFFER_TIMESTAMP (buffer)));
+
     if (vpu_dec_object->use_new_tsm) {
       TSManagerReceive2 (vpu_dec_object->tsm, GST_BUFFER_TIMESTAMP (buffer),
           minfo.size);
@@ -1212,6 +1216,10 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
   gst_vpu_dec_object_set_vpu_input_buf (vpu_dec_object, frame, &in_data);
   if (frame)
     gst_video_codec_frame_unref (frame);
+
+  if (in_data.nSize == 0) {
+    return GST_FLOW_OK;
+  }
 
   while (1) {
 
