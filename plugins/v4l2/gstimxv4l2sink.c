@@ -211,6 +211,8 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
         }
 
         v4l2sink->config_flag |= CONFIG_OVERLAY;
+        //need to configure rotate as PXP will store the previous rotate status
+        v4l2sink->config_flag |= CONFIG_ROTATE;
 
         if (v4l2sink->config_flag & CONFIG_OVERLAY
             || v4l2sink->config_flag & CONFIG_CROP
@@ -319,7 +321,7 @@ gst_imx_v4l2_allocator_cb (gpointer user_data, gint *count)
   guint min, max;
 
   if (v4l2sink->pool) {
-    GstStructure *config;
+   GstStructure *config;
     config = gst_buffer_pool_get_config (v4l2sink->pool);
 
     // check if has alignment option setted.
@@ -540,13 +542,16 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
   if (not_v4l2buffer) {
     GstBuffer *v4l2_buffer = NULL;
-    GstMapInfo info1, info2;
     GstCaps *caps = gst_pad_get_current_caps (GST_VIDEO_SINK_PAD (v4l2sink));
+    GstVideoInfo info;
+    GstVideoFrame frame1, frame2;
 
     GST_DEBUG_OBJECT (v4l2sink, "not v4l2 allocated buffer.");
 
-    if (!v4l2sink->pool && gst_imx_v4l2sink_setup_buffer_pool (v4l2sink, caps) < 0)
+    if (!v4l2sink->pool && gst_imx_v4l2sink_setup_buffer_pool (v4l2sink, caps) < 0) {
+      gst_caps_unref (caps);
       return GST_FLOW_ERROR;
+    }
     if (gst_buffer_pool_set_active (v4l2sink->pool, TRUE) != TRUE) {
       GST_ERROR_OBJECT (v4l2sink, "active pool(%p) failed.", v4l2sink->pool);
       return GST_FLOW_ERROR;
@@ -556,15 +561,17 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
       GST_ERROR_OBJECT (v4l2sink, "acquire buffer from pool(%p) failed.", v4l2sink->pool);
       return GST_FLOW_ERROR;
     }
-    gst_buffer_map (buffer, &info1, GST_MAP_READ);
-    gst_buffer_map (v4l2_buffer, &info2, GST_MAP_WRITE);
-    if (!info1.data || !info2.data || info2.maxsize < info1.size) {
-      GST_ERROR_OBJECT (v4l2sink, "Copy bufer to v4l2buffer failed.");
-        return GST_FLOW_ERROR;
-    }
-    memcpy (info2.data, info1.data, info1.size);
-    gst_buffer_unmap (buffer, &info1);
-    gst_buffer_unmap (v4l2_buffer, &info2);
+
+    gst_video_info_from_caps (&info, caps);
+    gst_video_frame_map (&frame1, &info, v4l2_buffer, GST_MAP_WRITE);
+    gst_video_frame_map (&frame2, &info, buffer, GST_MAP_READ);
+
+    gst_video_frame_copy (&frame1, &frame2);
+
+    gst_video_frame_unmap (&frame1);
+    gst_video_frame_unmap (&frame2);
+    gst_caps_unref (caps);
+
     buffer = v4l2_buffer;
   }
 
