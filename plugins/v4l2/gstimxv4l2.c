@@ -350,13 +350,14 @@ gst_imx_v4l2_get_min_buffer_num (gint type)
   gint num;
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
     if (gimx_chip == CC_MX60)
-      num = MAX (10, MAX (V4L2_HOLDED_BUFFERS, MX60_STREAMON_COUNT));
+      num = MAX (V4L2_HOLDED_BUFFERS, MX60_STREAMON_COUNT);
     else if (gimx_chip == CC_MX6Q)
       num = MAX (V4L2_HOLDED_BUFFERS, MX60_STREAMON_COUNT);
     else 
       num = V4L2_HOLDED_BUFFERS;
 
-    num += 1;
+    //add extra 3 buffers for better performance
+    num += 3;
   }
 
   return num;
