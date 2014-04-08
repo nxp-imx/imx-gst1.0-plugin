@@ -1058,6 +1058,11 @@ gint gst_imx_v4l2out_config_output (gpointer v4l2handle, IMXV4l2Rect *overlay, g
   }
   handle->invisible &= ~INVISIBLE_OUT;
 
+  if (rect->left > 0 && rect->left + rect->width > handle->disp_w)
+    rect->width = handle->disp_w - rect->left;
+  if (rect->top > 0 && rect->top + rect->height > handle->disp_h)
+    rect->height = handle->disp_h - rect->top;
+
   GST_DEBUG ("rect, (%d, %d) -> (%d, %d).", rect->left, rect->top, rect->width, rect->height);
 
   return (*handle->dev_itf.v4l2out_config_output) (handle, &crop);
