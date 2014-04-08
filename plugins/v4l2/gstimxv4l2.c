@@ -609,7 +609,7 @@ gst_imx_v4l2capture_config_usb_camera (IMXV4l2Handle *handle, guint fmt, guint w
   fszenum.index = 0;
   fszenum.pixel_format = fmt;
   while (ioctl (handle->v4l2_fd, VIDIOC_ENUM_FRAMESIZES, &fszenum) >= 0){
-    if (fszenum.discrete.width >= w && fszenum.discrete.height >= h) {
+    if (fszenum.discrete.width == w && fszenum.discrete.height == h) {
       capture_mode = fszenum.index;
       break;
     }

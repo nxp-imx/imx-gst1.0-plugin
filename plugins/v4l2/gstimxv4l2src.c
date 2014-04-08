@@ -473,6 +473,8 @@ gst_imx_v4l2src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
 
   max = min += DEFAULT_FRAMES_IN_V4L2_CAPTURE \
         + v4l2src->frame_plus;
+  if (min > 10)
+    max = min = 10;
   v4l2src->actual_buf_cnt = min;
 
   /* now configure */
