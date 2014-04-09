@@ -2371,7 +2371,7 @@ static void aiurdemux_parse_text (GstAiurDemux * demux, AiurDemuxStream * stream
   
     switch (stream->codec_type) {
       case TXT_DIVX_FEATURE_SUBTITLE:
-        codec_mime = "video/x-avi-unknown, fourcc=(fourcc)DXSB";
+        codec_mime = "subpicture/x-xsub";
         mime =
             g_strdup_printf ("%s, width=(int)%ld, height=(int)%ld", codec_mime,
             stream->info.subtitle.width, stream->info.subtitle.height);
