@@ -40,7 +40,7 @@ GST_DEBUG_CATEGORY_EXTERN (imxv4l2_debug);
 
 #define V4L2_HOLDED_BUFFERS (2)
 #define MX6Q_STREAMON_COUNT (1)
-#define MX60_STREAMON_COUNT (2)
+#define MX60_STREAMON_COUNT (1)
 
 #define MAX_BUFFER (32)
 #define UPALIGNTO8(a) ((a + 7) & (~7))
@@ -352,12 +352,11 @@ gst_imx_v4l2_get_min_buffer_num (gint type)
     if (gimx_chip == CC_MX60)
       num = MAX (V4L2_HOLDED_BUFFERS, MX60_STREAMON_COUNT);
     else if (gimx_chip == CC_MX6Q)
-      num = MAX (V4L2_HOLDED_BUFFERS, MX60_STREAMON_COUNT);
+      num = MAX (V4L2_HOLDED_BUFFERS, MX6Q_STREAMON_COUNT);
     else 
       num = V4L2_HOLDED_BUFFERS;
 
-    //add extra 3 buffers for better performance
-    num += 3;
+    num += 1;
   }
 
   return num;

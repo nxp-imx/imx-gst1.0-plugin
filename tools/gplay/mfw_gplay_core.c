@@ -1619,37 +1619,25 @@ fsl_player_ret_val fsl_player_set_video_crop(fsl_player_handle handle, fsl_playe
 {
     fsl_player* pplayer = (fsl_player*)handle;
     fsl_player_property* pproperty = (fsl_player_property*)pplayer->property_handle;
-    GstElement* auto_video_sink = NULL;
     GstElement* actual_video_sink = NULL;
 
-    g_object_get(pproperty->playbin, "video-sink", &auto_video_sink, NULL);
-    if( NULL == auto_video_sink )
-    {
-        FSL_PLAYER_PRINT("%s(): Can not find auto_video_sink\n", __FUNCTION__);
-        return FSL_PLAYER_FAILURE;
+    actual_video_sink = get_video_sink (handle);
+    if (!actual_video_sink) {
+      FSL_PLAYER_PRINT("Can't get video sink.\n");
+      return FSL_PLAYER_FAILURE;
     }
-    actual_video_sink = gst_bin_get_by_name((GstBin*)auto_video_sink, "videosink-actual-sink-mfw_v4l");
-    if( NULL == actual_video_sink )
-    {
-        FSL_PLAYER_PRINT("%s(): Can not find actual_video_sink\n", __FUNCTION__);    
-        return FSL_PLAYER_FAILURE;
-    }
-    FSL_PLAYER_PRINT("%s(): AutoVideoSink=%s : ActualVideoSink=%s\n", __FUNCTION__, GST_OBJECT_NAME(auto_video_sink), GST_OBJECT_NAME(actual_video_sink));
 
     pproperty->video_crop.left = video_crop.left;
-    pproperty->video_crop.right = video_crop.right;
     pproperty->video_crop.top = video_crop.top;
-    pproperty->video_crop.bottom = video_crop.bottom;
-    g_object_set(G_OBJECT(actual_video_sink), "crop-left-by-pixel", pproperty->video_crop.left, NULL);
-    g_object_set(G_OBJECT(actual_video_sink), "crop-right-by-pixel", pproperty->video_crop.right, NULL);
-    g_object_set(G_OBJECT(actual_video_sink), "crop-top-by-pixel", pproperty->video_crop.top, NULL);
-    g_object_set(G_OBJECT(actual_video_sink), "crop-bottom-by-pixel", pproperty->video_crop.bottom, NULL);
+    pproperty->video_crop.width = video_crop.width;
+    pproperty->video_crop.height = video_crop.height;
+    g_object_set(G_OBJECT(actual_video_sink), "crop-top", pproperty->video_crop.top, NULL);
+    g_object_set(G_OBJECT(actual_video_sink), "crop-left", pproperty->video_crop.left, NULL);
+    g_object_set(G_OBJECT(actual_video_sink), "crop-width", pproperty->video_crop.width, NULL);
+    g_object_set(G_OBJECT(actual_video_sink), "crop-height", pproperty->video_crop.height, NULL);
 
     update_mfw_v4lsink_parameter(actual_video_sink);
     
-    g_object_unref (actual_video_sink);
-    g_object_unref (auto_video_sink);
-
     return FSL_PLAYER_SUCCESS;
 }
 
@@ -1829,14 +1817,14 @@ fsl_player_ret_val fsl_player_get_property(fsl_player_handle handle, fsl_player_
                 &(pproperty->video_crop.left), NULL);
             //FIXME: crop changed.
             g_object_get(G_OBJECT(actual_video_sink), "crop-width", \
-                    &(pproperty->video_crop.right), NULL);
+                    &(pproperty->video_crop.width), NULL);
             g_object_get(G_OBJECT(actual_video_sink), "crop-height", \
-                    &(pproperty->video_crop.bottom), NULL);
+                    &(pproperty->video_crop.height), NULL);
            
             ((fsl_player_video_crop*)pstructure)->left = pproperty->video_crop.left;
-            ((fsl_player_video_crop*)pstructure)->right = pproperty->video_crop.right;
             ((fsl_player_video_crop*)pstructure)->top = pproperty->video_crop.top;
-            ((fsl_player_video_crop*)pstructure)->bottom = pproperty->video_crop.bottom;
+            ((fsl_player_video_crop*)pstructure)->width = pproperty->video_crop.width;
+            ((fsl_player_video_crop*)pstructure)->height = pproperty->video_crop.height;
             
             break;
         }
@@ -1981,58 +1969,10 @@ fsl_player_ret_val fsl_player_set_property(fsl_player_handle handle, fsl_player_
         }
         case FSL_PLAYER_PROPERTY_DISP_PARA:
         {
-            GstElement* auto_video_sink = NULL;
-            GstElement* actual_video_sink = NULL;
-
-            g_object_get(pproperty->playbin, "video-sink", &auto_video_sink, NULL);
-            if( NULL == auto_video_sink )
-            {
-                FSL_PLAYER_PRINT("%s(): Can not find auto_video_sink\n", __FUNCTION__);
-                return FSL_PLAYER_FAILURE;
-            }
-            actual_video_sink = gst_bin_get_by_name((GstBin*)auto_video_sink, "videosink-actual-sink-mfw_v4l");
-            if( NULL == actual_video_sink )
-            {
-                FSL_PLAYER_PRINT("%s(): Can not find actual_video_sink\n", __FUNCTION__);    
-                return FSL_PLAYER_FAILURE;
-            }
-            FSL_PLAYER_PRINT("%s(): AutoVideoSink=%s : ActualVideoSink=%s\n", __FUNCTION__, GST_OBJECT_NAME(auto_video_sink), GST_OBJECT_NAME(actual_video_sink));
-            g_object_set(G_OBJECT(actual_video_sink), VIDEO_LEFT, ((fsl_player_display_parameter*)pstructure)->offsetx, NULL);
-            g_object_set(G_OBJECT(actual_video_sink), VIDEO_TOP, ((fsl_player_display_parameter*)pstructure)->offsety, NULL);
-            g_object_set(G_OBJECT(actual_video_sink), VIDEO_WIDTH, ((fsl_player_display_parameter*)pstructure)->disp_width, NULL);
-            g_object_set(G_OBJECT(actual_video_sink), VIDEO_HEIGHT, ((fsl_player_display_parameter*)pstructure)->disp_height, NULL);
-            
-            g_object_unref (actual_video_sink);
-            g_object_unref (auto_video_sink);
-
             break;
         }
         case FSL_PLAYER_PROPERTY_VIDEO_CROP:
         {
-            GstElement* auto_video_sink = NULL;
-            GstElement* actual_video_sink = NULL;
-
-            g_object_get(pproperty->playbin, "video-sink", &auto_video_sink, NULL);
-            if( NULL == auto_video_sink )
-            {
-                FSL_PLAYER_PRINT("%s(): Can not find auto_video_sink\n", __FUNCTION__);
-                return FSL_PLAYER_FAILURE;
-            }
-            actual_video_sink = gst_bin_get_by_name((GstBin*)auto_video_sink, "videosink-actual-sink-mfw_v4l");
-            if( NULL == actual_video_sink )
-            {
-                FSL_PLAYER_PRINT("%s(): Can not find actual_video_sink\n", __FUNCTION__);    
-                return FSL_PLAYER_FAILURE;
-            }
-            FSL_PLAYER_PRINT("%s(): AutoVideoSink=%s : ActualVideoSink=%s\n", __FUNCTION__, GST_OBJECT_NAME(auto_video_sink), GST_OBJECT_NAME(actual_video_sink));
-            g_object_set(G_OBJECT(actual_video_sink), "crop-left-by-pixel", ((fsl_player_video_crop*)pstructure)->left, NULL);
-            g_object_set(G_OBJECT(actual_video_sink), "crop-right-by-pixel", ((fsl_player_video_crop*)pstructure)->right, NULL);
-            g_object_set(G_OBJECT(actual_video_sink), "crop-top-by-pixel", ((fsl_player_video_crop*)pstructure)->top, NULL);
-            g_object_set(G_OBJECT(actual_video_sink), "crop-bottom-by-pixel", ((fsl_player_video_crop*)pstructure)->bottom, NULL);
-            
-            g_object_unref (actual_video_sink);
-            g_object_unref (auto_video_sink);
-
             break;
         }
         default:

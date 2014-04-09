@@ -151,9 +151,9 @@ typedef struct
 typedef struct
 {
     fsl_player_s32 left;
-    fsl_player_s32 right;
     fsl_player_s32 top;
-    fsl_player_s32 bottom;
+    fsl_player_s32 width;
+    fsl_player_s32 height;
 } fsl_player_video_crop;
 
 /* metadata information */

@@ -1072,25 +1072,25 @@ int main(int argc,char *argv[])
             {
                 fsl_player_video_crop sVideoCrop;
                 fsl_player_s8 s8Left[128];
-                fsl_player_s8 s8Right[128];
                 fsl_player_s8 s8Top[128];
-                fsl_player_s8 s8Bottom[128];
+                fsl_player_s8 s8Width[128];
+                fsl_player_s8 s8Height[128];
                 pplayer->klass->get_property(pplayer, FSL_PLAYER_PROPERTY_VIDEO_CROP, \
                         (void*)(&sVideoCrop));
-                PRINT("Current [left: %d,ritht: %d,top: %d,bottom: %d]\n", \
-                        sVideoCrop.left, sVideoCrop.right, sVideoCrop.top, sVideoCrop.bottom);
-                PRINT("Input [left,ritht,top,bottom]:");
+                PRINT("Current [left: %d,top: %d,width: %d,height: %d]\n", \
+                        sVideoCrop.left, sVideoCrop.top, sVideoCrop.width, sVideoCrop.height);
+                PRINT("Input [left,top,width,height]:");
                 kb_restore_term(STDIN_FILENO);
                 gbdisplay = FSL_PLAYER_FALSE;
-                scanf("%s %s %s %s",s8Left,s8Right,s8Top,s8Bottom);
+                scanf("%s %s %s %s",s8Left,s8Top,s8Width,s8Height);
                 gbdisplay = FSL_PLAYER_TRUE;
                 kb_set_raw_term(STDIN_FILENO);
                 sVideoCrop.left = atoi(s8Left);
-                sVideoCrop.right = atoi(s8Right);
                 sVideoCrop.top = atoi(s8Top);
-                sVideoCrop.bottom = atoi(s8Bottom);
-                if( sVideoCrop.left < 0 || sVideoCrop.right < 0
-                    || sVideoCrop.top < 0 || sVideoCrop.bottom < 0 )
+                sVideoCrop.width = atoi(s8Width);
+                sVideoCrop.height = atoi(s8Height);
+                if( sVideoCrop.left < 0 || sVideoCrop.width < 0
+                    || sVideoCrop.top < 0 || sVideoCrop.height < 0 )
                 {
                     printf("Invalid video crop parameters!\n");
                     break;
@@ -1242,7 +1242,7 @@ int main(int argc,char *argv[])
 		    {
 		        fsl_player_video_crop crop = {0};
 		        pplayer->klass->get_property(pplayer, FSL_PLAYER_PROPERTY_VIDEO_CROP, (void*)(&crop));
-			printf("Current video crop : %d %d %d %d\n", crop.left, crop.right, crop.top, crop.bottom);
+			printf("Current video crop : %d %d %d %d\n", crop.left, crop.top, crop.width, crop.height);
 			break;
 		    }
 		    case 't':
