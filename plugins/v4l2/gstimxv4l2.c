@@ -38,8 +38,9 @@ GST_DEBUG_CATEGORY_EXTERN (imxv4l2_debug);
 #define GST_CAT_DEFAULT imxv4l2_debug
 
 
+#define V4L2_HOLDED_BUFFERS (2)
 #define MX6Q_STREAMON_COUNT (1)
-#define MX60_STREAMON_COUNT (1)
+#define MX60_STREAMON_COUNT (2)
 
 #define MAX_BUFFER (32)
 #define UPALIGNTO8(a) ((a + 7) & (~7))
@@ -349,14 +350,14 @@ gst_imx_v4l2_get_min_buffer_num (gint type)
   gint num;
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
     if (gimx_chip == CC_MX60)
-      num = MX60_STREAMON_COUNT;
+      num = MAX (V4L2_HOLDED_BUFFERS, MX60_STREAMON_COUNT);
     else if (gimx_chip == CC_MX6Q)
-      num =  MX6Q_STREAMON_COUNT;
+      num = MAX (V4L2_HOLDED_BUFFERS, MX60_STREAMON_COUNT);
     else 
-      num = 1;
+      num = V4L2_HOLDED_BUFFERS;
 
-    //add extra 2 buffers for better performance
-    num += 2;
+    //add extra 3 buffers for better performance
+    num += 3;
   }
 
   return num;
@@ -1336,7 +1337,7 @@ gint gst_imx_v4l2_dequeue_buffer (gpointer v4l2handle, GstBuffer **buffer)
   struct v4l2_buffer v4l2buf;
   gint trycnt = 0;
 
-  if (handle->queued_count <= handle->streamon_count)
+  if (handle->queued_count <= MAX(V4L2_HOLDED_BUFFERS, handle->streamon_count))
     return 0;
 
   if (handle->invisible) {
