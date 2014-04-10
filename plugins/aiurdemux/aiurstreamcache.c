@@ -231,19 +231,24 @@ gst_aiur_stream_cache_add_buffer (GstAiurStreamCache * cache,
       goto bail;
     } else {
       GstMapInfo map;
-      gst_buffer_map(buffer,&map,GST_MAP_WRITE);
-      map.data += (cache->ignore_size);
-      map.size -= (cache->ignore_size);
+      GstBuffer * newBuffer;
+      guint8 *inbuf = NULL;
+      gst_buffer_map (buffer, &map, GST_MAP_READ);
+      size = map.size;
+      inbuf = map.data;
       gst_buffer_unmap(buffer,&map);
-      //GST_BUFFER_DATA (buffer) += (cache->ignore_size);
-      //GST_BUFFER_SIZE (buffer) -= (cache->ignore_size);
-      size = gst_buffer_get_size (buffer);
-      cache->ignore_size = 0;
-    }
-    //g_print("cache offset %lld\n", cache->offset);
-  }
 
-  gst_adapter_push (cache->adapter, buffer);
+      newBuffer = gst_buffer_new_and_alloc (size - cache->ignore_size);
+      gst_buffer_fill(newBuffer,0,(guint8 *)inbuf+cache->ignore_size,size - cache->ignore_size);
+      cache->ignore_size = 0;
+
+      gst_adapter_push (cache->adapter, newBuffer);
+      newBuffer = NULL;
+    }
+
+  }else{
+    gst_adapter_push (cache->adapter, buffer);
+  }
   g_cond_signal (&cache->produce_cond);
 
   buffer = NULL;
