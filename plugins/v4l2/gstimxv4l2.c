@@ -80,16 +80,16 @@ typedef struct {
   gchar *device;
   gint type;
   int v4l2_fd;
-  guint disp_w;
-  guint disp_h;
+  gint disp_w;
+  gint disp_h;
   int device_map_id;
   gboolean streamon;
   gint invisible;
   gint streamon_count;
   gint queued_count;
   guint in_fmt;
-  guint in_w;
-  guint in_h;
+  gint in_w;
+  gint in_h;
   IMXV4l2Rect in_crop;
   gboolean do_deinterlace;
   gint buffer_count;
@@ -923,17 +923,21 @@ gst_imx_v4l2out_calc_crop (IMXV4l2Handle *handle,
 
   ratio = (gdouble)handle->in_crop.width / (gdouble)result->w;
   if ((rect_out->left + result->x) < 0) {
-    rect_crop->left = ABS(rect_out->left + result->x) * ratio;
-    rect_crop->width = MIN(handle->in_crop.width - rect_crop->left, handle->disp_w * ratio);
-    rect_out->width = result->w + (rect_out->left + result->x);
+    rect_crop->left = -(rect_out->left + result->x) * ratio;
+    rect_crop->width = MIN (handle->in_crop.width - rect_crop->left, handle->disp_w * ratio);
+    rect_out->width = MIN ((result->w + (rect_out->left + result->x)), handle->disp_w);
     rect_out->left = 0;
     need_crop = TRUE;
   }
   else if ((rect_out->left + result->x + result->w) > handle->disp_w) {
     rect_crop->left = 0;
-    rect_crop->width = (rect_out->left + result->x + result->w - handle->disp_w) * ratio;
+    rect_crop->width = (handle->disp_w - (rect_out->left + result->x)) * ratio;
+    if ((gint)rect_crop->width < 0)
+      rect_crop->width = 0;
     rect_out->left = rect_out->left + result->x;
-    rect_out->width = result->w;
+    rect_out->width = handle->disp_w - rect_out->left;
+    if (rect_out->width < 0)
+      rect_out->width = 0;
     need_crop = TRUE;
   }
   else {
@@ -944,17 +948,21 @@ gst_imx_v4l2out_calc_crop (IMXV4l2Handle *handle,
   }
 
   if ((rect_out->top + result->y) < 0) {
-    rect_crop->top = ABS(rect_out->top + result->y) * ratio;
-    rect_crop->height = MIN(handle->in_crop.height - rect_crop->top, handle->disp_h * ratio);
-    rect_out->height = result->h + (rect_out->top + result->y);
+    rect_crop->top = -(rect_out->top + result->y) * ratio;
+    rect_crop->height = MIN (handle->in_crop.height - rect_crop->top, handle->disp_h * ratio);
+    rect_out->height = MIN ((result->h + (rect_out->top + result->y)), handle->disp_h);
     rect_out->top = 0;
     need_crop = TRUE;
   }
   else if ((rect_out->top + result->y + result->h) > handle->disp_h) {
     rect_crop->top = 0;
-    rect_crop->height = (rect_out->top + result->y + result->h - handle->disp_h) * ratio;
+    rect_crop->height = (handle->disp_h - (rect_out->top + result->y)) * ratio;
+    if ((gint)rect_crop->height < 0)
+      rect_crop->height = 0;
     rect_out->top = rect_out->top + result->y;
-    rect_out->height = result->h;
+    rect_out->height = handle->disp_h - rect_out->top;
+    if (rect_out->height < 0)
+      rect_out->height = 0;
     need_crop = TRUE;
   }
   else {
@@ -1056,11 +1064,6 @@ gint gst_imx_v4l2out_config_output (gpointer v4l2handle, IMXV4l2Rect *overlay, g
     return 1;
   }
   handle->invisible &= ~INVISIBLE_OUT;
-
-  if (rect->left > 0 && rect->left + rect->width > handle->disp_w)
-    rect->width = handle->disp_w - rect->left;
-  if (rect->top > 0 && rect->top + rect->height > handle->disp_h)
-    rect->height = handle->disp_h - rect->top;
 
   GST_DEBUG ("rect, (%d, %d) -> (%d, %d).", rect->left, rect->top, rect->width, rect->height);
 
