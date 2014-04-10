@@ -61,8 +61,6 @@ enum
   NV12,
   I420,
   YV12,
-  TILED,
-  TILED_FIELD,
   OUTPUT_FORMAT_MAX
 };
 
@@ -81,10 +79,6 @@ gst_vpu_dec_output_format_get_type (void)
           "I420"},
       {YV12, "YV12 format",
           "YV12"},
-      {TILED, "Tiled format",
-          "tiled"},
-      {TILED_FIELD, "Tiled field format",
-          "tiledfield"},
       {0, NULL, NULL}
     };
 
@@ -740,20 +734,15 @@ gst_vpu_dec_object_register_frame_buffer (GstVpuDecObject * vpu_dec_object, \
     }
 
     mem_block = gst_buffer_query_phymem_block (buffer);
-    //FIXME: for tiled format.
     vpu_frame->pbufY = mem_block->paddr;
     vpu_frame->pbufCb = vpu_frame->pbufY + \
       (GST_VIDEO_FRAME_COMP_DATA (&frame, 1) - GST_VIDEO_FRAME_COMP_DATA (&frame, 0));
     vpu_frame->pbufCr = vpu_frame->pbufCb + \
       (GST_VIDEO_FRAME_COMP_DATA (&frame, 2) - GST_VIDEO_FRAME_COMP_DATA (&frame, 1));
-    //unsigned char* pbufY_tilebot;	//for field tile: luma bottom pointer
-    //unsigned char* pbufCb_tilebot;	//for field tile: chroma bottom pointer
 
     vpu_frame->pbufVirtY = GST_VIDEO_FRAME_COMP_DATA (&frame, 0);
     vpu_frame->pbufVirtCb = GST_VIDEO_FRAME_COMP_DATA (&frame, 1);
     vpu_frame->pbufVirtCr = GST_VIDEO_FRAME_COMP_DATA (&frame, 2);
-    //unsigned char* pbufVirtY_tilebot;	//for field tile: luma bottom pointer
-    //unsigned char* pbufVirtCb_tilebot;	//for field tile: chroma bottom pointer
 
     gst_video_frame_unmap (&frame);
 
