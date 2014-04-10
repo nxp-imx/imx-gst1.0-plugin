@@ -96,6 +96,7 @@ typedef struct {
   gint allocated;
   IMXV4l2BufferPair buffer_pair[MAX_BUFFER];
   gint rotate;
+  guint *support_format_table;
   IMXV4l2DeviceItf dev_itf;
   struct v4l2_buffer * v4lbuf_queued_before_streamon[MAX_BUFFER];
   gboolean prev_need_crop;
@@ -129,6 +130,20 @@ static IMXV4l2FmtMap g_imxv4l2fmt_maps[] = {
 static guint g_camera_format[] = {
   V4L2_PIX_FMT_YUV420,
   V4L2_PIX_FMT_NV12,
+  V4L2_PIX_FMT_YUYV,
+  V4L2_PIX_FMT_UYVY,
+  0,
+};
+
+static guint g_camera_format_IPU[] = {
+  V4L2_PIX_FMT_YUV420,
+  V4L2_PIX_FMT_NV12,
+  V4L2_PIX_FMT_YUYV,
+  V4L2_PIX_FMT_UYVY,
+  0,
+};
+
+static guint g_camera_format_PXP[] = {
   V4L2_PIX_FMT_YUYV,
   V4L2_PIX_FMT_UYVY,
   0,
@@ -410,7 +425,7 @@ gst_imx_v4l2_get_caps (gpointer v4l2handle)
 	struct v4l2_fmtdesc fmt;
 	struct v4l2_frmsizeenum frmsize;
 	struct v4l2_frmivalenum frmival;
-  gint i, vformat;
+  gint i, index, vformat;
   GstCaps *caps = NULL;
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
 
@@ -436,11 +451,7 @@ gst_imx_v4l2_get_caps (gpointer v4l2handle)
           frmival.pixel_format = fmt.pixelformat;
           frmival.width = frmsize.discrete.width;
           frmival.height = frmsize.discrete.height;
-          //FIXME: workaround for driver can't support VIDIOC_ENUM_FRAMEINTERVALS.
-          //on MX6Q. MX6SL can support it.
-          //while (ioctl(handle->v4l2_fd, VIDIOC_ENUM_FRAMEINTERVALS, &frmival) >= 0) {
-          frmival.discrete.numerator = 1;
-          frmival.discrete.denominator = 30;
+          while (ioctl(handle->v4l2_fd, VIDIOC_ENUM_FRAMEINTERVALS, &frmival) >= 0) {
             GST_INFO ("frame rate: %d/%d", frmival.discrete.denominator, frmival.discrete.numerator);
             for (i=0; i<sizeof(g_imxv4l2fmt_maps)/sizeof(IMXV4l2FmtMap); i++) {
               if (fmt.pixelformat == g_imxv4l2fmt_maps[i].v4l2fmt) {
@@ -458,8 +469,31 @@ gst_imx_v4l2_get_caps (gpointer v4l2handle)
                 }
               }
             }
+            // Add hard code format.
+            if (handle->support_format_table) {
+              index = 0;
+              while (handle->support_format_table[index]) {
+                for (i=0; i<sizeof(g_imxv4l2fmt_maps)/sizeof(IMXV4l2FmtMap); i++) {
+                  if (handle->support_format_table[index] == g_imxv4l2fmt_maps[i].v4l2fmt) {
+                    if (!caps)
+                      caps = gst_caps_new_empty ();
+                    if (caps) {
+                      GstStructure * structure = gst_structure_from_string( \
+                          g_imxv4l2fmt_maps[i].caps_str, NULL);
+                      gst_structure_set (structure, "width", G_TYPE_INT, frmsize.discrete.width, NULL);
+                      gst_structure_set (structure, "height", G_TYPE_INT, frmsize.discrete.height, NULL);
+                      gst_structure_set (structure, "framerate", GST_TYPE_FRACTION, \
+                          frmival.discrete.denominator, frmival.discrete.numerator, NULL);
+                      gst_caps_append_structure (caps, structure);
+                      GST_INFO ("Added one caps\n");
+                    }
+                  }
+                }
+                index ++;
+              }
+            }
             frmival.index++;
-          //}
+          }
         }
         frmsize.index++;
       }
@@ -720,14 +754,17 @@ gst_imx_v4l2capture_set_function (IMXV4l2Handle *handle)
     
     if (!strncmp (chip.match.name, MXC_V4L2_CAPTURE_CAMERA_NAME, 2)) {
       handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_camera;
+      handle->support_format_table = g_camera_format_IPU;
     } else if (!strncmp (chip.match.name, MXC_V4L2_CAPTURE_TVIN_NAME, 3)) {
       handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_tvin;
+      handle->support_format_table = g_camera_format_IPU;
     } else {
       GST_ERROR ("can't identify capture sensor type.\n");
       return -1;
     }
   } else if (!strcmp (cap.driver, PXP_V4L2_CAPTURE_NAME)) {
       handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_pxp;
+      handle->support_format_table = g_camera_format_PXP;
   } else {
       handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_usb_camera;
   }
