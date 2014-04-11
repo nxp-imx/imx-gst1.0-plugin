@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -17,25 +17,20 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
+#ifndef __DISPLAY_H__
+#define __DISPLAY_H__
+
+#include "osink_common.h"
+
+gint scan_displays (gpointer **phandle, gint *pcount);
+void free_display (gpointer handle);
+gchar *get_display_name(gpointer display);
+gint get_display_format(gpointer display);
+gint get_display_res (gpointer display, gint *width, gint *height);
+gint init_display (gpointer display);
+void deinit_display (gpointer display);
+gint clear_display (gpointer display);
+gint get_next_display_buffer (gpointer display, SurfaceBuffer *buffer);
+gint flip_display_buffer (gpointer display, SurfaceBuffer *buffer);
+
 #endif
-
-#include "gstimxv4l2sink.h"
-#include "gstimxv4l2src.h"
-
-static gboolean
-plugin_init (GstPlugin * plugin)
-{
-  if (!gst_element_register (plugin, "imxv4l2sink", IMX_GST_PLUGIN_RANK,
-        GST_TYPE_IMX_V4L2SINK))
-    return FALSE;
-
-  if (!gst_element_register (plugin, "imxv4l2src", IMX_GST_PLUGIN_RANK,
-        GST_TYPE_IMX_V4L2SRC))
-    return FALSE;
-
-  return TRUE;
-}
-
-IMX_GST_PLUGIN_DEFINE (imxv4l2, "IMX SoC v4l2-based video source/sink", plugin_init);

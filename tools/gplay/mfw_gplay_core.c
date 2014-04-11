@@ -721,7 +721,8 @@ fsl_player_handle fsl_player_init(fsl_player_config * config)
     }
 
     if (!config->video_sink_name)
-      config->video_sink_name = "imxv4l2sink";
+      //config->video_sink_name = "imxv4l2sink";
+      config->video_sink_name = "overlaysink";
 
     g_print("Generate VideoSink %s\n", config->video_sink_name);
     pproperty->video_sink = gst_parse_launch(config->video_sink_name, NULL);

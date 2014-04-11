@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <sys/utsname.h>
 #include <gst/gst.h>
+#include <string.h>
 
 #define IMX_GST_PLUGIN_AUTHOR "Multimedia Team <shmmmw@freescale.com>"
 #define IMX_GST_PLUGIN_PACKAGE_NAME "Freescle Gstreamer Multimedia Plugins"
@@ -193,14 +194,18 @@ getChipCodeFromSocid (void)
 
 #define KERN_VER(a, b, c) (((a) << 16) + ((b) << 8) + (c))
 
-static CHIP_CODE
-getChipCode (void)
+static CHIP_CODE gimx_chip_code = CC_UNKN;
+
+static CHIP_CODE imx_chip_code (void)
 {
   struct utsname sys_name;
   int kv, kv_major, kv_minor, kv_rel;
   char soc_name[255];
   int rev_major, rev_minor;
   int idx, num;
+
+  if (gimx_chip_code != CC_UNKN)
+    return gimx_chip_code;
 
   if (uname(&sys_name) < 0) {
     g_print("get kernel version via uname failed.\n");
@@ -216,11 +221,11 @@ getChipCode (void)
   //GST_INFO("kernel:%s, %d.%d.%d\n", sys_name.release, kv_major, kv_minor, kv_rel);
 
   if (kv < KERN_VER(3, 10, 0))
-    return getChipCodeFromCpuinfo();
+    gimx_chip_code = getChipCodeFromCpuinfo();
   else
-    return getChipCodeFromSocid();
+    gimx_chip_code = getChipCodeFromSocid();
 
-  return CC_UNKN;
+  return gimx_chip_code;
 }
 
 #endif

@@ -274,6 +274,7 @@ plugins/aiurdemux/aiur_registry_1.0.arm11.cf
 plugins/beepdec/Makefile
 plugins/beepdec/beep_registry_1.0.arm12.cf
 plugins/v4l2/Makefile
+plugins/overlay_sink/Makefile
 plugins/vpu/Makefile
 tools/Makefile
 tools/gplay/Makefile)

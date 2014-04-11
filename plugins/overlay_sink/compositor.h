@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -17,25 +17,18 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
+#ifndef __COMPOSITOR_H__
+#define __COMPOSITOR_H__
+
+#include "osink_common.h"
+
+
+gpointer create_compositor(gpointer device);
+void destroy_compositor(gpointer compositor);
+gpointer compositor_add_surface (gpointer compositor, SurfaceInfo *surface_info);
+gint compositor_remove_surface (gpointer compositor, gpointer surface);
+gint compositor_config_surface (gpointer compositor, gpointer surface, SurfaceInfo *surface_info);
+gboolean compositor_check_need_clear_display (gpointer compositor);
+gint compositor_update_surface (gpointer compositor, gpointer surface, SurfaceBuffer *buffer, SurfaceBuffer *dest);
+
 #endif
-
-#include "gstimxv4l2sink.h"
-#include "gstimxv4l2src.h"
-
-static gboolean
-plugin_init (GstPlugin * plugin)
-{
-  if (!gst_element_register (plugin, "imxv4l2sink", IMX_GST_PLUGIN_RANK,
-        GST_TYPE_IMX_V4L2SINK))
-    return FALSE;
-
-  if (!gst_element_register (plugin, "imxv4l2src", IMX_GST_PLUGIN_RANK,
-        GST_TYPE_IMX_V4L2SRC))
-    return FALSE;
-
-  return TRUE;
-}
-
-IMX_GST_PLUGIN_DEFINE (imxv4l2, "IMX SoC v4l2-based video source/sink", plugin_init);

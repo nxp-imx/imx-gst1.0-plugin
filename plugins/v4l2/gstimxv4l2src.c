@@ -569,7 +569,7 @@ gst_imx_v4l2src_acquire_buffer (GstImxV4l2Src * v4l2src, GstBuffer ** buf)
       GST_ERROR_OBJECT (v4l2src, "gst_buffer_pool_acquire_buffer failed.");
       return ret;
     }
-    if (gst_imx_v4l2_queue_buffer (v4l2src->v4l2handle, buffer, flags) < 0) {
+    if (gst_imx_v4l2_queue_gstbuffer (v4l2src->v4l2handle, buffer, flags) < 0) {
       GST_ERROR_OBJECT (v4l2src, "Queue buffer %p failed.", buffer);
       return GST_FLOW_ERROR;
     }
@@ -577,7 +577,7 @@ gst_imx_v4l2src_acquire_buffer (GstImxV4l2Src * v4l2src, GstBuffer ** buf)
         v4l2src->gstbuffer_in_v4l2, buffer);
   }
  
-  if (gst_imx_v4l2_dequeue_buffer (v4l2src->v4l2handle, buf) < 0) {
+  if (gst_imx_v4l2_dequeue_gstbuffer (v4l2src->v4l2handle, buf) < 0) {
     GST_ERROR_OBJECT (v4l2src, "Dequeue buffer failed.");
     return GST_FLOW_ERROR;
   }

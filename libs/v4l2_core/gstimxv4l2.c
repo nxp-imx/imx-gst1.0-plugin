@@ -34,9 +34,9 @@
 #include "gstimxcommon.h"
 #include "gstimxv4l2.h"
 
-GST_DEBUG_CATEGORY_EXTERN (imxv4l2_debug);
+//used in imx v4l2 core debug
+GST_DEBUG_CATEGORY (imxv4l2_debug);
 #define GST_CAT_DEFAULT imxv4l2_debug
-
 
 #define V4L2_HOLDED_BUFFERS (2)
 #define MX6Q_STREAMON_COUNT (1)
@@ -54,10 +54,9 @@ GST_DEBUG_CATEGORY_EXTERN (imxv4l2_debug);
 #define MXC_V4L2_CAPTURE_TVIN_NAME "adv"
 #define PXP_V4L2_CAPTURE_NAME "csi_v4l2"
 
-extern CHIP_CODE gimx_chip;
-
 typedef struct {
   struct v4l2_buffer v4l2buffer;
+  PhyMemBlock *v4l2memblk;
   GstBuffer *gstbuffer;
 } IMXV4l2BufferPair;
 
@@ -65,6 +64,8 @@ typedef gint (*V4l2outConfigInput) (void *handle, guint fmt, guint w, guint h, \
     IMXV4l2Rect *crop);
 typedef gint (*V4l2outConfigOutput) (void *handle, struct v4l2_crop *crop);
 typedef gint (*V4l2outConfigRotate) (void *handle, gint rotate);
+typedef gint (*V4l2outConfigAlpha) (void *handle, guint alpha);
+typedef gint (*V4l2outConfigColorkey) (void *handle, gboolean enable, guint color_key);
 typedef gint (*V4l2captureConfig) (void *handle, guint fmt, guint w, guint h, \
     guint fps_n, guint fps_d);
 static GstCaps *gst_imx_v4l2capture_get_device_caps ();
@@ -73,6 +74,8 @@ typedef struct {
   V4l2outConfigInput v4l2out_config_input;
   V4l2outConfigOutput v4l2out_config_output;
   V4l2outConfigRotate v4l2out_config_rotate;
+  V4l2outConfigAlpha v4l2out_config_alpha;
+  V4l2outConfigColorkey v4l2out_config_colorkey;
   V4l2captureConfig v4l2capture_config;
 } IMXV4l2DeviceItf;
 
@@ -82,7 +85,7 @@ typedef struct {
   int v4l2_fd;
   gint disp_w;
   gint disp_h;
-  int device_map_id;
+  gint device_map_id;
   gboolean streamon;
   gint invisible;
   gint streamon_count;
@@ -100,6 +103,8 @@ typedef struct {
   IMXV4l2DeviceItf dev_itf;
   struct v4l2_buffer * v4lbuf_queued_before_streamon[MAX_BUFFER];
   gboolean prev_need_crop;
+  guint alpha;
+  guint color_key;
 } IMXV4l2Handle;
 
 typedef struct {
@@ -109,6 +114,12 @@ typedef struct {
   guint bits_per_pixel;
   guint flags;
 } IMXV4l2FmtMap;
+
+typedef struct {
+  const gchar *name;
+  gboolean bg;
+  const gchar *bg_fb_name;
+} IMXV4l2DeviceMap;
 
 static IMXV4l2FmtMap g_imxv4l2fmt_maps[] = {
   {GST_VIDEO_CAPS_MAKE("I420"), V4L2_PIX_FMT_YUV420, GST_VIDEO_FORMAT_I420, 12, 0},
@@ -148,6 +159,16 @@ static guint g_camera_format_PXP[] = {
   V4L2_PIX_FMT_UYVY,
   0,
 };
+
+static IMXV4l2DeviceMap g_device_maps[] = {
+  {"/dev/video0", FALSE, "/dev/fb0"},
+  {"/dev/video16", TRUE, "/dev/fb0"},
+  {"/dev/video17", FALSE, "/dev/fb0"},
+  {"/dev/video18", TRUE, "/dev/fb2"},
+  {"/dev/video19", FALSE, "/dev/fb2"},
+  {"/dev/video20", TRUE, "/dev/fb4"}
+};
+
 
 //ipu device iterfaces
 static gint
@@ -233,6 +254,65 @@ imx_ipu_v4l2out_config_rotate(IMXV4l2Handle *handle, gint rotate)
   return 0;
 }
 
+static void
+imx_ipu_v4l2_config_alpha (IMXV4l2Handle *handle, guint alpha)
+{
+  struct mxcfb_gbl_alpha galpha;
+  char *device = (char*) g_device_maps[handle->device_map_id].bg_fb_name;
+  int fd;
+
+  fd = open (device, O_RDWR, 0);
+  if (fd < 0) {
+    GST_ERROR ("Can't open %s.\n", device);
+    return;
+  }
+
+  GST_DEBUG ("set alpha to (%d) for display (%s)", alpha, device);
+
+  galpha.alpha = alpha;
+  galpha.enable = 1;
+  if (ioctl(fd, MXCFB_SET_GBL_ALPHA, &galpha) < 0) {
+    GST_ERROR ("Set %s global alpha failed.", alpha);
+  }
+
+  close (fd);
+
+  return;
+}
+
+static void
+imx_ipu_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint color_key)
+{
+  struct mxcfb_color_key colorKey;
+  char *device = (char*)g_device_maps[handle->device_map_id].bg_fb_name;
+  int fd;
+
+  fd = open (device, O_RDWR, 0);
+  if (fd < 0) {
+    GST_ERROR ("Can't open %s.\n", device);
+    return;
+  }
+
+  if (enable) {
+    colorKey.color_key = color_key;
+    colorKey.enable = 1; 
+    GST_DEBUG ("set colorKey to (%x) for display (%s)", color_key, device);
+  }
+  else {
+    colorKey.enable = 0; 
+    GST_DEBUG ("disable colorKey for display (%s)", device);
+  }
+
+  if (ioctl (fd, MXCFB_SET_CLR_KEY, &colorKey) < 0) {
+    GST_ERROR ("Set %s color key failed.", device);
+  }
+
+  close (fd);
+
+  return;
+}
+
+
 //pxp device iterfaces
 static gint
 imx_pxp_v4l2out_config_input (IMXV4l2Handle *handle, guint fmt, guint w, guint h, IMXV4l2Rect *crop)
@@ -266,22 +346,11 @@ imx_pxp_v4l2out_config_input (IMXV4l2Handle *handle, guint fmt, guint w, guint h
     return -1;
   }
 
-  {
-    /* Set FB overlay options */
-    struct v4l2_framebuffer fb;
-    fb.flags = V4L2_FBUF_FLAG_OVERLAY;
-    fb.flags |= V4L2_FBUF_FLAG_GLOBAL_ALPHA;
-    if (ioctl(handle->v4l2_fd, VIDIOC_S_FBUF, &fb) < 0) {
-      GST_ERROR ("VIDIOC_S_FBUF failed.");
-      return -1;
-    }
-  }
-
   /* Set overlay source window */
   memset(&v4l2fmt, 0, sizeof(struct v4l2_format));
   v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY;
-  v4l2fmt.fmt.win.global_alpha = 0;
-  v4l2fmt.fmt.win.chromakey = 0;
+  v4l2fmt.fmt.win.global_alpha = handle->alpha;
+  v4l2fmt.fmt.win.chromakey = handle->color_key;
   v4l2fmt.fmt.win.w.left = crop->left;
   v4l2fmt.fmt.win.w.top = crop->top;
   v4l2fmt.fmt.win.w.width = crop->width;
@@ -323,15 +392,57 @@ imx_pxp_v4l2out_config_rotate(IMXV4l2Handle *handle, gint rotate)
   return 0;
 }
 
+static void
+imx_pxp_v4l2_config_alpha (IMXV4l2Handle *handle, guint alpha)
+{
+  struct v4l2_framebuffer fb;
+
+  GST_DEBUG ("set alpha to (%d)", alpha);
+
+  fb.flags = V4L2_FBUF_FLAG_OVERLAY;
+  fb.flags |= V4L2_FBUF_FLAG_GLOBAL_ALPHA;
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_FBUF, &fb) < 0) {
+    GST_ERROR ("VIDIOC_S_FBUF failed.");
+    return;
+  }
+
+  handle->alpha = alpha;
+
+  return;
+}
+
+static void
+imx_pxp_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint color_key)
+{
+  struct v4l2_framebuffer fb;
+
+  fb.flags = V4L2_FBUF_FLAG_OVERLAY;
+  if (enable) {
+    fb.flags |= V4L2_FBUF_FLAG_CHROMAKEY;
+    handle->color_key = color_key;
+    GST_DEBUG ("set colorKey to (%x) ", color_key);
+  }
+  else {
+    fb.flags |= V4L2_FBUF_FLAG_GLOBAL_ALPHA;
+  }
+
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_FBUF, &fb) < 0) {
+    GST_ERROR ("VIDIOC_S_FBUF failed.");
+    return;
+  }
+
+  return;
+}
+
 gchar *
 gst_imx_v4l2_get_default_device_name (gint type)
 {
   char * devname;
 
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-    if (gimx_chip == CC_MX6Q)
+    if (imx_chip_code () == CC_MX6Q)
       devname = (char*)"/dev/video17";
-    else if (gimx_chip == CC_MX60)
+    else if (imx_chip_code () == CC_MX60)
       devname = (char*)"/dev/video0";
     else {
       GST_ERROR ("UNKNOWN imx SoC.");
@@ -354,9 +465,9 @@ gst_imx_v4l2_get_min_buffer_num (gint type)
 {
   gint num;
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-    if (gimx_chip == CC_MX60)
+    if (imx_chip_code () == CC_MX60)
       num = MAX (V4L2_HOLDED_BUFFERS, MX60_STREAMON_COUNT);
-    else if (gimx_chip == CC_MX6Q)
+    else if (imx_chip_code () == CC_MX6Q)
       num = MAX (V4L2_HOLDED_BUFFERS, MX6Q_STREAMON_COUNT);
     else 
       num = V4L2_HOLDED_BUFFERS;
@@ -529,9 +640,9 @@ gboolean
 gst_imx_v4l2_support_deinterlace (gint type)
 {
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-    if (gimx_chip == CC_MX6Q)
+    if (imx_chip_code () == CC_MX6Q)
       return TRUE;
-    else if (gimx_chip == CC_MX60)
+    else if (imx_chip_code () == CC_MX60)
       return FALSE;
     else {
       GST_ERROR ("UNKNOWN imx SoC.");
@@ -542,27 +653,12 @@ gst_imx_v4l2_support_deinterlace (gint type)
   return FALSE;
 }
 
-typedef struct {
-  const gchar *name;
-  gboolean bg;
-  const gchar *bg_fb_name;
-} IMXV4l2DeviceMap;
-
-static IMXV4l2DeviceMap g_device_maps[] = {
-  {"/dev/video0", FALSE, "/dev/fb0"},
-  {"/dev/video16", TRUE, "/dev/fb0"},
-  {"/dev/video17", FALSE, "/dev/fb0"},
-  {"/dev/video18", TRUE, "/dev/fb2"},
-  {"/dev/video19", FALSE, "/dev/fb2"},
-  {"/dev/video20", TRUE, "/dev/fb4"}
-};
-
 static void
 gst_imx_v4l2output_set_default_res (IMXV4l2Handle *handle)
 {
   struct fb_var_screeninfo fb_var;
   IMXV4l2Rect rect;
-  int i;
+  gint i;
 
   for (i=0; i<sizeof(g_device_maps)/sizeof(IMXV4l2DeviceMap); i++) {
     if (!strcmp (handle->device, g_device_maps[i].name)) {
@@ -571,43 +667,19 @@ gst_imx_v4l2output_set_default_res (IMXV4l2Handle *handle)
     }
   }
 
-  if(!g_device_maps[handle->device_map_id].bg) {
-    int fd = open (g_device_maps[handle->device_map_id].bg_fb_name, O_RDWR, 0);
-    if (fd < 0) {
-      GST_ERROR ("Can't open %s.\n", g_device_maps[handle->device_map_id].bg_fb_name);
-      return;
-    }
+  if (g_device_maps[handle->device_map_id].bg)
+    return;
 
-    if (ioctl (fd, FBIOGET_VSCREENINFO, &fb_var) >= 0) {
-      handle->disp_w = fb_var.xres;
-      handle->disp_h = fb_var.yres;
-      GST_DEBUG ("display(%s) resolution is (%dx%d).", g_device_maps[handle->device_map_id].bg_fb_name, fb_var.xres, fb_var.yres);
-    }
-    else {
-#define DEFAULTW (320)
-#define DEFAULTH (240)
-      GST_ERROR ("Can't get display resolution, use default (%dx%d).\n", DEFAULTW, DEFAULTH);
-      handle->disp_w = DEFAULTW;
-      handle->disp_h = DEFAULTH;
-    }
+  gst_imx_v4l2_get_display_resolution (handle->device, &handle->disp_w, &handle->disp_h);
 
-    {
-      //set gblobal alpha to 0 to show video
-      struct mxcfb_gbl_alpha galpha;
-      galpha.alpha = 0; //overlay transparent
-      galpha.enable = 1;
-      if (ioctl(fd, MXCFB_SET_GBL_ALPHA, &galpha) < 0)
-        GST_ERROR ("Set %s global alpha failed.", g_device_maps[handle->device_map_id].bg_fb_name);
-    }
-    
-    close (fd);
+  //set gblobal alpha to 0 to show video
+  gst_imx_v4l2out_config_alpha (handle, 0);
 
-    rect.left = 0;
-    rect.top = 0;
-    rect.width = handle->disp_w;
-    rect.height = handle->disp_h;
-    gst_imx_v4l2out_config_output (handle, &rect, TRUE);
-  }
+  rect.left = 0;
+  rect.top = 0;
+  rect.width = handle->disp_w;
+  rect.height = handle->disp_h;
+  gst_imx_v4l2out_config_output (handle, &rect, TRUE);
 
   return;
 }
@@ -762,11 +834,52 @@ gst_imx_v4l2capture_set_function (IMXV4l2Handle *handle)
   return 0;
 }
 
+#define DEFAULTW (320)
+#define DEFAULTH (240)
+void gst_imx_v4l2_get_display_resolution (gchar *device, gint *w, gint *h)
+{
+  struct fb_var_screeninfo fb_var;
+  gint i, device_map_id;
+  int fd;
+
+  *w = DEFAULTW;
+  *h = DEFAULTH;
+
+  for (i=0; i<sizeof(g_device_maps)/sizeof(IMXV4l2DeviceMap); i++) {
+    if (!strcmp (device, g_device_maps[i].name)) {
+      device_map_id = i;
+      break;
+    }
+  }
+
+  fd = open (g_device_maps[device_map_id].bg_fb_name, O_RDWR, 0);
+  if (fd < 0) {
+    GST_ERROR ("Can't open %s.\n", g_device_maps[device_map_id].bg_fb_name);
+    return;
+  }
+
+  if (ioctl (fd, FBIOGET_VSCREENINFO, &fb_var) < 0) {
+    GST_ERROR ("Can't get display resolution, use default (%dx%d).\n", DEFAULTW, DEFAULTH);
+    close (fd);
+    return;
+  }
+
+  *w = fb_var.xres;
+  *h = fb_var.yres;
+  GST_DEBUG ("display(%s) resolution is (%dx%d).", g_device_maps[device_map_id].bg_fb_name, fb_var.xres, fb_var.yres);
+
+  close (fd);
+
+  return;
+}
+
 gpointer gst_imx_v4l2_open_device (gchar *device, int type)
 {
   int fd;
   struct v4l2_capability cap;
   IMXV4l2Handle *handle = NULL;
+
+  GST_DEBUG_CATEGORY_INIT (imxv4l2_debug, "imxv4l2", 0, "IMX V4L2 Core");
 
   GST_INFO ("device name: %s", device);
   if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
@@ -805,16 +918,20 @@ gpointer gst_imx_v4l2_open_device (gchar *device, int type)
   handle->streamon = FALSE;
 
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-    if (gimx_chip == CC_MX6Q) {
+    if (imx_chip_code () == CC_MX6Q) {
       handle->dev_itf.v4l2out_config_input = (V4l2outConfigInput)imx_ipu_v4l2out_config_input;
       handle->dev_itf.v4l2out_config_output = (V4l2outConfigOutput)imx_ipu_v4l2out_config_output;
       handle->dev_itf.v4l2out_config_rotate = (V4l2outConfigRotate)imx_ipu_v4l2out_config_rotate;
+      handle->dev_itf.v4l2out_config_alpha = (V4l2outConfigAlpha) imx_ipu_v4l2_config_alpha;
+      handle->dev_itf.v4l2out_config_colorkey = (V4l2outConfigColorkey) imx_ipu_v4l2_config_colorkey;
       handle->streamon_count = MX6Q_STREAMON_COUNT;
     }
-    else if (gimx_chip == CC_MX60) {
+    else if (imx_chip_code () == CC_MX60) {
       handle->dev_itf.v4l2out_config_input = (V4l2outConfigInput)imx_pxp_v4l2out_config_input;
       handle->dev_itf.v4l2out_config_output = (V4l2outConfigOutput)imx_pxp_v4l2out_config_output;
       handle->dev_itf.v4l2out_config_rotate = (V4l2outConfigRotate)imx_pxp_v4l2out_config_rotate;
+      handle->dev_itf.v4l2out_config_alpha = (V4l2outConfigAlpha) imx_pxp_v4l2_config_alpha;
+      handle->dev_itf.v4l2out_config_colorkey = (V4l2outConfigColorkey) imx_pxp_v4l2_config_colorkey;
       handle->streamon_count = MX60_STREAMON_COUNT;
     }
 
@@ -1130,6 +1247,34 @@ gint gst_imx_v4l2_config_deinterlace (gpointer v4l2handle, gboolean do_deinterla
   return 0;
 }
 
+void gst_imx_v4l2out_config_alpha (gpointer v4l2handle, guint alpha)
+{
+  IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
+
+  if (handle->type != V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+    GST_ERROR ("Can't set alpha for non output device.");
+    return;
+  }
+
+  (*handle->dev_itf.v4l2out_config_alpha) (handle, alpha);
+
+  return;
+}
+
+void gst_imx_v4l2out_config_color_key (gpointer v4l2handle, gboolean enable, guint color_key)
+{
+  IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
+
+  if (handle->type != V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+    GST_ERROR ("Can't set color key for non output device.");
+    return;
+  }
+
+  (*handle->dev_itf.v4l2out_config_colorkey) (handle, enable, color_key);
+
+  return ;
+}
+
 gint gst_imx_v4l2_set_buffer_count (gpointer v4l2handle, guint count, guint memory_mode)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
@@ -1188,7 +1333,8 @@ gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   memblk->paddr = (guint8*) v4l2buf->m.offset;
   memblk->user_data = (gpointer) v4l2buf;
 
-  GST_DEBUG ("Allocated v4l2buffer(%p), index(%d).", v4l2buf, handle->allocated - 1);
+  GST_DEBUG ("Allocated v4l2buffer(%p), index(%d), vaddr(%p), paddr(%p), size(%d).", 
+      v4l2buf, handle->allocated - 1, memblk->vaddr, memblk->paddr, memblk->size);
 
   return 0;
 }
@@ -1243,7 +1389,7 @@ gint gst_imx_v4l2_free_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   return 0;
 }
 
-gint imx_v4l2_do_queue_buffer (IMXV4l2Handle *handle, struct v4l2_buffer *v4l2buf)
+static gint imx_v4l2_do_queue_buffer (IMXV4l2Handle *handle, struct v4l2_buffer *v4l2buf)
 {
   struct timeval queuetime;
 
@@ -1258,19 +1404,86 @@ gint imx_v4l2_do_queue_buffer (IMXV4l2Handle *handle, struct v4l2_buffer *v4l2bu
 
   if (ioctl (handle->v4l2_fd, VIDIOC_QBUF, v4l2buf) < 0) {
     GST_ERROR ("queue v4l2 buffer failed.\n");
-    handle->buffer_pair[v4l2buf->index].gstbuffer = NULL;
     return -1;
   }
 
   return 0;
 }
 
-gint gst_imx_v4l2_queue_buffer (gpointer v4l2handle, GstBuffer *buffer, GstVideoFrameFlags flags)
+gint gst_imx_v4l2_queue_v4l2memblk (gpointer v4l2handle, PhyMemBlock *memblk, GstVideoFrameFlags flags)
+{
+  IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
+  struct v4l2_buffer *v4l2buf;
+  gint index;
+
+  v4l2buf = (struct v4l2_buffer *) memblk->user_data;
+  index = v4l2buf->index;
+
+  GST_DEBUG ("queue v4lbuffer memblk (%p), index(%d), flags(%x).",
+      memblk, index, flags);
+
+  v4l2buf->field = V4L2_FIELD_NONE;
+  if ((flags & GST_VIDEO_FRAME_FLAG_INTERLACED) && handle->do_deinterlace) {
+    if (flags & GST_VIDEO_FRAME_FLAG_TFF)
+      v4l2buf->field = V4L2_FIELD_INTERLACED_TB;
+    else
+      v4l2buf->field = V4L2_FIELD_INTERLACED_BT;
+  }
+
+  if (flags & GST_VIDEO_FRAME_FLAG_ONEFIELD) {
+    if (flags & GST_VIDEO_FRAME_FLAG_TFF)
+      v4l2buf->field = V4L2_FIELD_TOP;
+    else
+      v4l2buf->field = V4L2_FIELD_BOTTOM;
+  }
+
+  handle->buffer_pair[v4l2buf->index].v4l2memblk = memblk;
+
+  if (!handle->streamon) {
+    int i;
+    GST_DEBUG ("streamon count (%d), queue count (%d)\n", handle->streamon_count, handle->queued_count);
+
+    handle->v4lbuf_queued_before_streamon[handle->queued_count] = v4l2buf;
+    handle->queued_count ++;
+    if (handle->queued_count < handle->streamon_count)
+      return 0;
+
+    for (i=0; i<handle->streamon_count; i++) {
+      if (imx_v4l2_do_queue_buffer (handle, handle->v4lbuf_queued_before_streamon[i]) < 0) {
+        handle->buffer_pair[handle->v4lbuf_queued_before_streamon[i]->index].v4l2memblk = NULL;
+        GST_ERROR ("queue buffers before streamon failed.");
+        return -1;
+      }
+    }
+
+    if (ioctl (handle->v4l2_fd, VIDIOC_STREAMON, &handle->type) < 0) {
+      GST_ERROR ("Stream on V4L2 device failed.\n");
+      return -1;
+    }
+    handle->streamon = TRUE;
+    GST_DEBUG ("V4L2 device is STREAMON.");
+    return 0;
+  }
+
+  if (imx_v4l2_do_queue_buffer (handle, v4l2buf) < 0) {
+    handle->buffer_pair[v4l2buf->index].v4l2memblk = NULL;
+    GST_ERROR ("queue buffer failed.");
+    return -1;
+  }
+
+  handle->queued_count ++;
+
+  GST_DEBUG ("queued (%d)\n", handle->queued_count);
+
+  return 0;
+}
+
+gint gst_imx_v4l2_queue_gstbuffer (gpointer v4l2handle, GstBuffer *buffer, GstVideoFrameFlags flags)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
   struct v4l2_buffer *v4l2buf;
   PhyMemBlock *memblk;
-  gint index;
+  gint ret;
 
   if (handle->invisible) {
     gst_buffer_unref (buffer);
@@ -1296,63 +1509,17 @@ gint gst_imx_v4l2_queue_buffer (gpointer v4l2handle, GstBuffer *buffer, GstVideo
   }
 #endif
 
+  GST_DEBUG ("queue gstbuffer(%p).", buffer);
   v4l2buf = (struct v4l2_buffer *) memblk->user_data;
-  index = v4l2buf->index;
-  if (handle->buffer_pair[index].gstbuffer)
+  if (handle->buffer_pair[v4l2buf->index].gstbuffer)
     GST_ERROR ("gstbuffer(%p) not dequeued yet but queued again, index(%d).", buffer, index);
-  handle->buffer_pair[index].gstbuffer = buffer;
 
-  v4l2buf->field = V4L2_FIELD_NONE;
-  if ((flags & GST_VIDEO_FRAME_FLAG_INTERLACED) && handle->do_deinterlace) {
-    if (flags & GST_VIDEO_FRAME_FLAG_TFF)
-      v4l2buf->field = V4L2_FIELD_INTERLACED_TB;
-    else
-      v4l2buf->field = V4L2_FIELD_INTERLACED_BT;
+  if (gst_imx_v4l2_queue_v4l2memblk (v4l2handle, memblk, flags) < 0) {
+    GST_ERROR ("queue gstbuffer (%p) failed.", buffer);
+    return ret;
   }
 
-  if (flags & GST_VIDEO_FRAME_FLAG_ONEFIELD) {
-    if (flags & GST_VIDEO_FRAME_FLAG_TFF)
-      v4l2buf->field = V4L2_FIELD_TOP;
-    else
-      v4l2buf->field = V4L2_FIELD_BOTTOM;
-  }
-
-  GST_DEBUG ("queue gstbuffer(%p), flags(%x), v4lbuffer(%p), index(%d).",
-      buffer, flags, v4l2buf, index);
-
-  if (!handle->streamon) {
-    int i;
-    GST_DEBUG ("streamon count (%d), queue count (%d)\n", handle->streamon_count, handle->queued_count);
-
-    handle->v4lbuf_queued_before_streamon[handle->queued_count] = v4l2buf;
-    handle->queued_count ++;
-    if (handle->queued_count < handle->streamon_count)
-      return 0;
-
-    for (i=0; i<handle->streamon_count; i++) {
-      if (imx_v4l2_do_queue_buffer (handle, handle->v4lbuf_queued_before_streamon[i]) < 0) {
-        GST_ERROR ("queue buffers before streamon failed.");
-        return -1;
-      }
-    }
-
-    if (ioctl (handle->v4l2_fd, VIDIOC_STREAMON, &handle->type) < 0) {
-      GST_ERROR ("Stream on V4L2 device failed.\n");
-      return -1;
-    }
-    handle->streamon = TRUE;
-    GST_DEBUG ("V4L2 device is STREAMON.");
-    return 0;
-  }
-
-  if (imx_v4l2_do_queue_buffer (handle, v4l2buf) < 0) {
-    GST_ERROR ("queue buffer failed.");
-    return -1;
-  }
-
-  handle->queued_count ++;
-
-  GST_DEBUG ("queued (%d)\n", handle->queued_count);
+  handle->buffer_pair[v4l2buf->index].gstbuffer = buffer;
 
   return 0;
 }
@@ -1360,16 +1527,15 @@ gint gst_imx_v4l2_queue_buffer (gpointer v4l2handle, GstBuffer *buffer, GstVideo
 #define TRY_TIMEOUT (500000) //500ms
 #define TRY_INTERVAL (10000) //10ms
 #define MAX_TRY_CNT (TRY_TIMEOUT/TRY_INTERVAL)
-gint gst_imx_v4l2_dequeue_buffer (gpointer v4l2handle, GstBuffer **buffer)
+
+gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
   struct v4l2_buffer v4l2buf;
   gint trycnt = 0;
 
-  if (handle->queued_count <= MAX(V4L2_HOLDED_BUFFERS, handle->streamon_count))
-    return 0;
-
-  if (handle->invisible) {
+  if (handle->queued_count <= MAX(V4L2_HOLDED_BUFFERS, handle->streamon_count)) {
+    *memblk = NULL;
     return 0;
   }
 
@@ -1387,11 +1553,38 @@ gint gst_imx_v4l2_dequeue_buffer (gpointer v4l2handle, GstBuffer **buffer)
     usleep (TRY_INTERVAL);
   }
 
-  *buffer = handle->buffer_pair[v4l2buf.index].gstbuffer;
-  handle->buffer_pair[v4l2buf.index].gstbuffer = NULL;
+  *memblk = handle->buffer_pair[v4l2buf.index].v4l2memblk;
+  handle->buffer_pair[v4l2buf.index].v4l2memblk = NULL;
   handle->queued_count--;
 
-  GST_DEBUG ("dequeue gstbuffer(%p), v4l2buffer index(%d).", *buffer, v4l2buf.index);
+  GST_DEBUG ("deque v4l2buffer memblk (%p), index (%d)", v4l2buf.index, handle->buffer_pair[v4l2buf.index].v4l2memblk);
+
+  return 0;
+}
+
+gint gst_imx_v4l2_dequeue_gstbuffer (gpointer v4l2handle, GstBuffer **buffer)
+{
+  IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
+  PhyMemBlock *memblk = NULL;
+  struct v4l2_buffer *v4l2buf;
+
+  if (handle->invisible) {
+    return 0;
+  }
+
+  if (gst_imx_v4l2_dequeue_v4l2memblk (handle, &memblk) < 0) {
+    GST_ERROR ("dequeue memblk failed.");
+    return -1;
+  }
+
+  if (!memblk)
+    return 0;
+
+  v4l2buf = (struct v4l2_buffer *) memblk->user_data;
+  *buffer = handle->buffer_pair[v4l2buf->index].gstbuffer;
+  handle->buffer_pair[v4l2buf->index].gstbuffer = NULL;
+
+  GST_DEBUG ("dequeue gstbuffer(%p), v4l2buffer index(%d).", *buffer, v4l2buf->index);
 
   return 0;
 }

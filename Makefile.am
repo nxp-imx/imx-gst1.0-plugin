@@ -22,10 +22,12 @@ if USE_WMA8_ENC
 WMA8ENC_DIR =
 endif
 
+OVERLAYSINKDIRS = plugins/overlay_sink
+
 TOOLDIRS =    tools/                      \
               tools/gplay
 
-BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS)
+BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS) $(OVERLAYSINKDIRS)
               
 if PLATFORM_IS_MX6
 
