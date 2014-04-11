@@ -25,8 +25,6 @@
 GST_DEBUG_CATEGORY (imxv4l2sink_debug);
 #define GST_CAT_DEFAULT imxv4l2sink_debug
 
-extern CHIP_CODE gimx_chip;
-
 enum {
   PROP_0,
   PROP_DEVICE,
@@ -599,7 +597,7 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
         return GST_FLOW_ERROR;
       }
       v4l2sink->config_flag &= ~CONFIG_ROTATE;
-      if (v4l2sink->keep_video_ratio || gimx_chip == CC_MX60) {
+      if (v4l2sink->keep_video_ratio) {
         //need to recalculate output as rotation changed
         v4l2sink->config_flag |= CONFIG_OVERLAY;
       }

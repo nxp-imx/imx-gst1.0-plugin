@@ -300,16 +300,6 @@ imx_pxp_v4l2out_config_output(IMXV4l2Handle *handle, struct v4l2_crop *crop)
   gboolean brotate = (handle->rotate == 90 || handle->rotate == 270) ? TRUE : FALSE;
 
   crop->type = V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY;
-  if (brotate) {
-    gint tmp;
-    tmp = crop->c.left;
-    crop->c.left = crop->c.top;
-    crop->c.top = tmp;
-    tmp = crop->c.width;
-    crop->c.width = crop->c.height;
-    crop->c.height = tmp;
-  }
-
   if (ioctl(handle->v4l2_fd, VIDIOC_S_CROP, crop) < 0) {
     GST_ERROR ("Set crop failed.");
     return -1;
