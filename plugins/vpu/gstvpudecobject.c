@@ -124,7 +124,7 @@ gst_vpu_dec_object_get_src_caps (void)
   static GstCaps *caps = NULL;
 
   if (caps == NULL) {
-    caps = gst_caps_from_string (GST_VIDEO_CAPS_MAKE ("{ NV12, I420, YV12, TNVP, TNVF }"));
+    caps = gst_caps_from_string (GST_VIDEO_CAPS_MAKE ("{ NV12, I420, YV12 }"));
   }
 
   return gst_caps_ref (caps);
@@ -505,8 +505,6 @@ gst_vpu_dec_object_decide_output_format (GstVpuDecObject * vpu_dec_object, \
       case NV12: vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_NV12; break;
       case I420: vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_I420; break;
       case YV12: vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_YV12; break;
-                 //case TNVP: vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_TNVP; break;
-                 //case TNVF: vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_TNVF; break;
       default: GST_WARNING_OBJECT(vpu_dec_object, "unknown output format"); break;
     }
 
@@ -582,15 +580,6 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
     if (vpu_dec_object->output_format_decided == GST_VIDEO_FORMAT_NV12) {
       open_param->nChromaInterleave = 1;
     } 
-    /*else if (!strcmp (format, "TNVP")) {
-      //FIXME:vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_TNVP;
-      open_param->nChromaInterleave = 1;
-      open_param->nMapType = 1;
-    } else if (!strcmp (format, "TNVF")) {
-      //FIXME:vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_TNVF;
-      open_param->nChromaInterleave = 1;
-      open_param->nMapType = 2;
-    }*/
   } else {
     vpu_dec_object->is_mjpeg = TRUE;
   }
