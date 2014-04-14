@@ -1041,13 +1041,11 @@ static gboolean gst_aiurdemux_setcaps(GstPad * pad, GstObject * parent, GstCaps 
 
   GST_DEBUG_OBJECT(demux,"gst_aiurdemux_setcaps=%s",gst_caps_to_string(caps));
 
-
-  
-
-  
-
-  if(demux->core_interface == NULL)
+  if(demux->core_interface == NULL){
     demux->core_interface = aiur_core_create_interface_from_caps (caps);
+  }else{
+    return TRUE;
+  }
 
   if ((demux->core_interface) && (demux->core_interface->name)
     && (demux->core_interface->name)) {
