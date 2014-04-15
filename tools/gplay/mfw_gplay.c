@@ -515,19 +515,11 @@ fsl_player_s32 display_thread_fun(fsl_player_handle handle)
             {
                 sprintf(str_volume, "Vol=%02d", (fsl_player_s32)(volume));
             }
-            /* Get the real fps value */
-            if ((hour*3600+minute*60+second) > 0 )
-                printf("\r[%s%s][%s][%02d:%02d:%02d/%02d:%02d:%02d][fps:%.0f]",
-                           str_player_state_rate/*str_player_state[player_state]*/,prepeated_mode/*(brepeated?"(Repeated)":"")*/, str_volume,
-                           (fsl_player_s32)hour, (fsl_player_s32)minute, (fsl_player_s32)second,
-                           (fsl_player_s32)hour_d, (fsl_player_s32)minute_d, (fsl_player_s32)second_d,
-                           (float)(total_frames/(hour*3600+minute*60+second)));
-            else
-                printf("\r[%s%s][%s][%02d:%02d:%02d/%02d:%02d:%02d][fps:%.0f]",
-                           str_player_state_rate/*str_player_state[player_state]*/,prepeated_mode/*(brepeated?"(Repeated)":"")*/, str_volume,
-                           (fsl_player_s32)hour, (fsl_player_s32)minute, (fsl_player_s32)second,
-                           (fsl_player_s32)hour_d, (fsl_player_s32)minute_d, (fsl_player_s32)second_d,
-                           0);
+
+            printf("\r[%s%s][%s][%02d:%02d:%02d/%02d:%02d:%02d]",
+                str_player_state_rate/*str_player_state[player_state]*/,prepeated_mode/*(brepeated?"(Repeated)":"")*/, str_volume,
+                (fsl_player_s32)hour, (fsl_player_s32)minute, (fsl_player_s32)second,
+                (fsl_player_s32)hour_d, (fsl_player_s32)minute_d, (fsl_player_s32)second_d);
 
             fflush (stdout);
         }
