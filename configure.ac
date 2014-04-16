@@ -229,6 +229,8 @@ FIND_ACODEC_SONAME(ac3d, arm12)
 FIND_ACODEC_SONAME(vorbisd, arm11)
 FIND_ACODEC_SONAME(vorbisd, arm12)
 FIND_ACODEC_SONAME(ddpd, arm12)
+FIND_ACODEC_SONAME(nbamrd, arm11)
+FIND_ACODEC_SONAME(wbamrd, arm12)
 
 dnl set the plugindir where plugins should be installed
 plugindir="\$(libdir)/gstreamer-$GST_MAJORMINOR"
