@@ -25,8 +25,8 @@
  * <refsect2>
  * <title>Example launch line</title>
  * |[
- * gst-launch-1.0 -v filesrc location=mvpu.avi ! avidemux !  queue ! vpudec ! videoconvert ! videoscale ! autovideosink
- * ]| The above pipeline decode the mvpu stream and renders it to the screen.
+ * gst-launch-1.0 -v filesrc location=test.avi ! avidemux !  queue ! vpudec ! videoconvert ! videoscale ! autovideosink
+ * ]| The above pipeline decode the test.avi and renders it to the screen.
  * </refsect2>
  */
 
@@ -68,7 +68,7 @@ static gboolean gst_vpu_dec_open (GstVideoDecoder * bdec);
 static gboolean gst_vpu_dec_close (GstVideoDecoder * bdec);
 static gboolean gst_vpu_dec_start (GstVideoDecoder * bdec);
 static gboolean gst_vpu_dec_stop (GstVideoDecoder * bdec);
-static gboolean gst_vpu_dec_set_format (GstVideoDecoder * dec,
+static gboolean gst_vpu_dec_set_format (GstVideoDecoder * bdec,
     GstVideoCodecState * state);
 static GstFlowReturn gst_vpu_dec_handle_frame (GstVideoDecoder * bdec,
     GstVideoCodecFrame * frame);

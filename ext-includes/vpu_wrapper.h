@@ -40,7 +40,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 35)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 48)
 
 /**************************** decoder part **********************************/
 
@@ -498,12 +498,15 @@ typedef struct {
 	int nFrameRate;
 	int nBitRate;				/*unit: kbps*/
 	int nGOPSize;
+	int nIntraRefresh;		/*intra macro block numbers*/
+	int nIntraQP;				/*0: auto, >0: qp value*/
 	int nChromaInterleave;	/*should be set to 1 when (nMapType!=0)*/
 	VpuEncMirrorDirection sMirror;
 	//int nQuantParam;
 	int nMapType;			/*frame buffer: 0--linear ; 1--frame tile; 2--field tile*/
 	int nLinear2TiledEnable; 	/*valid when (nMapType!=0): 0--tile input; 1--yuv input*/
 	VpuColorFormat eColorFormat;	/*only MJPG support non-420*/
+	int nIsAvcc;				/*it is used for H.264 data format, 0: byte stream ; 1: avcc format*/
 
 	int nReserved[3];				/*reserved for future extension*/
 	void* pAppCxt;				/*reserved for future extension*/
@@ -589,6 +592,7 @@ typedef struct {
 	int nMESearchRange;      // 3: 16x16, 2:32x16, 1:64x32, 0:128x64, H.263(Short Header : always 3)
 	int nMEUseZeroPmv;       // 0: PMV_ENABLE, 1: PMV_DISABLE
 	int nIntraCostWeight;    // Additional weight of Intra Cost for mode decision to reduce Intra MB density
+	int nIsAvcc;				/*it is used for H.264 data format, 0: byte stream ; 1: avcc format*/
 
 	int nReserved[8];				/*reserved for future extension*/
 	void* pAppCxt;			/*reserved for future extension*/
@@ -632,6 +636,9 @@ typedef enum {
 	//VPU_DEC_CONF_BLOCK,
 	//VPU_DEC_CONF_NONEBLOCK,
 	VPU_ENC_CONF_BIT_RATE,  /*parameter: kbps*/
+	VPU_ENC_CONF_INTRA_REFRESH, /*intra refresh: minimum number of macroblocks to refresh in a frame*/
+	VPU_ENC_CONF_ENA_SPSPPS_IDR, /*some muxers may ignore the sequence or config data(such as ts muxer), so SPS/PPS is needed for every IDR frame, including the first IDR*/
+	VPU_ENC_CONF_RC_INTRA_QP, /*intra qp value*/
 } VpuEncConfig;
 
 
@@ -662,6 +669,7 @@ VpuDecRetCode VPU_DecOutFrameDisplayed(VpuDecHandle InHandle, VpuFrameBuffer* pI
 //VpuDecRetCode VPU_DecFlushLeftFrame(VpuDecHandle InHandle);
 VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle);
 VpuDecRetCode VPU_DecAllRegFrameInfo(VpuDecHandle InHandle, VpuFrameBuffer** ppOutFrameBuf, int* pOutNum);
+VpuDecRetCode VPU_DecGetNumAvailableFrameBuffers(VpuDecHandle InHandle,int* pOutBufNum);
 
 VpuDecRetCode VPU_DecClose(VpuDecHandle InHandle);
 VpuDecRetCode VPU_DecUnLoad();
@@ -681,7 +689,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 VpuEncRetCode VPU_EncClose(VpuEncHandle InHandle);
 VpuEncRetCode VPU_EncGetInitialInfo(VpuEncHandle InHandle, VpuEncInitInfo * pOutInitInfo);
 VpuEncRetCode VPU_EncGetVersionInfo(VpuVersionInfo * pOutVerInfo);
-VpuDecRetCode VPU_EncGetWrapperVersionInfo(VpuWrapperVersionInfo * pOutVerInfo);
+VpuEncRetCode VPU_EncGetWrapperVersionInfo(VpuWrapperVersionInfo * pOutVerInfo);
 VpuEncRetCode VPU_EncRegisterFrameBuffer(VpuEncHandle InHandle,VpuFrameBuffer *pInFrameBufArray, int nNum,int nSrcStride);
 VpuEncRetCode VPU_EncQueryMem(VpuMemInfo* pOutMemInfo);
 VpuEncRetCode VPU_EncGetMem(VpuMemDesc* pInOutMem);

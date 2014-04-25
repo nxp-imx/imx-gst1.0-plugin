@@ -1,17 +1,19 @@
 plugin_LTLIBRARIES = libgstvpu.la
 
 noinst_HEADERS = \
+	gstvpu.h \
 	gstvpudec.h \
 	gstvpudecobject.h \
 	gstvpuallocator.h \
-	#gstvpuenc.h
+	gstvpuenc.h
 
 libgstvpu_la_SOURCES = \
 	gstvpu.c \
+	gstvpuplugins.c \
 	gstvpudec.c \
 	gstvpudecobject.c \
 	gstvpuallocator.c \
-	#gstvpuenc.c
+	gstvpuenc.c
 
 libgstvpu_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
 libgstvpu_la_CFLAGS += -I../../libs -I../../ext-includes

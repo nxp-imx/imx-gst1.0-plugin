@@ -26,34 +26,11 @@ GST_DEBUG_CATEGORY_STATIC(vpu_dec_object_debug);
 #define GST_CAT_DEFAULT vpu_dec_object_debug
 
 #define VPUDEC_TS_BUFFER_LENGTH_DEFAULT (1024)
-#define DEFAULT_FRAME_BUFFER_ALIGNMENT_H 16
-#define DEFAULT_FRAME_BUFFER_ALIGNMENT_V 16
 #define MASAIC_THRESHOLD (30)
 //FIXME: relate with frame plus?
 #define DROP_RESUME (200 * GST_MSECOND)
 #define MAX_RATE_FOR_NORMAL_PLAYBACK (2)
 #define MIN_RATE_FOR_NORMAL_PLAYBACK (0)
-
-#define ALIGN(ptr,align)	((align) ? ((((guint32)(ptr))+(align)-1)/(align)*(align)) : ((guint32)(ptr)))
-
-typedef struct
-{
-  VpuCodStd std;
-  const gchar *mime;
-} VPUMapper;
-
-static VPUMapper vpu_mappers[] = {
-  {VPU_V_MPEG4, "video/mpeg, mpegversion=(int)4"},
-  {VPU_V_XVID, "video/x-xvid"},
-  {VPU_V_H263, "video/x-h263"},
-  {VPU_V_AVC, "video/x-h264"},
-  {VPU_V_VC1, "video/x-wmv, wmvversion=(int)3, format=(string)WMV3"},
-  {VPU_V_VC1_AP, "video/x-wmv, wmvversion=(int)3, format=(string)WVC1"},
-  {VPU_V_MPEG2, "video/mpeg, systemstream=(boolean)false, mpegversion=(int){1,2}"},
-  {VPU_V_MJPG, "image/jpeg"},
-  {VPU_V_VP8, "video/x-vp8"},
-  {-1, NULL}
-};
 
 enum
 {
@@ -167,8 +144,8 @@ gst_vpu_dec_object_init(GstVpuDecObject *vpu_dec_object)
   vpu_dec_object->new_segment = TRUE;
   vpu_dec_object->mosaic_cnt = 0;
   vpu_dec_object->tsm_mode = MODE_AI;
-  vpu_dec_object->internal_virt_mem = NULL;
-  vpu_dec_object->internal_phy_mem = NULL;
+  vpu_dec_object->vpu_internal_mem.internal_virt_mem = NULL;
+  vpu_dec_object->vpu_internal_mem.internal_phy_mem = NULL;
   vpu_dec_object->mv_mem = NULL;
   vpu_dec_object->gstbuffer_in_vpudec = NULL;
   vpu_dec_object->system_frame_number_in_vpu = NULL;
@@ -237,67 +214,6 @@ gst_vpu_dec_object_close (GstVpuDecObject * vpu_dec_object)
 }
 
 static gboolean
-gst_vpu_dec_object_free_internal_buffer (GstVpuDecObject * vpu_dec_object)
-{
-  g_list_foreach (vpu_dec_object->internal_virt_mem, (GFunc) g_free, NULL);
-  g_list_free (vpu_dec_object->internal_virt_mem);
-  vpu_dec_object->internal_virt_mem = NULL;
-  g_list_foreach (vpu_dec_object->internal_phy_mem, (GFunc) gst_memory_unref, NULL);
-  g_list_free (vpu_dec_object->internal_phy_mem);
-  vpu_dec_object->internal_phy_mem = NULL;
-
-  return TRUE;
-}
- 
-static gboolean
-gst_vpu_dec_object_allocate_internal_buffer (GstVpuDecObject * vpu_dec_object)
-{
-  GstAllocationParams params;
-  GstMemory * gst_memory;
-  PhyMemBlock *memory;
-	gint size;
-	guint8 *ptr;
-        gint i;
-
-	memset(&params, 0, sizeof(GstAllocationParams));
-	for (i = 0; i < vpu_dec_object->mem_info.nSubBlockNum; ++i) {
-		size = vpu_dec_object->mem_info.MemSubBlock[i].nAlignment \
-           + vpu_dec_object->mem_info.MemSubBlock[i].nSize;
-		GST_DEBUG_OBJECT(vpu_dec_object, "sub block %d  type: %s  size: %d", i, \
-        (vpu_dec_object->mem_info.MemSubBlock[i].MemType == VPU_MEM_VIRT) ? \
-        "virtual" : "phys", size);
- 
-		if (vpu_dec_object->mem_info.MemSubBlock[i].MemType == VPU_MEM_VIRT) {
-      ptr = g_malloc(size);
-      if (ptr == NULL) {
-        GST_ERROR_OBJECT (vpu_dec_object, "Could not allocate memory");
-        return FALSE;
-      }
-
-			vpu_dec_object->mem_info.MemSubBlock[i].pVirtAddr = (unsigned char*)ALIGN( \
-          ptr, vpu_dec_object->mem_info.MemSubBlock[i].nAlignment);
-      vpu_dec_object->internal_virt_mem = g_list_append (vpu_dec_object->internal_virt_mem, ptr);
-		} else if (vpu_dec_object->mem_info.MemSubBlock[i].MemType == VPU_MEM_PHY) {
-      params.align = vpu_dec_object->mem_info.MemSubBlock[i].nAlignment - 1;
-      gst_memory = gst_allocator_alloc (gst_vpu_allocator_obtain(), size, &params);
-      memory = gst_memory_query_phymem_block (gst_memory);
-      if (memory == NULL) {
-        GST_ERROR_OBJECT (vpu_dec_object, "Could not allocate memory using VPU allocator");
-        return FALSE;
-      }
-
-			vpu_dec_object->mem_info.MemSubBlock[i].pVirtAddr = memory->vaddr;
-			vpu_dec_object->mem_info.MemSubBlock[i].pPhyAddr = memory->paddr;
-      vpu_dec_object->internal_phy_mem = g_list_append (vpu_dec_object->internal_phy_mem, gst_memory);
-		} else {
-			GST_WARNING_OBJECT(vpu_dec_object, "sub block %d type is unknown - skipping", i);
-		}
- 	}
-
-  return TRUE;
-}
-
-static gboolean
 gst_vpu_dec_object_init_qos (GstVpuDecObject * vpu_dec_object)
 {
 
@@ -333,16 +249,16 @@ gst_vpu_dec_object_start (GstVpuDecObject * vpu_dec_object)
 
   /* mem_info contains information about how to set up memory blocks
    * the VPU uses as temporary storage (they are "work buffers") */
-  memset(&(vpu_dec_object->mem_info), 0, sizeof(VpuMemInfo));
-  ret = VPU_DecQueryMem(&(vpu_dec_object->mem_info));
+  memset(&(vpu_dec_object->vpu_internal_mem.mem_info), 0, sizeof(VpuMemInfo));
+  ret = VPU_DecQueryMem(&(vpu_dec_object->vpu_internal_mem.mem_info));
   if (ret != VPU_DEC_RET_SUCCESS) {
     GST_ERROR_OBJECT(vpu_dec_object, "could not get VPU memory information: %s", \
         gst_vpu_dec_object_strerror(ret));
     return FALSE;
   }
 
-  if (!gst_vpu_dec_object_allocate_internal_buffer(vpu_dec_object)) {
-    GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_allocate_internal_buffer fail");
+  if (!gst_vpu_allocate_internal_mem (&(vpu_dec_object->vpu_internal_mem))) {
+    GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_allocate_internal_mem fail");
     return FALSE;
   }
 
@@ -455,8 +371,8 @@ gst_vpu_dec_object_stop (GstVpuDecObject * vpu_dec_object)
     return FALSE;
   }
 
-  if (!gst_vpu_dec_object_free_internal_buffer(vpu_dec_object)) {
-    GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_free_internal_buffer fail");
+  if (!gst_vpu_free_internal_mem (&(vpu_dec_object->vpu_internal_mem))) {
+    GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_free_internal_mem fail");
     return FALSE;
   }
 
@@ -472,26 +388,6 @@ gst_vpu_dec_object_stop (GstVpuDecObject * vpu_dec_object)
   vpu_dec_object->state = STATE_LOADED;
 
   return TRUE;
-}
-
-static gint
-gst_vpu_dec_object_find_std (GstCaps * caps)
-{
-  VPUMapper *mapper = vpu_mappers;
-
-  while (mapper->mime) {
-    GstCaps *scaps = gst_caps_from_string (mapper->mime);
-    if (scaps) {
-      if (gst_caps_is_subset (caps, scaps)) {
-        gst_caps_unref (scaps);
-        return mapper->std;
-      }
-      gst_caps_unref (scaps);
-    }
-    mapper++;
-  }
-
-  return -1;
 }
 
 static void
@@ -560,7 +456,7 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
 {
   GstVideoInfo *info = &state->info;
 
-  open_param->CodecFormat = gst_vpu_dec_object_find_std (state->caps);
+  open_param->CodecFormat = gst_vpu_find_std (state->caps);
   if (open_param->CodecFormat < 0) {
     GST_ERROR_OBJECT(vpu_dec_object, "can't find VPU supported format");
     return FALSE;
@@ -607,7 +503,8 @@ gst_vpu_dec_object_open_vpu (GstVpuDecObject * vpu_dec_object, \
     return FALSE;
   }
 
-  ret = VPU_DecOpen(&(vpu_dec_object->handle), &open_param, &(vpu_dec_object->mem_info));
+  ret = VPU_DecOpen(&(vpu_dec_object->handle), &open_param, \
+      &(vpu_dec_object->vpu_internal_mem.mem_info));
   if (ret != VPU_DEC_RET_SUCCESS) {
     GST_ERROR_OBJECT(vpu_dec_object, "opening new VPU handle failed: %s", \
         gst_vpu_dec_object_strerror(ret));
@@ -693,52 +590,25 @@ gst_vpu_dec_object_register_frame_buffer (GstVpuDecObject * vpu_dec_object, \
     GstVideoDecoder * bdec)
 {
 	VpuDecRetCode dec_ret;
-  VpuFrameBuffer *vpu_frame;
-  GstVideoFrame frame;
-  PhyMemBlock * mem_block;
   GstBuffer *buffer;
-  GstVideoInfo *info = &vpu_dec_object->output_state->info;
   guint i;
 
   g_hash_table_remove_all (vpu_dec_object->frame2gstbuffer_table);
   g_hash_table_remove_all (vpu_dec_object->gstbuffer2frame_table);
- 
+
+  if (!gst_vpu_register_frame_buffer (vpu_dec_object->gstbuffer_in_vpudec, \
+    &vpu_dec_object->output_state->info, vpu_dec_object->vpuframebuffers)) {
+      GST_ERROR_OBJECT (vpu_dec_object, "gst_vpu_register_frame_buffer fail.\n");
+      return FALSE;
+  }
+
   for (i=0; i<vpu_dec_object->actual_buf_cnt; i++) {
     buffer = g_list_nth_data (vpu_dec_object->gstbuffer_in_vpudec, i);
-    GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer index: %d get from list: %x\n", \
-        i, buffer);
-    vpu_frame = &vpu_dec_object->vpuframebuffers[i];
-
-    if (!gst_video_frame_map (&frame, info, buffer, GST_MAP_WRITE)) {
-      GST_ERROR_OBJECT (vpu_dec_object, "Could not map video buffer");
-      return FALSE;
-    }
-    vpu_frame->nStrideY = GST_VIDEO_FRAME_COMP_STRIDE (&frame, 0);
-    vpu_frame->nStrideC = GST_VIDEO_FRAME_COMP_STRIDE (&frame, 1);
-
-    if (!gst_buffer_is_phymem (buffer)) {
-      GST_ERROR_OBJECT (vpu_dec_object, "isn't physical memory allocator");
-      gst_video_frame_unmap (&frame);
-      return FALSE;
-    }
-
-    mem_block = gst_buffer_query_phymem_block (buffer);
-    vpu_frame->pbufY = mem_block->paddr;
-    vpu_frame->pbufCb = vpu_frame->pbufY + \
-      (GST_VIDEO_FRAME_COMP_DATA (&frame, 1) - GST_VIDEO_FRAME_COMP_DATA (&frame, 0));
-    vpu_frame->pbufCr = vpu_frame->pbufCb + \
-      (GST_VIDEO_FRAME_COMP_DATA (&frame, 2) - GST_VIDEO_FRAME_COMP_DATA (&frame, 1));
-
-    vpu_frame->pbufVirtY = GST_VIDEO_FRAME_COMP_DATA (&frame, 0);
-    vpu_frame->pbufVirtCb = GST_VIDEO_FRAME_COMP_DATA (&frame, 1);
-    vpu_frame->pbufVirtCr = GST_VIDEO_FRAME_COMP_DATA (&frame, 2);
-
-    gst_video_frame_unmap (&frame);
 
     g_hash_table_replace(vpu_dec_object->frame2gstbuffer_table, \
-        (gpointer)(vpu_frame->pbufVirtY), (gpointer)(buffer));
+        (gpointer)(vpu_dec_object->vpuframebuffers[i].pbufVirtY), (gpointer)(buffer));
     GST_DEBUG_OBJECT (vpu_dec_object, "VpuFrameBuffer: 0x%x VpuFrameBuffer pbufVirtY: 0x%x GstBuffer: 0x%x\n", \
-        vpu_frame, vpu_frame->pbufVirtY, buffer);
+        vpu_dec_object->vpuframebuffers[i], vpu_dec_object->vpuframebuffers[i].pbufVirtY, buffer);
   }
 
 	dec_ret = VPU_DecRegisterFrameBuffer (vpu_dec_object->handle, \

@@ -21,8 +21,8 @@
 #define __GST_VPU_DEC_OBJECT_H__
 
 #include <gst/video/gstvideodecoder.h>
-#include "vpu_wrapper.h"
 #include "video-tsm/mfw_gst_ts.h"
+#include "gstvpu.h"
 
 G_BEGIN_DECLS
 
@@ -77,19 +77,17 @@ struct _GstVpuDecObject {
   /* vpu_dec_object parameter */
   VpuDecHandle handle;
   VpuDecInitInfo init_info;
-  VpuMemInfo mem_info;
+  VpuInternalMem vpu_internal_mem;
   VpuFrameBuffer *vpuframebuffers;
   gint width_paded;
   gint height_paded;
   VpuDecState state;
-	GList * internal_virt_mem;
-	GList * internal_phy_mem;
 	GList * mv_mem;
   GstVideoFormat output_format_decided;
 	GHashTable *frame2gstbuffer_table;
 	GHashTable *gstbuffer2frame_table;
-	GList * gstbuffer_in_vpudec;
 	GList * system_frame_number_in_vpu;
+	GList * gstbuffer_in_vpudec;
   gboolean use_new_tsm;
   gint framerate_n;
   gint framerate_d;
