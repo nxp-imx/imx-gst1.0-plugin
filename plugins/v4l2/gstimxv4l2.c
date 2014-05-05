@@ -620,16 +620,6 @@ gst_imx_v4l2capture_config_usb_camera (IMXV4l2Handle *handle, guint fmt, guint w
   struct v4l2_streamparm parm = {0};
   gint capture_mode = -1;
 
-  v4l2_fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-  v4l2_fmt.fmt.pix.pixelformat = fmt;
-  v4l2_fmt.fmt.pix.width = w;
-  v4l2_fmt.fmt.pix.height = h;
-
-  if (ioctl (handle->v4l2_fd, VIDIOC_S_FMT, &v4l2_fmt) < 0) {
-    GST_ERROR ("VIDIOC_S_FMT failed");
-    return -1;
-  }
-
   fszenum.index = 0;
   fszenum.pixel_format = fmt;
   while (ioctl (handle->v4l2_fd, VIDIOC_ENUM_FRAMESIZES, &fszenum) >= 0){
@@ -656,7 +646,17 @@ gst_imx_v4l2capture_config_usb_camera (IMXV4l2Handle *handle, guint fmt, guint w
     return -1;
   }
 
-   return 0;
+  v4l2_fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  v4l2_fmt.fmt.pix.pixelformat = fmt;
+  v4l2_fmt.fmt.pix.width = w;
+  v4l2_fmt.fmt.pix.height = h;
+
+  if (ioctl (handle->v4l2_fd, VIDIOC_S_FMT, &v4l2_fmt) < 0) {
+    GST_ERROR ("VIDIOC_S_FMT failed");
+    return -1;
+  }
+
+  return 0;
 }
 
 static gint 
