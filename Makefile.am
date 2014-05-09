@@ -15,7 +15,7 @@ V4LSINKDIRS = plugins/v4l2
 endif
 
 if USE_MP3_ENC
-MP3ENC_DIR =    
+MP3ENC_DIR =  plugins/mp3enc
 endif
 
 if USE_WMA8_ENC
@@ -59,7 +59,8 @@ noinst_HEADERS = \
     ext-includes/fsl_types.h			 \
     ext-includes/fsl_parser.h			 \
     ext-includes/vpu_wrapper.h		 \
-    ext-includes/fsl_unia.h				  
+    ext-includes/fsl_unia.h        \
+    ext-includes/mp3_enc_interface.h	  
     
 
 fslmmdocdir = $(docdir)/imx-mm/gstreamer-1.0

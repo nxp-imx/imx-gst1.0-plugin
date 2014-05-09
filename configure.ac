@@ -246,7 +246,7 @@ AM_CONDITIONAL(PLATFORM_IS_MX6SL, test "x$PLATFORM" = "xMX6SL")
 AM_CONDITIONAL(PLATFORM_IS_MX6SX, test "x$PLATFORM" = "xMX6SX")
 
 
-CHECK_DISABLE_FEATURE(mp3enc, [Disable mp3 encoder plugin], [MP3_ENC], [mp3_enc_interface.h], [plugin: mp3_enc])
+CHECK_DISABLE_FEATURE(mp3enc, [Disable mp3 encoder plugin], [MP3_ENC], [mp3_enc_interface.h], [plugin: imxmp3enc])
 CHECK_DISABLE_FEATURE(wma8enc, [Disable wma8 encoder plugin], [WMA8_ENC], [wma8_enc_interface.h], [plugin: wma8_enc])
 CHECK_DISABLE_FEATURE(vpuwrap, [Disable vpu plugin], [VPU_WRAP], [vpu_wrapper.h], [plugin: vpu_wrap])
 CHECK_DISABLE_FEATURE(aiur, [Disable aiur demux], [AIUR], [fsl_parser.h], [plugin: aiur])
@@ -276,6 +276,7 @@ plugins/beepdec/beep_registry_1.0.arm12.cf
 plugins/v4l2/Makefile
 plugins/overlay_sink/Makefile
 plugins/vpu/Makefile
+plugins/mp3enc/Makefile
 tools/Makefile
 tools/gplay/Makefile)
 
