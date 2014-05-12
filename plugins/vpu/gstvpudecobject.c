@@ -1067,7 +1067,7 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
   if (frame)
     gst_video_codec_frame_unref (frame);
 
-  if (in_data.nSize == 0) {
+  if (in_data.nSize == 0 && frame) {
     return GST_FLOW_OK;
   }
 
