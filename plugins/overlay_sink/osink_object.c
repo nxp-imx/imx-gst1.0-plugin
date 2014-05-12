@@ -25,6 +25,7 @@
 
 #include "osink_object.h"
 #include "device.h"
+#include "compositor.h"
 
 GST_DEBUG_CATEGORY_EXTERN (overlay_sink_debug);
 #define GST_CAT_DEFAULT overlay_sink_debug
@@ -279,11 +280,6 @@ static void destroy_osink_object()
     return;
 
   for (i=0; i<gosink->display_count; i++) {
-    if (gosink->hdisplay[i]) {
-      deinit_display (gosink->hdisplay[i]);
-      free_display (gosink->hdisplay[i]);
-      gosink->hdisplay[i] = NULL;
-    }
     if (gosink->hcompositor[i]) {
       destroy_compositor (gosink->hcompositor[i]);
       gosink->hcompositor[i] = NULL;
@@ -291,6 +287,11 @@ static void destroy_osink_object()
     if (gosink->hdevice[i]) {
       comositor_device_close (gosink->hdevice[i]);
       gosink->hdevice[i] = NULL;
+    }
+    if (gosink->hdisplay[i]) {
+      deinit_display (gosink->hdisplay[i]);
+      free_display (gosink->hdisplay[i]);
+      gosink->hdisplay[i] = NULL;
     }
     gosink->display_enabled[i] = FALSE;
   }
@@ -328,6 +329,30 @@ static OSinkHandle *create_osink_object()
   }
 
   return handle;
+}
+
+static int osink_object_get_compositor_dst_buffer (gpointer context, SurfaceBuffer *buffer)
+{
+  gpointer hdisplay = context;
+
+  if (get_next_display_buffer (hdisplay, buffer) < 0) {
+    GST_ERROR ("get next display buffer failed.");
+    return -1;
+  }
+
+  return 0;
+}
+
+static int osink_object_flip_compositor_dst_buffer (gpointer context, SurfaceBuffer *buffer)
+{
+  gpointer hdisplay = context;
+
+  if (flip_display_buffer (hdisplay, buffer) < 0) {
+    GST_ERROR ("flip display buffer failed.");
+    return -1;
+  }
+
+  return 0;
 }
 
 
@@ -395,6 +420,7 @@ int osink_object_get_display_info (gpointer osink_handle, DisplayInfo *info, gin
 int osink_object_enable_display (gpointer osink_handle, gint display_idx)
 {
   OSinkHandle *handle;
+  CompositorDstBufferCb dstbufcb;
   OSINK_MAKE_HANDLE (-1);
   CHECK_DISPLAY_INDEX (-1);
   GET_LOCK (-1);
@@ -419,7 +445,10 @@ int osink_object_enable_display (gpointer osink_handle, gint display_idx)
       return -1;
     }
 
-    handle->hcompositor[display_idx] = create_compositor (handle->hdevice[display_idx]);
+    dstbufcb.context = handle->hdisplay[display_idx];
+    dstbufcb.get_dst_buffer = osink_object_get_compositor_dst_buffer;
+    dstbufcb.flip_dst_buffer = osink_object_flip_compositor_dst_buffer;
+    handle->hcompositor[display_idx] = create_compositor (handle->hdevice[display_idx], &dstbufcb);
     if (handle->hcompositor[display_idx] == NULL) {
       GST_ERROR ("create compositor for display (%s) failed.", handle->disp_info[display_idx].name);
       deinit_display (handle->hdisplay[display_idx]);
@@ -497,7 +526,6 @@ int osink_object_config_overlay (gpointer osink_handle, gpointer overlay, Surfac
   gint ret;
   OSinkHandle *handle;
   OSinkOverlay *hoverlay;
-  SurfaceBuffer dest;
 
   OSINK_MAKE_HANDLE (-1);
   OSINK_MAKE_OVERLAY (-1);
@@ -524,27 +552,14 @@ int osink_object_update_overlay (gpointer osink_handle, gpointer overlay, Surfac
   gint ret;
   OSinkHandle *handle;
   OSinkOverlay *hoverlay;
-  SurfaceBuffer dest;
 
   OSINK_MAKE_HANDLE (-1);
   OSINK_MAKE_OVERLAY (-1);
   GET_LOCK (-1);
 
   LOCK (glock);
-  if (get_next_display_buffer (handle->hdisplay[hoverlay->display_idx], &dest) < 0) {
-    GST_ERROR ("get next display buffer failed.");
-    UNLOCK (glock);
-    return -1;
-  }
-
-  if (compositor_update_surface (handle->hcompositor[hoverlay->display_idx], hoverlay->hsurface, buffer, &dest) < 0) {
+  if (compositor_update_surface (handle->hcompositor[hoverlay->display_idx], hoverlay->hsurface, buffer) < 0) {
     GST_ERROR ("compositor update surface (%p) failed.", hoverlay);
-    UNLOCK (glock);
-    return -1;
-  }
-
-  if (flip_display_buffer (handle->hdisplay[hoverlay->display_idx], &dest) < 0) {
-    GST_ERROR ("flip display buffer failed.");
     UNLOCK (glock);
     return -1;
   }
@@ -552,6 +567,17 @@ int osink_object_update_overlay (gpointer osink_handle, gpointer overlay, Surfac
   UNLOCK (glock);
 
   return 0;
+}
+
+gint64 osink_object_get_overlay_showed_frames (gpointer osink_handle, gpointer overlay)
+{
+  OSinkHandle *handle;
+  OSinkOverlay *hoverlay;
+
+  OSINK_MAKE_HANDLE (-1);
+  OSINK_MAKE_OVERLAY (-1);
+
+  return compositor_get_surface_showed_frames (handle->hcompositor[hoverlay->display_idx], hoverlay->hsurface);
 }
 
 int osink_object_allocate_memory (gpointer osink_handle, PhyMemBlock *memblk)

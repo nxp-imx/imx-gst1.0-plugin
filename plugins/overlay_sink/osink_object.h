@@ -32,6 +32,7 @@ gpointer osink_object_create_overlay (gpointer osink_handle, guint display_idx, 
 void osink_object_destroy_overlay (gpointer ohandle, gpointer overlay);
 int osink_object_config_overlay (gpointer ohandle, gpointer overlay, SurfaceInfo *surface_info);
 int osink_object_update_overlay (gpointer ohandle, gpointer overlay, SurfaceBuffer *buffer);
+gint64 osink_object_get_overlay_showed_frames (gpointer ohandle, gpointer overlay);
 int osink_object_allocate_memory (gpointer handle, PhyMemBlock *memblk);
 int osink_object_free_memory (gpointer handle, PhyMemBlock *memblk);
 

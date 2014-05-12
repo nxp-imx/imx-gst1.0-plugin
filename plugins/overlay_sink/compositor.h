@@ -22,13 +22,19 @@
 
 #include "osink_common.h"
 
+typedef struct {
+  gpointer context;
+  int (*get_dst_buffer) (gpointer context, SurfaceBuffer *buffer);
+  int (*flip_dst_buffer) (gpointer context, SurfaceBuffer *buffer);
+} CompositorDstBufferCb;
 
-gpointer create_compositor(gpointer device);
+gpointer create_compositor(gpointer device, CompositorDstBufferCb *pcallback);
 void destroy_compositor(gpointer compositor);
 gpointer compositor_add_surface (gpointer compositor, SurfaceInfo *surface_info);
 gint compositor_remove_surface (gpointer compositor, gpointer surface);
 gint compositor_config_surface (gpointer compositor, gpointer surface, SurfaceInfo *surface_info);
 gboolean compositor_check_need_clear_display (gpointer compositor);
-gint compositor_update_surface (gpointer compositor, gpointer surface, SurfaceBuffer *buffer, SurfaceBuffer *dest);
+gint compositor_update_surface (gpointer compositor, gpointer surface, SurfaceBuffer *buffer);
+gint64 compositor_get_surface_showed_frames (gpointer compositor, gpointer surface);
 
 #endif

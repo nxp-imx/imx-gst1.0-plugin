@@ -62,7 +62,6 @@ struct _GstOverlaySink {
   gint disp_count;
   DisplayInfo disp_info[MAX_DISPLAY];
   gboolean disp_on[MAX_DISPLAY];
-  guint config_flag[MAX_DISPLAY];
   gboolean config[MAX_DISPLAY];
   GstVideoCropMeta cropmeta;
   GstVideoAlignment video_align;

@@ -45,14 +45,22 @@ enum
 
 #define OVERLAY_SINK_PROP_DISP_LENGTH (OVERLAY_SINK_PROP_DISP_MAX_0-OVERLAY_SINK_PROP_DISP_ON_0)
 
-enum {
-  CONFIG_OVERLAY = 0x1,
-  CONFIG_CROP = 0x2,
-  CONFIG_ROTATE = 0x4
-};
-
 #define gst_overlay_sink_parent_class parent_class
 G_DEFINE_TYPE (GstOverlaySink, gst_overlay_sink, GST_TYPE_VIDEO_SINK);
+
+static gint
+gst_overlay_sink_output_config (GstOverlaySink *sink, gint idx) 
+{
+  sink->surface_info.dst.left = sink->overlay[idx].x;
+  sink->surface_info.dst.top = sink->overlay[idx].y;
+  sink->surface_info.dst.right = sink->overlay[idx].w + sink->surface_info.dst.left;
+  sink->surface_info.dst.bottom = sink->overlay[idx].h + sink->surface_info.dst.top;
+  sink->surface_info.rot = sink->overlay[idx].rot;
+  sink->surface_info.keep_ratio = sink->overlay[idx].keep_ratio;
+  sink->surface_info.zorder = sink->overlay[idx].zorder;
+
+  return 0;
+}
 
 static void
 gst_overlay_sink_set_property (GObject * object,
@@ -71,23 +79,18 @@ gst_overlay_sink_set_property (GObject * object,
       break;
     case OVERLAY_SINK_PROP_DISPWIN_X_0:
       sink->overlay[idx].x = g_value_get_int (value);
-      sink->config_flag[idx] |= CONFIG_OVERLAY; 
       break;
     case OVERLAY_SINK_PROP_DISPWIN_Y_0:
       sink->overlay[idx].y = g_value_get_int (value);
-      sink->config_flag[idx] |= CONFIG_OVERLAY; 
       break;
     case OVERLAY_SINK_PROP_DISPWIN_W_0:
       sink->overlay[idx].w = g_value_get_int (value);
-      sink->config_flag[idx] |= CONFIG_OVERLAY; 
       break;
     case OVERLAY_SINK_PROP_DISPWIN_H_0:
       sink->overlay[idx].h = g_value_get_int (value);
-      sink->config_flag[idx] |= CONFIG_OVERLAY; 
       break;
     case OVERLAY_SINK_PROP_ROTATION_0:
       sink->overlay[idx].rot = g_value_get_int (value);
-      sink->config_flag[idx] |= CONFIG_ROTATE; 
       break;
     case OVERLAY_SINK_PROP_DISP_UPDATE_0:
       sink->config[idx] = g_value_get_boolean (value);
@@ -221,6 +224,13 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
 
         for (i=0; i<sink->disp_count; i++) {
           if (sink->hoverlay[i]) {
+            GstClockTime run_time = gst_element_get_start_time (GST_ELEMENT (sink));
+            if (run_time > 0) {
+              gint64 blited = osink_object_get_overlay_showed_frames (sink->osink_obj, sink->hoverlay[i]);
+              g_print ("Total showed frames (%lld), display %s blited (%lld), playing for (%"GST_TIME_FORMAT"), fps (%.3f).\n",
+                  sink->frame_showed, sink->disp_info[i].name, blited, GST_TIME_ARGS (run_time),
+                  (gfloat)GST_SECOND * blited / run_time);
+            }
             osink_object_destroy_overlay (sink->osink_obj, sink->hoverlay[i]);
             sink->hoverlay[i] = NULL;
           }
@@ -240,17 +250,9 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
       break;
     case GST_STATE_CHANGE_READY_TO_NULL:
       {
-        GstClockTime run_time;
-
         if (sink->osink_obj)
           osink_object_free (sink->osink_obj);
 
-        run_time = gst_element_get_start_time (GST_ELEMENT (sink));
-        if (run_time > 0) {
-          g_print ("Total showed frames (%lld), playing for (%"GST_TIME_FORMAT"), fps (%.3f).\n",
-              sink->frame_showed, GST_TIME_ARGS (run_time),
-              (gfloat)GST_SECOND * sink->frame_showed / run_time);
-        }
       }
       break;
     default:
@@ -350,13 +352,7 @@ gst_overlay_sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
 
   for (i=0; i<sink->disp_count; i++) {
     if (sink->disp_on[i]) {
-      sink->surface_info.dst.left = sink->overlay[i].x;
-      sink->surface_info.dst.top = sink->overlay[i].y;
-      sink->surface_info.dst.right = sink->overlay[i].w + sink->surface_info.dst.left;
-      sink->surface_info.dst.bottom = sink->overlay[i].h + sink->surface_info.dst.top;
-      sink->surface_info.rot = sink->overlay[i].rot;
-      sink->surface_info.keep_ratio = sink->overlay[i].keep_ratio;
-      sink->surface_info.zorder = sink->overlay[i].zorder;
+      gst_overlay_sink_output_config (sink, i);
       if (sink->hoverlay[i] == NULL) {
         sink->hoverlay[i] = osink_object_create_overlay (sink->osink_obj, i, &sink->surface_info);
         if (!sink->hoverlay[i]) {
@@ -471,28 +467,6 @@ gst_overlay_sink_input_config (GstOverlaySink *sink)
   for (i=0; i<sink->disp_count; i++) {
     sink->config[i] = TRUE;
   }
-
-  return 0;
-}
-
-static gint
-gst_overlay_sink_output_config (GstOverlaySink *sink, gint idx) 
-{
-  if (sink->config_flag[idx] & CONFIG_OVERLAY) {
-    sink->surface_info.dst.left = sink->overlay[idx].x;
-    sink->surface_info.dst.top = sink->overlay[idx].y;
-    sink->surface_info.dst.right = sink->overlay[idx].w + sink->surface_info.dst.left;
-    sink->surface_info.dst.bottom = sink->overlay[idx].h + sink->surface_info.dst.top;
-    sink->config_flag[idx] &= ~CONFIG_OVERLAY;
-  }
-
-  if (sink->config_flag[idx] & CONFIG_ROTATE) {
-    sink->surface_info.rot = sink->overlay[idx].rot;
-    sink->config_flag[idx] &= ~CONFIG_ROTATE;
-  }
-
-  sink->surface_info.keep_ratio = sink->overlay[idx].keep_ratio;
-  sink->surface_info.zorder = sink->overlay[idx].zorder;
 
   return 0;
 }
@@ -821,16 +795,13 @@ gst_overlay_sink_init (GstOverlaySink * overlay_sink)
   overlay_sink->pool = NULL;
   overlay_sink->allocator = NULL;
   overlay_sink->min_buffers = 2;
-  overlay_sink->max_buffers = 0;
-  if (imx_chip_code () == CC_MX60)
-    overlay_sink->max_buffers = 10;
+  overlay_sink->max_buffers = 30;
   overlay_sink->prv_buffer = NULL;
   memset (&overlay_sink->surface_info, 0, sizeof (SurfaceInfo));
 
   for (i=0; i<MAX_DISPLAY; i++) {
     overlay_sink->hoverlay[i] = NULL;
     overlay_sink->disp_on[i] = FALSE;
-    overlay_sink->config_flag[i] = 0;
     overlay_sink->config[MAX_DISPLAY] = FALSE;
     overlay_sink->overlay[i].keep_ratio = TRUE;
     overlay_sink->overlay[i].zorder = 0;

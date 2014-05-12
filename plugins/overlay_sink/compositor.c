@@ -36,6 +36,8 @@ GST_DEBUG_CATEGORY_EXTERN (overlay_sink_debug);
   (((a)->right <= (b)->left) || ((a)->left >= (b)->right) \
    || ((a)->bottom <= (b)->top) || ((a)->top >= (b)->bottom))
 
+#define COMPOSITOR_WAIT_SURFACE(h) (g_cond_wait (&((h)->cond), &((h)->lock)))
+#define COMPOSITOR_POST_SURFACE(h) (g_cond_signal (&((h)->cond)))
 
 typedef struct _Surface Surface;
 struct _Surface{
@@ -45,6 +47,7 @@ struct _Surface{
   gboolean single;
   gboolean hide;
   gpointer hdevice_surface;
+  gint64 blited_frames;
 
   Surface *prev;
   Surface *next;
@@ -52,6 +55,12 @@ struct _Surface{
 
 typedef struct {
   gpointer hdevice;
+  CompositorDstBufferCb dst_buffer_cb;
+  GThread *thread;
+  GCond cond;
+  GMutex lock;
+  gboolean running;
+
   Surface *head;
   Surface *tail;
   PhyMemBlock prvdst;
@@ -198,9 +207,84 @@ compositor_check_keep_ratio (CompositorHandle *hcompositor, Surface *hsurface, S
   return;
 }
 
+static gpointer compositor_do_compositing_surface_list (CompositorHandle *hcompositor)
+{
+  gpointer hdevice;
+  Surface *surface, *list;
+  SurfaceBuffer dstbuf;
+  gboolean upper;
+
+  if (hcompositor->dst_buffer_cb.get_dst_buffer (hcompositor->dst_buffer_cb.context, &dstbuf) < 0) {
+    GST_ERROR ("compositor dst buffer is invalid vaddr(%p), paddr(%p)", dstbuf.vaddr, dstbuf.paddr);
+    return;
+  }
+
+  if (hcompositor->head != hcompositor->tail) {
+    // need to back copy dest buffer for 2 more surfaces
+    if (hcompositor->prvdst.vaddr)
+      compositor_device_copy (hcompositor->hdevice, &dstbuf, &hcompositor->prvdst);
+  }
+
+  upper = FALSE;
+  list = hcompositor->head;
+  while (list) {
+    surface = list;
+    list = list->next;
+
+    if (surface->hide) {
+      GST_DEBUG ("surface is hide");
+      continue;
+    }
+
+    if (surface->single && !surface->update) {
+      GST_DEBUG ("Surface is single, but not updated.");
+      continue;
+    }
+
+    if (surface->update && !surface->single) {
+      upper = TRUE;
+    }
+
+    if (surface->update || upper) {
+      GST_DEBUG ("blit surface (%p)", surface);
+      if (compositor_device_blit_surface (hcompositor->hdevice, surface->hdevice_surface, 
+            &surface->buffer, &dstbuf) < 0) {
+        GST_ERROR ("composite surface (%p) failed.", surface);
+        break;
+      }
+    }
+
+    surface->blited_frames ++;
+    surface->update = FALSE;
+  }
+
+  if (hcompositor->dst_buffer_cb.flip_dst_buffer (hcompositor->dst_buffer_cb.context, &dstbuf) < 0) {
+    GST_ERROR ("compositor flit dst buffer failed.");
+  }
+
+  memcpy (&hcompositor->prvdst, &dstbuf, sizeof (SurfaceBuffer));
+
+  return;
+}
+
+static gpointer compositor_compositing_thread (gpointer compositor)
+{
+  CompositorHandle *hcompositor = (CompositorHandle*) compositor;
+
+  while (hcompositor->running) {
+    COMPOSITOR_WAIT_SURFACE (hcompositor);
+    compositor_do_compositing_surface_list (hcompositor);
+  }
+
+  GST_DEBUG ("compositor thread exit");
+
+  return;
+}
+
+
 // global functions
 
-gpointer create_compositor(gpointer device)
+gpointer create_compositor(gpointer device, CompositorDstBufferCb *pcallback)
 {
   CompositorHandle *hcompositor = NULL;
 
@@ -212,6 +296,18 @@ gpointer create_compositor(gpointer device)
 
   memset (hcompositor, 0, sizeof(CompositorHandle));
   hcompositor->hdevice = device;
+  hcompositor->dst_buffer_cb.context = pcallback->context;
+  hcompositor->dst_buffer_cb.get_dst_buffer = pcallback->get_dst_buffer;
+  hcompositor->dst_buffer_cb.flip_dst_buffer = pcallback->flip_dst_buffer;
+  g_mutex_init (&hcompositor->lock);
+  g_cond_init (&hcompositor->cond);
+  hcompositor->running = TRUE;
+  hcompositor->thread = g_thread_new ("compositor thread", compositor_compositing_thread, hcompositor);
+  if (!hcompositor->thread) {
+    GST_ERROR ("Create compositor thread failed.");
+    destroy_compositor (hcompositor);
+    return NULL;
+  }
 
   return hcompositor;
 }
@@ -225,6 +321,14 @@ void destroy_compositor(gpointer compositor)
     return;
   }
 
+  if (hcompositor->thread) {
+    hcompositor->running = FALSE;
+    COMPOSITOR_POST_SURFACE (hcompositor);
+    g_thread_join (hcompositor->thread);
+    hcompositor->thread = NULL;
+  }
+  g_mutex_clear (&hcompositor->lock);
+  g_cond_clear (&hcompositor->cond);
   g_slice_free1 (sizeof(CompositorHandle), hcompositor);
 
   return;
@@ -327,74 +431,40 @@ gboolean compositor_check_need_clear_display (gpointer compositor)
   return TRUE; 
 }
 
-gint compositor_update_surface (gpointer compositor, gpointer surface, SurfaceBuffer *buffer, SurfaceBuffer *dest)
+gint compositor_update_surface (gpointer compositor, gpointer surface, SurfaceBuffer *buffer)
 {
   CompositorHandle *hcompositor = (CompositorHandle*) compositor;
   Surface *hsurface = (Surface *) surface;
-  gpointer hdevice;
-  gboolean upper = FALSE;
-  gint ret = 0;
 
-  if (!hcompositor || !hsurface || !buffer || !dest) {
+  if (!hcompositor || !hsurface || !buffer) {
     GST_ERROR ("invalid parameter.");
     return -1;
   }
 
-  GST_DEBUG ("update surface (%p), buffer vaddr (%p) paddr (%p), dest paddr (%p).", 
-      hsurface, buffer->vaddr, buffer->paddr, dest->paddr);
+  GST_DEBUG ("update surface (%p), buffer vaddr (%p) paddr (%p)", 
+      hsurface, buffer->vaddr, buffer->paddr);
 
   memcpy (&hsurface->buffer, buffer, sizeof(SurfaceBuffer));
   hsurface->update = TRUE;
 
-  if (hsurface->hide) {
-    GST_DEBUG ("surface %p is hide.", hsurface);
-    return 0;
+  if (hcompositor->head == hcompositor->tail)
+    compositor_do_compositing_surface_list (hcompositor);
+  else
+    COMPOSITOR_POST_SURFACE (hcompositor);
+
+  return 0;
+}
+
+gint64 compositor_get_surface_showed_frames (gpointer compositor, gpointer surface)
+{
+  CompositorHandle *hcompositor = (CompositorHandle*) compositor;
+  Surface *hsurface = (Surface *) surface;
+
+  if (!hcompositor || !hsurface) {
+    GST_ERROR ("invalid parameter.");
+    return -1;
   }
 
-  if (hcompositor->head != hcompositor->tail) {
-    // need to back copy dest buffer for 2 more surfaces
-    if (hcompositor->prvdst.vaddr)
-      compositor_device_copy (hdevice, dest, &hcompositor->prvdst);
-  }
-
-  if (hsurface->single) {
-    GST_DEBUG ("surface %p is single.", hsurface);
-    hsurface->update = FALSE;
-    if (compositor_device_blit_surface (hdevice, hsurface->hdevice_surface, &hsurface->buffer, dest) < 0) {
-      GST_ERROR ("composite surface (%p) failed.", hsurface->hdevice_surface);
-      return -1;
-    }
-    memcpy (&hcompositor->prvdst, dest, sizeof (SurfaceBuffer));
-    return 0;
-  }
-
-  Surface *list = hcompositor->head;
-  hdevice = hcompositor->hdevice;
-  while (list) {
-    Surface *scur = list;
-    list = list->next;
-
-    if (scur == hsurface) {
-      upper = TRUE;
-    }
-
-    if (scur->hide || scur->single)
-      continue;
-
-    if (!upper && !scur->update)
-      continue;
-
-    GST_DEBUG ("blit surface (%p)", scur);
-    if (compositor_device_blit_surface (hdevice, scur->hdevice_surface, &scur->buffer, dest) < 0) {
-      GST_ERROR ("composite surface (%p) failed.", scur->hdevice_surface);
-      ret = -1;
-      break;
-    }
-  }
-
-  hsurface->update = FALSE;
-  memcpy (&hcompositor->prvdst, dest, sizeof (SurfaceBuffer));
-
-  return ret;
+  return hsurface->blited_frames;
 }
 
