@@ -849,7 +849,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
     vpu_dec_object->gstbuffer_in_vpudec = g_list_remove ( \
         vpu_dec_object->gstbuffer_in_vpudec, output_buffer);
   } else {
-    TSManagerSend (vpu_dec_object->tsm);
+    output_pts = TSManagerSend (vpu_dec_object->tsm);
   }
 
   if (out_frame == NULL) {
@@ -875,6 +875,8 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
         return FALSE;
       }
     }
+    if (output_pts)
+      out_frame->pts = output_pts;
     return gst_video_decoder_drop_frame (bdec, out_frame);
   }
 
