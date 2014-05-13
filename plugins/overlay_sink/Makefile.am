@@ -28,4 +28,14 @@ libgstoverlaysinkplugins_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 
 noinst_HEADERS = osink_common.h gstosink.h gstosinkallocator.h osink_object.h compositor.h device.h displays.h
 
+if PLATFORM_IS_MX6
+registry_file = imx_6q_display_config
+endif
+
+if PLATFORM_IS_MX6SX
+registry_file = imx_6sx_display_config
+endif
+
+data_DATA = $(registry_file)
+EXTRA_DIST = $(data_DATA)
 

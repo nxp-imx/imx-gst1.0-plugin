@@ -168,6 +168,7 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_NULL_TO_READY:
       {
         gint i;
+        gboolean display_enabled = FALSE;
 
         sink->osink_obj = osink_object_new ();
         if (!sink->osink_obj) {
@@ -185,6 +186,8 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
               continue;
             }
 
+            display_enabled = TRUE;
+
             if (sink->overlay[i].w == 0) {
               if (sink->overlay[i].x > 0)
                 sink->overlay[i].w = sink->disp_info[i].width - sink->overlay[i].x;
@@ -199,6 +202,13 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
                 sink->overlay[i].h = sink->disp_info[i].height;
             }
           }
+        }
+
+        if (!display_enabled) {
+          GST_ERROR_OBJECT (sink, "No display enabled.");
+          osink_object_free (sink->osink_obj);
+          sink->osink_obj = NULL;
+          return GST_STATE_CHANGE_FAILURE;
         }
 
         sink->frame_showed = 0;

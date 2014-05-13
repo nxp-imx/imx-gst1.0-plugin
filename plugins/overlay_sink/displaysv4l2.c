@@ -28,6 +28,7 @@
 #include <linux/fb.h>
 #include <linux/mxcfb.h>
 
+#include "gstimxcommon.h"
 #include "displays.h"
 #include "gstsutils.h"
 #include "gstimxv4l2.h"
@@ -82,10 +83,19 @@ static guint string_to_fmt (char *value)
 
 gint scan_displays(gpointer **phandle, gint *pcount)
 {
-  GstsutilsEntry *entry =  gstsutils_init_entry ("/usr/share/imx_display_config");
+  GstsutilsEntry *entry = NULL;
   gint group_count;
   gint i;
   gint count = 0;
+
+  if (imx_chip_code () == CC_MX6Q)
+    entry = gstsutils_init_entry ("/usr/share/imx_6q_display_config");
+  else if (imx_chip_code () == CC_MX60)
+    entry = gstsutils_init_entry ("/usr/share/imx_6sx_display_config");
+  else {
+    GST_ERROR ("Not supported platform.");
+    return -1;
+  }
 
   if(entry == NULL) {
     GST_ERROR ("scan display configuration file failed.");
