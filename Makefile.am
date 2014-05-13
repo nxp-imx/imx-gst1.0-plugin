@@ -61,8 +61,7 @@ noinst_HEADERS = \
     
 
 fslmmdocdir = $(docdir)/imx-mm/gstreamer-1.0
-fslmmdoc_DATA = \
-    doc/EULA.txt    
+fslmmdoc_DATA = 
 
 pcverfiles = gstreamer-fsl-@GST_MAJORMINOR@.pc
 ### how to generate versioned .pc files from .pc files in this dir
