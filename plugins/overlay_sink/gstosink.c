@@ -166,55 +166,57 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
 
   switch (transition) {
     case GST_STATE_CHANGE_NULL_TO_READY:
-      {
-        gint i;
-        gboolean display_enabled = FALSE;
-
         sink->osink_obj = osink_object_new ();
         if (!sink->osink_obj) {
           GST_ERROR_OBJECT (sink, "create osink object failed.");
           return GST_STATE_CHANGE_FAILURE;
         }
+        break;
+    case GST_STATE_CHANGE_READY_TO_PAUSED:
+        {
+          gint i;
+          gboolean display_enabled = FALSE;
 
-        sink->disp_count = osink_object_get_display_count (sink->osink_obj);
-        for (i=0; i<sink->disp_count; i++) {
-          osink_object_get_display_info (sink->osink_obj, &sink->disp_info[i], i);
-          if (sink->disp_on[i]) {
-            if (osink_object_enable_display (sink->osink_obj, i) < 0) {
-              GST_ERROR_OBJECT (sink, "enable display %s failed.", sink->disp_info[i].name);
-              sink->disp_on[i] = FALSE;
-              continue;
-            }
+          //put enable display in READY->PAUSE as playbin will change videosink
+          //to ready state even for pure audio playback, this will cause overlaysink
+          //show black screen in enable_display call
+          sink->disp_count = osink_object_get_display_count (sink->osink_obj);
+          for (i=0; i<sink->disp_count; i++) {
+            osink_object_get_display_info (sink->osink_obj, &sink->disp_info[i], i);
+            if (sink->disp_on[i]) {
+              if (osink_object_enable_display (sink->osink_obj, i) < 0) {
+                GST_ERROR_OBJECT (sink, "enable display %s failed.", sink->disp_info[i].name);
+                sink->disp_on[i] = FALSE;
+                continue;
+              }
 
-            display_enabled = TRUE;
+              display_enabled = TRUE;
 
-            if (sink->overlay[i].w == 0) {
-              if (sink->overlay[i].x > 0)
-                sink->overlay[i].w = sink->disp_info[i].width - sink->overlay[i].x;
-              else
-                sink->overlay[i].w = sink->disp_info[i].width;
-            }
+              if (sink->overlay[i].w == 0) {
+                if (sink->overlay[i].x > 0)
+                  sink->overlay[i].w = sink->disp_info[i].width - sink->overlay[i].x;
+                else
+                  sink->overlay[i].w = sink->disp_info[i].width;
+              }
 
-            if (sink->overlay[i].h == 0) {
-              if (sink->overlay[i].y > 0)
-                sink->overlay[i].h = sink->disp_info[i].height - sink->overlay[i].h;
-              else
-                sink->overlay[i].h = sink->disp_info[i].height;
+              if (sink->overlay[i].h == 0) {
+                if (sink->overlay[i].y > 0)
+                  sink->overlay[i].h = sink->disp_info[i].height - sink->overlay[i].h;
+                else
+                  sink->overlay[i].h = sink->disp_info[i].height;
+              }
             }
           }
-        }
 
-        if (!display_enabled) {
-          GST_ERROR_OBJECT (sink, "No display enabled.");
-          osink_object_free (sink->osink_obj);
-          sink->osink_obj = NULL;
-          return GST_STATE_CHANGE_FAILURE;
-        }
+          if (!display_enabled) {
+            GST_ERROR_OBJECT (sink, "No display enabled.");
+            osink_object_free (sink->osink_obj);
+            sink->osink_obj = NULL;
+            return GST_STATE_CHANGE_FAILURE;
+          }
 
-        sink->frame_showed = 0;
-      }
-      break;
-    case GST_STATE_CHANGE_READY_TO_PAUSED:
+          sink->frame_showed = 0;
+        }
       break;
     default:
       break;
