@@ -254,7 +254,9 @@ static gpointer compositor_do_compositing_surface_list (CompositorHandle *hcompo
       }
     }
 
-    surface->blited_frames ++;
+    if (surface->update)
+      surface->blited_frames ++;
+
     surface->update = FALSE;
   }
 

@@ -66,6 +66,7 @@ struct _GstOverlaySink {
   GstVideoCropMeta cropmeta;
   GstVideoAlignment video_align;
   gboolean pool_alignment_checked;
+  gboolean self_pool_configed;
   guint64 frame_showed;
   gint min_buffers;
   gint max_buffers;
