@@ -144,12 +144,13 @@ gint scan_displays(gpointer **phandle, gint *pcount)
     hdisplay = g_slice_alloc (sizeof(DisplayHandle));
     if (!hdisplay) {
       GST_ERROR ("allocate DisplayHandle for display %s failed.", name);
+      gstsutils_deinit_entry (entry);
       return -1;
     }
     memset (hdisplay, 0, sizeof (DisplayHandle));
 
-    hdisplay->name = g_strdup (name);
-    hdisplay->device = g_strdup (device);
+    hdisplay->name = name;
+    hdisplay->device = device;
     hdisplay->fmt = string_to_fmt (fmt);
     hdisplay->alpha = atoi (alpha);
     if (color_key) {
@@ -178,6 +179,7 @@ gint scan_displays(gpointer **phandle, gint *pcount)
       break;
   }
 
+  gstsutils_deinit_entry (entry);
   *pcount = count;
 
   return 0;

@@ -804,7 +804,7 @@ gst_overlay_sink_init (GstOverlaySink * overlay_sink)
   overlay_sink->osink_obj = NULL;
   overlay_sink->pool = NULL;
   overlay_sink->allocator = NULL;
-  overlay_sink->min_buffers = 2;
+  overlay_sink->min_buffers = 3;
   overlay_sink->max_buffers = 30;
   overlay_sink->prv_buffer = NULL;
   memset (&overlay_sink->surface_info, 0, sizeof (SurfaceInfo));
@@ -826,7 +826,7 @@ plugin_init (GstPlugin * plugin)
 {
   GST_DEBUG_CATEGORY_INIT (overlay_sink_debug, "overlaysink", 0, "Freescale IMX video overlay(compositor) sink element");
 
-  if (!gst_element_register (plugin, "overlaysink", IMX_GST_PLUGIN_RANK,
+  if (!gst_element_register (plugin, "overlaysink", IMX_GST_PLUGIN_RANK + 1,
         GST_TYPE_OVERLAY_SINK))
     return FALSE;
 
