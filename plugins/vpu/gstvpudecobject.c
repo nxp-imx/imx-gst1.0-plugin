@@ -1154,6 +1154,17 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
       GST_INFO_OBJECT (vpu_dec_object, "Got EOS message!!");
       break;
     }
+    // send EOS to VPU to force VPU output all video frame for rewind as videodecoder
+    // need it. only can support skip I frame rewind.
+    if (vpu_dec_object->tsm_mode == MODE_FIFO) {
+      GST_DEBUG_OBJECT (vpu_dec_object, "send eos to VPU.\n");
+      frame = NULL;
+      if (!(buf_ret & VPU_DEC_INPUT_USED))
+        GST_WARNING_OBJECT (vpu_dec_object, "VPU hasn't consumed input data, Shouldn't be here!");
+      in_data.nSize = 0;
+      in_data.pVirAddr = (unsigned char *) 0x1;
+      continue;
+    }
     if (buf_ret & VPU_DEC_NO_ENOUGH_INBUF) {
       GST_LOG_OBJECT (vpu_dec_object, "Got not enough input message!!");
       break;
