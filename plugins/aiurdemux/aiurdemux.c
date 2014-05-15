@@ -2639,33 +2639,59 @@ beach:
 }
 static GstFlowReturn aiurdemux_parse_vorbis_codec_data(GstAiurDemux * demux, AiurDemuxStream* stream)
 {
-  int i = 0;
-  int num = 0;
-  int len = 0;
   int offset = 0;
-  num = (int)*(stream->codec_data.codec_data);
-  offset = num+1;
+  int32 header1 = 0;
+  int32 header2 = 0;
+  int32 header3 = 0;
+  int32 len1 = 0;
+  int32 len2 = 0;
+  int32 len3 = 0;
+  uint8 * inbuffer;
+  uint8 * vorbisPtr;
   if(demux == NULL || stream == NULL)
     return GST_FLOW_ERROR;
   if(stream->codec_data.length == 0 || stream->codec_data.codec_data == NULL)
     return GST_FLOW_ERROR;
-  GST_DEBUG_OBJECT (demux, "vorbis lace num=%d",num);
-  for( i = 1; i <= num; i++){
-    GstBuffer *gstbuf;
-    len = (int)*(stream->codec_data.codec_data+i);
-    gstbuf = gst_buffer_new_and_alloc (len);
-    gst_buffer_fill(gstbuf,0,(guint8 *)stream->codec_data.codec_data+offset,len);
-    gst_pad_push (stream->pad, gstbuf);
-    offset +=len;
-    GST_DEBUG_OBJECT (demux, "push vorbis codec buffer %d len=%d",i,len);
+
+  inbuffer = stream->codec_data.codec_data;
+  while(offset + 6 < stream->codec_data.length){
+    vorbisPtr = inbuffer+offset+1;
+    if(inbuffer[offset] == 0x01){
+      if(!memcmp(vorbisPtr,"vorbis",6)){
+        header1 = offset;
+        offset += 6;
+      }
+    }else if(inbuffer[offset] == 0x03){
+      if(!memcmp(vorbisPtr,"vorbis",6)){
+        header2 = offset;
+        offset += 6;
+      }
+    }else if(inbuffer[offset] == 0x05){
+      if(!memcmp(vorbisPtr,"vorbis",6)){
+        header3 = offset;
+        break;
+      }
+    }
+    offset ++;
   }
-  if(offset < stream->codec_data.length){
+  len1 = header2 - header1;
+  len2 = header3 - header2;
+  len3 = stream->codec_data.length - header3;
+  if(header1 < header2 && header2 < header3){
     GstBuffer *gstbuf;
-    len = stream->codec_data.length - offset;
-    gstbuf = gst_buffer_new_and_alloc (len);
-    gst_buffer_fill(gstbuf,0,(guint8 *)stream->codec_data.codec_data+offset,len);
+    gstbuf = gst_buffer_new_and_alloc (len1);
+    gst_buffer_fill(gstbuf,0,(guint8 *)(stream->codec_data.codec_data+header1),len1);
     gst_pad_push (stream->pad, gstbuf);
-    GST_DEBUG_OBJECT (demux, "push vorbis codec buffer last len=%d",len);
+    gstbuf = NULL;
+    gstbuf = gst_buffer_new_and_alloc (len2);
+    gst_buffer_fill(gstbuf,0,(guint8 *)(stream->codec_data.codec_data+header2),len2);
+    gst_pad_push (stream->pad, gstbuf);
+    gstbuf = NULL;
+    gstbuf = gst_buffer_new_and_alloc (len3);
+    gst_buffer_fill(gstbuf,0,(guint8 *)(stream->codec_data.codec_data+header3),len3);
+    gst_pad_push (stream->pad, gstbuf);
+    GST_DEBUG_OBJECT (demux, "push vorbis codec buffer totalLen=%d,1=%d,2=%d,3=%d",
+      stream->codec_data.length,header1,header2,header3);
   }
 
   return GST_FLOW_OK;

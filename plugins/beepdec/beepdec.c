@@ -328,6 +328,7 @@ static gboolean beep_dec_set_init_parameter(GstBeepDec * beep_dec,
                 parameter.codecData.buf = map.data;
                 IDecoder->setDecoderPara(handle,UNIA_CODEC_DATA, &parameter);
                 gst_buffer_unmap(codec_data, &map);
+                beep_dec->set_codec_data = TRUE;
             }
         }
 
@@ -439,7 +440,7 @@ static gboolean beep_dec_start (GstAudioDecoder * dec)
     beepdec->core_layout = NULL;
     beepdec->output_changed = FALSE;
     beepdec->frame_cnt = 0;
-    beepdec->send_vorbis_codec_data = FALSE;
+    beepdec->set_codec_data = FALSE;
     beepdec->in_cnt = 0;
     
     gst_tag_register (GST_TAG_BEEP_CHANNELS, GST_TAG_FLAG_DECODED,
@@ -726,7 +727,7 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
     if(!strcmp(IDecoder->name,"mp3"))
         twice = TRUE;
 
-    if(!strcmp(IDecoder->name,"vorbis") && !beepdec->send_vorbis_codec_data){
+    if(!strcmp(IDecoder->name,"vorbis") && !beepdec->set_codec_data){
         if(beepdec->frame_cnt < VORBIS_HEADER_FRAME){
             temp_buffer = gst_buffer_new_allocate (NULL, inbuf_size, NULL);
             temp_buffer = gst_buffer_make_writable (temp_buffer);
@@ -752,7 +753,7 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
                 parameter.codecData.buf = map.data;
                 IDecoder->setDecoderPara(handle,UNIA_CODEC_DATA, &parameter);
                 gst_buffer_unmap(codec_data, &map);
-                beepdec->send_vorbis_codec_data = TRUE;
+                beepdec->set_codec_data = TRUE;
             }
             gst_adapter_clear (beepdec->adapter);
         }

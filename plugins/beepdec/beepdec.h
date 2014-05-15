@@ -87,7 +87,7 @@ struct _GstBeepDec
     GstAudioChannelPosition * core_layout;
     GstAudioChannelPosition * out_layout;
     gboolean output_changed;
-    gboolean send_vorbis_codec_data;
+    gboolean set_codec_data;
     gint frame_cnt;
     gint in_cnt;
 };

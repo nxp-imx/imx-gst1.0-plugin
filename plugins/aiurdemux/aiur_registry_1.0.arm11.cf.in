@@ -25,7 +25,7 @@ mime= video/x-matroska ; video/webm
 library = @mkv_arm11_SONAME@
 
 [OGG]
-mime= application/ogg; application/x-annodex
+mime= application/ogg; application/x-annodex; audio/ogg
 library = @ogg_arm11_SONAME@
 
 
