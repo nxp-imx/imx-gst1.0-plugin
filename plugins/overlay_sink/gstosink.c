@@ -790,7 +790,7 @@ gst_overlay_sink_get_static_caps ()
   GstCaps *caps;
   gint i;
 
-#define CAPS_NUM 8
+#define CAPS_NUM 7
   gchar *caps_str[] = {
     (gchar*)GST_VIDEO_CAPS_MAKE("I420"),
     (gchar*)GST_VIDEO_CAPS_MAKE("NV12"),
