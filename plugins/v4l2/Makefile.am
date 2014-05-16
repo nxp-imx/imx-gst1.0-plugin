@@ -7,15 +7,15 @@ libgstimxv4l2plugins_la_SOURCES = gstimxv4l2plugins.c \
 libgstimxv4l2plugins_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
 				 $(GST_BASE_CFLAGS) \
 				 $(GST_CFLAGS) \
-				 -I../../libs \
-				 -I../../libs/allocator \
-				 -I../../libs/v4l2_core
+				 -I$(top_srcdir)/libs \
+				 -I$(top_srcdir)/libs/allocator \
+				 -I$(top_srcdir)/libs/v4l2_core
 libgstimxv4l2plugins_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 				 $(GST_BASE_LIBS) \
 				 $(GST_PLUGINS_BASE_LIBS) \
 				 -lgstvideo-$(GST_API_VERSION) \
 				 $(GST_LIBS) \
-				 ../../libs/libgstfsl-@GST_API_VERSION@.la
+				 $(top_srcdir)/libs/libgstfsl-@GST_API_VERSION@.la
 libgstimxv4l2plugins_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstimxv4l2plugins_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 

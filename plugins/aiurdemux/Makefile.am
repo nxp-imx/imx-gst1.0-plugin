@@ -4,10 +4,10 @@ plugin_LTLIBRARIES = libgstaiurdemux.la
 # for the next set of variables, rename the prefix if you renamed the .la
 # sources used to compile this plug-in
 libgstaiurdemux_la_SOURCES =  aiur.c aiurregistry.c aiurstreamcache.c aiuridxtab.c aiurdemux.c aiurtypefind.c aiurcontent.c
-libgstaiurdemux_la_CFLAGS =  $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS) -I../../libs -I../../ext-includes
+libgstaiurdemux_la_CFLAGS =  $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS) -I$(top_srcdir)/libs -I$(top_srcdir)/ext-includes
 libgstaiurdemux_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) $(GST_BASE_LIBS) $(GST_LIBS) -lgsttag-$(GST_API_VERSION) -lgstriff-$(GST_API_VERSION)
 libgstaiurdemux_la_CPPFLAGS = $(GST_LIBS_CPPFLAGS) 
-libgstaiurdemux_la_LIBADD += ../../libs/libgstfsl-@GST_API_VERSION@.la
+libgstaiurdemux_la_LIBADD += $(top_srcdir)/libs/libgstfsl-@GST_API_VERSION@.la
 libgstaiurdemux_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstaiurdemux_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 
