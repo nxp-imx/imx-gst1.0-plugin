@@ -43,7 +43,7 @@ GST_DEBUG_CATEGORY (beep_dec_debug);
 
 #define CORE_FATAL_ERROR_MASK ((uint32)0xff)
 #define CORE_STATUS_MASK (~(uint32)0xff)
-#define MAX_PROFILE_ERROR_COUNT 500 //about 1 second decoding time, 1 seconds' audio data length
+#define MAX_PROFILE_ERROR_COUNT 50 //about 1 second decoding time, 1 seconds' audio data length
 #define VORBIS_HEADER_FRAME 3
 #define GST_TAG_BEEP_SAMPLING_RATE  "sampling_frequency"
 #define GST_TAG_BEEP_CHANNELS       "channels"
@@ -780,7 +780,7 @@ begin:
             ret = gst_audio_decoder_finish_frame (dec, NULL, 1);
             break;
         }else if(core_ret == ACODEC_PROFILE_NOT_SUPPORT){
-            beepdec->err_cnt += 10;
+            beepdec->err_cnt += 4;
             break;
         }else if(core_ret == ACODEC_NOT_ENOUGH_DATA){
             break;
