@@ -215,7 +215,7 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
 
           if (!display_enabled) {
             GST_ERROR_OBJECT (sink, "No display enabled.");
-            osink_object_free (sink->osink_obj);
+            osink_object_unref (sink->osink_obj);
             sink->osink_obj = NULL;
             return GST_STATE_CHANGE_FAILURE;
           }
@@ -268,7 +268,7 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_READY_TO_NULL:
       {
         if (sink->osink_obj)
-          osink_object_free (sink->osink_obj);
+          osink_object_unref (sink->osink_obj);
 
       }
       break;
@@ -302,7 +302,7 @@ gst_overlay_sink_setup_buffer_pool (GstOverlaySink *sink, GstCaps *caps)
   }
   GST_DEBUG_OBJECT (sink, "create buffer pool(%p).", sink->pool);
 
-  sink->allocator = gst_osink_allocator_new (sink);
+  sink->allocator = gst_osink_allocator_new (sink->osink_obj);
   if (!sink->allocator) {
     GST_ERROR_OBJECT (sink, "New osink allocator failed.\n");
     return -1;
@@ -779,7 +779,7 @@ gst_overlay_sink_install_properties (GObjectClass *gobject_class)
     prop++;
   }
 
-  osink_object_free (osink_obj);
+  osink_object_unref (osink_obj);
 
   return;
 }

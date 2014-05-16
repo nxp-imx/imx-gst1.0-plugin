@@ -28,7 +28,7 @@ osink_allocate_memory (GstAllocatorPhyMem *allocator, PhyMemBlock *memblk)
 {
   GstAllocatorOsink *osink_allocator = GST_ALLOCATOR_OSINK(allocator);
 
-  if (osink_object_allocate_memory (osink_allocator->hosink, memblk) < 0) {
+  if (osink_object_allocate_memory (osink_allocator->hosink_obj, memblk) < 0) {
     GST_ERROR ("osink allocate memory failed.");
     return -1;
   }
@@ -41,7 +41,7 @@ osink_free_memory (GstAllocatorPhyMem *allocator, PhyMemBlock *memblk)
 {
   GstAllocatorOsink *osink_allocator = GST_ALLOCATOR_OSINK(allocator);
 
-  if (osink_object_free_memory (osink_allocator->hosink, memblk) < 0) {
+  if (osink_object_free_memory (osink_allocator->hosink_obj, memblk) < 0) {
     GST_ERROR ("osink free memory failed.");
     return -1;
   }
@@ -70,7 +70,7 @@ gst_allocator_osink_init (GstAllocatorOsink * allocator)
 
 // global function
 GstAllocator *
-gst_osink_allocator_new (gpointer osink)
+gst_osink_allocator_new (gpointer osink_object)
 {
   GstAllocatorOsink *allocator;
 
@@ -80,7 +80,7 @@ gst_osink_allocator_new (gpointer osink)
     return NULL;
   }
 
-  allocator->hosink = osink;
+  allocator->hosink_obj = osink_object;
 
   GST_DEBUG ("Create osink allocator(%p).", allocator);
 

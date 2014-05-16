@@ -37,7 +37,7 @@ typedef struct {
 
 struct _GstAllocatorOsink {
   GstAllocatorPhyMem parent;
-  gpointer hosink;
+  gpointer hosink_obj;
 };
 
 struct _GstAllocatorOsinkClass {
@@ -45,6 +45,6 @@ struct _GstAllocatorOsinkClass {
 };
 
 GType gst_allocator_osink_get_type (void);
-GstAllocator *gst_osink_allocator_new (gpointer osink);
+GstAllocator *gst_osink_allocator_new (gpointer osink_object);
 
 #endif

@@ -373,7 +373,22 @@ gpointer osink_object_new ()
   return (gpointer) gosink;
 }
 
-void osink_object_free (gpointer osink_handle)
+void osink_object_ref (gpointer osink_handle)
+{
+  if (!osink_handle || osink_handle != gosink) {
+    GST_ERROR ("osink handle is not correct, current (%p), expected (%p).", osink_handle, gosink);
+    return;
+  }
+
+  GET_LOCK ();
+  LOCK (glock);
+  gosink->refcount ++;
+  UNLOCK (glock);
+
+  return;
+}
+
+void osink_object_unref (gpointer osink_handle)
 {
   if (!osink_handle || osink_handle != gosink) {
     GST_ERROR ("osink handle is not correct, current (%p), expected (%p).", osink_handle, gosink);
@@ -390,6 +405,7 @@ void osink_object_free (gpointer osink_handle)
     g_mutex_clear (glock);
     g_slice_free1 (sizeof (GMutex), glock);
     glock = NULL;
+    GST_DEBUG ("osink object is freed.");
     return;
   }
 
@@ -397,6 +413,7 @@ void osink_object_free (gpointer osink_handle)
 
   return;
 }
+
 
 int osink_object_get_display_count (gpointer osink_handle)
 {
@@ -591,6 +608,9 @@ int osink_object_allocate_memory (gpointer osink_handle, PhyMemBlock *memblk)
   ret = compositor_device_allocate_memory (handle->hdevice[0], memblk);
   UNLOCK (glock);
 
+  if (ret >= 0)
+    osink_object_ref (osink_handle);
+
   GST_DEBUG ("allocate memory, vaddr (%p), paddr (%p).", memblk->vaddr, memblk->paddr);
 
   return ret;
@@ -608,6 +628,8 @@ int osink_object_free_memory (gpointer osink_handle, PhyMemBlock *memblk)
   LOCK (glock);
   ret = compositor_device_free_memory (handle->hdevice[0], memblk);
   UNLOCK (glock);
+
+  osink_object_unref (osink_handle);
 
   return ret ;
 }

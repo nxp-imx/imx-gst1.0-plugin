@@ -24,7 +24,8 @@
 #include "gstallocatorphymem.h"
 
 gpointer osink_object_new ();
-void osink_object_free (gpointer osink_handle);
+void osink_object_ref (gpointer osink_handle);
+void osink_object_unref (gpointer osink_handle);
 int osink_object_get_display_count (gpointer osink_handle);
 int osink_object_get_display_info (gpointer osink_handle, DisplayInfo *info, gint display_idx);
 int osink_object_enable_display (gpointer osink_handle, gint display_idx);
