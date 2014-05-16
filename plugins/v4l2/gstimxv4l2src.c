@@ -107,7 +107,6 @@ gst_imx_v4l2src_stop (GstBaseSrc * src)
       v4l2src->pool = NULL;
     }
     if (v4l2src->allocator) {
-      gst_object_unref (v4l2src->allocator);
       v4l2src->allocator = NULL;
     }
   }
@@ -124,6 +123,11 @@ gst_imx_v4l2src_stop (GstBaseSrc * src)
     v4l2src->probed_caps = NULL;
   }
 
+  if (v4l2src->gstbuffer_in_v4l2) {
+    g_list_free (v4l2src->gstbuffer_in_v4l2);
+    v4l2src->gstbuffer_in_v4l2 = NULL;
+  }
+ 
   return TRUE;
 }
 
@@ -209,9 +213,11 @@ gst_imx_v4l2src_reset (GstImxV4l2Src * v4l2src)
     gst_imx_v4l2_reset_device (v4l2src->v4l2handle);
   }
 
-  g_list_foreach (v4l2src->gstbuffer_in_v4l2, (GFunc) gst_memory_unref, NULL);
-  g_list_free (v4l2src->gstbuffer_in_v4l2);
-  v4l2src->gstbuffer_in_v4l2 = NULL;
+  if (v4l2src->gstbuffer_in_v4l2) {
+    g_list_foreach (v4l2src->gstbuffer_in_v4l2, (GFunc) gst_memory_unref, NULL);
+    g_list_free (v4l2src->gstbuffer_in_v4l2);
+    v4l2src->gstbuffer_in_v4l2 = NULL;
+  }
   GST_DEBUG_OBJECT (v4l2src, "gstbuffer_in_v4l2 list free\n");
   v4l2src->stream_on = FALSE;
   v4l2src->actual_buf_cnt = 0;
@@ -445,9 +451,10 @@ gst_imx_v4l2src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
     /* no allocator or isn't physical memory allocator. VPU need continus
      * physical memory. use VPU memory allocator. */
     if (allocator) {
+      GST_ERROR_OBJECT (v4l2src, "unref proposaled allocator.\n");
       gst_object_unref (allocator);
     }
-    GST_DEBUG_OBJECT (v4l2src, "using v4l2 source allocator.\n");
+    GST_ERROR_OBJECT (v4l2src, "using v4l2 source allocator.\n");
 
     context.v4l2_handle = v4l2src->v4l2handle;
     context.user_data = (gpointer) v4l2src;

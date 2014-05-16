@@ -1362,6 +1362,10 @@ gint gst_imx_v4l2_register_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
     return -1;
   }
 
+  //FIXME: workaround for conflict when v4l2src ! v4l2sink.
+  if (!memblk->user_data) {
+    memblk->user_data = (gpointer) v4l2buf;
+  }
   handle->allocated ++;
 
   GST_DEBUG ("Allocated v4l2buffer(%p), index(%d).", v4l2buf, handle->allocated - 1);

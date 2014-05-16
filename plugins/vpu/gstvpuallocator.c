@@ -59,16 +59,21 @@ gst_vpu_alloc_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock 
 	VpuDecRetCode ret;
 	VpuMemDesc mem_desc;
 
+#define PAGE_ALIGN(x) (((x) + 4095) & ~4095)
 	GST_DEBUG_OBJECT(allocator, "vpu allocator malloc size: %d\n", memory->size);
 	memset(&mem_desc, 0, sizeof(VpuMemDesc));
-	mem_desc.nSize = memory->size;
+  // VPU allocate momory is page alignment, so it is ok align size to page.
+  // V4l2 capture will check physical memory size when registry buffer.
+	mem_desc.nSize = PAGE_ALIGN(memory->size);
 	ret = VPU_DecGetMem(&mem_desc);
 
 	if (ret == VPU_DEC_RET_SUCCESS) {
 		memory->size         = mem_desc.nSize;
 		memory->paddr        = (guint8 *)(mem_desc.nPhyAddr);
 		memory->vaddr         = (guint8 *)(mem_desc.nVirtAddr);
-		return TRUE;
+    GST_DEBUG_OBJECT(allocator, "vpu allocator malloc paddr: %x vaddr: %x\n", \
+        memory->paddr, memory->vaddr);
+    return TRUE;
 	} else
 		return FALSE;
 }

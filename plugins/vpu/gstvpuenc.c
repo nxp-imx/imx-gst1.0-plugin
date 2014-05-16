@@ -626,6 +626,7 @@ gst_vpu_enc_setup_internal_bufferpool (GstVpuEnc * enc)
 {
   GstAllocationParams params = { 0 };
   GstAllocator *allocator = NULL;
+  GstCaps *caps;
   GstStructure *config;
   guint i;
 
@@ -656,8 +657,8 @@ gst_vpu_enc_setup_internal_bufferpool (GstVpuEnc * enc)
   config = gst_buffer_pool_get_config(enc->pool);
   gst_buffer_pool_config_add_option(config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
   gst_buffer_pool_config_add_option(config, GST_BUFFER_POOL_OPTION_VIDEO_META);
-  gst_buffer_pool_config_set_params(config, gst_video_info_to_caps \
-      (&(enc->state->info)), enc->state->info.size, 2, 0);
+  caps = gst_video_info_to_caps (&(enc->state->info));
+  gst_buffer_pool_config_set_params(config, caps, enc->state->info.size, 2, 0);
   gst_buffer_pool_config_set_video_alignment (config, &enc->video_align);
   gst_buffer_pool_config_set_allocator(config, allocator, &params);
   gst_buffer_pool_set_config(enc->pool, config);
@@ -665,6 +666,7 @@ gst_vpu_enc_setup_internal_bufferpool (GstVpuEnc * enc)
   if (allocator)
     gst_object_unref (allocator);
 
+  gst_caps_unref (caps);
   if (gst_buffer_pool_set_active (enc->pool, TRUE) != TRUE) {
     GST_ERROR_OBJECT (enc, "active pool(%p) failed.", enc->pool);
     return FALSE;
@@ -977,16 +979,16 @@ gst_vpu_enc_propose_allocation (GstVideoEncoder * benc, GstQuery * query)
     gst_buffer_pool_config_set_params (structure, caps, size, 0, 0);
     gst_buffer_pool_config_set_allocator (structure, allocator, &params);
 
-    if (allocator)
-      gst_object_unref (allocator);
-
     if (!gst_buffer_pool_set_config (pool, structure)) {
       GST_ERROR_OBJECT (enc, "failed to set config");
+      gst_object_unref (allocator);
       gst_object_unref (pool);
       return FALSE;
     }
 
-    gst_query_add_allocation_pool (query, pool, size, 0, 0);
+    gst_query_add_allocation_pool (query, pool, size, 3, 0);
+    gst_query_add_allocation_param (query, allocator, NULL);
+    gst_object_unref (allocator);
     gst_object_unref (pool);
     gst_query_add_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL);
   }
