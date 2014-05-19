@@ -87,6 +87,8 @@ g2d_device_update_surface_info (gpointer device, SurfaceInfo *info, gpointer sur
     hsurface->src.format = G2D_NV12;
   else if(info->fmt == GST_VIDEO_FORMAT_YV12)
     hsurface->src.format = G2D_YV12;
+  else if(info->fmt == GST_VIDEO_FORMAT_NV16)
+    hsurface->src.format = G2D_NV16;
   else if(info->fmt == GST_VIDEO_FORMAT_YUY2)
     hsurface->src.format = G2D_YUYV;
   else if(info->fmt == GST_VIDEO_FORMAT_UYVY)
@@ -186,17 +188,25 @@ g2d_device_blit_surface (gpointer device, gpointer surface, SurfaceBuffer *buffe
   }
 
   switch(hsurface->src.format) {
-    case G2D_NV12:
-      hsurface->src.planes[0] = buffer->paddr;
-      hsurface->src.planes[1] = buffer->paddr + hsurface->src.width * hsurface->src.height;
-      break;
     case G2D_I420:
+    case G2D_YV12:
       hsurface->src.planes[0] = buffer->paddr;
       hsurface->src.planes[1] = buffer->paddr + hsurface->src.width * hsurface->src.height;
       hsurface->src.planes[2] = hsurface->src.planes[1]  + hsurface->src.width * hsurface->src.height / 4;
       //GST_DEBUG ("YUV address: %p, %p, %p", hsurface->src.planes[0], hsurface->src.planes[1], hsurface->src.planes[2]);
       break;
+    case G2D_NV12:
+      hsurface->src.planes[0] = buffer->paddr;
+      hsurface->src.planes[1] = buffer->paddr + hsurface->src.width * hsurface->src.height;
+      break;
+    case G2D_NV16:
+      hsurface->src.planes[0] = buffer->paddr;
+      hsurface->src.planes[1] = buffer->paddr + hsurface->src.width * hsurface->src.height;
+      break;
     case G2D_RGB565:
+    case G2D_RGBX8888:
+    case G2D_UYVY:
+    case G2D_YUYV:
       hsurface->src.planes[0] = buffer->paddr;
       break;
     default:
