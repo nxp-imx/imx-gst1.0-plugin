@@ -118,8 +118,9 @@ gst_vpu_dec_class_init (GstVpuDecClass * klass)
           DEFAULT_LOW_LATENCY, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (gobject_class, PROP_OUTPUT_FORMAT,
       g_param_spec_enum ("output-format", "output format",
-        "set raw format for output (ignored when MJPEG)", GST_TYPE_VPU_DEC_OUTPUT_FORMAT,
-          DEFAULT_OUTPUT_FORMAT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+        "set raw video format for output (Y42B NV16 Y444 NV24 only for MJPEG)", \
+        GST_TYPE_VPU_DEC_OUTPUT_FORMAT, \
+        DEFAULT_OUTPUT_FORMAT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (gobject_class, PROP_ADAPTIVE_FRAMEDROP,
       g_param_spec_boolean ("framedrop", "frame drop",
         "enable adaptive frame drop for smoothly playback", 

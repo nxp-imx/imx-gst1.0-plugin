@@ -728,19 +728,6 @@ int main(int argc,char *argv[])
         return -1;
     }
 
-    fsl_player_element_property property[1];
-
-    property[0].type = ELEMENT_TYPE_PLAYBIN;
-    property[0].property_type = ELEMENT_PROPERTY_TYPE_INT;
-    property[0].property_name = "flags";
-    if (opt->enable_visual){
-      property[0].value_int = 0x5f; /* default+native_video+buffering+visual */
-    }else{
-      property[0].value_int = 0x57; /* default+native_video+buffering */
-    }
-    property[0].next = NULL;
-    config.ele_properties = property;
-
     player_handle = fsl_player_init(&config);
     if( NULL == player_handle )
     {

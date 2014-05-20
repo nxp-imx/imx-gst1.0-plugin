@@ -93,6 +93,7 @@ struct _GstVpuDecObject {
   gint framerate_d;
   gint mosaic_cnt;
   gboolean is_mjpeg;
+  gboolean chroma_interleaved;
   gboolean new_segment;
   gboolean dropping;
   void *tsm;

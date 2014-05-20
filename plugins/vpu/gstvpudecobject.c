@@ -38,6 +38,10 @@ enum
   NV12,
   I420,
   YV12,
+  Y42B,
+  NV16,
+  Y444,
+  NV24,
   OUTPUT_FORMAT_MAX
 };
 
@@ -48,7 +52,7 @@ gst_vpu_dec_output_format_get_type (void)
 
   if (gtype == 0) {
     static const GEnumValue values[] = {
-      {AUTO, "Decide output frame based on vpudec priority and downstream caps (default)",
+      {AUTO, "enable chroma interleave. (default)",
           "auto"},
       {NV12, "NV12 format",
           "NV12"},
@@ -56,6 +60,14 @@ gst_vpu_dec_output_format_get_type (void)
           "I420"},
       {YV12, "YV12 format",
           "YV12"},
+      {Y42B, "Y42B format",
+          "Y42B"},
+      {NV16, "NV16 format",
+          "NV16"},
+      {Y444, "Y444 format",
+          "Y444"},
+      {NV24, "NV24 format",
+          "NV24"},
       {0, NULL, NULL}
     };
 
@@ -101,7 +113,8 @@ gst_vpu_dec_object_get_src_caps (void)
   static GstCaps *caps = NULL;
 
   if (caps == NULL) {
-    caps = gst_caps_from_string (GST_VIDEO_CAPS_MAKE ("{ NV12, I420, YV12 }"));
+    caps = gst_caps_from_string (GST_VIDEO_CAPS_MAKE ("{ NV12, I420, YV12, Y42B, \
+          NV16, Y444, NV24 }"));
   }
 
   return gst_caps_ref (caps);
@@ -401,52 +414,12 @@ gst_vpu_dec_object_decide_output_format (GstVpuDecObject * vpu_dec_object, \
       case NV12: vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_NV12; break;
       case I420: vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_I420; break;
       case YV12: vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_YV12; break;
+      case Y42B: vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_Y42B; break;
+      case NV16: vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_NV16; break;
+      case Y444: vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_Y444; break;
+      case NV24: vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_NV24; break;
       default: GST_WARNING_OBJECT(vpu_dec_object, "unknown output format"); break;
     }
-
-    return;
-  }
-
-  peer_caps = gst_pad_get_allowed_caps (GST_VIDEO_DECODER_SRC_PAD(bdec));
-  if (G_LIKELY (peer_caps)) {
-    guint i = 0, j = 0, n = 0;
-
-    n = gst_caps_get_size (peer_caps);
-    GST_DEBUG_OBJECT (vpu_dec_object, "peer allowed caps (%u structure(s)) are %"
-        GST_PTR_FORMAT, n, peer_caps);
-
-    for (i = 0; i < n; i++) {
-      GstStructure *s;
-      const gchar *fmt_str;
-      const GValue *format, *fmt_val;
-
-      s = gst_caps_get_structure (peer_caps, i);
-      if (!gst_structure_has_name (s, "video/x-raw"))
-        continue;
-
-      format = gst_structure_get_value (s, "format");
-      if (format == NULL)
-        continue;
-
-      if (GST_VALUE_HOLDS_LIST (format)) {
-        for (j = 0; j < gst_value_list_get_size (format); ++j) {
-          fmt_val = gst_value_list_get_value (format, j);
-          fmt_str = g_value_get_string (fmt_val);
-          GST_DEBUG_OBJECT (vpu_dec_object, "format string: '%s'", fmt_str);
-          vpu_dec_object->output_format_decided = gst_video_format_from_string (fmt_str);
-          gst_caps_unref (peer_caps);
-          return;
-        }
-      } else if (G_VALUE_HOLDS_STRING (format)) {
-        fmt_str = g_value_get_string (format);
-        GST_DEBUG_OBJECT (vpu_dec_object, "format string: '%s'", fmt_str);
-        vpu_dec_object->output_format_decided = gst_video_format_from_string (fmt_str);
-        gst_caps_unref (peer_caps);
-        return;
-      }
-    }
-
-    gst_caps_unref (peer_caps);
   }
 }
 
@@ -469,17 +442,23 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
   open_param->nChromaInterleave = 0;
   open_param->nMapType = 0;
   open_param->nTiled2LinearEnable = 0;
-  vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_I420;
-  vpu_dec_object->is_mjpeg = FALSE;
-  if (open_param->CodecFormat != VPU_V_MJPG) {
-    gst_vpu_dec_object_decide_output_format(vpu_dec_object, bdec);
-    if (vpu_dec_object->output_format_decided == GST_VIDEO_FORMAT_NV12) {
-      open_param->nChromaInterleave = 1;
-    } 
-  } else {
+  vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_NV12;
+  if (open_param->CodecFormat == VPU_V_MJPG) {
     vpu_dec_object->is_mjpeg = TRUE;
+  } else {
+    vpu_dec_object->is_mjpeg = FALSE;
   }
-
+  gst_vpu_dec_object_decide_output_format(vpu_dec_object, bdec);
+  if (vpu_dec_object->is_mjpeg 
+      && (vpu_dec_object->output_format_decided == GST_VIDEO_FORMAT_NV12
+        || vpu_dec_object->output_format_decided == GST_VIDEO_FORMAT_NV16
+        || vpu_dec_object->output_format_decided == GST_VIDEO_FORMAT_NV24)) {
+    open_param->nChromaInterleave = 1;
+    vpu_dec_object->chroma_interleaved = TRUE;
+  }else if (vpu_dec_object->output_format_decided == GST_VIDEO_FORMAT_NV12) {
+    open_param->nChromaInterleave = 1;
+    vpu_dec_object->chroma_interleaved = TRUE;
+  }
   open_param->nReorderEnable = 1;
   open_param->nEnableFileMode = 0;
   open_param->nPicWidth = GST_VIDEO_INFO_WIDTH(info);
@@ -649,9 +628,12 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
 
   if (vpu_dec_object->is_mjpeg) {
     switch (vpu_dec_object->init_info.nMjpgSourceFormat) {
-      case 0: fmt = GST_VIDEO_FORMAT_I420; break;
-      case 1: fmt = GST_VIDEO_FORMAT_Y42B; break;
-      case 3: fmt = GST_VIDEO_FORMAT_Y444; break;
+      case VPU_COLOR_420: fmt = vpu_dec_object->chroma_interleaved ? \
+              GST_VIDEO_FORMAT_NV12 : GST_VIDEO_FORMAT_I420; break;
+      case VPU_COLOR_422H: fmt = vpu_dec_object->chroma_interleaved ? \
+              GST_VIDEO_FORMAT_NV16 : GST_VIDEO_FORMAT_Y42B; break;
+      case VPU_COLOR_444: fmt = vpu_dec_object->chroma_interleaved ? \
+              GST_VIDEO_FORMAT_NV24 : GST_VIDEO_FORMAT_Y444; break;
       default:
               GST_ERROR_OBJECT(vpu_dec_object, "unsupported MJPEG output format %d", \
                   vpu_dec_object->init_info.nMjpgSourceFormat);
