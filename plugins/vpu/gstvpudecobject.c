@@ -903,7 +903,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   return ret;
 }
 
-static gboolean
+static GstFlowReturn
 gst_vpu_dec_object_get_gst_buffer (GstVideoDecoder * bdec, GstVpuDecObject * vpu_dec_object)
 {
   GstBuffer *buffer;
@@ -913,16 +913,21 @@ gst_vpu_dec_object_get_gst_buffer (GstVideoDecoder * bdec, GstVpuDecObject * vpu
     buffer = gst_video_decoder_allocate_output_buffer(bdec);
     if (G_UNLIKELY (buffer == NULL)) {
       GST_DEBUG_OBJECT (vpu_dec_object, "could not get buffer.");
-      return FALSE;
+      return GST_FLOW_FLUSHING;
+    }
+    if (!gst_buffer_is_phymem (buffer)) {
+      gst_buffer_unref (buffer);
+      GST_DEBUG_OBJECT(vpu_dec_object, "gstbuffer isn't physical buffer.");
+      return GST_FLOW_FLUSHING;
     }
     if (!gst_vpu_dec_object_release_frame_buffer_to_vpu (vpu_dec_object, buffer)) {
       GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_release_frame_buffer_to_vpu fail.");
-      return FALSE;
+      return GST_FLOW_ERROR;
     }
   } else
     GST_WARNING_OBJECT(vpu_dec_object, "no more gstbuffer.\n");
 
-  return TRUE;
+  return GST_FLOW_OK;
 }
 
 static gboolean
@@ -1092,9 +1097,11 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
       }
     }
     if (buf_ret & VPU_DEC_NO_ENOUGH_BUF) {
-      if (!gst_vpu_dec_object_get_gst_buffer(bdec, vpu_dec_object)) {
-        GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_get_gst_buffer fail.");
-        return GST_FLOW_ERROR;
+      ret = gst_vpu_dec_object_get_gst_buffer(bdec, vpu_dec_object);
+      if (ret != GST_FLOW_OK) {
+        GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_get_gst_buffer fail: %s\n", \
+            gst_flow_get_name (ret));
+        return ret;
       }
     }
     if (buf_ret & VPU_DEC_OUTPUT_MOSAIC_DIS) {
