@@ -443,6 +443,8 @@ static gboolean beep_dec_start (GstAudioDecoder * dec)
     beepdec->set_codec_data = FALSE;
     beepdec->in_cnt = 0;
     
+    gst_audio_decoder_set_estimate_rate(dec, TRUE);
+    
     gst_tag_register (GST_TAG_BEEP_CHANNELS, GST_TAG_FLAG_DECODED,
         G_TYPE_UINT, "number of channels", "number of channels", NULL);
     gst_tag_register (GST_TAG_BEEP_SAMPLING_RATE, GST_TAG_FLAG_DECODED,
