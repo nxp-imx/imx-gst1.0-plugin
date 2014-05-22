@@ -50,7 +50,7 @@
 #define G_MINUINT64_STR "0"
 #define G_MAXUINT64_STR "0xffffffffffffffffU"
 
-#define FSL_GST_CONF_DEFAULT_FILENAME "/usr/share/gst-fsl-plugins.conf"
+#define FSL_GST_CONF_DEFAULT_FILENAME "/usr/share/gst-fsl-plugins_1.0.conf"
 
 
 
