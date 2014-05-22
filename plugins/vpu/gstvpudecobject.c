@@ -807,7 +807,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   out_frame = gst_video_decoder_get_frame (bdec, frame_number);
   GST_LOG_OBJECT (vpu_dec_object, "gst_video_decoder_get_frame: 0x%x\n", \
       out_frame);
-  if (out_frame)
+  if (out_frame && vpu_dec_object->frame_drop)
     gst_vpu_dec_object_process_qos (vpu_dec_object, bdec, out_frame);
  
   if (drop == FALSE) {

@@ -46,13 +46,13 @@ enum
 {
   PROP_0,
   PROP_OUTPUT_FORMAT,
-  PROP_ADAPTIVE_FRAMEDROP,
+  PROP_ADAPTIVE_FRAME_DROP,
   PROP_FRAMES_PLUS,
 };
 
 #define DEFAULT_LOW_LATENCY FALSE
 #define DEFAULT_OUTPUT_FORMAT 0
-#define DEFAULT_ADAPTIVE_FRAMEDROP TRUE
+#define DEFAULT_ADAPTIVE_FRAME_DROP TRUE
 #define DEFAULT_FRAMES_PLUS 3
 
 GST_DEBUG_CATEGORY_STATIC (vpu_dec_debug);
@@ -116,10 +116,10 @@ gst_vpu_dec_class_init (GstVpuDecClass * klass)
         "set raw video format for output (Y42B NV16 Y444 NV24 only for MJPEG)", \
         GST_TYPE_VPU_DEC_OUTPUT_FORMAT, \
         DEFAULT_OUTPUT_FORMAT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-  g_object_class_install_property (gobject_class, PROP_ADAPTIVE_FRAMEDROP,
-      g_param_spec_boolean ("framedrop", "frame drop",
+  g_object_class_install_property (gobject_class, PROP_ADAPTIVE_FRAME_DROP,
+      g_param_spec_boolean ("frame-drop", "frame drop",
         "enable adaptive frame drop for smoothly playback", 
-          DEFAULT_ADAPTIVE_FRAMEDROP, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          DEFAULT_ADAPTIVE_FRAME_DROP, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (gobject_class, PROP_FRAMES_PLUS,
       g_param_spec_uint ("frame-plus", "addtionlal frames",
         "set number of addtional frames for smoothly playback", 
@@ -159,7 +159,7 @@ gst_vpu_dec_init (GstVpuDec * dec)
 
   GST_VPU_DEC_LOW_LATENCY (dec->vpu_dec_object) = DEFAULT_LOW_LATENCY;
   GST_VPU_DEC_OUTPUT_FORMAT (dec->vpu_dec_object) = DEFAULT_OUTPUT_FORMAT;
-  GST_VPU_DEC_FRAME_DROP (dec->vpu_dec_object) = DEFAULT_ADAPTIVE_FRAMEDROP;
+  GST_VPU_DEC_FRAME_DROP (dec->vpu_dec_object) = DEFAULT_ADAPTIVE_FRAME_DROP;
   GST_VPU_DEC_FRAMES_PLUS (dec->vpu_dec_object) = DEFAULT_FRAMES_PLUS;
   GST_VPU_DEC_MIN_BUF_CNT (dec->vpu_dec_object) = 0;
 
@@ -180,7 +180,7 @@ gst_vpu_dec_get_property (GObject * object, guint prop_id, GValue * value,
     case PROP_OUTPUT_FORMAT:
       g_value_set_enum (value, GST_VPU_DEC_OUTPUT_FORMAT (dec->vpu_dec_object));
       break;
-    case PROP_ADAPTIVE_FRAMEDROP:
+    case PROP_ADAPTIVE_FRAME_DROP:
       g_value_set_boolean (value, GST_VPU_DEC_FRAME_DROP (dec->vpu_dec_object));
       break;
     case PROP_FRAMES_PLUS:
@@ -205,7 +205,7 @@ gst_vpu_dec_set_property (GObject * object, guint prop_id,
     case PROP_OUTPUT_FORMAT:
       GST_VPU_DEC_OUTPUT_FORMAT (dec->vpu_dec_object) = g_value_get_enum (value);
       break;
-    case PROP_ADAPTIVE_FRAMEDROP:
+    case PROP_ADAPTIVE_FRAME_DROP:
       GST_VPU_DEC_FRAME_DROP (dec->vpu_dec_object) = g_value_get_boolean (value);
       break;
     case PROP_FRAMES_PLUS:
