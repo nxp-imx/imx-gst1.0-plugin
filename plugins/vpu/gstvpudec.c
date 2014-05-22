@@ -45,7 +45,6 @@
 enum
 {
   PROP_0,
-  PROP_LOW_LATENCY,
   PROP_OUTPUT_FORMAT,
   PROP_ADAPTIVE_FRAMEDROP,
   PROP_FRAMES_PLUS,
@@ -112,10 +111,6 @@ gst_vpu_dec_class_init (GstVpuDecClass * klass)
   gobject_class->set_property = GST_DEBUG_FUNCPTR (gst_vpu_dec_set_property);
   gobject_class->get_property = GST_DEBUG_FUNCPTR (gst_vpu_dec_get_property);
 
-  g_object_class_install_property (gobject_class, PROP_LOW_LATENCY,
-      g_param_spec_boolean ("low-latency", "low latency",
-          "set low latency mode enable/disable for streaming case", 
-          DEFAULT_LOW_LATENCY, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (gobject_class, PROP_OUTPUT_FORMAT,
       g_param_spec_enum ("output-format", "output format",
         "set raw video format for output (Y42B NV16 Y444 NV24 only for MJPEG)", \
@@ -182,9 +177,6 @@ gst_vpu_dec_get_property (GObject * object, guint prop_id, GValue * value,
   dec = GST_VPU_DEC (object);
 
   switch (prop_id) {
-    case PROP_LOW_LATENCY:
-      g_value_set_boolean (value, GST_VPU_DEC_LOW_LATENCY (dec->vpu_dec_object));
-      break;
     case PROP_OUTPUT_FORMAT:
       g_value_set_enum (value, GST_VPU_DEC_OUTPUT_FORMAT (dec->vpu_dec_object));
       break;
@@ -210,9 +202,6 @@ gst_vpu_dec_set_property (GObject * object, guint prop_id,
   dec = GST_VPU_DEC (object);
 
   switch (prop_id) {
-    case PROP_LOW_LATENCY:
-      GST_VPU_DEC_LOW_LATENCY (dec->vpu_dec_object) = g_value_get_boolean (value);
-      break;
     case PROP_OUTPUT_FORMAT:
       GST_VPU_DEC_OUTPUT_FORMAT (dec->vpu_dec_object) = g_value_get_enum (value);
       break;
@@ -264,6 +253,23 @@ static gboolean
 gst_vpu_dec_set_format (GstVideoDecoder * bdec, GstVideoCodecState * state)
 {
   GstVpuDec *dec = (GstVpuDec *) bdec;
+  GstQuery *query;
+  gboolean is_live;
+
+  query = gst_query_new_latency ();
+  is_live = FALSE;
+  if (gst_pad_peer_query (GST_VIDEO_DECODER_SINK_PAD (bdec), query)) {
+    gst_query_parse_latency (query, &is_live, NULL, NULL);
+  }
+  gst_query_unref (query);
+
+  if (is_live) {
+    GST_INFO_OBJECT (dec, "Pipeline is live, set VPU to low latency mode.\n");
+    GST_VPU_DEC_LOW_LATENCY (dec->vpu_dec_object) = TRUE;
+  } else {
+    GST_INFO_OBJECT (dec, "Pipeline isn't live, set VPU to latency mode.\n");
+    GST_VPU_DEC_LOW_LATENCY (dec->vpu_dec_object) = TRUE;
+  }
 
   return gst_vpu_dec_object_config (dec->vpu_dec_object, bdec, state);
 }
