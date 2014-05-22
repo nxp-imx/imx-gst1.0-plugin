@@ -59,13 +59,21 @@ beep_register_external_typefinders (GstPlugin * plugin)
   gboolean ret = TRUE;
   BeepExternalTypeFind *t = g_beepextypefinders;
   while (t->name) {
+    GstCaps *caps;
+    caps = gst_caps_new_simple(t->mime, NULL);
     ret &= gst_type_find_register (plugin, t->name, GST_RANK_PRIMARY,
-        t->func, t->exts, gst_caps_new_simple (t->mime, NULL), NULL, NULL);
+        t->func, t->exts, caps, NULL, NULL);
+    gst_caps_unref(caps);
     t++;
   }
   return ret;
 
 }
+
+static GstStaticCaps caps_3ca = GST_STATIC_CAPS("audio/x-3ca");
+#define CAPS_3CA (gst_static_caps_get(&caps_3ca))
+static GstStaticCaps caps_ac3 = GST_STATIC_CAPS("audio/x-ac3");
+#define CAPS_AC3 (gst_static_caps_get(&caps_ac3))
 
 static void
 ac3_typefind (GstTypeFind * tf, gpointer data)
@@ -74,8 +82,7 @@ ac3_typefind (GstTypeFind * tf, gpointer data)
 
   if (data_in) {
     if (data_in[0] == 0x0b && data_in[1] == 0x77)
-      gst_type_find_suggest (tf, GST_TYPE_FIND_MAXIMUM,
-          gst_caps_new_simple ("audio/x-ac3", NULL));
+      gst_type_find_suggest(tf, GST_TYPE_FIND_MAXIMUM, CAPS_AC3);
   }
 }
 
@@ -86,7 +93,6 @@ ac3_bigendian_typefind (GstTypeFind * tf, gpointer data)
 
   if (data_in) {
     if (data_in[1] == 0x0b && data_in[0] == 0x77)
-      gst_type_find_suggest (tf, GST_TYPE_FIND_MAXIMUM,
-          gst_caps_new_simple ("audio/x-3ca", NULL));
+      gst_type_find_suggest(tf, GST_TYPE_FIND_MAXIMUM, CAPS_3CA);
   }
 }
