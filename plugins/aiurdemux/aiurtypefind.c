@@ -63,8 +63,11 @@ aiur_register_external_typefinders (GstPlugin * plugin)
   gboolean ret = TRUE;
   AiurExternalTypeFind *t = g_aiurextypefinders;
   while (t->name) {
+    GstCaps *caps;
+    caps = gst_caps_new_simple(t->mime, NULL);
     ret &= gst_type_find_register (plugin, t->name, GST_RANK_PRIMARY,
-        t->func, t->exts, gst_caps_new_simple (t->mime, NULL), NULL, NULL);
+        t->func, t->exts, caps, NULL, NULL);
+    gst_caps_unref(caps);
     t++;
   }
   return ret;
