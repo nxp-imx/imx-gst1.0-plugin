@@ -22,7 +22,9 @@ if USE_WMA8_ENC
 WMA8ENC_DIR =
 endif
 
+if USE_OVERLAY_SINK
 OVERLAYSINKDIRS = plugins/overlay_sink
+endif
 
 TOOLDIRS =    tools/                      \
               tools/gplay
