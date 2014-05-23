@@ -699,6 +699,13 @@ void gstsutils_load_default_property(gstsutils_property * table,GstObject* dec,
                        p->set_func(dec,(gint)value);
                        break;
                        }
+                    case G_TYPE_UINT:
+                       {
+                       gint value;
+                       value = g_key_file_get_integer(keyfile,group,p->name,NULL);
+                       p->set_func(dec,(guint)value);
+                       break;
+                       }
                     case G_TYPE_STRING:
                         {
                         char * value;
