@@ -473,6 +473,7 @@ gst_overlay_sink_input_config (GstOverlaySink *sink)
           sink->video_align.padding_right, sink->video_align.padding_bottom);
     }
     sink->pool_alignment_checked = TRUE;
+    gst_structure_free (config);
   }
 
   GST_DEBUG_OBJECT (sink, "cropmeta (%d, %d) --> (%d, %d)", 
