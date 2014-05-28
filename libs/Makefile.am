@@ -15,3 +15,10 @@ noinst_HEADERS = allocator/gstallocatorphymem.h \
     video-tsm/mfw_gst_ts.h \
     gstsutils/gstsutils.h \
     v4l2_core/gstimxv4l2.h
+
+libgstfsl_@GST_API_VERSION@_la_SOURCES += video-overlay/gstimxvideooverlay.c \
+																					video-overlay/gstimxxoverlay.c
+libgstfsl_@GST_API_VERSION@_la_LIBADD += -lX11
+libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_X11    
+noinst_HEADERS += video-overlay/gstimxvideooverlay.h \
+									video-overlay/gstimxxoverlay.h

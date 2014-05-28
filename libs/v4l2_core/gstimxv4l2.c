@@ -34,6 +34,16 @@
 #include "gstimxcommon.h"
 #include "gstimxv4l2.h"
 
+#define RGB888(r,g,b)\
+    ((((guint32)(r))<<16)|(((guint32)(g))<<8)|(((guint32)(b))))
+#define RGB888TORGB565(rgb)\
+    ((((rgb)<<8)>>27<<11)|(((rgb)<<18)>>26<<5)|(((rgb)<<27)>>27))
+
+#define RGB565TOCOLORKEY(rgb)                              \
+      ( ((rgb & 0xf800)<<8)  |  ((rgb & 0xe000)<<3)  |     \
+        ((rgb & 0x07e0)<<5)  |  ((rgb & 0x0600)>>1)  |     \
+        ((rgb & 0x001f)<<3)  |  ((rgb & 0x001c)>>2)  )
+
 //used in imx v4l2 core debug
 GST_DEBUG_CATEGORY (imxv4l2_debug);
 #define GST_CAT_DEFAULT imxv4l2_debug
@@ -281,23 +291,37 @@ imx_ipu_v4l2_config_alpha (IMXV4l2Handle *handle, guint alpha)
   return;
 }
 
-static void
+static gint
 imx_ipu_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint color_key)
 {
   struct mxcfb_color_key colorKey;
   char *device = (char*)g_device_maps[handle->device_map_id].bg_fb_name;
   int fd;
+  struct fb_var_screeninfo fbVar;
+  gint key = 0;
 
   fd = open (device, O_RDWR, 0);
   if (fd < 0) {
     GST_ERROR ("Can't open %s.\n", device);
-    return;
+    return 0;
+  }
+
+  if (ioctl(fd, FBIOGET_VSCREENINFO, &fbVar) < 0) {
+    GST_ERROR("get vscreen info failed.\n");
+  } else {
+    if (fbVar.bits_per_pixel == 16) {
+      key = RGB888TORGB565(color_key);
+      colorKey.color_key = RGB565TOCOLORKEY(key);
+      GST_DEBUG("%08X:%08X:%08X\n", key, colorKey.color_key, color_key);
+    } else if (fbVar.bits_per_pixel == 24 || fbVar.bits_per_pixel == 32) {
+      key = color_key;
+      colorKey.color_key = color_key;
+    }
   }
 
   if (enable) {
-    colorKey.color_key = color_key;
     colorKey.enable = 1; 
-    GST_DEBUG ("set colorKey to (%x) for display (%s)", color_key, device);
+    GST_DEBUG ("set colorKey to (%x) for display (%s)", colorKey.color_key, device);
   }
   else {
     colorKey.enable = 0; 
@@ -310,7 +334,7 @@ imx_ipu_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint colo
 
   close (fd);
 
-  return;
+  return key;
 }
 
 
@@ -412,15 +436,17 @@ imx_pxp_v4l2_config_alpha (IMXV4l2Handle *handle, guint alpha)
   return;
 }
 
-static void
+static gint
 imx_pxp_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint color_key)
 {
   struct v4l2_framebuffer fb;
+  gint key = 0;
 
   fb.flags = V4L2_FBUF_FLAG_OVERLAY;
   if (enable) {
     fb.flags |= V4L2_FBUF_FLAG_CHROMAKEY;
     handle->color_key = color_key;
+    key = (gint)color_key;
     GST_DEBUG ("set colorKey to (%x) ", color_key);
   }
   else {
@@ -429,10 +455,10 @@ imx_pxp_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint colo
 
   if (ioctl(handle->v4l2_fd, VIDIOC_S_FBUF, &fb) < 0) {
     GST_ERROR ("VIDIOC_S_FBUF failed.");
-    return;
+    return 0;
   }
 
-  return;
+  return key;
 }
 
 gchar *
@@ -1272,18 +1298,16 @@ void gst_imx_v4l2out_config_alpha (gpointer v4l2handle, guint alpha)
   return;
 }
 
-void gst_imx_v4l2out_config_color_key (gpointer v4l2handle, gboolean enable, guint color_key)
+gint gst_imx_v4l2out_config_color_key (gpointer v4l2handle, gboolean enable, guint color_key)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
 
   if (handle->type != V4L2_BUF_TYPE_VIDEO_OUTPUT) {
     GST_ERROR ("Can't set color key for non output device.");
-    return;
+    return 0;
   }
 
-  (*handle->dev_itf.v4l2out_config_colorkey) (handle, enable, color_key);
-
-  return ;
+  return (*handle->dev_itf.v4l2out_config_colorkey) (handle, enable, color_key);
 }
 
 gint gst_imx_v4l2_set_buffer_count (gpointer v4l2handle, guint count, guint memory_mode)

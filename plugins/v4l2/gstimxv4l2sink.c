@@ -26,6 +26,10 @@
 #define ISALIGNED(a, b) (!(a & (b-1)))
 #define ALIGNTO(a, b) ((a + (b-1)) & (~(b-1)))
 
+#ifdef USE_X11
+#include "gstimxvideooverlay.h"
+#endif
+
 GST_DEBUG_CATEGORY (imxv4l2sink_debug);
 #define GST_CAT_DEFAULT imxv4l2sink_debug
 
@@ -53,8 +57,47 @@ enum {
   CONFIG_ROTATE = 0x4
 };
 
+#ifdef USE_X11
+GST_IMPLEMENT_VIDEO_OVERLAY_METHODS (GstImxV4l2Sink, gst_imx_v4l2sink);
+
+gboolean update_video_geo(GstElement * object, GstVideoRectangle win_rect) {
+  GstImxV4l2Sink *v4l2sink = GST_IMX_V4L2SINK (object);
+  v4l2sink->overlay.left = win_rect.x;
+  v4l2sink->overlay.top = win_rect.y;
+  v4l2sink->overlay.width = win_rect.w;
+  v4l2sink->overlay.height = win_rect.h;
+  v4l2sink->config_flag |= CONFIG_OVERLAY;
+  v4l2sink->config = TRUE;
+  return TRUE;
+}
+
+void config_global_alpha(GObject * object, guint alpha)
+{
+  GstImxV4l2Sink *v4l2sink = GST_IMX_V4L2SINK (object);
+  if (v4l2sink && v4l2sink->v4l2handle)
+    gst_imx_v4l2out_config_alpha(v4l2sink->v4l2handle, alpha);
+}
+
+gint config_color_key(GObject * object, gboolean enable, guint color_key)
+{
+  GstImxV4l2Sink *v4l2sink = GST_IMX_V4L2SINK (object);
+  gint key = -1;
+
+  if (v4l2sink && v4l2sink->v4l2handle)
+    key = gst_imx_v4l2out_config_color_key(v4l2sink->v4l2handle, enable, color_key);
+
+  return key;
+}
+#endif
+
 #define gst_imx_v4l2sink_parent_class parent_class
+#ifdef USE_X11
+G_DEFINE_TYPE_WITH_CODE (GstImxV4l2Sink, gst_imx_v4l2sink, GST_TYPE_VIDEO_SINK,
+    G_IMPLEMENT_INTERFACE (GST_TYPE_VIDEO_OVERLAY,
+                       gst_imx_v4l2sink_video_overlay_interface_init));
+#else
 G_DEFINE_TYPE (GstImxV4l2Sink, gst_imx_v4l2sink, GST_TYPE_VIDEO_SINK);
+#endif
 
 static void
 gst_imx_v4l2sink_set_property (GObject * object,
@@ -221,7 +264,6 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
             || (v4l2sink->config_flag & CONFIG_ROTATE)) {
           v4l2sink->config = TRUE;
         }
-
       }
       break;
     case GST_STATE_CHANGE_READY_TO_PAUSED:
@@ -229,6 +271,9 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
         gst_imx_v4l2_config_deinterlace (v4l2sink->v4l2handle, 
             v4l2sink->do_deinterlace, v4l2sink->deinterlace_motion);
       }
+#ifdef USE_X11
+        gst_imx_video_overlay_start (v4l2sink->imxoverlay);
+#endif
       break;
     default:
       break;
@@ -239,6 +284,10 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
   switch (transition) {
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       if (v4l2sink->v4l2handle) {
+#ifdef USE_X11
+        gst_imx_video_overlay_stop (v4l2sink->imxoverlay);
+#endif
+
         if (gst_imx_v4l2_reset_device (v4l2sink->v4l2handle) < 0) {
           return GST_STATE_CHANGE_FAILURE;
         }
@@ -459,6 +508,11 @@ gst_imx_v4l2sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
     return FALSE;
 
   v4l2sink->self_pool_configed = FALSE;
+
+#ifdef USE_X11
+  gst_imx_video_overlay_prepare_window_handle (v4l2sink->imxoverlay, TRUE);
+#endif
+
   return TRUE;
 }
 
@@ -680,6 +734,12 @@ gst_imx_v4l2sink_finalize (GstImxV4l2Sink * v4l2sink)
   if (v4l2sink->device)
     g_free (v4l2sink->device);
 
+#ifdef USE_X11
+  if (v4l2sink->imxoverlay) {
+    gst_imx_video_overlay_finalize (v4l2sink->imxoverlay);
+    v4l2sink->imxoverlay = NULL;
+  }
+#endif
   G_OBJECT_CLASS (parent_class)->finalize ((GObject *) (v4l2sink));
 }
 
@@ -853,5 +913,9 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   v4l2sink->keep_video_ratio = FALSE;
   v4l2sink->frame_showed = 0;
   v4l2sink->min_buffers = gst_imx_v4l2_get_min_buffer_num (V4L2_BUF_TYPE_VIDEO_OUTPUT);
+#ifdef USE_X11
+  v4l2sink->imxoverlay = gst_imx_video_overlay_init ((GstElement *)v4l2sink,
+                     update_video_geo, config_color_key, config_global_alpha);
+#endif
 }
 

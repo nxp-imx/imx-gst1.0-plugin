@@ -61,6 +61,9 @@ struct _GstImxV4l2Sink {
   guint64 frame_showed;
   guint min_buffers;
   gboolean self_pool_configed;
+#ifdef USE_X11
+  void *imxoverlay;
+#endif
 };
 
 struct _GstImxV4l2SinkClass {
