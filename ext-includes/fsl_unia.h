@@ -1,6 +1,6 @@
 
 /*
-* Copyright (c) 2011-2013, Freescale Semiconductor, Inc. 
+* Copyright (c) 2011-2014, Freescale Semiconductor, Inc. 
  */
 
 /*
