@@ -29,7 +29,7 @@
 
 //#define PREPARE_WINDOW_MESSAGE
 //#define ENABLE_OVERLAY_INTERNEL_WINDOW
-#define VIDEO_SINK_V4L2SINK
+//#define VIDEO_SINK_V4L2SINK
 
 static GstElement *pipeline;
 static GstElement *bin;

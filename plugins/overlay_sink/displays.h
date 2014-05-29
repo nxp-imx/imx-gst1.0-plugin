@@ -32,5 +32,7 @@ void deinit_display (gpointer display);
 gint clear_display (gpointer display);
 gint get_next_display_buffer (gpointer display, SurfaceBuffer *buffer);
 gint flip_display_buffer (gpointer display, SurfaceBuffer *buffer);
+void set_global_alpha(gpointer display, gint alpha);
+void set_color_key(gpointer display, gboolean enable, guint colorkey);
 
 #endif

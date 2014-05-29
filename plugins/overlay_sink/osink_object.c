@@ -634,3 +634,26 @@ int osink_object_free_memory (gpointer osink_handle, PhyMemBlock *memblk)
   return ret ;
 }
 
+void osink_object_set_global_alpha(gpointer osink_handle, gint display_idx, gint alpha)
+{
+  OSinkHandle *handle;
+  OSINK_MAKE_HANDLE ();
+  GET_LOCK ();
+
+  GST_DEBUG ("set global alpha, (%d), (%d).", display_idx, alpha);
+  LOCK (glock);
+  set_global_alpha(handle->hdisplay[display_idx], alpha);
+  UNLOCK (glock);
+}
+
+void osink_object_set_color_key(gpointer osink_handle, gint display_idx, gboolean enable, guint colorkey)
+{
+  OSinkHandle *handle;
+  OSINK_MAKE_HANDLE ();
+  GET_LOCK ();
+
+  GST_DEBUG ("set global alpha, (%d), (%d). (%08x)", display_idx, enable, colorkey);
+  LOCK (glock);
+  set_color_key(handle->hdisplay[display_idx], enable, colorkey);
+  UNLOCK (glock);
+}

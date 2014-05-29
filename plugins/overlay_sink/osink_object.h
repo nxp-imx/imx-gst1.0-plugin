@@ -36,5 +36,7 @@ int osink_object_update_overlay (gpointer ohandle, gpointer overlay, SurfaceBuff
 gint64 osink_object_get_overlay_showed_frames (gpointer ohandle, gpointer overlay);
 int osink_object_allocate_memory (gpointer handle, PhyMemBlock *memblk);
 int osink_object_free_memory (gpointer handle, PhyMemBlock *memblk);
+void osink_object_set_global_alpha(gpointer ohandle, gint display_idx, gint alpha);
+void osink_object_set_color_key(gpointer ohandle, gint display_idx, gboolean enable, guint colorkey);
 
 #endif

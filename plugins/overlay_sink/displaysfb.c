@@ -32,6 +32,14 @@
 #include "gstsutils.h"
 #include "gstimxv4l2.h"
 
+#define RGB888TORGB565(rgb)\
+    ((((rgb)<<8)>>27<<11)|(((rgb)<<18)>>26<<5)|(((rgb)<<27)>>27))
+
+#define RGB565TOCOLORKEY(rgb)                              \
+      ( ((rgb & 0xf800)<<8)  |  ((rgb & 0xe000)<<3)  |     \
+        ((rgb & 0x07e0)<<5)  |  ((rgb & 0x0600)>>1)  |     \
+        ((rgb & 0x001f)<<3)  |  ((rgb & 0x001c)>>2)  )
+
 GST_DEBUG_CATEGORY_EXTERN (overlay_sink_debug);
 #define GST_CAT_DEFAULT overlay_sink_debug
 
@@ -128,22 +136,31 @@ static void set_display_alpha (gchar *device, gint alpha)
 static void set_display_color_key (gchar *device, gboolean enable, gint color_key)
 {
   struct mxcfb_color_key colorKey;
+  struct fb_var_screeninfo fbVar;
+
   int fd = open (device, O_RDWR, 0);
   if (fd) {
-    if (enable) {
-      colorKey.color_key = color_key;
-      colorKey.enable = 1; 
-    GST_DEBUG ("set colorKey to (%x) for display (%s)", color_key, device);
+    if (ioctl(fd, FBIOGET_VSCREENINFO, &fbVar) < 0) {
+      GST_ERROR("get vscreen info failed.\n");
+    } else {
+      if (fbVar.bits_per_pixel == 16) {
+        colorKey.color_key = RGB565TOCOLORKEY(RGB888TORGB565(color_key));
+        GST_DEBUG("%08X:%08X\n", colorKey.color_key, color_key);
+      } else if (fbVar.bits_per_pixel == 24 || fbVar.bits_per_pixel == 32) {
+        colorKey.color_key = color_key;
+      }
     }
-    else {
+
+    if (enable) {
+      colorKey.enable = 1; 
+    GST_DEBUG ("set colorKey to (%x) for display (%s)", colorKey.color_key, device);
+    } else {
       colorKey.enable = 0; 
       GST_DEBUG ("disable colorKey for display (%s)", device);
     }
     ioctl (fd, MXCFB_SET_CLR_KEY, &colorKey);
     close (fd);
   }
-
-  return;
 }
 
 gint scan_displays(gpointer **phandle, gint *pcount)
@@ -396,3 +413,16 @@ gint flip_display_buffer (gpointer display, SurfaceBuffer *buffer)
   return 0;
 }
 
+void set_global_alpha(gpointer display, gint alpha)
+{
+  DisplayHandle *hdisplay = (DisplayHandle*) display;
+  if (hdisplay && hdisplay->bg_device)
+    set_display_alpha (hdisplay->bg_device, alpha);
+}
+
+void set_color_key(gpointer display, gboolean enable, guint colorkey)
+{
+  DisplayHandle *hdisplay = (DisplayHandle*) display;
+  if (hdisplay && hdisplay->bg_device)
+    set_display_color_key (hdisplay->bg_device, enable, colorkey);
+}

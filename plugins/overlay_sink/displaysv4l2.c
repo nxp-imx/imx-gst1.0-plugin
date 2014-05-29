@@ -363,3 +363,16 @@ gint flip_display_buffer (gpointer display, SurfaceBuffer *buffer)
   return 0;
 }
 
+void set_global_alpha(gpointer display, gint alpha)
+{
+  DisplayHandle *hdisplay = (DisplayHandle*) display;
+  if (hdisplay && hdisplay->v4l2handle)
+    gst_imx_v4l2out_config_alpha (hdisplay->v4l2handle, alpha);
+}
+
+void set_color_key(gpointer display, gboolean enable, guint colorkey)
+{
+  DisplayHandle *hdisplay = (DisplayHandle*) display;
+  if (hdisplay && hdisplay->v4l2handle)
+    gst_imx_v4l2out_config_color_key (hdisplay->v4l2handle, enable, colorkey);
+}
