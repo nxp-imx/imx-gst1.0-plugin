@@ -58,6 +58,7 @@ struct _GstImxV4l2Sink {
   gboolean keep_video_ratio;
   guint64 frame_showed;
   guint min_buffers;
+  gboolean self_pool_configed;
 };
 
 struct _GstImxV4l2SinkClass {

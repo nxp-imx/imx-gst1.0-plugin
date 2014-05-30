@@ -22,6 +22,10 @@
 #include "gstimxv4l2sink.h"
 #include "gstimxv4l2allocator.h"
 
+#define ALIGNMENT_8 (8)
+#define ISALIGNED(a, b) (!(a & (b-1)))
+#define ALIGNTO(a, b) ((a + (b-1)) & (~(b-1)))
+
 GST_DEBUG_CATEGORY (imxv4l2sink_debug);
 #define GST_CAT_DEFAULT imxv4l2sink_debug
 
@@ -454,6 +458,7 @@ gst_imx_v4l2sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
   if (gst_imx_v4l2sink_setup_buffer_pool (v4l2sink, caps) < 0)
     return FALSE;
 
+  v4l2sink->self_pool_configed = FALSE;
   return TRUE;
 }
 
@@ -550,17 +555,44 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
       gst_caps_unref (caps);
       return GST_FLOW_ERROR;
     }
+
+    gst_video_info_from_caps (&info, caps);
+    if (!v4l2sink->self_pool_configed) {
+      gint w = GST_VIDEO_INFO_WIDTH (&info);
+      GstVideoAlignment alignment;
+
+      if (!ISALIGNED (w, ALIGNMENT_8)) {
+        if (gst_buffer_pool_set_active (v4l2sink->pool, FALSE) != TRUE) {
+          GST_ERROR_OBJECT (v4l2sink, "de-active pool(%p) failed.", v4l2sink->pool);
+          return GST_FLOW_ERROR;
+        }
+
+        memset (&alignment, 0, sizeof (GstVideoAlignment));
+        alignment.padding_right = ALIGNTO (w, ALIGNMENT_8) - w;
+
+        GST_DEBUG ("align buffer, w(%d) padding(%d)", w, alignment.padding_right);
+
+        GstStructure *config = gst_buffer_pool_get_config (v4l2sink->pool);
+        gst_buffer_pool_config_add_option (config, GST_BUFFER_POOL_OPTION_VIDEO_META);
+        gst_buffer_pool_config_add_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
+        gst_buffer_pool_config_set_video_alignment (config, &alignment);
+        gst_buffer_pool_set_config (v4l2sink->pool, config);
+      }
+
+      v4l2sink->self_pool_configed = TRUE;
+    }
+
     if (gst_buffer_pool_set_active (v4l2sink->pool, TRUE) != TRUE) {
       GST_ERROR_OBJECT (v4l2sink, "active pool(%p) failed.", v4l2sink->pool);
       return GST_FLOW_ERROR;
     }
+
     gst_buffer_pool_acquire_buffer (v4l2sink->pool, &v4l2_buffer, NULL);
     if (!v4l2_buffer) {
       GST_ERROR_OBJECT (v4l2sink, "acquire buffer from pool(%p) failed.", v4l2sink->pool);
       return GST_FLOW_ERROR;
     }
 
-    gst_video_info_from_caps (&info, caps);
     gst_video_frame_map (&frame1, &info, v4l2_buffer, GST_MAP_WRITE);
     gst_video_frame_map (&frame2, &info, buffer, GST_MAP_READ);
 
