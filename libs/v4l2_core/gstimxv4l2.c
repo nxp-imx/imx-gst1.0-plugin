@@ -105,6 +105,7 @@ typedef struct {
   gboolean prev_need_crop;
   guint alpha;
   guint color_key;
+  IMXV4l2Rect overlay;
 } IMXV4l2Handle;
 
 typedef struct {
@@ -1138,14 +1139,15 @@ gint gst_imx_v4l2out_config_output (gpointer v4l2handle, IMXV4l2Rect *overlay, g
       rect->left, rect->top, rect->width, rect->height);
 
   if (handle->rotate != 0) {
-    if (rect->left < 0 || rect->top < 0 
+    if (rect->left < 0 || rect->top < 0
         || (rect->left + rect->width) > handle->disp_w
         || (rect->top + rect->height) > handle->disp_h) {
       g_print ("not support video out of screen if oritation is not landscape.\n");
-      return 0;
+      return -1;
     }
   }
 
+  memcpy(&handle->overlay, overlay, sizeof(IMXV4l2Rect));
   brotate = (handle->rotate == 90 || handle->rotate == 270) ? TRUE : FALSE;
 
   //keep video ratio with display
@@ -1219,6 +1221,15 @@ gint gst_imx_v4l2_config_rotate (gpointer v4l2handle, gint rotate)
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
 
   GST_DEBUG ("set rotation to (%d).", rotate);
+
+  if (rotate != 0) {
+    if (handle->overlay.left < 0 || handle->overlay.top < 0
+        || (handle->overlay.left + handle->overlay.width) > handle->disp_w
+        || (handle->overlay.top + handle->overlay.height) > handle->disp_h) {
+      g_print ("not support video out of screen if orientation is not landscape.\n");
+      return -1;
+    }
+  }
 
   if ((*handle->dev_itf.v4l2out_config_rotate) (handle, rotate) < 0) {
     return -1;

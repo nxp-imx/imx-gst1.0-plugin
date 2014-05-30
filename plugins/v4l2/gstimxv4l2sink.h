@@ -46,6 +46,8 @@ struct _GstImxV4l2Sink {
   guint w, h;
   IMXV4l2Rect overlay, crop;
   guint rotate;
+  IMXV4l2Rect prev_overlay;
+  guint prev_rotate;
   gboolean do_deinterlace;
   guint deinterlace_motion;
   gboolean config;

@@ -216,9 +216,9 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
         //need to configure rotate as PXP will store the previous rotate status
         v4l2sink->config_flag |= CONFIG_ROTATE;
 
-        if (v4l2sink->config_flag & CONFIG_OVERLAY
-            || v4l2sink->config_flag & CONFIG_CROP
-            || v4l2sink->config_flag & CONFIG_ROTATE) {
+        if ((v4l2sink->config_flag & CONFIG_OVERLAY)
+            || (v4l2sink->config_flag & CONFIG_CROP)
+            || (v4l2sink->config_flag & CONFIG_ROTATE)) {
           v4l2sink->config = TRUE;
         }
 
@@ -626,19 +626,23 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     if (v4l2sink->config_flag & CONFIG_ROTATE) {
       if (gst_imx_v4l2_config_rotate (v4l2sink->v4l2handle, v4l2sink->rotate) < 0) {
         GST_ERROR_OBJECT (v4l2sink, "configure ratate failed.");
-        return GST_FLOW_ERROR;
+        v4l2sink->rotate = v4l2sink->prev_rotate;
+      } else {
+        v4l2sink->prev_rotate = v4l2sink->rotate;
+        if (v4l2sink->keep_video_ratio) {
+          //need to recalculate output as rotation changed
+          v4l2sink->config_flag |= CONFIG_OVERLAY;
+        }
       }
       v4l2sink->config_flag &= ~CONFIG_ROTATE;
-      if (v4l2sink->keep_video_ratio) {
-        //need to recalculate output as rotation changed
-        v4l2sink->config_flag |= CONFIG_OVERLAY;
-      }
     }
 
     if (v4l2sink->config_flag & CONFIG_OVERLAY) {
       if (gst_imx_v4l2out_config_output (v4l2sink->v4l2handle, &v4l2sink->overlay, v4l2sink->keep_video_ratio) < 0) {
         GST_ERROR_OBJECT (v4l2sink, "configure output failed.");
-        return GST_FLOW_ERROR;
+        memcpy(&v4l2sink->overlay, &v4l2sink->prev_overlay, sizeof(IMXV4l2Rect));
+      } else {
+        memcpy(&v4l2sink->prev_overlay, &v4l2sink->overlay, sizeof(IMXV4l2Rect));
       }
       v4l2sink->config_flag &= ~CONFIG_OVERLAY;
     }
@@ -835,6 +839,7 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
 {
   v4l2sink->device = g_strdup (gst_imx_v4l2_get_default_device_name(V4L2_BUF_TYPE_VIDEO_OUTPUT));
   v4l2sink->rotate = 0;
+  v4l2sink->prev_rotate = 0;
   v4l2sink->do_deinterlace = FALSE;
   v4l2sink->deinterlace_motion = 0;
   v4l2sink->config = FALSE;
@@ -843,6 +848,7 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   v4l2sink->pool = NULL;
   v4l2sink->allocator = NULL;
   memset (&v4l2sink->overlay, 0, sizeof(IMXV4l2Rect));
+  memset (&v4l2sink->prev_overlay, 0, sizeof(IMXV4l2Rect));
   memset (&v4l2sink->crop, 0, sizeof(IMXV4l2Rect));
   v4l2sink->keep_video_ratio = FALSE;
   v4l2sink->frame_showed = 0;
