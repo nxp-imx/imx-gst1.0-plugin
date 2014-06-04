@@ -25,7 +25,7 @@
 #include <gst/video/videooverlay.h>
 
 #define RGB888(r,g,b) ((((guint32)(r))<<16)|(((guint32)(g))<<8)|(((guint32)(b))))
-#define DEFAULT_COLORKEY RGB888(0, 0, 0)
+#define DEFAULT_COLORKEY RGB888(1, 2, 3)
 
 /*
  * uncomment following definition to enable gst video overlay prepare window
@@ -45,13 +45,12 @@
 #define EVENT_REFRESH_INTERVAL  45    /* miliseconds */
 
 typedef gboolean  (*VideoUpdateCallback) (GstElement *object, GstVideoRectangle win_rect);
-typedef gint (*ColorkeySetCallback) (GObject *object, gboolean enable, guint key);
+typedef void (*ColorkeySetCallback) (GObject *object, gboolean enable, guint key);
 typedef void (*AlphaSetCallback) (GObject *object, guint alpha);
 
 typedef struct _ImxVideoOverlay {
   void *parent;           /* pointer to the object who use this interface*/
-  gint colorkey;        /* The color key for FB */
-  guint colorkey_888;   /* The color key from "COLORKEY" environment variable*/
+  gint colorkey;        /* The color key for FB (RGB888)*/
   gulong video_win;      /* ID of window where video display */
   gint event_id;          /* event refresh */
   gulong internal_win;    /* ID of window created internally */

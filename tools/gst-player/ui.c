@@ -498,13 +498,13 @@ static gboolean position_update(gpointer data) {
 static void create_ui(void) {
   GtkWidget *button;
   GdkColor bg_color, color;
+  gchar colorstr[8] = {0};
 
   gulong color_key = backend_get_color_key();
-  g_print("Get color key = %08x\n", (guint)color_key);
-  bg_color.pixel = 0;
-  bg_color.red = (color_key & 0xFF0000) >> 16;
-  bg_color.green = (color_key & 0xFF00) >> 8;
-  bg_color.blue = (color_key & 0xFF);
+  sprintf(colorstr, "#%06x", RGB565TOCOLORKEY(RGB888TORGB565(color_key)));
+  gdk_color_parse (colorstr, &bg_color);
+  g_print("%08x,%s,%08x,%08x,%08x\n", color_key, colorstr,
+          bg_color.red, bg_color.green, bg_color.blue);
 
   window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 

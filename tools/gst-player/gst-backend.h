@@ -23,6 +23,14 @@
 #ifndef GST_BACKEND_H
 #define GST_BACKEND_H
 
+#define RGB888TORGB565(rgb)\
+    ((((rgb)<<8)>>27<<11)|(((rgb)<<18)>>26<<5)|(((rgb)<<27)>>27))
+
+#define RGB565TOCOLORKEY(rgb)                              \
+      ( ((rgb & 0xf800)<<8)  |  ((rgb & 0xe000)<<3)  |     \
+        ((rgb & 0x07e0)<<5)  |  ((rgb & 0x0600)>>1)  |     \
+        ((rgb & 0x001f)<<3)  |  ((rgb & 0x001c)>>2)  )
+
 #define METADATA_ITEM_MAX_SIZE_LARGE 256
 #define METADATA_ITEM_MAX_SIZE_SMALL 64
 

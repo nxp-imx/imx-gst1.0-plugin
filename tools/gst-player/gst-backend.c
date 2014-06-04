@@ -106,14 +106,10 @@ void backend_init(int *argc, char **argv[]) {
   pipeline = gst_pipeline_new("gst-player");
 
   bin = gst_element_factory_make("playbin", "bin");
-#ifdef CT_BUILD_TYPE_armv7l
 #ifdef VIDEO_SINK_V4L2SINK
   video_sink = gst_element_factory_make ("imxv4l2sink", "videosink");
 #else
   video_sink = gst_element_factory_make ("overlaysink", "videosink");
-#endif
-#else
-  video_sink = gst_element_factory_make("xvimagesink", "videosink");
 #endif
 
   g_object_set(G_OBJECT(bin), "video-sink", video_sink, NULL);

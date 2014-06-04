@@ -25,6 +25,9 @@
 #include "gstimxvideooverlay.h"
 #include "gstimxxoverlay.h"
 
+#define RGB888TORGB565(rgb)\
+    ((((rgb)<<8)>>27<<11)|(((rgb)<<18)>>26<<5)|(((rgb)<<27)>>27))
+
 GST_DEBUG_CATEGORY_STATIC (imxxoverlay_debug);
 #define GST_CAT_DEFAULT imxxoverlay_debug
 
@@ -123,7 +126,7 @@ update_video_win (ImxVideoOverlay * imxxoverlay)
           imxxoverlay->render_rect.y + v_rect.h,
           attr.width - imxxoverlay->render_rect.x, rh);
 
-    XSetForeground (dpy, gc, imxxoverlay->colorkey);
+    XSetForeground (dpy, gc, RGB888TORGB565(imxxoverlay->colorkey));
     //XClearWindow (dpy, win);
     XFillRectangle (dpy, win, gc, imxxoverlay->render_rect.x,
                     imxxoverlay->render_rect.y, v_rect.w, v_rect.h);

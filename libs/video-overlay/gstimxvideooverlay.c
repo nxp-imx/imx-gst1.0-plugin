@@ -79,17 +79,14 @@ gst_imx_video_overlay_init(GstElement *element,
   if (!set_alpha)
     GST_ERROR("Alpha setting callback NULL, video overlay may not work");
 
-  overlay->colorkey = -1;
-  overlay->colorkey_888 = 0;
-
-  const gchar *colorkey = g_getenv ("COLORKEY");
+  const gchar *colorkey = getenv ("COLORKEY");
   if (colorkey && (strlen(colorkey) > 1)) {
-    overlay->colorkey_888 = strtol(colorkey, NULL, 16);
+    overlay->colorkey = strtol(colorkey, NULL, 16);
   } else {
-    overlay->colorkey_888 = DEFAULT_COLORKEY;
-    gchar str[10];
-    sprintf(str, "%08x", overlay->colorkey_888);
-    g_setenv("COLORKEY", str, TRUE);
+    overlay->colorkey = DEFAULT_COLORKEY;
+    gchar str[10] = {0};
+    sprintf(str, "%08x", overlay->colorkey);
+    setenv("COLORKEY", str, TRUE);
     g_print("set color key:%s\n", str);
   }
 
@@ -129,10 +126,8 @@ gst_imx_video_overlay_start (ImxVideoOverlay * imxxoverlay)
       if (imxxoverlay->set_global_alpha)
         imxxoverlay->set_global_alpha(imxxoverlay->parent, 255);
 
-      if (imxxoverlay->colorkey < 0 && imxxoverlay->set_color_key) {
-        imxxoverlay->colorkey = imxxoverlay->set_color_key (imxxoverlay->parent,
-                                      TRUE, imxxoverlay->colorkey_888);
-      }
+      if (imxxoverlay->set_color_key)
+        imxxoverlay->set_color_key (imxxoverlay->parent, TRUE, imxxoverlay->colorkey);
 
       imxxoverlay->update_win_geo (imxxoverlay);
     }
@@ -172,9 +167,8 @@ gst_imx_video_overlay_set_window_handle (ImxVideoOverlay *imxxoverlay,
     if (imxxoverlay->set_global_alpha)
       imxxoverlay->set_global_alpha(imxxoverlay->parent, 255);
 
-    if (imxxoverlay->colorkey < 0 && imxxoverlay->set_color_key)
-      imxxoverlay->colorkey = imxxoverlay->set_color_key (imxxoverlay->parent,
-                                TRUE, imxxoverlay->colorkey_888);
+    if (imxxoverlay->set_color_key)
+      imxxoverlay->set_color_key (imxxoverlay->parent, TRUE, imxxoverlay->colorkey);
 
     if (imxxoverlay->update_win_geo)
       imxxoverlay->update_win_geo (imxxoverlay);

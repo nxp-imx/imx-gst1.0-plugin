@@ -60,7 +60,7 @@ enum {
 #ifdef USE_X11
 GST_IMPLEMENT_VIDEO_OVERLAY_METHODS (GstImxV4l2Sink, gst_imx_v4l2sink);
 
-gboolean update_video_geo(GstElement * object, GstVideoRectangle win_rect) {
+static gboolean v4l2sink_update_video_geo(GstElement * object, GstVideoRectangle win_rect) {
   GstImxV4l2Sink *v4l2sink = GST_IMX_V4L2SINK (object);
   v4l2sink->overlay.left = win_rect.x;
   v4l2sink->overlay.top = win_rect.y;
@@ -71,22 +71,18 @@ gboolean update_video_geo(GstElement * object, GstVideoRectangle win_rect) {
   return TRUE;
 }
 
-void config_global_alpha(GObject * object, guint alpha)
+static void v4l2sink_config_global_alpha(GObject * object, guint alpha)
 {
   GstImxV4l2Sink *v4l2sink = GST_IMX_V4L2SINK (object);
   if (v4l2sink && v4l2sink->v4l2handle)
     gst_imx_v4l2out_config_alpha(v4l2sink->v4l2handle, alpha);
 }
 
-gint config_color_key(GObject * object, gboolean enable, guint color_key)
+static void v4l2sink_config_color_key(GObject * object, gboolean enable, guint color_key)
 {
   GstImxV4l2Sink *v4l2sink = GST_IMX_V4L2SINK (object);
-  gint key = -1;
-
   if (v4l2sink && v4l2sink->v4l2handle)
-    key = gst_imx_v4l2out_config_color_key(v4l2sink->v4l2handle, enable, color_key);
-
-  return key;
+    gst_imx_v4l2out_config_color_key(v4l2sink->v4l2handle, enable, color_key);
 }
 #endif
 
@@ -915,7 +911,9 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   v4l2sink->min_buffers = gst_imx_v4l2_get_min_buffer_num (V4L2_BUF_TYPE_VIDEO_OUTPUT);
 #ifdef USE_X11
   v4l2sink->imxoverlay = gst_imx_video_overlay_init ((GstElement *)v4l2sink,
-                     update_video_geo, config_color_key, config_global_alpha);
+                                              v4l2sink_update_video_geo,
+                                              v4l2sink_config_color_key,
+                                              v4l2sink_config_global_alpha);
 #endif
 }
 

@@ -46,7 +46,7 @@ gint gst_imx_v4l2out_config_output (gpointer v4l2handle, IMXV4l2Rect *rect, gboo
 gint gst_imx_v4l2_config_rotate (gpointer v4l2handle, gint rotate);
 gint gst_imx_v4l2_config_deinterlace (gpointer v4l2handle, gboolean do_deinterlace, guint motion);
 void gst_imx_v4l2out_config_alpha (gpointer v4l2handle, guint alpha);
-gint gst_imx_v4l2out_config_color_key (gpointer v4l2handle, gboolean enable, guint color_key);
+void gst_imx_v4l2out_config_color_key (gpointer v4l2handle, gboolean enable, guint color_key);
 gint gst_imx_v4l2_set_buffer_count (gpointer v4l2handle, guint count, guint memory_mode);
 gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk);
 gint gst_imx_v4l2_register_buffer (gpointer v4l2handle, PhyMemBlock *memblk);
