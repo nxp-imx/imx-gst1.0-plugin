@@ -62,6 +62,10 @@ GST_IMPLEMENT_VIDEO_OVERLAY_METHODS (GstImxV4l2Sink, gst_imx_v4l2sink);
 
 static gboolean v4l2sink_update_video_geo(GstElement * object, GstVideoRectangle win_rect) {
   GstImxV4l2Sink *v4l2sink = GST_IMX_V4L2SINK (object);
+  if (v4l2sink->overlay.left == win_rect.x && v4l2sink->overlay.top == win_rect.y &&
+      v4l2sink->overlay.width == win_rect.w && v4l2sink->overlay.height == win_rect.h)
+    return TRUE;
+
   v4l2sink->overlay.left = win_rect.x;
   v4l2sink->overlay.top = win_rect.y;
   v4l2sink->overlay.width = win_rect.w;
@@ -314,6 +318,8 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
               (gfloat)GST_SECOND * v4l2sink->frame_showed / run_time);
         }
       }
+
+      memset (&v4l2sink->crop, 0, sizeof(IMXV4l2Rect));
 
       break;
     default:
