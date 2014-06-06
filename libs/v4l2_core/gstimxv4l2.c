@@ -683,10 +683,10 @@ gst_imx_v4l2output_set_default_res (IMXV4l2Handle *handle)
     }
   }
 
+  gst_imx_v4l2_get_display_resolution (handle->device, &handle->disp_w, &handle->disp_h);
+
   if (g_device_maps[handle->device_map_id].bg)
     return;
-
-  gst_imx_v4l2_get_display_resolution (handle->device, &handle->disp_w, &handle->disp_h);
 
   //set gblobal alpha to 0 to show video
   gst_imx_v4l2out_config_alpha (handle, 0);
