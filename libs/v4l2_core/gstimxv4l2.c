@@ -426,6 +426,18 @@ imx_pxp_v4l2_config_alpha (IMXV4l2Handle *handle, guint alpha)
 
   handle->alpha = alpha;
 
+  struct v4l2_format v4l2fmt;
+  memset(&v4l2fmt, 0, sizeof(struct v4l2_format));
+  v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY;
+  v4l2fmt.fmt.win.global_alpha = handle->alpha;
+  v4l2fmt.fmt.win.chromakey = handle->color_key;
+  v4l2fmt.fmt.win.w.left = handle->in_crop.left;
+  v4l2fmt.fmt.win.w.top = handle->in_crop.top;
+  v4l2fmt.fmt.win.w.width = handle->in_crop.width;
+  v4l2fmt.fmt.win.w.height = handle->in_crop.height;
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_FMT, &v4l2fmt) < 0)
+    GST_ERROR ("Set VIDIOC_S_FMT output overlay failed.");
+
   return;
 }
 
@@ -433,14 +445,36 @@ static void
 imx_pxp_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint color_key)
 {
   struct v4l2_framebuffer fb;
+  guint key = color_key;
+  char *device = (char*)g_device_maps[handle->device_map_id].bg_fb_name;
+  int fd;
+  struct fb_var_screeninfo fbVar;
+
+  fd = open (device, O_RDWR, 0);
+  if (fd < 0) {
+    GST_ERROR ("Can't open %s.", device);
+    return;
+  }
+
+  if (ioctl(fd, FBIOGET_VSCREENINFO, &fbVar) < 0) {
+    GST_ERROR("get vscreen info failed.");
+    return;
+  } else {
+    if (fbVar.bits_per_pixel == 16) {
+      key = RGB565TOCOLORKEY(RGB888TORGB565(color_key));
+      GST_DEBUG("%08X:%08X", key, color_key);
+    } else if (fbVar.bits_per_pixel == 24 || fbVar.bits_per_pixel == 32) {
+      key = color_key;
+    }
+  }
 
   fb.flags = V4L2_FBUF_FLAG_OVERLAY;
   if (enable) {
     fb.flags |= V4L2_FBUF_FLAG_CHROMAKEY;
-    handle->color_key = color_key;
-    GST_DEBUG ("set colorKey to (%x) ", color_key);
-  }
-  else {
+    fb.flags |= V4L2_FBUF_FLAG_GLOBAL_ALPHA;
+    handle->color_key = key;
+    GST_DEBUG ("set colorKey to (%x) ", key);
+  } else {
     fb.flags |= V4L2_FBUF_FLAG_GLOBAL_ALPHA;
   }
 
@@ -448,6 +482,18 @@ imx_pxp_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint colo
     GST_ERROR ("VIDIOC_S_FBUF failed.");
     return;
   }
+
+  struct v4l2_format v4l2fmt;
+  memset(&v4l2fmt, 0, sizeof(struct v4l2_format));
+  v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY;
+  v4l2fmt.fmt.win.global_alpha = handle->alpha;
+  v4l2fmt.fmt.win.chromakey = handle->color_key;
+  v4l2fmt.fmt.win.w.left = handle->in_crop.left;
+  v4l2fmt.fmt.win.w.top = handle->in_crop.top;
+  v4l2fmt.fmt.win.w.width = handle->in_crop.width;
+  v4l2fmt.fmt.win.w.height = handle->in_crop.height;
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_FMT, &v4l2fmt) < 0)
+    GST_ERROR ("Set VIDIOC_S_FMT output overlay failed.");
 }
 
 gchar *
