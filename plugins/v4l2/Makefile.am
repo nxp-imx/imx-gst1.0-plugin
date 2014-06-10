@@ -15,7 +15,7 @@ libgstimxv4l2plugins_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 				 $(GST_PLUGINS_BASE_LIBS) \
 				 -lgstvideo-$(GST_API_VERSION) \
 				 $(GST_LIBS) \
-				 $(top_srcdir)/libs/libgstfsl-@GST_API_VERSION@.la
+				 ../../libs/libgstfsl-@GST_API_VERSION@.la
 libgstimxv4l2plugins_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstimxv4l2plugins_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 

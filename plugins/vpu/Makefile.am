@@ -19,7 +19,7 @@ libgstvpu_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS
 libgstvpu_la_CFLAGS += -I$(top_srcdir)/libs -I$(top_srcdir)/ext-includes
 libgstvpu_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) $(GST_BASE_LIBS) $(GST_LIBS) -lgstvideo-$(GST_API_VERSION) \
 	$(VPU_LIBS) $(LIBM)
-libgstvpu_la_LIBADD += $(top_srcdir)/libs/libgstfsl-@GST_API_VERSION@.la
+libgstvpu_la_LIBADD += ../../libs/libgstfsl-@GST_API_VERSION@.la
 
 libgstvpu_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstvpu_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
