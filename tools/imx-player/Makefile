@@ -6,11 +6,16 @@ EXTRA_WARNINGS=-Wall -W -Wformat-nonliteral -Wcast-align -Wpointer-arith \
 CFLAGS=-ggdb $(EXTRA_WARNINGS) `pkg-config --cflags gtk+-2.0 gstreamer-1.0`
 LIBS=`pkg-config --libs gtk+-2.0 gstreamer-1.0`
 
+LIBS += -l gstvideo-1.0
+
+SRC = imxplayer.c playengine.c controlbar.c infobox.c menubar.c \
+      playlistbox.c subtitle.c volumebar.c seektodialog.c speedbox.c
+      
 all: player
 
 player: 
-	gcc -o gst-player ui.c gst-backend.c $(LIBS) $(CFLAGS) -l gstvideo-1.0
+	gcc -o imxplayer $(SRC) $(CFLAGS) $(LIBS) 
 
 clean:
-	rm *.o gst-player
+	rm imxplayer
 
