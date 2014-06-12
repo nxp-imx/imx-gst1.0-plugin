@@ -40,5 +40,7 @@ endif
 data_DATA = $(registry_file)
 EXTRA_DIST = $(data_DATA)
 
+if USE_X11
 libgstoverlaysinkplugins_la_CFLAGS += -DUSE_X11
 libgstoverlaysinkplugins_la_CFLAGS += -I$(top_srcdir)/libs/video-overlay
+endif

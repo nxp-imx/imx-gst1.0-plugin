@@ -253,6 +253,7 @@ CHECK_DISABLE_FEATURE(aiur, [Disable aiur demux], [AIUR], [fsl_parser.h], [plugi
 CHECK_DISABLE_FEATURE(beep, [Disable beep audio decoder], [BEEP], [fsl_unia.h], [plugin: beep])
 CHECK_DISABLE_FEATURE(v4lsink, [Disable fsl v4l sink], [V4L_SINK], [linux/videodev2.h], [plugin: v4lsink])
 CHECK_DISABLE_FEATURE(overlaysink, [Disable fsl overlaysink], [OVERLAY_SINK], [g2d.h], [plugin: overlaysink])
+CHECK_DISABLE_FEATURE(x11, [Disable x11 lib], [X11], [X11/Xlib.h], [library: libX11])
 
 # Allow headers to be inside include/uapi and include/linux
 #saved_CFLAGS="$CFLAGS"

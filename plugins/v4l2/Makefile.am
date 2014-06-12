@@ -21,7 +21,8 @@ libgstimxv4l2plugins_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 
 noinst_HEADERS = gstimxv4l2allocator.h gstimxv4l2sink.h gstimxv4l2src.h
 
+if USE_X11
 libgstimxv4l2plugins_la_CFLAGS += -DUSE_X11
 libgstimxv4l2plugins_la_CFLAGS += -I$(top_srcdir)/libs/video-overlay
-
+endif
 
