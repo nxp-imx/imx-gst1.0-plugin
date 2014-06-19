@@ -26,10 +26,13 @@ if USE_OVERLAY_SINK
 OVERLAYSINKDIRS = plugins/overlay_sink
 endif
 
+AVBDIRS = plugins/avb
+
+
 TOOLDIRS =    tools/                      \
               tools/gplay
 
-BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS) $(OVERLAYSINKDIRS)
+BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS) $(OVERLAYSINKDIRS) $(AVBDIRS)
               
 if PLATFORM_IS_MX6
 

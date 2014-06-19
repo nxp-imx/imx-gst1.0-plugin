@@ -570,16 +570,22 @@ static void aiurcontent_set_flag (AiurContent *pContent)
   AiurdemuxProtocalEntry * protocol = NULL;
 
   gchar *uri = pContent->uri;
-  gchar *uri_protocal = gst_uri_get_protocol (uri);
+  gchar *uri_protocal = NULL;
+  if(uri)
+    uri_protocal = gst_uri_get_protocol (uri);
 
   pContent->flags = 0;
 
+  if(uri_protocal){
   for(i = 0; i < sizeof(aiurdemux_protocol_table); i++){
     protocol = &aiurdemux_protocol_table[i];
-    if (protocol != NULL && (strcmp (uri_protocal, protocol->protocol) == 0)){
+    if (protocol->protocol != NULL && (strcmp (uri_protocal, protocol->protocol) == 0)){
         pContent->flags = protocol->flags;
         break;
+      }
     }
+  }else{
+    pContent->flags = FILE_FLAG_NON_SEEKABLE|FILE_FLAG_READ_IN_SEQUENCE;
   }
 
   if(!pContent->seekable)
