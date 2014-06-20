@@ -805,7 +805,7 @@ gst_imx_v4l2sink_install_properties (GObjectClass *gobject_class)
     g_object_class_install_property (gobject_class,PROP_DEINTERLACE_ENABLE,
         g_param_spec_boolean ("deinterlace", "deinterlace",
           "set deinterlace enabled; can't be configed on fly",
-          FALSE, G_PARAM_READWRITE));
+          TRUE, G_PARAM_READWRITE));
 
     g_object_class_install_property (gobject_class, PROP_DEINTERLACE_MOTION,
         g_param_spec_uint ("motion",
@@ -902,8 +902,8 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   v4l2sink->device = g_strdup (gst_imx_v4l2_get_default_device_name(V4L2_BUF_TYPE_VIDEO_OUTPUT));
   v4l2sink->rotate = 0;
   v4l2sink->prev_rotate = 0;
-  v4l2sink->do_deinterlace = FALSE;
-  v4l2sink->deinterlace_motion = 0;
+  v4l2sink->do_deinterlace = TRUE;  /* enable deinterlace by default */
+  v4l2sink->deinterlace_motion = 2; /* high motion by default */
   v4l2sink->config = FALSE;
   v4l2sink->config_flag = 0;
   v4l2sink->v4l2handle = NULL;

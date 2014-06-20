@@ -880,9 +880,9 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   /* set field info */
   switch (out_frame_info.eFieldType) {
     case VPU_FIELD_NONE: vmeta->flags = GST_VIDEO_FRAME_FLAG_NONE; break;
-    case VPU_FIELD_TOP: vmeta->flags = GST_VIDEO_FRAME_FLAG_ONEFIELD; break;
+    case VPU_FIELD_TOP: vmeta->flags = GST_VIDEO_FRAME_FLAG_ONEFIELD | GST_VIDEO_FRAME_FLAG_TFF; break;
     case VPU_FIELD_BOTTOM: vmeta->flags = GST_VIDEO_FRAME_FLAG_ONEFIELD; break;
-    case VPU_FIELD_TB: vmeta->flags = GST_VIDEO_FRAME_FLAG_TFF; break;
+    case VPU_FIELD_TB: vmeta->flags = GST_VIDEO_FRAME_FLAG_INTERLACED | GST_VIDEO_FRAME_FLAG_TFF; break;
     case VPU_FIELD_BT: vmeta->flags = GST_VIDEO_FRAME_FLAG_INTERLACED; break;
     default: GST_WARNING_OBJECT(vpu_dec_object, "unknown field type"); break;
   }
