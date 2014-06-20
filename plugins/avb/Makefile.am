@@ -14,3 +14,4 @@ libgstavb_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 # flags used to compile this plugin
 # we use the GST_LIBS flags because we might be using plug-in libs
 libgstavb_la_CFLAGS += -O2 -fno-omit-frame-pointer -D_ARM12
+noinst_HEADERS = gstavbsink.h gstavbpcmsink.h gstavbmpegtssink.h gstavbsrc.h gstavbpcmsrc.h gstavbmpegtssrc.h avtp.h cip.h ethernet.h gstavbclock.h
