@@ -37,8 +37,7 @@ if PLATFORM_IS_MX6SX
 registry_file = imx_6sx_display_config
 endif
 
-data_DATA = $(registry_file)
-EXTRA_DIST = $(data_DATA)
+EXTRA_DIST = $(registry_file)
 
 if USE_X11
 libgstoverlaysinkplugins_la_CFLAGS += -DUSE_X11
