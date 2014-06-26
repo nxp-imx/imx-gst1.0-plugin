@@ -276,6 +276,12 @@ typedef enum FSL_PARSER_USER_DATA_TYPE
     USER_DATA_AUD_ENC_PADDING, /* audio encoding padding */
     USER_DATA_DISCNUMBER,      /* disc number */
 
+    USER_DATA_AUTHOR,         /* author */
+    USER_DATA_COLLECTION,     /* collection user */
+    USER_DATA_PUBLISHER,      /* publisher */
+    USER_DATA_SOFTWARE,       /* software */
+    USER_DATA_YEAR,           /* year */
+    USER_DATA_KEYWORDS,       /* keywords */
     USER_DATA_MAX
 } UserDataID;
 
