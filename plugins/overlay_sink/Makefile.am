@@ -29,16 +29,18 @@ libgstoverlaysinkplugins_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 
 noinst_HEADERS = osink_common.h gstosink.h gstosinkallocator.h osink_object.h compositor.h device.h displays.h
 
+registry_file1 = imx_6q_display_config
+registry_file2 = imx_6sx_display_config
+
 if PLATFORM_IS_MX6
-registry_file = imx_6q_display_config
+data_DATA = $(registry_file1)
 endif
 
 if PLATFORM_IS_MX6SX
-registry_file = imx_6sx_display_config
+data_DATA = $(registry_file2)
 endif
 
-data_DATA = $(registry_file)
-EXTRA_DIST = $(registry_file)
+EXTRA_DIST = $(registry_file1) $(registry_file2)
 
 if USE_X11
 libgstoverlaysinkplugins_la_CFLAGS += -DUSE_X11
