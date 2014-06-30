@@ -7,7 +7,7 @@ libgstbeepdec_la_SOURCES =  beep.c beepregistry.c beepdec.c beeptypefind.c
 libgstbeepdec_la_CFLAGS =  $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS) -I$(top_srcdir)/libs -I$(top_srcdir)/ext-includes
 libgstbeepdec_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) $(GST_BASE_LIBS) $(GST_LIBS) -lgstaudio-$(GST_API_VERSION) -lgsttag-$(GST_API_VERSION) -lgstriff-$(GST_API_VERSION)
 libgstbeepdec_la_CPPFLAGS = $(GST_LIBS_CPPFLAGS) 
-libgstbeepdec_la_LIBADD += ../../libs/libgstfsl-@GST_API_VERSION@.la
+libgstbeepdec_la_LIBADD += $(top_srcdir)/libs/libgstfsl-@GST_API_VERSION@.la
 libgstbeepdec_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstbeepdec_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 
