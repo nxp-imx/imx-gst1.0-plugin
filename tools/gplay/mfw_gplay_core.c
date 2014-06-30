@@ -310,7 +310,7 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
                 strncpy(pproperty->metadata.album, str, sizeof(pproperty->metadata.album));
                 pproperty->metadata.album, str[sizeof(pproperty->metadata.album, str)-1] = '\0';
             }
-            if( strncmp(gst_tag_get_nick(tag), "year", 4) == 0 )
+            if( strncmp(gst_tag_get_nick(tag), "date", 4) == 0 )
             {
                 strncpy(pproperty->metadata.year, str, sizeof(pproperty->metadata.year));
                 pproperty->metadata.year[sizeof(pproperty->metadata.year)-1] = '\0';
@@ -319,135 +319,6 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
             {
                 strncpy(pproperty->metadata.genre, str, sizeof(pproperty->metadata.genre));
                 pproperty->metadata.genre[sizeof(pproperty->metadata.genre)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "copyright", 9) == 0 )
-            {
-                strncpy(pproperty->metadata.copyright, str, sizeof(pproperty->metadata.copyright));
-                pproperty->metadata.copyright[sizeof(pproperty->metadata.copyright)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "comment", 7) == 0 )
-            {
-                strncpy(pproperty->metadata.comment, str, sizeof(pproperty->metadata.comment));
-                pproperty->metadata.comment[sizeof(pproperty->metadata.comment)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "date", 4) == 0 )
-            {
-                GDate *date;
-                GDateYear year;
-                GDateMonth month;
-                GDateDay day;
-                gchar *date_str = NULL;
-                gst_tag_list_get_date (list, tag, &date);
-                year = g_date_get_year (date);
-                month = g_date_get_month (date);
-                day = g_date_get_day (date);
-                g_date_free (date);
-                date_str = g_strdup_printf ("%u-%u-%u", year, month, day);
-                strncpy(pproperty->metadata.date, date_str, sizeof(pproperty->metadata.date));
-                pproperty->metadata.date[sizeof(pproperty->metadata.date)-1] = '\0';
-                g_free(date_str);
-            }
-            if( strncmp(gst_tag_get_nick(tag), "composer", 8) == 0 )
-            {
-                strncpy(pproperty->metadata.composer, str, sizeof(pproperty->metadata.composer));
-                pproperty->metadata.composer[sizeof(pproperty->metadata.composer)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "director", 8) == 0 )
-            {
-                strncpy(pproperty->metadata.director, str, sizeof(pproperty->metadata.director));
-                pproperty->metadata.director[sizeof(pproperty->metadata.director)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "infomation", 10) == 0 )
-            {
-                strncpy(pproperty->metadata.info, str, sizeof(pproperty->metadata.info));
-                pproperty->metadata.info[sizeof(pproperty->metadata.info)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "creator", 7) == 0 )
-            {
-                strncpy(pproperty->metadata.creator, str, sizeof(pproperty->metadata.creator));
-                pproperty->metadata.creator[sizeof(pproperty->metadata.creator)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "producer", 8) == 0 )
-            {
-                strncpy(pproperty->metadata.producer, str, sizeof(pproperty->metadata.producer));
-                pproperty->metadata.producer[sizeof(pproperty->metadata.producer)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "performer", 9) == 0 )
-            {
-                strncpy(pproperty->metadata.performer, str, sizeof(pproperty->metadata.performer));
-                pproperty->metadata.performer[sizeof(pproperty->metadata.performer)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "requirement", 11) == 0 )
-            {
-                strncpy(pproperty->metadata.requirement, str, sizeof(pproperty->metadata.requirement));
-                pproperty->metadata.requirement[sizeof(pproperty->metadata.requirement)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "songwritor", 10) == 0 )
-            {
-                strncpy(pproperty->metadata.songwritor, str, sizeof(pproperty->metadata.songwritor));
-                pproperty->metadata.songwritor[sizeof(pproperty->metadata.songwritor)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "moviewritor", 11) == 0 )
-            {
-                strncpy(pproperty->metadata.moviewritor, str, sizeof(pproperty->metadata.moviewritor));
-                pproperty->metadata.moviewritor[sizeof(pproperty->metadata.moviewritor)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "encoder", 7) == 0 )
-            {
-                strncpy(pproperty->metadata.tool, str, sizeof(pproperty->metadata.tool));
-                pproperty->metadata.tool[sizeof(pproperty->metadata.tool)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "description", 5) == 0 )
-            {
-                strncpy(pproperty->metadata.description, str, sizeof(pproperty->metadata.description));
-                pproperty->metadata.description[sizeof(pproperty->metadata.description)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "geo location latitude", 21) == 0 )
-            {
-              strncpy(pproperty->metadata.latitude, str, sizeof(pproperty->metadata.latitude));
-              pproperty->metadata.latitude[sizeof(pproperty->metadata.latitude)-1] = '\0';
-            }
-            if (strncmp(gst_tag_get_nick(tag), "geo location longitude", 22) == 0)
-            {
-              strncpy(pproperty->metadata.longitude, str, sizeof(pproperty->metadata.longitude));
-              pproperty->metadata.longitude[sizeof(pproperty->metadata.longitude)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "author", 6) == 0 )
-            {
-                strncpy(pproperty->metadata.author, str, sizeof(pproperty->metadata.author));
-                pproperty->metadata.author[sizeof(pproperty->metadata.author)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "collection", 10) == 0 )
-            {
-                strncpy(pproperty->metadata.collection, str, sizeof(pproperty->metadata.collection));
-                pproperty->metadata.collection[sizeof(pproperty->metadata.collection)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "publisher", 9) == 0 )
-            {
-                strncpy(pproperty->metadata.publisher, str, sizeof(pproperty->metadata.publisher));
-                pproperty->metadata.publisher[sizeof(pproperty->metadata.publisher)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "software", 8) == 0 )
-            {
-                strncpy(pproperty->metadata.software, str, sizeof(pproperty->metadata.software));
-                pproperty->metadata.software[sizeof(pproperty->metadata.software)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "keywords", 8) == 0 )
-            {
-                strncpy(pproperty->metadata.keywords, str, sizeof(pproperty->metadata.keywords));
-                pproperty->metadata.keywords[sizeof(pproperty->metadata.keywords)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "track number", 12) == 0 )
-            {
-                pproperty->metadata.track_num = atoi(str);
-            }
-            if( strncmp(gst_tag_get_nick(tag), "track count", 11) == 0 )
-            {
-                pproperty->metadata.track_count = atoi(str);
-            }
-            if( strncmp(gst_tag_get_nick(tag), "user rating", 11) == 0 )
-            {
-                pproperty->metadata.rating= atoi(str);
             }
             if( strncmp(gst_tag_get_nick(tag), "audio codec", 11) == 0 )
             {

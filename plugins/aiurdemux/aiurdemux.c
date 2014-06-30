@@ -44,17 +44,6 @@
 #define GST_TAG_VIDEO_WIDTH "image_width"
 #define GST_TAG_VIDEO_HEIGHT "image_height"
 
-#define GST_TAG_DIRECTOR "director"
-#define GST_TAG_INFORMATION "information"
-#define GST_TAG_CREATOR "creator"
-#define GST_TAG_PRODUCER "producer"
-#define GST_TAG_REQUIREMENTS "requirement"
-#define GST_TAG_SONGWRITER "songwritor"
-#define GST_TAG_MOVIEWRITER "moviewritor"
-#define GST_TAG_AUTHOR "author"
-#define GST_TAG_COLLECTION "collection"
-#define GST_TAG_SOFTWARE "software"
-#define GST_TAG_YEAR "year"
 GST_DEBUG_CATEGORY (aiurdemux_debug);
 
 typedef struct{
@@ -175,8 +164,6 @@ static AiurDemuxTagEntry g_user_data_entry[] = {
       "Comments : %s\n"},
   {USER_DATA_CREATION_DATE, USER_DATA_FORMAT_UTF8, GST_TAG_DATE,
       "Creation Date : %s\n"},
-  {USER_DATA_RATING, USER_DATA_FORMAT_INT_LE, GST_TAG_USER_RATING,
-      "User Rating : %d\n"},
   {USER_DATA_ALBUM, USER_DATA_FORMAT_UTF8, GST_TAG_ALBUM,
       "Album  : %s\n"},
   {USER_DATA_VCODECNAME, USER_DATA_FORMAT_UTF8, GST_TAG_VIDEO_CODEC,
@@ -184,18 +171,18 @@ static AiurDemuxTagEntry g_user_data_entry[] = {
   {USER_DATA_ACODECNAME, USER_DATA_FORMAT_UTF8, GST_TAG_AUDIO_CODEC,
       "Audio Codec Name : %s\n"},
   {USER_DATA_ARTWORK, USER_DATA_FORMAT_JPEG, GST_TAG_IMAGE,
-      "Found Artwork : format %d, size %d bytes\n"},
+      "Found Artwork : %" GST_PTR_FORMAT ", %d bytes\n"},
   {USER_DATA_COMPOSER, USER_DATA_FORMAT_UTF8, GST_TAG_COMPOSER,
       "Composer : %s\n"},
-  {USER_DATA_DIRECTOR,        USER_DATA_FORMAT_UTF8, GST_TAG_DIRECTOR, "Director : %s\n"}, /* tag is not defined */
-  {USER_DATA_INFORMATION,     USER_DATA_FORMAT_UTF8, GST_TAG_INFORMATION, "Information : %s\n"}, /* tag is not defined */
-  {USER_DATA_CREATOR,         USER_DATA_FORMAT_UTF8, GST_TAG_CREATOR,  "Creator : %s\n"}, /* tag is not defined */
-  {USER_DATA_PRODUCER,        USER_DATA_FORMAT_UTF8, GST_TAG_PRODUCER,  "Producer : %s\n"}, /* tag is not defined */
+  //{USER_DATA_DIRECTOR,        USER_DATA_FORMAT_UTF8, ?,                       "Director : %s\n"}, /* tag is not defined */
+  //{USER_DATA_INFORMATION,     USER_DATA_FORMAT_UTF8, ?,                       "Information : %s\n"}, /* tag is not defined */
+  //{USER_DATA_CREATOR,         USER_DATA_FORMAT_UTF8, ?,                       "Creator : %s\n"}, /* tag is not defined */
+  //{USER_DATA_PRODUCER,        USER_DATA_FORMAT_UTF8, ?,                       "Producer : %s\n"}, /* tag is not defined */
   {USER_DATA_PERFORMER, USER_DATA_FORMAT_UTF8, GST_TAG_PERFORMER,
       "Performer : %s\n"},
-  {USER_DATA_REQUIREMENTS,    USER_DATA_FORMAT_UTF8, GST_TAG_REQUIREMENTS,   "Requirements : %s\n"}, /* tag is not defined */
-  {USER_DATA_SONGWRITER,      USER_DATA_FORMAT_UTF8, GST_TAG_SONGWRITER,  "Song Writer : %s\n"}, /* tag is not defined */
-  {USER_DATA_MOVIEWRITER,     USER_DATA_FORMAT_UTF8, GST_TAG_MOVIEWRITER,  "Movie Writer : %s\n"}, /* tag is not defined */
+  //{USER_DATA_REQUIREMENTS,    USER_DATA_FORMAT_UTF8, ?,                       "Requirements : %s\n"}, /* tag is not defined */
+  //{USER_DATA_SONGWRITER,      USER_DATA_FORMAT_UTF8, ?,                       "Song Writer : %s\n"}, /* tag is not defined */
+  //{USER_DATA_MOVIEWRITER,     USER_DATA_FORMAT_UTF8, ?,                       "Movie Writer : %s\n"}, /* tag is not defined */
   {USER_DATA_TOOL, USER_DATA_FORMAT_UTF8, GST_TAG_ENCODER,
       "Writing Application : %s\n"},
   {USER_DATA_DESCRIPTION, USER_DATA_FORMAT_UTF8, GST_TAG_DESCRIPTION,
@@ -204,20 +191,6 @@ static AiurDemuxTagEntry g_user_data_entry[] = {
       "Track Number : %s\n"},
   {USER_DATA_TOTALTRACKNUMBER, USER_DATA_FORMAT_UTF8, GST_TAG_TRACK_COUNT,
       "Track Count : %s\n"},
-  {USER_DATA_LOCATION, USER_DATA_FORMAT_UTF8, -1,
-      "Location : %s\n"},
-  {USER_DATA_AUTHOR, USER_DATA_FORMAT_UTF8, GST_TAG_AUTHOR,/* tag is not defined */
-      "Author : %s\n"},
-  {USER_DATA_COLLECTION, USER_DATA_FORMAT_UTF8, GST_TAG_COLLECTION,/* tag is not defined */
-      "Collection : %s\n"},
-  {USER_DATA_PUBLISHER, USER_DATA_FORMAT_UTF8, GST_TAG_PUBLISHER,
-      "Publisher : %s\n"},
-  {USER_DATA_SOFTWARE, USER_DATA_FORMAT_UTF8, GST_TAG_SOFTWARE,/* tag is not defined */
-      "Software : %s\n"},
-  {USER_DATA_YEAR, USER_DATA_FORMAT_UTF8, GST_TAG_YEAR,/* tag is not defined */
-      "Year : %s\n"},
-  {USER_DATA_KEYWORDS, USER_DATA_FORMAT_UTF8, GST_TAG_KEYWORDS,/* tag is not defined */
-      "Keywords : %s\n"},
 
 };
 
@@ -527,28 +500,6 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
       gst_tag_register (GST_TAG_VIDEO_HEIGHT, GST_TAG_FLAG_DECODED,
           G_TYPE_UINT, "image height", "image height", NULL);
 
-      gst_tag_register (GST_TAG_DIRECTOR, GST_TAG_FLAG_META,
-          G_TYPE_STRING, "director", "director", NULL);
-      gst_tag_register (GST_TAG_INFORMATION, GST_TAG_FLAG_META,
-          G_TYPE_STRING, "information", "information", NULL);
-      gst_tag_register (GST_TAG_CREATOR, GST_TAG_FLAG_META,
-          G_TYPE_STRING, "creator", "creator", NULL);
-      gst_tag_register (GST_TAG_PRODUCER, GST_TAG_FLAG_META,
-          G_TYPE_STRING, "producer", "producer", NULL);
-      gst_tag_register (GST_TAG_REQUIREMENTS, GST_TAG_FLAG_META,
-          G_TYPE_STRING, "requirement", "requirement", NULL);
-      gst_tag_register (GST_TAG_SONGWRITER, GST_TAG_FLAG_META,
-          G_TYPE_STRING, "songwriter", "songwriter", NULL);
-      gst_tag_register (GST_TAG_MOVIEWRITER, GST_TAG_FLAG_META,
-          G_TYPE_STRING, "moviewriter", "moviewriter", NULL);
-      gst_tag_register (GST_TAG_AUTHOR, GST_TAG_FLAG_META,
-          G_TYPE_STRING, "author", "author", NULL);
-      gst_tag_register (GST_TAG_COLLECTION, GST_TAG_FLAG_META,
-          G_TYPE_STRING, "collection", "collection", NULL);
-      gst_tag_register (GST_TAG_SOFTWARE, GST_TAG_FLAG_META,
-          G_TYPE_STRING, "software", "software", NULL);
-      gst_tag_register (GST_TAG_YEAR, GST_TAG_FLAG_META,
-          G_TYPE_STRING, "year", "year", NULL);
       demux->clock_offset = GST_CLOCK_TIME_NONE;
       demux->start_time = GST_CLOCK_TIME_NONE;
       demux->tag_list = gst_tag_list_new_empty ();
@@ -1697,43 +1648,6 @@ aiurdemux_add_user_tags (GstAiurDemux * demux)
           if (string) {
             /* FIXME : create GDate object for GST_TAG_DATA */
             if (USER_DATA_CREATION_DATE == id) {
-              guint y, m = 1, d = 1;
-              gint ret;
-              ret = sscanf (string->str, "%u-%u-%u", &y, &m, &d);
-              if (ret >= 1 && y > 1500 && y < 3000) {
-                GDate *date;
-                date = g_date_new_dmy (d, m, y);
-                gst_tag_list_add (list, GST_TAG_MERGE_REPLACE, g_user_data_entry[i].gst_tag_name,
-                  date, NULL);
-                GST_INFO_OBJECT (demux, g_user_data_entry[i].print_string, string->str);
-                g_date_free (date);
-              }
-              g_string_free (string, TRUE);
-              continue;
-            }else if(USER_DATA_LOCATION == id){
-              gdouble latitude;
-              gdouble longitude;
-              guint longitude_pos = 0;
-              guint8* latitude_ptr = g_strndup ((gchar *) userData, 8);
-              guint8* longitude_ptr = g_strndup ((gchar *) userData+8, 9);
-              if ((sscanf (latitude_ptr, "%lf", &latitude) == 1)
-                && (sscanf (longitude_ptr, "%lf", &longitude) == 1)) {
-                gst_tag_list_add (list, GST_TAG_MERGE_APPEND,
-                    GST_TAG_GEO_LOCATION_LATITUDE, latitude, NULL);
-                gst_tag_list_add (list, GST_TAG_MERGE_APPEND,
-                    GST_TAG_GEO_LOCATION_LONGITUDE, longitude, NULL);
-                GST_INFO_OBJECT (demux, "LATITUDE=%lf,LONGITUDE=%lf", latitude,longitude);
-              }
-              g_free (latitude_ptr);
-              g_free (longitude_ptr);
-              g_string_free (string, TRUE);
-              continue;
-            }else if(USER_DATA_TRACKNUMBER == id || USER_DATA_TOTALTRACKNUMBER == id){
-              guint32 value;
-              value = atoi(string->str);
-              gst_tag_list_add (list, GST_TAG_MERGE_APPEND,
-                g_user_data_entry[i].gst_tag_name, value, NULL);
-              GST_INFO_OBJECT (demux, g_user_data_entry[i].print_string, string->str);
               g_string_free (string, TRUE);
               continue;
             }
@@ -1759,10 +1673,6 @@ aiurdemux_add_user_tags (GstAiurDemux * demux)
             
             gst_sample_unref (sample);
           }
-        }else if(USER_DATA_FORMAT_INT_LE == format && USER_DATA_RATING == id) {
-            gst_tag_list_add (list, GST_TAG_MERGE_APPEND,
-                g_user_data_entry[i].gst_tag_name, (guint32)(*userData),NULL);
-            GST_INFO_OBJECT (demux, g_user_data_entry[i].print_string, (guint32)(*userData));
         }
       }
     }
@@ -3567,8 +3477,7 @@ aiurdemux_release_resource (GstAiurDemux * demux)
             continue;
         }
         if (stream->pad) {
-            gst_element_remove_pad (GST_ELEMENT (demux), stream->pad);
-            gst_object_unref ( stream->pad);
+            gst_element_remove_pad (GST_ELEMENT_CAST (demux), stream->pad);
             stream->pad = NULL;
         }
         if (stream->caps) {
