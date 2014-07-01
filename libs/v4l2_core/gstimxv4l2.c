@@ -1369,6 +1369,24 @@ void gst_imx_v4l2out_config_color_key (gpointer v4l2handle, gboolean enable, gui
   (*handle->dev_itf.v4l2out_config_colorkey) (handle, enable, color_key);
 }
 
+static void * gst_imx_v4l2_find_buffer(gpointer v4l2handle, PhyMemBlock *memblk)
+{
+  IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
+  struct v4l2_buffer *v4l2buf;
+  gint i;
+
+  for(i=0; i<handle->allocated && i<MAX_BUFFER; i++) {
+    v4l2buf = &handle->buffer_pair[i].v4l2buffer;
+    if ((v4l2buf->memory == V4L2_MEMORY_MMAP && v4l2buf->m.offset == memblk->paddr)
+        || (v4l2buf->memory == V4L2_MEMORY_USERPTR && v4l2buf->m.userptr == memblk->paddr)) {
+      return v4l2buf;
+    }
+  }
+
+  GST_ERROR ("Can't find the buffer 0x%08X.", memblk->paddr);
+  return NULL;
+}
+
 gint gst_imx_v4l2_set_buffer_count (gpointer v4l2handle, guint count, guint memory_mode)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
@@ -1403,7 +1421,7 @@ gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   v4l2buf = &handle->buffer_pair[handle->allocated].v4l2buffer;
   memset (v4l2buf, 0, sizeof(struct v4l2_buffer));
   v4l2buf->type = handle->type;
-  v4l2buf->memory = V4L2_MEMORY_MMAP;;
+  v4l2buf->memory = V4L2_MEMORY_MMAP;
   v4l2buf->index = handle->allocated;
 
   if (ioctl(handle->v4l2_fd, VIDIOC_QUERYBUF, v4l2buf) < 0) {
@@ -1425,7 +1443,6 @@ gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
     return -1;
   }
   memblk->paddr = (guint8*) v4l2buf->m.offset;
-  memblk->user_data = (gpointer) v4l2buf;
 
   GST_DEBUG ("Allocated v4l2buffer(%p), index(%d), vaddr(%p), paddr(%p), size(%d).", 
       v4l2buf, handle->allocated - 1, memblk->vaddr, memblk->paddr, memblk->size);
@@ -1456,10 +1473,6 @@ gint gst_imx_v4l2_register_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
     return -1;
   }
 
-  //FIXME: workaround for conflict when v4l2src ! v4l2sink.
-  if (!memblk->user_data) {
-    memblk->user_data = (gpointer) v4l2buf;
-  }
   handle->allocated ++;
 
   GST_DEBUG ("Allocated v4l2buffer(%p), index(%d).", v4l2buf, handle->allocated - 1);
@@ -1480,9 +1493,11 @@ gint gst_imx_v4l2_free_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
     handle->allocated = 0;
   }
 
-  v4l2buf =  (struct v4l2_buffer*) memblk->user_data;
-  GST_DEBUG ("Free v4l2buffer(%p), index(%d).", v4l2buf, v4l2buf->index);
-  memset (v4l2buf, 0, sizeof(struct v4l2_buffer));
+  v4l2buf =  (struct v4l2_buffer *)gst_imx_v4l2_find_buffer(v4l2handle, memblk);
+  if (v4l2buf) {
+    GST_DEBUG ("Free v4l2buffer(%p), index(%d).", v4l2buf, v4l2buf->index);
+    memset (v4l2buf, 0, sizeof(struct v4l2_buffer));
+  }
 
   return 0;
 }
@@ -1514,7 +1529,10 @@ gint gst_imx_v4l2_queue_v4l2memblk (gpointer v4l2handle, PhyMemBlock *memblk, Gs
   struct v4l2_buffer *v4l2buf;
   gint index;
 
-  v4l2buf = (struct v4l2_buffer *) memblk->user_data;
+  v4l2buf = (struct v4l2_buffer *)gst_imx_v4l2_find_buffer(v4l2handle, memblk);
+  if (!v4l2buf)
+    return -1;
+
   index = v4l2buf->index;
 
   GST_DEBUG ("queue v4lbuffer memblk (%p), index(%d), flags(%x).",
@@ -1608,7 +1626,10 @@ gint gst_imx_v4l2_queue_gstbuffer (gpointer v4l2handle, GstBuffer *buffer, GstVi
 #endif
 
   GST_DEBUG ("queue gstbuffer(%p).", buffer);
-  v4l2buf = (struct v4l2_buffer *) memblk->user_data;
+  v4l2buf = (struct v4l2_buffer *) gst_imx_v4l2_find_buffer(v4l2handle, memblk);
+  if (!v4l2buf)
+    return -1;
+
   if (handle->buffer_pair[v4l2buf->index].gstbuffer)
     GST_ERROR ("gstbuffer(%p) not dequeued yet but queued again, index(%d).", buffer, index);
 
@@ -1678,7 +1699,10 @@ gint gst_imx_v4l2_dequeue_gstbuffer (gpointer v4l2handle, GstBuffer **buffer)
   if (!memblk)
     return 0;
 
-  v4l2buf = (struct v4l2_buffer *) memblk->user_data;
+  v4l2buf = (struct v4l2_buffer *) gst_imx_v4l2_find_buffer(v4l2handle, memblk);
+  if (!v4l2buf)
+    return -1;
+
   *buffer = handle->buffer_pair[v4l2buf->index].gstbuffer;
   handle->buffer_pair[v4l2buf->index].gstbuffer = NULL;
 
