@@ -60,6 +60,7 @@ GST_DEBUG_CATEGORY (imxv4l2_debug);
 #define MXC_V4L2_CAPTURE_NAME "mxc_v4l2"
 #define MXC_V4L2_CAPTURE_CAMERA_NAME "ov"
 #define MXC_V4L2_CAPTURE_TVIN_NAME "adv"
+#define MXC_V4L2_CAPTURE_TVIN_VADC_NAME "vadc"
 #define PXP_V4L2_CAPTURE_NAME "csi_v4l2"
 
 typedef struct {
@@ -585,9 +586,9 @@ gst_imx_v4l2_get_device_caps (gint type)
 GstCaps *
 gst_imx_v4l2_get_caps (gpointer v4l2handle)
 {
-	struct v4l2_fmtdesc fmt;
-	struct v4l2_frmsizeenum frmsize;
-	struct v4l2_frmivalenum frmival;
+  struct v4l2_fmtdesc fmt;
+  struct v4l2_frmsizeenum frmsize;
+  struct v4l2_frmivalenum frmival;
   gint i, index, vformat;
   GstCaps *caps = NULL;
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
@@ -597,43 +598,26 @@ gst_imx_v4l2_get_caps (gpointer v4l2handle)
     fmt.type = handle->type;
     //FIXME: driver should report v4l2 capture output format. not camera sensor
     //support format.
-    //while (ioctl(handle->v4l2_fd, VIDIOC_ENUM_FMT, &fmt) >= 0) {
-    while (g_camera_format[fmt.index]) {
-      fmt.pixelformat = g_camera_format[fmt.index];
-      vformat = fmt.pixelformat;
-      GST_INFO ("frame format: %c%c%c%c",	vformat & 0xff, (vformat >> 8) & 0xff,
-					(vformat >> 16) & 0xff, (vformat >> 24) & 0xff);
-      frmsize.pixel_format = fmt.pixelformat;
-      frmsize.index = 0;
-      while (ioctl(handle->v4l2_fd, VIDIOC_ENUM_FRAMESIZES, &frmsize) >= 0) {
-        GST_INFO ("frame size: %dx%d", frmsize.discrete.width, frmsize.discrete.height);
-        GST_INFO ("frame size type: %d", frmsize.type);
-        //FIXME: driver haven't set type.
-        if (1) {//frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE) {
-          frmival.index = 0;
-          frmival.pixel_format = fmt.pixelformat;
-          frmival.width = frmsize.discrete.width;
-          frmival.height = frmsize.discrete.height;
-          while (ioctl(handle->v4l2_fd, VIDIOC_ENUM_FRAMEINTERVALS, &frmival) >= 0) {
-            GST_INFO ("frame rate: %d/%d", frmival.discrete.denominator, frmival.discrete.numerator);
-            for (i=0; i<sizeof(g_imxv4l2fmt_maps)/sizeof(IMXV4l2FmtMap); i++) {
-              if (fmt.pixelformat == g_imxv4l2fmt_maps[i].v4l2fmt) {
-                if (!caps)
-                  caps = gst_caps_new_empty ();
-                if (caps) {
-                  GstStructure * structure = gst_structure_from_string( \
-                      g_imxv4l2fmt_maps[i].caps_str, NULL);
-                  gst_structure_set (structure, "width", G_TYPE_INT, frmsize.discrete.width, NULL);
-                  gst_structure_set (structure, "height", G_TYPE_INT, frmsize.discrete.height, NULL);
-                  gst_structure_set (structure, "framerate", GST_TYPE_FRACTION, \
-                      frmival.discrete.denominator, frmival.discrete.numerator, NULL);
-                  gst_caps_append_structure (caps, structure);
-                  GST_INFO ("Added one caps\n");
-                }
-              }
-            }
-            // Add hard code format.
-            if (handle->support_format_table) {
+    if (handle->support_format_table) {
+      while (handle->support_format_table[fmt.index]) {
+        fmt.pixelformat = handle->support_format_table[fmt.index];
+        vformat = fmt.pixelformat;
+        GST_INFO ("frame format: %c%c%c%c",	vformat & 0xff, (vformat >> 8) & 0xff,
+            (vformat >> 16) & 0xff, (vformat >> 24) & 0xff);
+        frmsize.pixel_format = fmt.pixelformat;
+        frmsize.index = 0;
+        while (ioctl(handle->v4l2_fd, VIDIOC_ENUM_FRAMESIZES, &frmsize) >= 0) {
+          GST_INFO ("frame size: %dx%d", frmsize.discrete.width, frmsize.discrete.height);
+          GST_INFO ("frame size type: %d", frmsize.type);
+          //FIXME: driver haven't set type.
+          if (1) {//frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE) {
+            frmival.index = 0;
+            frmival.pixel_format = fmt.pixelformat;
+            frmival.width = frmsize.discrete.width;
+            frmival.height = frmsize.discrete.height;
+            while (ioctl(handle->v4l2_fd, VIDIOC_ENUM_FRAMEINTERVALS, &frmival) >= 0) {
+              GST_INFO ("frame rate: %d/%d", frmival.discrete.denominator, frmival.discrete.numerator);
+              // Add hard code format.
               index = 0;
               while (handle->support_format_table[index]) {
                 for (i=0; i<sizeof(g_imxv4l2fmt_maps)/sizeof(IMXV4l2FmtMap); i++) {
@@ -654,13 +638,53 @@ gst_imx_v4l2_get_caps (gpointer v4l2handle)
                 }
                 index ++;
               }
+              frmival.index++;
             }
-            frmival.index++;
           }
+          frmsize.index++;
         }
-        frmsize.index++;
+        fmt.index++;
       }
-      fmt.index++;
+    } else {
+      while (ioctl(handle->v4l2_fd, VIDIOC_ENUM_FMT, &fmt) >= 0) {
+        vformat = fmt.pixelformat;
+        GST_INFO ("frame format: %c%c%c%c",	vformat & 0xff, (vformat >> 8) & 0xff,
+            (vformat >> 16) & 0xff, (vformat >> 24) & 0xff);
+        frmsize.pixel_format = fmt.pixelformat;
+        frmsize.index = 0;
+        while (ioctl(handle->v4l2_fd, VIDIOC_ENUM_FRAMESIZES, &frmsize) >= 0) {
+          GST_INFO ("frame size: %dx%d", frmsize.discrete.width, frmsize.discrete.height);
+          GST_INFO ("frame size type: %d", frmsize.type);
+          if (frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE) {
+            frmival.index = 0;
+            frmival.pixel_format = fmt.pixelformat;
+            frmival.width = frmsize.discrete.width;
+            frmival.height = frmsize.discrete.height;
+            while (ioctl(handle->v4l2_fd, VIDIOC_ENUM_FRAMEINTERVALS, &frmival) >= 0) {
+              GST_INFO ("frame rate: %d/%d", frmival.discrete.denominator, frmival.discrete.numerator);
+              for (i=0; i<sizeof(g_imxv4l2fmt_maps)/sizeof(IMXV4l2FmtMap); i++) {
+                if (fmt.pixelformat == g_imxv4l2fmt_maps[i].v4l2fmt) {
+                  if (!caps)
+                    caps = gst_caps_new_empty ();
+                  if (caps) {
+                    GstStructure * structure = gst_structure_from_string( \
+                        g_imxv4l2fmt_maps[i].caps_str, NULL);
+                    gst_structure_set (structure, "width", G_TYPE_INT, frmsize.discrete.width, NULL);
+                    gst_structure_set (structure, "height", G_TYPE_INT, frmsize.discrete.height, NULL);
+                    gst_structure_set (structure, "framerate", GST_TYPE_FRACTION, \
+                        frmival.discrete.denominator, frmival.discrete.numerator, NULL);
+                    gst_caps_append_structure (caps, structure);
+                    GST_INFO ("Added one caps\n");
+                  }
+                }
+              }
+              frmival.index++;
+            }
+          }
+          frmsize.index++;
+        }
+        fmt.index++;
+      }
     }
   }
 
@@ -803,22 +827,6 @@ gst_imx_v4l2capture_config_pxp (IMXV4l2Handle *handle, guint fmt, guint w, guint
     return -1;
   }
 
-  crop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-  if (ioctl(handle->v4l2_fd, VIDIOC_G_CROP, &crop) < 0) {
-    GST_ERROR ("VIDIOC_G_CROP failed\n");
-    return -1;
-  }
-
-  crop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-  crop.c.width = w;
-  crop.c.height = h;
-  crop.c.top = 0;
-  crop.c.left = 0;
-  if (ioctl(handle->v4l2_fd, VIDIOC_S_CROP, &crop) < 0) {
-    GST_ERROR ("VIDIOC_S_CROP failed\n");
-    return -1;
-  }
-
   return 0;
 }
 
@@ -887,10 +895,26 @@ gst_imx_v4l2capture_set_function (IMXV4l2Handle *handle)
       return -1;
     }
   } else if (!strcmp (cap.driver, PXP_V4L2_CAPTURE_NAME)) {
+    struct v4l2_dbg_chip_ident chip;
+    if (ioctl(handle->v4l2_fd, VIDIOC_DBG_G_CHIP_IDENT, &chip)) {
+      GST_ERROR ("VIDIOC_DBG_G_CHIP_IDENT failed.\n");
+      return -1;
+    }
+    GST_INFO ("sensor chip is %s\n", chip.match.name);
+    
+    if (!strncmp (chip.match.name, MXC_V4L2_CAPTURE_CAMERA_NAME, 2)) {
       handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_pxp;
       handle->support_format_table = g_camera_format_PXP;
+    } else if (!strncmp (chip.match.name, MXC_V4L2_CAPTURE_TVIN_VADC_NAME, 3)) {
+      handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_tvin;
+      handle->support_format_table = g_camera_format_PXP;
+    } else {
+      GST_ERROR ("can't identify capture sensor type.\n");
+      return -1;
+    }
   } else {
       handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_usb_camera;
+      handle->support_format_table = NULL;
   }
 
   return 0;

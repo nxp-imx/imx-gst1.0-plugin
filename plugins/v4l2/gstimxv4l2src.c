@@ -27,11 +27,13 @@ GST_DEBUG_CATEGORY (imxv4l2src_debug);
 
 #define DEFAULT_DEVICE "/dev/video0"
 #define DEFAULT_FRAME_PLUS 1
+#define DEFAULT_USE_V4L2SRC_MEMORY TRUE
 #define DEFAULT_FRAMES_IN_V4L2_CAPTURE 3
 
 enum {
   PROP_0,
   PROP_DEVICE,
+  PROP_USE_V4L2SRC_MEMORY,
   PROP_FRAME_PLUS,
 };
 
@@ -47,6 +49,9 @@ gst_imx_v4l2src_get_property (GObject * object,
   switch (prop_id) {
     case PROP_DEVICE:
       g_value_set_string (value, v4l2src->device);
+      break;
+    case PROP_USE_V4L2SRC_MEMORY:
+      g_value_set_boolean (value, v4l2src->use_v4l2_memory);
       break;
     case PROP_FRAME_PLUS:
       g_value_set_uint (value, v4l2src->frame_plus);
@@ -67,6 +72,9 @@ gst_imx_v4l2src_set_property (GObject * object,
     case PROP_DEVICE:
       g_free (v4l2src->device);
       v4l2src->device = g_value_dup_string (value);
+      break;
+    case PROP_USE_V4L2SRC_MEMORY:
+      v4l2src->use_v4l2_memory = g_value_get_boolean (value);
       break;
     case PROP_FRAME_PLUS:
       v4l2src->frame_plus = g_value_get_uint (value);
@@ -443,8 +451,6 @@ gst_imx_v4l2src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
     update_pool = FALSE;
   }
 
-  //FIXME: wround around for USB camera can't share buffer with V4L2 sink.
-  //v4l2src->use_v4l2_memory = TRUE;
   if (allocator == NULL \
       || !GST_IS_ALLOCATOR_PHYMEM (allocator) \
       || v4l2src->use_v4l2_memory == TRUE) {
@@ -697,6 +703,10 @@ gst_imx_v4l2src_install_properties (GObjectClass *gobject_class)
   g_object_class_install_property (gobject_class, PROP_DEVICE,
       g_param_spec_string ("device", "Device", "Device location",
         DEFAULT_DEVICE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (gobject_class, PROP_USE_V4L2SRC_MEMORY,
+      g_param_spec_boolean ("use-v4l2src-memory", "Force use V4L2 src memory",
+        "Force allocate video frame buffer by V4L2 capture", 
+          DEFAULT_USE_V4L2SRC_MEMORY, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (gobject_class, PROP_FRAME_PLUS,
       g_param_spec_uint ("frame-plus", "addtionlal frames",
         "set number of addtional frames for smoothly recording", 
@@ -784,7 +794,7 @@ gst_imx_v4l2src_init (GstImxV4l2Src * v4l2src)
   v4l2src->duration = 0;
   v4l2src->stream_on = FALSE;
   v4l2src->use_my_allocator = FALSE;
-  v4l2src->use_v4l2_memory = FALSE;
+  v4l2src->use_v4l2_memory = DEFAULT_USE_V4L2SRC_MEMORY;
 
   gst_base_src_set_format (GST_BASE_SRC (v4l2src), GST_FORMAT_TIME);
   gst_base_src_set_live (GST_BASE_SRC (v4l2src), TRUE);
