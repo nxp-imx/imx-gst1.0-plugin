@@ -1473,28 +1473,28 @@ fsl_player_ret_val fsl_player_select_subtitle(fsl_player_handle handle, fsl_play
     return FSL_PLAYER_SUCCESS;
 }
 
-static fsl_player_ret_val update_mfw_v4lsink_parameter(GstElement* mfw_v4lsink)
+static fsl_player_ret_val update_video_sink_parameter(GstElement* video_sink)
 {
     fsl_player_s32 cnt = 0;
     fsl_player_s32 paraset;
 
-    g_object_set(G_OBJECT(mfw_v4lsink), VIDEO_CONFIG, 1, NULL);
+    g_object_set(G_OBJECT(video_sink), VIDEO_CONFIG, 1, NULL);
 
-  	g_object_get(G_OBJECT(mfw_v4lsink), VIDEO_CONFIG, &paraset, NULL);
+  	g_object_get(G_OBJECT(video_sink), VIDEO_CONFIG, &paraset, NULL);
     while( (paraset) && cnt<100 )
     {
         usleep(20000);
         cnt++;
-        g_object_get(G_OBJECT(mfw_v4lsink), VIDEO_CONFIG, &paraset, NULL);
+        g_object_get(G_OBJECT(video_sink), VIDEO_CONFIG, &paraset, NULL);
     }
     if( cnt >= 100 )
     {
-        FSL_PLAYER_PRINT("%s(): Can not set separa to v4lsink!\n", __FUNCTION__);
+        FSL_PLAYER_PRINT("%s(): Can not set separa to video sink!\n", __FUNCTION__);
         return FSL_PLAYER_FAILURE;
     }
     else
     {
-        FSL_PLAYER_PRINT("%s(): Update mfw_v4lsink successfully!\n", __FUNCTION__);
+        FSL_PLAYER_PRINT("%s(): Update video sink successfully!\n", __FUNCTION__);
     }
     return FSL_PLAYER_SUCCESS;
 }
@@ -1568,7 +1568,7 @@ fsl_player_ret_val fsl_player_full_screen(fsl_player_handle handle)
         pproperty->bfullscreen = 1;
     }
 
-    update_mfw_v4lsink_parameter(actual_video_sink);
+    update_video_sink_parameter(actual_video_sink);
 
     return FSL_PLAYER_SUCCESS;
 }
@@ -1603,7 +1603,7 @@ fsl_player_ret_val fsl_player_resize(fsl_player_handle handle, fsl_player_displa
     g_object_set(G_OBJECT(actual_video_sink), VIDEO_WIDTH, pproperty->display_parameter.disp_width, NULL);
     g_object_set(G_OBJECT(actual_video_sink), VIDEO_HEIGHT, pproperty->display_parameter.disp_height, NULL);
 
-    update_mfw_v4lsink_parameter(actual_video_sink);
+    update_video_sink_parameter(actual_video_sink);
 
     if (display_parameter.offsetx == 0 && display_parameter.offsety == 0
             && display_parameter.disp_width == pproperty->fullscreen_width
@@ -1636,7 +1636,7 @@ fsl_player_ret_val fsl_player_set_video_crop(fsl_player_handle handle, fsl_playe
     g_object_set(G_OBJECT(actual_video_sink), "crop-width", pproperty->video_crop.width, NULL);
     g_object_set(G_OBJECT(actual_video_sink), "crop-height", pproperty->video_crop.height, NULL);
 
-    update_mfw_v4lsink_parameter(actual_video_sink);
+    update_video_sink_parameter(actual_video_sink);
     
     return FSL_PLAYER_SUCCESS;
 }
@@ -1658,7 +1658,7 @@ fsl_player_ret_val fsl_player_rotate(fsl_player_handle handle, fsl_player_s32 ro
     FSL_PLAYER_PRINT("rotate_value = %d\n", rotate_value);
     g_object_set(G_OBJECT(actual_video_sink), VIDEO_ROTATE, (int)rotate_value, NULL);
 
-    update_mfw_v4lsink_parameter(actual_video_sink);
+    update_video_sink_parameter(actual_video_sink);
 
     pproperty->rotate_value = rotate_value;
 
