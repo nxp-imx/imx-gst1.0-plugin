@@ -672,7 +672,7 @@ static gboolean gst_aiurdemux_handle_src_event (GstPad * pad, GstObject * parent
   GstAiurDemux *demux = GST_AIURDEMUX (parent);
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_SEEK:
-      if (!demux->seekable && !aiurcontent_is_seelable(demux->content_info)) {
+      if (!demux->seekable || !aiurcontent_is_seelable(demux->content_info)) {
         goto not_support;
       }
 
