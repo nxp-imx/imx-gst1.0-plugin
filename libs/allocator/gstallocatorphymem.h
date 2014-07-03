@@ -23,6 +23,8 @@
 #include <gst/gst.h>
 #include <gst/gstallocator.h>
 
+#define PAGE_ALIGN(x) (((x) + 4095) & ~4095)
+
 #define GST_TYPE_ALLOCATOR_PHYMEM             (gst_allocator_phymem_get_type())
 #define GST_ALLOCATOR_PHYMEM(obj)             (G_TYPE_CHECK_INSTANCE_CAST((obj), GST_TYPE_ALLOCATOR_PHYMEM, GstAllocatorPhyMem))
 #define GST_ALLOCATOR_PHYMEM_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass), GST_TYPE_ALLOCATOR_PHYMEM, GstAllocatorPhyMemClass))

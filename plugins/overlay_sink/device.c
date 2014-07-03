@@ -232,6 +232,10 @@ g2d_device_allocate_memory (gpointer device, PhyMemBlock *memblk)
 {
   struct g2d_buf *pbuf = NULL;
 
+  // g2d allocate momory is page alignment, so it is ok align size to page.
+  // V4l2 capture will check physical memory size when registry buffer.
+  memblk->size = PAGE_ALIGN(memblk->size);
+
   pbuf = g2d_alloc (memblk->size, 0);
   if (!pbuf) {
     GST_ERROR ("g2d_alloc failed.");

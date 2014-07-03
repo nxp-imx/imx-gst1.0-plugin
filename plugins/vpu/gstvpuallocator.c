@@ -59,7 +59,6 @@ gst_vpu_alloc_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock 
 	VpuDecRetCode ret;
 	VpuMemDesc mem_desc;
 
-#define PAGE_ALIGN(x) (((x) + 4095) & ~4095)
 	GST_DEBUG_OBJECT(allocator, "vpu allocator malloc size: %d\n", memory->size);
 	memset(&mem_desc, 0, sizeof(VpuMemDesc));
   // VPU allocate momory is page alignment, so it is ok align size to page.
