@@ -98,6 +98,7 @@ struct _GstVpuDecObject {
   gboolean dropping;
   void *tsm;
   TSMGR_MODE tsm_mode;
+  GstClockTime last_valid_ts;
 };
 
 struct _GstVpuDecObjectClass {

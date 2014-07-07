@@ -157,6 +157,7 @@ gst_vpu_dec_object_init(GstVpuDecObject *vpu_dec_object)
   vpu_dec_object->new_segment = TRUE;
   vpu_dec_object->mosaic_cnt = 0;
   vpu_dec_object->tsm_mode = MODE_AI;
+  vpu_dec_object->last_valid_ts = 0;
   vpu_dec_object->vpu_internal_mem.internal_virt_mem = NULL;
   vpu_dec_object->vpu_internal_mem.internal_phy_mem = NULL;
   vpu_dec_object->mv_mem = NULL;
@@ -894,6 +895,13 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   cmeta->y = out_frame_info.pExtInfo->FrmCropRect.nTop;
   cmeta->width = out_frame_info.pExtInfo->FrmCropRect.nRight-out_frame_info.pExtInfo->FrmCropRect.nLeft;
   cmeta->height = out_frame_info.pExtInfo->FrmCropRect.nBottom-out_frame_info.pExtInfo->FrmCropRect.nTop;
+
+  if (vpu_dec_object->tsm_mode == MODE_FIFO) {
+    if (!GST_CLOCK_TIME_IS_VALID(out_frame->pts))
+      out_frame->pts = vpu_dec_object->last_valid_ts;
+    else
+      vpu_dec_object->last_valid_ts = out_frame->pts;
+  }
 
   GST_DEBUG_OBJECT (vpu_dec_object, "vpu dec output frame time stamp: %" \
       GST_TIME_FORMAT, GST_TIME_ARGS (out_frame->pts));
