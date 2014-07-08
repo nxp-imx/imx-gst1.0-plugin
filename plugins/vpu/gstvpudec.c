@@ -267,8 +267,8 @@ gst_vpu_dec_set_format (GstVideoDecoder * bdec, GstVideoCodecState * state)
     GST_INFO_OBJECT (dec, "Pipeline is live, set VPU to low latency mode.\n");
     GST_VPU_DEC_LOW_LATENCY (dec->vpu_dec_object) = TRUE;
   } else {
-    GST_INFO_OBJECT (dec, "Pipeline isn't live, set VPU to latency mode.\n");
-    GST_VPU_DEC_LOW_LATENCY (dec->vpu_dec_object) = TRUE;
+    GST_INFO_OBJECT (dec, "Pipeline isn't live, set VPU to non-latency mode.\n");
+    GST_VPU_DEC_LOW_LATENCY (dec->vpu_dec_object) = FALSE;
   }
 
   return gst_vpu_dec_object_config (dec->vpu_dec_object, bdec, state);
