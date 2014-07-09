@@ -32,14 +32,7 @@ noinst_HEADERS = osink_common.h gstosink.h gstosinkallocator.h osink_object.h co
 registry_file1 = imx_6q_display_config
 registry_file2 = imx_6sx_display_config
 
-if PLATFORM_IS_MX6
-data_DATA = $(registry_file1)
-endif
-
-if PLATFORM_IS_MX6SX
-data_DATA = $(registry_file2)
-endif
-
+data_DATA = $(registry_file1) $(registry_file2)
 EXTRA_DIST = $(registry_file1) $(registry_file2)
 
 if USE_X11
