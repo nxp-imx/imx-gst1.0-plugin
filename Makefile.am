@@ -28,11 +28,12 @@ endif
 
 AVBDIRS = plugins/avb
 
+VIDEO_CONVERT_DIRS = plugins/videoconvert
 
 TOOLDIRS =    tools/                      \
               tools/gplay
 
-BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS) $(OVERLAYSINKDIRS) $(AVBDIRS)
+BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS) $(OVERLAYSINKDIRS) $(AVBDIRS) $(VIDEO_CONVERT_DIRS)
               
 if PLATFORM_IS_MX6
 

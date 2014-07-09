@@ -1,0 +1,115 @@
+/* GStreamer IMX Video Processing Device Abstract
+ * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Library General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Library General Public License for more details.
+ *
+ * You should have received a copy of the GNU Library General Public
+ * License along with this library; if not, write to the
+ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
+ */
+
+#ifndef __IMX_VIDEO_PROCESS_DEVICE_H__
+#define __IMX_VIDEO_PROCESS_DEVICE_H__
+
+#include <gst/gst.h>
+#include <gst/video/video.h>
+#include "gstallocatorphymem.h"
+#include "gstimxcommon.h"
+
+typedef enum {
+  IMX_VP_DEVICE_G2D,
+  IMX_VP_DEVICE_IPU,
+  IMX_VP_DEVICE_PXP,
+  IMX_VP_DEVICE_GLES2,
+} ImxVpDeviceType;
+
+typedef enum {
+  IMX_VP_DEVICE_CAP_SCALE        = 0x01,
+  IMX_VP_DEVICE_CAP_CSC          = 0x02,
+  IMX_VP_DEVICE_CAP_ROTATE       = 0x04,
+  IMX_VP_DEVICE_CAP_DEINTERLACE  = 0x08,
+  IMX_VP_DEVICE_CAP_ALPHA        = 0x10,
+  IMX_VP_DEVICE_CAP_ALL          = 0x1F
+} ImxVpDeviceCap;
+
+typedef enum {
+  IMX_VIDEO_ROTATION_0,
+  IMX_VIDEO_ROTATION_90,
+  IMX_VIDEO_ROTATION_180,
+  IMX_VIDEO_ROTATION_270,
+  IMX_VIDEO_ROTATION_HFLIP,
+  IMX_VIDEO_ROTATION_VFLIP
+} ImxVideoRotationMode;
+
+typedef enum {
+  IMX_VIDEO_DEINTERLACE_NONE,
+  IMX_VIDEO_DEINTERLACE_LOW_MOTION,
+  IMX_VIDEO_DEINTERLACE_MID_MOTION,
+  IMX_VIDEO_DEINTERLACE_HIGH_MOTION
+} ImxVideoDeinterlaceMode;
+
+typedef struct {
+  GstVideoFormat in_fmt;
+  GstVideoFormat out_fmt;
+  gint  complexity;
+  gint  loss;
+} ImxVideoTransformMap;
+
+typedef struct _ImxVideoProcessDevice  ImxVideoProcessDevice;
+struct _ImxVideoProcessDevice {
+  ImxVpDeviceType  device_type;
+
+  /* point to concrete device object */
+  gpointer priv;
+
+  /* device interfaces */
+  gint     (*open)                    (ImxVideoProcessDevice* device);
+  gint     (*close)                   (ImxVideoProcessDevice* device);
+  gint     (*alloc_mem)               (ImxVideoProcessDevice* device,
+                                        PhyMemBlock *memblk);
+  gint     (*free_mem)                (ImxVideoProcessDevice* device,
+                                        PhyMemBlock *memblk);
+  gint     (*frame_copy)              (ImxVideoProcessDevice* device,
+                                        PhyMemBlock *from, PhyMemBlock *to);
+  //TODO : remove set_input_frame and set_output_frame interface if they can be
+  //       merge into do_convert interface
+  gint     (*set_input_frame)         (ImxVideoProcessDevice* device,
+                                        GstVideoFrame *input);
+  gint     (*set_output_frame)        (ImxVideoProcessDevice* device,
+                                        GstVideoFrame *output);
+  gint     (*set_deinterlace)         (ImxVideoProcessDevice* device,
+                                        ImxVideoDeinterlaceMode mode);
+  gint     (*set_rotate)              (ImxVideoProcessDevice* device,
+                                        ImxVideoRotationMode mode);
+  //TODO : replace GstVideoFrame with general buffer, so that we can make
+  //       the device independent with Gstreamer completely.
+  gint     (*do_convert)              (ImxVideoProcessDevice* device,
+                                        GstVideoFrame *from, GstVideoFrame *to);
+
+  gint                    (*get_capabilities)        (void);
+  GList*                  (*get_supported_in_fmts)   (void);
+  GList*                  (*get_supported_out_fmts)  (void);
+  ImxVideoRotationMode    (*get_rotate)     (ImxVideoProcessDevice* device);
+  ImxVideoDeinterlaceMode (*get_deinterlace)(ImxVideoProcessDevice* device);
+};
+
+typedef struct _ImxVideoProcessDeviceInfo {
+  gchar *name;
+  gchar *description;
+  gchar *detail;
+  ImxVideoProcessDevice*  (*create)   (void);
+  gint                    (*destroy)  (ImxVideoProcessDevice* dev);
+} ImxVideoProcessDeviceInfo;
+
+const ImxVideoProcessDeviceInfo * imx_get_video_process_devices(void);
+
+#endif /* __IMX_VIDEO_PROCESS_DEVICE_H__ */
