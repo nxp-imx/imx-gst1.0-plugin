@@ -158,6 +158,8 @@ g2d_device_create_surface (gpointer device, SurfaceInfo *info)
     return NULL;
   }
 
+  memset(surface, 0, sizeof(G2DSurface));
+
   if (g2d_device_update_surface_info (device, info, surface) < 0) {
     g_slice_free1 (sizeof(G2DSurface), surface);
     return NULL;
