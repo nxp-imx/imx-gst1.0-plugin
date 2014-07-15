@@ -330,7 +330,16 @@ gint init_display (gpointer display)
   fb_var.yres_virtual = hdisplay->h * DISPLAY_NUM_BUFFERS;
   fb_var.activate |= FB_ACTIVATE_FORCE;
   fb_var.nonstd = hdisplay->fmt;
-  fb_var.bits_per_pixel = 16;
+
+  if (hdisplay->fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'x')) {
+    fb_var.bits_per_pixel = 32;
+  } else if (hdisplay->fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'P')) {
+    fb_var.bits_per_pixel = 16;
+  } else {
+    GST_ERROR ("Unsupported display format, check the display config file.");
+    return -1;
+  }
+
   if (ioctl(hdisplay->fd, FBIOPUT_VSCREENINFO, &fb_var) < 0) {
     return -1;
   }

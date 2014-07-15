@@ -125,28 +125,38 @@ gst_overlay_sink_set_property (GObject * object,
       break;
     case OVERLAY_SINK_PROP_DISPWIN_X_0:
       val = g_value_get_int (value);
-      if (val < sink->disp_info[idx].width)
+      if (sink->disp_info[idx].width > 0 ) {
+        if (val < sink->disp_info[idx].width)
+          sink->overlay[idx].x = val;
+        else
+          GST_WARNING_OBJECT (sink, "overlay x out of screen (%d).", val);
+      } else {
         sink->overlay[idx].x = val;
-      else
-        GST_WARNING_OBJECT (sink, "overlay x out of screen (%d).", val);
+      }
       break;
     case OVERLAY_SINK_PROP_DISPWIN_Y_0:
       val = g_value_get_int (value);
-      if (val < sink->disp_info[idx].height)
+      if (sink->disp_info[idx].height > 0) {
+        if(val < sink->disp_info[idx].height)
+          sink->overlay[idx].y = val;
+        else
+          GST_WARNING_OBJECT (sink, "overlay y out of screen (%d).", val);
+      } else {
         sink->overlay[idx].y = val;
-      else
-        GST_WARNING_OBJECT (sink, "overlay y out of screen (%d).", val);
+      }
       break;
     case OVERLAY_SINK_PROP_DISPWIN_W_0:
       val = g_value_get_int (value);
-      if (val + sink->overlay[idx].x >= sink->disp_info[idx].width)
+      if (sink->disp_info[idx].width > 0 &&
+          val + sink->overlay[idx].x >= sink->disp_info[idx].width)
         sink->overlay[idx].w = sink->disp_info[idx].width - sink->overlay[idx].x;
       else
         sink->overlay[idx].w = val;
       break;
     case OVERLAY_SINK_PROP_DISPWIN_H_0:
       val = g_value_get_int (value);
-      if (val + sink->overlay[idx].y >= sink->disp_info[idx].height)
+      if (sink->disp_info[idx].height > 0 &&
+          val + sink->overlay[idx].y >= sink->disp_info[idx].height)
         sink->overlay[idx].h = sink->disp_info[idx].height - sink->overlay[idx].y;
       else
         sink->overlay[idx].h = val;
