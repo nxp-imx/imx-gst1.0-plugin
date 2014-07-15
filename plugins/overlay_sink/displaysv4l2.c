@@ -81,6 +81,17 @@ static guint string_to_fmt (char *value)
   return fmt;
 }
 
+static guint display_fmt_to_v4l2_fmt (guint display_fmt)
+{
+  guint fmt = 0;
+  if (display_fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'P'))
+    fmt = V4L2_PIX_FMT_RGB565;
+  else if (display_fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'x'))
+    fmt = V4L2_PIX_FMT_RGB32;
+
+  return fmt;
+}
+
 gint scan_displays(gpointer **phandle, gint *pcount)
 {
   GstsutilsEntry *entry = NULL;
@@ -241,7 +252,14 @@ gint init_display (gpointer display)
   rect.left = rect.top = 0;
   rect.width = hdisplay->w;
   rect.height = hdisplay->h;
-  if (gst_imx_v4l2out_config_input (hdisplay->v4l2handle, hdisplay->fmt, hdisplay->w, hdisplay->h, &rect) < 0) {
+
+  guint fmt = display_fmt_to_v4l2_fmt(hdisplay->fmt);
+  if (0 == fmt) {
+    GST_ERROR ("Unsupported display format, check the display config file.");
+    goto err;
+  }
+
+  if (gst_imx_v4l2out_config_input (hdisplay->v4l2handle, fmt, hdisplay->w, hdisplay->h, &rect) < 0) {
     GST_ERROR ("configure v4l2 device %s input failed.", hdisplay->device);
     goto err;
   }
