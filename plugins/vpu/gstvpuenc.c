@@ -64,8 +64,8 @@ static GstStaticPadTemplate static_sink_template = GST_STATIC_PAD_TEMPLATE(
 	GST_STATIC_CAPS(
 		"video/x-raw,"
 		"format = (string) { NV12, I420, YV12 }, "
-		"width = (int) [ 48, 1920, 8 ], "
-		"height = (int) [ 32, 1080, 8 ], "
+		"width = (int) [ 64, 1920, 8 ], "
+		"height = (int) [ 64, 1088, 8 ], "
 		"framerate = (fraction) [ 0, MAX ]"
 	)
 );
@@ -82,14 +82,14 @@ static GstStaticPadTemplate static_src_template = GST_STATIC_PAD_TEMPLATE(
 		"video/mpeg, "
 		"mpegversion = (int) 4," 
 		"systemstream = (boolean) false, "
-		"width = (int) [ 48, 1920, 8 ], "
-		"height = (int) [ 32, 1080, 8 ], "
+		"width = (int) [ 64, 1920, 8 ], "
+		"height = (int) [ 64, 1088, 8 ], "
 		"framerate = (fraction) [ 0, MAX ]; "
 
 		"video/x-h263, "
 		"variant = (string) itu, "
-		"width = (int) [ 48, 1920, 8 ], "
-		"height = (int) [ 32, 1080, 8 ], "
+		"width = (int) [ 64, 1920, 8 ], "
+		"height = (int) [ 64, 1088, 8 ], "
 		"framerate = (fraction) [ 0, MAX ]; "
 
 		"image/jpeg; "
@@ -515,8 +515,8 @@ gst_vpu_enc_set_caps (GstVideoEncoder * benc, guint8 * codec_data, gint codec_da
 
   out_caps = gst_vpu_enc_decide_output_caps(benc);
   s = gst_caps_get_structure (out_caps, 0);
-  gst_structure_set (s, "width", G_TYPE_INT, GST_VIDEO_INFO_WIDTH(&(enc->state->info)), NULL);
-  gst_structure_set (s, "height", G_TYPE_INT, GST_VIDEO_INFO_HEIGHT(&(enc->state->info)), NULL);
+  gst_structure_set (s, "width", G_TYPE_INT, enc->open_param.nPicWidth, NULL);
+  gst_structure_set (s, "height", G_TYPE_INT, enc->open_param.nPicHeight, NULL);
   gst_structure_set (s, "framerate", GST_TYPE_FRACTION, \
       GST_VIDEO_INFO_FPS_N(&(enc->state->info)), \
       GST_VIDEO_INFO_FPS_D(&(enc->state->info)), NULL);
@@ -555,7 +555,6 @@ gst_vpu_enc_set_format (GstVideoEncoder * benc, GstVideoCodecState * state)
   GstVpuEnc *enc = (GstVpuEnc *) benc;
   const gchar *video_format_str = NULL;
   GstStructure *s;
-  VpuEncRetCode ret;
 	
 	if (!gst_vpu_enc_reset (enc)) {
 		GST_ERROR_OBJECT (enc, "gst_vpu_enc_reset fail.");
@@ -589,6 +588,17 @@ gst_vpu_enc_set_format (GstVideoEncoder * benc, GstVideoCodecState * state)
 	GST_INFO_OBJECT(enc, "setting bitrate to %u kbps and GOP size to %u", \
       enc->open_param.nBitRate, enc->open_param.nGOPSize);
 
+	enc->state = gst_video_codec_state_ref(state);
+
+	return TRUE;
+}
+
+static gboolean
+gst_vpu_enc_open_vpu (GstVideoEncoder * benc)
+{
+  GstVpuEnc *enc = (GstVpuEnc *) benc;
+  VpuEncRetCode ret;
+
 	ret = VPU_EncOpenSimp(&(enc->handle), &(enc->vpu_internal_mem.mem_info), \
       &(enc->open_param));
 	if (ret != VPU_ENC_RET_SUCCESS) {
@@ -610,8 +620,6 @@ gst_vpu_enc_set_format (GstVideoEncoder * benc, GstVideoCodecState * state)
         gst_vpu_enc_strerror(ret));
 		return FALSE;
 	}
-
-	enc->state = gst_video_codec_state_ref(state);
 
   if (!gst_vpu_enc_set_caps(benc, NULL, 0)) {
     GST_ERROR_OBJECT(enc, "gst_vpu_enc_set_caps fail.");
@@ -752,12 +760,26 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 	VpuEncRetCode enc_ret;
 	VpuEncEncParam enc_enc_param;
 	VpuFrameBuffer input_framebuf;
+  GstVideoCropMeta *cropmeta = NULL;
 	GstBuffer *input_buffer;
 	GstBuffer *pool_buffer = NULL;
 	gint src_stride;
 
 	memset(&enc_enc_param, 0, sizeof(enc_enc_param));
 	memset(&input_framebuf, 0, sizeof(input_framebuf));
+
+  cropmeta = gst_buffer_get_video_crop_meta (frame->input_buffer);
+  if (cropmeta) {
+    enc->open_param.nPicWidth = cropmeta->width;
+    enc->open_param.nPicHeight = cropmeta->height;
+  }
+
+  if (!enc->handle) {
+    if (!gst_vpu_enc_open_vpu (benc)) {
+      GST_ERROR_OBJECT (enc, "gst_vpu_enc_open_vpu failed.");
+      return GST_FLOW_ERROR;
+    }
+  }
 
   if (!gst_buffer_is_phymem (frame->input_buffer)) {
     GstVideoInfo info = enc->state->info;
@@ -853,6 +875,9 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 	enc_enc_param.eFormat = enc->open_param.eFormat;
 	enc_enc_param.nQuantParam = enc->quant;
 	enc_enc_param.nForceIPicture = 0;
+
+  GST_DEBUG_OBJECT(enc, "VPU enc width: %d, height: %d", \
+    enc_enc_param.nPicWidth, enc_enc_param.nPicHeight);
 
 	if (GST_VIDEO_CODEC_FRAME_IS_FORCE_KEYFRAME(frame) \
       || GST_VIDEO_CODEC_FRAME_IS_FORCE_KEYFRAME_HEADERS(frame) \
