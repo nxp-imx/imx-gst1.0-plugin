@@ -161,7 +161,7 @@ compositor_check_list_draw_area (CompositorHandle *hcompositor)
     GST_DEBUG ("surface list node%d %p", i++, list);
     list->single = TRUE;
     list->hide = FALSE;
-    list->update = TRUE;
+    list->update = FALSE;
     compositor_check_surface_draw_area (hcompositor, list);
     list = list->next;
   }
@@ -230,6 +230,11 @@ static gpointer compositor_do_compositing_surface_list (CompositorHandle *hcompo
   while (list) {
     surface = list;
     list = list->next;
+
+    if (NULL == surface->buffer.paddr) {
+      GST_WARNING ("Surface is empty, don't need update.");
+      continue;
+    }
 
     if (surface->hide) {
       GST_DEBUG ("surface is hide");
