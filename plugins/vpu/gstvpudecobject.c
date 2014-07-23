@@ -1164,6 +1164,15 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
     }
     if (buf_ret & VPU_DEC_NO_ENOUGH_INBUF) {
       GST_LOG_OBJECT (vpu_dec_object, "Got not enough input message!!");
+      if (vpu_dec_object->state < STATE_REGISTRIED_FRAME_BUFFER) {
+        GST_WARNING_OBJECT (vpu_dec_object, "Dropped video frame before VPU init ok!");
+        ret = gst_vpu_dec_object_send_output (vpu_dec_object, bdec, TRUE);
+        if (ret != GST_FLOW_OK) {
+          GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_send_output fail: %s\n", \
+              gst_flow_get_name (ret));
+          return ret;
+        }
+      }
       break;
     }
     if (((buf_ret & VPU_DEC_INPUT_USED)) && frame) {
