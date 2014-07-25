@@ -54,6 +54,7 @@ imx_v4l2_free_memory (GstAllocatorPhyMem *allocator, PhyMemBlock *phy_mem)
   IMXV4l2AllocatorContext *context = &v4l2_allocator->context;
 
   gst_imx_v4l2_free_buffer (context->v4l2_handle, phy_mem);
+  memset(phy_mem, 0, sizeof(PhyMemBlock));
   v4l2_allocator->allocated --;
 
   return 0;

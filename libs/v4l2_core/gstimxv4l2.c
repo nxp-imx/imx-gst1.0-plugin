@@ -459,6 +459,7 @@ imx_pxp_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint colo
 
   if (ioctl(fd, FBIOGET_VSCREENINFO, &fbVar) < 0) {
     GST_ERROR("get vscreen info failed.");
+    close(fd);
     return;
   } else {
     if (fbVar.bits_per_pixel == 16) {
@@ -481,6 +482,7 @@ imx_pxp_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint colo
 
   if (ioctl(handle->v4l2_fd, VIDIOC_S_FBUF, &fb) < 0) {
     GST_ERROR ("VIDIOC_S_FBUF failed.");
+    close(fd);
     return;
   }
 
@@ -495,6 +497,8 @@ imx_pxp_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint colo
   v4l2fmt.fmt.win.w.height = handle->in_crop.height;
   if (ioctl(handle->v4l2_fd, VIDIOC_S_FMT, &v4l2fmt) < 0)
     GST_ERROR ("Set VIDIOC_S_FMT output overlay failed.");
+
+  close(fd);
 }
 
 gchar *
@@ -1375,7 +1379,7 @@ static void * gst_imx_v4l2_find_buffer(gpointer v4l2handle, PhyMemBlock *memblk)
   struct v4l2_buffer *v4l2buf;
   gint i;
 
-  for(i=0; i<handle->allocated && i<MAX_BUFFER; i++) {
+  for(i=0; i<MAX_BUFFER; i++) {
     v4l2buf = &handle->buffer_pair[i].v4l2buffer;
     if ((v4l2buf->memory == V4L2_MEMORY_MMAP && v4l2buf->m.offset == memblk->paddr)
         || (v4l2buf->memory == V4L2_MEMORY_USERPTR && v4l2buf->m.userptr == memblk->paddr)) {
@@ -1444,7 +1448,7 @@ gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   }
   memblk->paddr = (guint8*) v4l2buf->m.offset;
 
-  GST_DEBUG ("Allocated v4l2buffer(%p), index(%d), vaddr(%p), paddr(%p), size(%d).", 
+  GST_DEBUG ("Allocated v4l2buffer(%p), index(%d), vaddr(%p), paddr(%p), size(%d).",
       v4l2buf, handle->allocated - 1, memblk->vaddr, memblk->paddr, memblk->size);
 
   return 0;
@@ -1485,18 +1489,20 @@ gint gst_imx_v4l2_free_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
   struct v4l2_buffer *v4l2buf;
 
+  v4l2buf =  (struct v4l2_buffer *)gst_imx_v4l2_find_buffer(v4l2handle, memblk);
+
   if (memblk->vaddr)
     munmap(memblk->vaddr, memblk->size);
+
+  if (v4l2buf) {
+    GST_DEBUG ("Free v4l2buffer(%p), index(%d).", v4l2buf, v4l2buf->index);
+    memset (v4l2buf, 0, sizeof(struct v4l2_buffer));
+  }
+
   handle->allocated --;
   if (handle->allocated < 0) {
     GST_ERROR ("freed buffer more than allocated.");
     handle->allocated = 0;
-  }
-
-  v4l2buf =  (struct v4l2_buffer *)gst_imx_v4l2_find_buffer(v4l2handle, memblk);
-  if (v4l2buf) {
-    GST_DEBUG ("Free v4l2buffer(%p), index(%d).", v4l2buf, v4l2buf->index);
-    memset (v4l2buf, 0, sizeof(struct v4l2_buffer));
   }
 
   return 0;

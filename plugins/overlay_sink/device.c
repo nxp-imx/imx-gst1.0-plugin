@@ -213,6 +213,7 @@ g2d_device_blit_surface (gpointer device, gpointer surface, SurfaceBuffer *buffe
       break;
     default:
       GST_ERROR ("not supported format.");
+      g2d_close (g2d_handle);
       return -1;
   }
 
