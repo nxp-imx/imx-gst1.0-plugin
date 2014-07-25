@@ -205,7 +205,7 @@ gst_beep_dec_class_init (GstBeepDecClass * klass)
 static void
 gst_beep_dec_init (GstBeepDec * dec)
 {
-    gst_audio_decoder_set_tolerance(GST_AUDIO_DECODER_CAST(dec),200000000);
+    gst_audio_decoder_set_tolerance(GST_AUDIO_DECODER_CAST(dec),400000000);
     gstsutils_load_default_property(beep_property,GST_AUDIO_DECODER_CAST(dec),
         FSL_GST_CONF_DEFAULT_FILENAME,"beepdec");
 
@@ -693,7 +693,7 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
     GstMapInfo map;
     gboolean twice = FALSE;
     beepdec = GST_BEEP_DEC (dec);
-
+    gboolean sent = FALSE;
     if(!beepdec)
         goto bail;
     
@@ -738,6 +738,7 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
             beepdec->frame_cnt ++;
             buffer = NULL;
             beepdec->in_cnt--;
+            sent=TRUE;
             ret = gst_audio_decoder_finish_frame (dec, NULL, 1);
             goto bail;
         }else if(beepdec->frame_cnt == VORBIS_HEADER_FRAME){
@@ -780,6 +781,7 @@ begin:
             beepdec->in_cnt--;
             beepdec->err_cnt ++;
             ret = gst_audio_decoder_finish_frame (dec, NULL, 1);
+            sent = TRUE;
             break;
         }else if(core_ret == ACODEC_PROFILE_NOT_SUPPORT){
             beepdec->err_cnt += 4;
@@ -807,6 +809,7 @@ begin:
            {
                 beepdec->in_cnt--;
                 ret = gst_audio_decoder_finish_frame (dec, temp_buffer, 1);
+                  sent = TRUE;
                 GST_LOG_OBJECT (beepdec,"output one frame[%d] size=%d",beepdec->in_cnt,out_size);
            }else{
                 gst_adapter_push (beepdec->adapter, temp_buffer);
@@ -834,11 +837,14 @@ begin:
     if(adapter_size > 0){
         out = gst_adapter_take_buffer (beepdec->adapter, adapter_size);
         beepdec->in_cnt--;
+        sent=TRUE;
         ret = gst_audio_decoder_finish_frame (dec, out, 1);
         gst_adapter_clear (beepdec->adapter);
         GST_LOG_OBJECT (beepdec,"output frames[%d] size=%d",beepdec->in_cnt,adapter_size);
-    }else{
-        //gst_audio_decoder_finish_frame (dec, NULL, 1);
+    }else if (sent == FALSE && (!strcmp(IDecoder->name,"wma") ) ){
+        beepdec->in_cnt--;
+        gst_audio_decoder_finish_frame (dec, NULL, 1); 
+        sent=TRUE;
         GST_LOG_OBJECT (beepdec,"beep_dec_parse_and_decode ret=%x",ret);
     }
 
