@@ -7,7 +7,7 @@ libgstavb_la_SOURCES =  gstavbplugin.c gstavbsink.c gstavbpcmsink.c gstavbmpegts
 libgstavb_la_CFLAGS =  $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS) -I$(top_srcdir)/libs -I$(top_srcdir)/ext-includes
 libgstavb_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) $(GST_BASE_LIBS) $(GST_NET_LIBS) $(GIO_LIBS) -lgstaudio-$(GST_API_VERSION) 
 libgstavb_la_CPPFLAGS = $(GST_LIBS_CPPFLAGS)
-libgstavb_la_LIBADD += $(top_srcdir)/libs/libgstfsl-@GST_API_VERSION@.la
+libgstavb_la_LIBADD += ../../libs/libgstfsl-@GST_API_VERSION@.la
 libgstavb_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstavb_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 
