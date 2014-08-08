@@ -186,12 +186,20 @@ static fsl_player_bool poll_for_state_change(fsl_player_property* pproperty ,Gst
         g_print("Wait status change from %d to %d \n", current, sRecState);
         if(pproperty->abort){
             pproperty->abort = FSL_PLAYER_FALSE;
+            if( NULL != ele_name )
+            {
+                g_free(ele_name);
+            }
             return FSL_PLAYER_FALSE;
             }
         }
 
         else{
           g_print("state change failed from %d to %d \n", current, sRecState);
+          if( NULL != ele_name )
+          {
+              g_free(ele_name);
+          }
           return FSL_PLAYER_FALSE;
         }
         //FSL_PLAYER_PRINT( "\ntimeescap=%d.Element %s time out in state transferring from %s to %s\n", 

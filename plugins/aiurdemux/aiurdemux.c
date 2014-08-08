@@ -519,15 +519,6 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
       demux->state = AIURDEMUX_STATE_PROBE;
       demux->pullbased = FALSE;
 
-
-      demux->play_mode = AIUR_PLAY_MODE_NORMAL;
-      demux->valid_mask = 0;
-      demux->n_streams = 0;
-      demux->n_video_streams = 0;
-      demux->n_audio_streams = 0;
-      demux->n_sub_streams = 0;
-
-      
       if (demux->tag_list)
         gst_tag_list_unref (demux->tag_list);
       
@@ -538,6 +529,13 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
       demux->content_info = NULL;
       
       gst_segment_init (&demux->segment, GST_FORMAT_TIME);
+
+      demux->play_mode = AIUR_PLAY_MODE_NORMAL;
+      demux->valid_mask = 0;
+      demux->n_streams = 0;
+      demux->n_video_streams = 0;
+      demux->n_audio_streams = 0;
+      demux->n_sub_streams = 0;
 
       break;
     }

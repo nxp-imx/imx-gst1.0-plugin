@@ -546,6 +546,8 @@ static void aiurcontent_query_content_info (AiurContent *pContent)
   }
   gst_query_unref (q);
 
+  gst_object_unref (GST_OBJECT_CAST (pad));
+
   prefix = (gchar *)getenv ("HOME");
 
   if (prefix == NULL)

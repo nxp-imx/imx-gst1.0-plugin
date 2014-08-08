@@ -167,6 +167,7 @@ gst_beep_dec_sink_pad_template (void)
 
     if (caps) {
       templ = gst_pad_template_new ("sink", GST_PAD_SINK, GST_PAD_ALWAYS, caps);
+      gst_caps_unref(caps);
     }
   }
   return templ;

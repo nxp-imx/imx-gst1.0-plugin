@@ -193,6 +193,7 @@ static GstCaps * aiur_get_caps_from_entry(GstsutilsEntry * entry)
       continue;
     }
     if(!gstsutils_get_value_by_key(group,FSL_KEY_LIB,&libname)){
+      g_free(mime);
       continue;
     }
     dlhandle = dlopen (libname, RTLD_LAZY);
