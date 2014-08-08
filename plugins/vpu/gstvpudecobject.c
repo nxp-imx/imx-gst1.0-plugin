@@ -26,6 +26,8 @@ GST_DEBUG_CATEGORY_STATIC(vpu_dec_object_debug);
 #define GST_CAT_DEFAULT vpu_dec_object_debug
 
 #define VPUDEC_TS_BUFFER_LENGTH_DEFAULT (1024)
+#define MAX_BUFFERED_DURATION_IN_VPU (3*1000000000ll)
+#define MAX_BUFFERED_COUNT_IN_VPU (100)
 #define MASAIC_THRESHOLD (30)
 //FIXME: relate with frame plus?
 #define DROP_RESUME (200 * GST_MSECOND)
@@ -158,6 +160,7 @@ gst_vpu_dec_object_init(GstVpuDecObject *vpu_dec_object)
   vpu_dec_object->mosaic_cnt = 0;
   vpu_dec_object->tsm_mode = MODE_AI;
   vpu_dec_object->last_valid_ts = 0;
+  vpu_dec_object->last_received_ts = 0;
   vpu_dec_object->vpu_internal_mem.internal_virt_mem = NULL;
   vpu_dec_object->vpu_internal_mem.internal_phy_mem = NULL;
   vpu_dec_object->mv_mem = NULL;
@@ -999,6 +1002,7 @@ gst_vpu_dec_object_handle_input_time_stamp (GstVpuDecObject * vpu_dec_object, \
     } else {
       TSManagerReceive (vpu_dec_object->tsm, GST_BUFFER_TIMESTAMP (buffer));
     }
+    vpu_dec_object->last_received_ts = GST_BUFFER_TIMESTAMP (buffer);
   }
 
   gst_buffer_unmap (buffer, &minfo);
@@ -1067,8 +1071,11 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
   }
 
   while (1) {
+    gint64 start_time;
 
     GST_DEBUG_OBJECT(vpu_dec_object, "in data: %d \n", in_data.nSize);
+
+    start_time = g_get_monotonic_time ();
 
     dec_ret = VPU_DecDecodeBuf(vpu_dec_object->handle, &in_data, &buf_ret);
     if (dec_ret != VPU_DEC_RET_SUCCESS) {
@@ -1077,7 +1084,8 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
       return GST_FLOW_ERROR;
     }
 
-    GST_DEBUG_OBJECT(vpu_dec_object, "buf status: 0x%x \n", buf_ret);
+    GST_DEBUG_OBJECT(vpu_dec_object, "buf status: 0x%x time: %lld\n", \
+        buf_ret, g_get_monotonic_time () - start_time);
 
     if ((vpu_dec_object->use_new_tsm) && (buf_ret & VPU_DEC_ONE_FRM_CONSUMED)) {
       if (!gst_vpu_dec_object_set_tsm_consumed_len (vpu_dec_object)) {
@@ -1176,8 +1184,17 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
       break;
     }
     if (((buf_ret & VPU_DEC_INPUT_USED)) && frame) {
+      gboolean bRetry = FALSE;
       GST_LOG_OBJECT (vpu_dec_object, "Got VPU_DEC_INPUT_USED!!");
-      if (vpu_dec_object->low_latency == FALSE) {
+      if (GST_CLOCK_TIME_IS_VALID(vpu_dec_object->last_received_ts)) {
+        if (vpu_dec_object->last_received_ts - getTSManagerPosition ( \
+              vpu_dec_object->tsm) > MAX_BUFFERED_DURATION_IN_VPU)
+          bRetry = TRUE;
+      } else {
+        if (getTSManagerPreBufferCnt (vpu_dec_object->tsm) > MAX_BUFFERED_COUNT_IN_VPU)
+          bRetry = TRUE;
+      }
+      if (vpu_dec_object->low_latency == FALSE && bRetry == FALSE) {
         break;
       } else {
         if (in_data.nSize) {

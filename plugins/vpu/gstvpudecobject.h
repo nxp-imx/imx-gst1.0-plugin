@@ -98,6 +98,7 @@ struct _GstVpuDecObject {
   void *tsm;
   TSMGR_MODE tsm_mode;
   GstClockTime last_valid_ts;
+  GstClockTime last_received_ts;
 };
 
 struct _GstVpuDecObjectClass {
