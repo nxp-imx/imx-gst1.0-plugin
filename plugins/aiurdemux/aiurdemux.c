@@ -2864,8 +2864,11 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
     gst_segment_init (&segment, GST_FORMAT_TIME);
 
   if (demux->segment.rate >= 0) {
+    if (demux->play_mode == AIUR_PLAY_MODE_TRICK_FORWARD && stream->type == MEDIA_AUDIO) {
+      stream->new_segment = FALSE;
+      return;
+    }
 
-    
     if (stream->buffer) {
 
       if ((GST_CLOCK_TIME_IS_VALID (GST_BUFFER_TIMESTAMP (stream->buffer)))
@@ -2886,8 +2889,13 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
     segment.format = GST_FORMAT_TIME;
     segment.rate = demux->segment.rate;
     segment.start = stream->time_position;
-    segment.stop = GST_CLOCK_TIME_NONE;
+    if (stream->track_duration) {
+      segment.stop = stream->track_duration;
+    } else {
+      segment.stop = GST_CLOCK_TIME_NONE;
+    }
     segment.position = segment.time = stream->time_position;
+    GST_DEBUG ("segment event %" GST_SEGMENT_FORMAT, &segment);
     gst_pad_push_event (stream->pad, gst_event_new_segment (&segment));
   } else {
     if(stream->type == MEDIA_AUDIO){
@@ -2905,6 +2913,7 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
     segment.start = 0;
     segment.stop = stream->time_position;
     segment.position = segment.time = 0;
+    GST_DEBUG ("segment event %" GST_SEGMENT_FORMAT, &segment);
     gst_pad_push_event (stream->pad, gst_event_new_segment (&segment));
   }
   stream->new_segment = FALSE;
