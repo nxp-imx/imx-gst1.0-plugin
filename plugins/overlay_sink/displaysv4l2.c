@@ -292,7 +292,7 @@ gint init_display (gpointer display)
   return 0;
 
 err:
-    deinit_display (hdisplay->v4l2handle);
+    deinit_display (display);
     return -1;
 }
 
@@ -308,8 +308,10 @@ void deinit_display (gpointer display)
     }
   }
 
-  gst_imx_v4l2_close_device (hdisplay->v4l2handle);
-  hdisplay->v4l2handle = NULL;
+  if (hdisplay->v4l2handle) {
+    gst_imx_v4l2_close_device (hdisplay->v4l2handle);
+    hdisplay->v4l2handle = NULL;
+  }
 
   return;
 }
