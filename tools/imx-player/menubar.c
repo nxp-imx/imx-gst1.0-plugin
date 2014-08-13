@@ -543,11 +543,11 @@ void menubar_create(void *imxplayer)
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(rotate_90), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->rotatemenu), item);
 
-  item = gtk_menu_item_new_with_label("Rotate 90");
+  item = gtk_menu_item_new_with_label("Rotate 180");
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(rotate_180), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->rotatemenu), item);
 
-  item = gtk_menu_item_new_with_label("Rotate 90");
+  item = gtk_menu_item_new_with_label("Rotate 270");
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(rotate_270), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->rotatemenu), item);
 
