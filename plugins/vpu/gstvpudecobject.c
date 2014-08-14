@@ -167,6 +167,7 @@ gst_vpu_dec_object_init(GstVpuDecObject *vpu_dec_object)
   vpu_dec_object->gstbuffer_in_vpudec = NULL;
   vpu_dec_object->system_frame_number_in_vpu = NULL;
   vpu_dec_object->dropping = FALSE;
+  vpu_dec_object->vpu_report_resolution_change = FALSE; 
 }
 
 static void 
@@ -535,7 +536,8 @@ gst_vpu_dec_object_config (GstVpuDecObject * vpu_dec_object, \
     state = vpu_dec_object->input_state;
   }
 
-  if (vpu_dec_object->state >= STATE_REGISTRIED_FRAME_BUFFER) {
+  if (vpu_dec_object->vpu_report_resolution_change == FALSE \
+      && vpu_dec_object->state >= STATE_REGISTRIED_FRAME_BUFFER) {
     dec_ret = VPU_DecClose(vpu_dec_object->handle);
     if (dec_ret != VPU_DEC_RET_SUCCESS) {
       GST_ERROR_OBJECT(vpu_dec_object, "closing decoder failed: %s", \
@@ -700,6 +702,11 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
     GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer get from buffer pool: %x\n", buffer);
     GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer_in_vpudec list length: %d actual_buf_cnt: %d \n", \
         g_list_length (vpu_dec_object->gstbuffer_in_vpudec), vpu_dec_object->actual_buf_cnt);
+  }
+
+  if (!gst_vpu_dec_object_free_mv_buffer(vpu_dec_object)) {
+    GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_free_mv_buffer fail");
+    return GST_FLOW_ERROR;
   }
 
   if (!gst_vpu_dec_object_allocate_mv_buffer(vpu_dec_object)) {
@@ -1105,7 +1112,10 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
 
     if (buf_ret & VPU_DEC_INIT_OK \
         || buf_ret & VPU_DEC_RESOLUTION_CHANGED) {
+      if (buf_ret & VPU_DEC_RESOLUTION_CHANGED)
+        vpu_dec_object->vpu_report_resolution_change = TRUE; 
       ret = gst_vpu_dec_object_handle_reconfig(vpu_dec_object, bdec);
+      vpu_dec_object->vpu_report_resolution_change = FALSE; 
       if (ret != GST_FLOW_OK) {
         GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_handle_reconfig fail: %s\n", \
             gst_flow_get_name (ret));

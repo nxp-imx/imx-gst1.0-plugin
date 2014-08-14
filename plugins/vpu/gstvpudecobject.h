@@ -95,6 +95,7 @@ struct _GstVpuDecObject {
   gboolean chroma_interleaved;
   gboolean new_segment;
   gboolean dropping;
+  gboolean vpu_report_resolution_change; 
   void *tsm;
   TSMGR_MODE tsm_mode;
   GstClockTime last_valid_ts;
