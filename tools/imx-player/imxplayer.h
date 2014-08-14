@@ -37,9 +37,9 @@
 //#define REMOVE_WINDOW_MANAGER_DECORATION
 //#define ENABLE_SET_COLOR_KEY
 
-#define INFO_BOX_W      300
-#define INFO_BOX_H      320
-#define PLAYLISTBOX_W   300
+#define INFO_BOX_W      500
+#define INFO_BOX_H      300
+#define PLAYLISTBOX_W   INFO_BOX_W
 #define PLAYLISTBOX_H   400
 #define SUBTITLE_BOX_W  800
 #define SUBTITLE_BOX_H  50
@@ -55,7 +55,6 @@ typedef struct
   GtkWidget *video_win;
 
   MenuBar menubar;
-  //GtkWidget *toolbar;
   CtrlBar ctrlbar;
   InfoBox infobox;
   VolumeBar volumebar;
@@ -67,12 +66,13 @@ typedef struct
   imx_metadata meta;
 
   gboolean fullscreen;
-  gboolean metainfo_refresh;
+//  gboolean metainfo_refresh;
   gboolean show_info;
   gboolean show_ctrlbar;
   gboolean show_menubar;
   gboolean show_playlist;
   gboolean show_volbar;
+  gboolean show_subtitle;
   gint video_x;
   gint video_y;
   gint video_w;

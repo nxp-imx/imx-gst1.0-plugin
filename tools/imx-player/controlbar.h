@@ -23,12 +23,22 @@
 #ifndef CONTROLBAR_H_
 #define CONTROLBAR_H_
 
+//#define ENABLE_STOP_BUTTON
+//#define USE_IDLE_SEEK
+
 #define CTRLBAR_BOTTON_W      50
 #define CTRLBAR_BOTTON_H      50
 #define CTRLBAR_BOTTON_GAP    1
-#define CTRLBAR_PROGRESS_H    30
+#define CTRLBAR_PROGRESS_H    50
 #define CTRLBAR_PROGRESS_GAP  1
+
+#ifdef ENABLE_STOP_BUTTON
 #define NUM_OF_BUTTONS        13
+#else
+#define NUM_OF_BUTTONS        12
+#endif
+
+#define CTRLBAR_TIME_W        120
 
 #define CTRLBAR_H (CTRLBAR_BOTTON_H + CTRLBAR_PROGRESS_GAP + CTRLBAR_PROGRESS_H)
 #define CTRLBAR_W ((CTRLBAR_BOTTON_W + CTRLBAR_BOTTON_GAP) * NUM_OF_BUTTONS \
@@ -42,7 +52,9 @@ typedef struct
   GtkWidget *progress;
   GtkWidget *current;
   GtkWidget *duration;
+#ifdef ENABLE_STOP_BUTTON
   GtkWidget *play_stop;
+#endif
   GtkWidget *play_pause;
   GtkWidget *trick_forward;
   GtkWidget *trick_backward;

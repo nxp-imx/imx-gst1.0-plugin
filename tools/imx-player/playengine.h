@@ -28,6 +28,8 @@
 //#define PREPARE_WINDOW_MESSAGE
 //#define ENABLE_OVERLAY_INTERNEL_WINDOW
 //#define VIDEO_SINK_V4L2SINK
+//#define GET_STREAM_INFO_FROM_TAGS
+//#define PRINT_STREAM_INFO
 
 extern void gtk_main_quit(void);
 
@@ -41,8 +43,10 @@ extern void gtk_main_quit(void);
 
 #define METADATA_ITEM_SIZE_LARGE 256
 #define METADATA_ITEM_SIZE_SMALL 64
-#define AUDIO_STREAM_MAX         10
-#define SUBTITLE_STREAM_MAX      10
+
+#define MAX_AUDIO_TRACK_COUNT     8
+#define MAX_VIDEO_TRACK_COUNT     8
+#define MAX_SUBTITLE_TRACK_COUNT  8
 
 typedef enum
 {
@@ -56,14 +60,42 @@ typedef enum
   PLAYENGINE_INVALID
 } PlayEngineState;
 
+/* audio stream info */
+typedef struct {
+  gchar codec_type[METADATA_ITEM_SIZE_SMALL];
+  gchar language[METADATA_ITEM_SIZE_SMALL];
+  gint samplerate;
+  gint channels;
+  guint bitrate;
+} imx_audio_info;
+
+/* video stream info */
+typedef struct {
+  gchar codec_type[METADATA_ITEM_SIZE_SMALL];
+  gchar language[METADATA_ITEM_SIZE_SMALL];
+  gint width;
+  gint height;
+  gint framerate_numerator;
+  gint framerate_denominator;
+  guint bitrate;
+} imx_video_info;
+
+/* subtitle stream info */
+typedef struct {
+  gchar codec_type[METADATA_ITEM_SIZE_SMALL];
+  gchar language[METADATA_ITEM_SIZE_SMALL];
+} imx_subtitle_info;
+
 typedef struct
 {
+    gchar container[METADATA_ITEM_SIZE_SMALL];
     gchar pathname[METADATA_ITEM_SIZE_LARGE];
     gchar title[METADATA_ITEM_SIZE_LARGE];
     gchar artist[METADATA_ITEM_SIZE_LARGE];
     gchar album[METADATA_ITEM_SIZE_LARGE];
     gchar year[METADATA_ITEM_SIZE_SMALL];
     gchar genre[METADATA_ITEM_SIZE_SMALL];
+#ifdef GET_STREAM_INFO_FROM_TAGS
     gint width;
     gint height;
     gint framerate;
@@ -73,6 +105,13 @@ typedef struct
     gint samplerate;
     gint audiobitrate;
     gchar audiocodec[METADATA_ITEM_SIZE_SMALL];
+#endif
+    gint n_audio;
+    gint n_video;
+    gint n_subtitle;
+    imx_audio_info audio_info[MAX_AUDIO_TRACK_COUNT];
+    imx_video_info video_info[MAX_VIDEO_TRACK_COUNT];
+    imx_subtitle_info subtitle_info[MAX_SUBTITLE_TRACK_COUNT];
 } imx_metadata;
 
 typedef struct _play_engine
@@ -80,17 +119,12 @@ typedef struct _play_engine
   GstElement *pipeline;
   GstElement *bin;
   GstElement *video_sink;
-  imx_metadata metadata;
+  imx_metadata meta;
   gint64 duration;
   double play_rate;
-  gint n_video;
-  gint n_audio;
-  gint n_text;
   gint cur_video;
   gint cur_audio;
-  gint cur_text;
-  gchar audio_lang[AUDIO_STREAM_MAX][METADATA_ITEM_SIZE_SMALL];
-  gchar text_lang[SUBTITLE_STREAM_MAX][METADATA_ITEM_SIZE_SMALL];
+  gint cur_subtitle;
   void *player;
 #ifdef PREPARE_WINDOW_MESSAGE
   guintptr video_window_handle;
@@ -113,6 +147,9 @@ typedef struct _play_engine
   gint (*get_subtitle_num) (struct _play_engine *engine);
   gint (*get_audio_num) (struct _play_engine *engine);
   gint (*get_video_num) (struct _play_engine *engine);
+  gint (*get_cur_subtitle_no) (struct _play_engine *engine);
+  gint (*get_cur_audio_no) (struct _play_engine *engine);
+  gint (*get_cur_video_no) (struct _play_engine *engine);
   void (*select_subtitle) (struct _play_engine *engine, gint text_no);
   void (*select_audio) (struct _play_engine *engine, gint audio_no);
   void (*select_video) (struct _play_engine *engine, gint video_no);
@@ -128,10 +165,14 @@ typedef struct _play_engine
 
   void (*error_cb) (void* player, const gchar *error_str);
   void (*eos_cb) (void* player);
+  void (*state_change_cb) (void* player,
+                           GstState old_s, GstState new_s, GstState pending_s);
 } play_engine;
 
 play_engine * play_engine_create(int *argc, char **argv[],
-              void (*eos_cb)(void *), void (*error_cb)(void *, const gchar *));
+              void (*eos_cb)(void *),
+              void (*error_cb)(void *, const gchar *),
+              void (*state_change_cb)(void *, GstState, GstState, GstState));
 void play_engine_destroy(play_engine *engine);
 
 #endif /* IMX_PLAY_ENGINE_H */

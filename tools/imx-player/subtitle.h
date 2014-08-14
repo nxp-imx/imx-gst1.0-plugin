@@ -23,6 +23,8 @@
 #ifndef SUBTITLE_H_
 #define SUBTITLE_H_
 
+#define  SUBTITLE_Y_PROPOTION 7/8
+
 typedef struct
 {
   GtkWidget *subtitle;

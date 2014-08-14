@@ -20,6 +20,7 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#include <string.h>
 #include "imxplayer.h"
 #include "infobox.h"
 
@@ -40,26 +41,16 @@ void infobox_create(void *imxplayer)
                              "Year: \n"
                              "Genre: \n"
                              "Duration: \n"
+                             "Container: \n"
                              "Seekable: \n"
-                             "Number of Videos: \n"
-                             "Number of Audios: \n"
-                             "Number of subtitles: \n"
+                             "Videos: 0, Audios: 0, Subtitles: 0\n"
                              "Video:\n"
-                             "      Width: \n"
-                             "      Height: \n"
-                             "      Frame Rate: xx\n"
-                             "      BitRate: \n"
-                             "      Codec: \n"
                              "Audio:\n"
-                             "      Channels: \n"
-                             "      Sample Rate: \n"
-                             "      Bitrate: \n"
-                             "      Codec: \n"
                              );
   gdk_color_parse ("white", &color);
   gtk_widget_modify_fg (infobox->info_text, GTK_STATE_NORMAL, &color);
   gtk_widget_modify_font(infobox->info_text,
-      pango_font_description_from_string("Tahoma Bold 10"));
+      pango_font_description_from_string("Tahoma Bold 12"));
   gtk_container_add(GTK_CONTAINER(infobox->info_box), infobox->info_text);
 }
 
@@ -74,11 +65,12 @@ void infobox_show(InfoBox *infobox, gboolean show)
 
 void infobox_update(void *imxplayer)
 {
-  char str[1024];
+  char str[INFO_TEXT_LEN_MAX];
+  char s[256];
+  gint ntracks, i;
   ImxPlayer *player = (ImxPlayer *)imxplayer;
-  imx_metadata *meta = &player->meta;
-  player->playengine->get_metadata(player->playengine, meta);
   gint64 dur = player->playengine->get_duration(player->playengine);
+  imx_metadata *meta = &player->meta;
 
   sprintf(str,
       "Title: %s\n"
@@ -87,29 +79,66 @@ void infobox_update(void *imxplayer)
       "Year: %s\n"
       "Genre: %s\n"
       "Duration: %d\n"
+      "Container: %s\n"
       "Seekable: %s\n"
-      "Number of Videos: %d\n"
-      "Number of Audios: %d\n"
-      "Number of subtitles: %d\n"
-      "Video:\n"
-      "      Width: %d\n"
-      "      Height: %d\n"
-      "      Frame Rate: %d\n"
-      "      BitRate: %d\n"
-      "      Codec: %s\n"
-      "Audio:\n"
-      "      Channels: %d\n"
-      "      Sample Rate: %d\n"
-      "      Bitrate: %d\n"
-      "      Codec: %s",
-      meta->title, meta->artist, meta->album,
-      meta->year, meta->genre, (gint)(dur/1000000),
+      "Videos: [%d], Audios: [%d], Subtitles: [%d]\n",
+      meta->title,
+      meta->artist,
+      meta->album,
+      meta->year,
+      meta->genre,
+      (gint)(dur/1000000),
+      meta->container,
       player->playengine->get_seekable(player->playengine) ? "Yes" : "No",
-      player->playengine->get_video_num(player->playengine),
-      player->playengine->get_audio_num(player->playengine),
-      player->playengine->get_subtitle_num(player->playengine), meta->width,
-      meta->height, meta->framerate, meta->videobitrate, meta->videocodec,
-      meta->channels, meta->samplerate, meta->audiobitrate, meta->audiocodec);
+      meta->n_video, meta->n_audio, meta->n_subtitle);
+
+  ntracks = meta->n_video;
+  if (ntracks > MAX_VIDEO_TRACK_COUNT)
+    ntracks = MAX_VIDEO_TRACK_COUNT;
+  for (i = 0; i < ntracks; i++) {
+    sprintf(s, "Video %d: %s, Language: %s\n        %d x %d (%d/%d)",
+               i, meta->video_info[i].codec_type, meta->video_info[i].language,
+               meta->video_info[i].width, meta->video_info[i].height,
+               meta->video_info[i].framerate_numerator,
+               meta->video_info[i].framerate_denominator);
+    strncat(str, s, INFO_TEXT_LEN_MAX);
+
+    if (meta->video_info[i].bitrate || !HIDE_INVALID_INFO) {
+      sprintf(s, ", %d bps\n", meta->video_info[i].bitrate);
+    } else {
+      sprintf(s, "\n");
+    }
+
+    strncat(str, s, INFO_TEXT_LEN_MAX);
+  }
+
+  ntracks = meta->n_audio;
+  if (ntracks > MAX_AUDIO_TRACK_COUNT)
+    ntracks = MAX_AUDIO_TRACK_COUNT;
+  for (i = 0; i < ntracks; i++) {
+    sprintf(s,"Audio %d: %s, Language: %s\n        %d Channels, %d Hz",
+              i, meta->audio_info[i].codec_type, meta->audio_info[i].language,
+              meta->audio_info[i].channels, meta->audio_info[i].samplerate);
+    strncat(str, s, INFO_TEXT_LEN_MAX);
+
+    if (meta->audio_info[i].bitrate || !HIDE_INVALID_INFO) {
+      sprintf(s, ", %d bps\n", meta->audio_info[i].bitrate);
+    } else {
+      sprintf(s, "\n");
+    }
+
+    strncat(str, s, INFO_TEXT_LEN_MAX);
+  }
+
+  ntracks = meta->n_subtitle;
+  if (ntracks > MAX_SUBTITLE_TRACK_COUNT)
+    ntracks = MAX_SUBTITLE_TRACK_COUNT;
+  for (i = 0; i < ntracks; i++) {
+    sprintf(s,"Subtitle %d: %s, Language: %s\n",
+              i, meta->subtitle_info[i].codec_type,
+              meta->subtitle_info[i].language);
+    strncat(str, s, INFO_TEXT_LEN_MAX);
+  }
 
   gtk_label_set_text(GTK_LABEL(player->infobox.info_text), str);
 }

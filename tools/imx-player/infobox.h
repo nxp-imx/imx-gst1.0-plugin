@@ -23,6 +23,9 @@
 #ifndef INFOBOX_H_
 #define INFOBOX_H_
 
+#define INFO_TEXT_LEN_MAX 2048
+#define HIDE_INVALID_INFO 0
+
 typedef struct
 {
   GtkWidget *info_box;

@@ -65,13 +65,17 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
   if (!engine)
     return;
 
-  imx_metadata *meta = &engine->metadata;
+  imx_metadata *meta = &engine->meta;
   for (i = 0; i < count; i++) {
     const GValue *val = gst_tag_list_get_value_index (list, tag, i);
     //g_print ("\t%20s : tag of type %s\n", tag, G_VALUE_TYPE_NAME (val));
     if (G_VALUE_HOLDS_STRING (val)) {
       const gchar *str = g_value_get_string (val);
       if (str) {
+        if( strncmp(gst_tag_get_nick(tag), "container format", 16) == 0 ) {
+          strncpy(meta->container, str, sizeof(meta->container));
+          meta->container[sizeof(meta->container) - 1] = '\0';
+        }
         if (strncmp(gst_tag_get_nick(tag), "location", 8) == 0) {
           strncpy(meta->pathname, str, sizeof(meta->pathname));
           meta->pathname[sizeof(meta->pathname) - 1] = '\0';
@@ -96,6 +100,7 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
           strncpy(meta->genre, str, sizeof(meta->genre));
           meta->genre[sizeof(meta->genre) - 1] = '\0';
         }
+#ifdef GET_STREAM_INFO_FROM_TAGS
         if (strncmp(gst_tag_get_nick(tag), "audio codec", 11) == 0) {
           strncpy(meta->audiocodec, str, sizeof(meta->audiocodec));
           meta->audiocodec[sizeof(meta->audiocodec) - 1] = '\0';
@@ -104,8 +109,11 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
           strncpy(meta->videocodec, str, sizeof(meta->videocodec));
           meta->videocodec[sizeof(meta->videocodec) - 1] = '\0';
         }
+#endif
       }
-    } else if (G_VALUE_HOLDS_UINT (val)) {
+    }
+#ifdef GET_STREAM_INFO_FROM_TAGS
+    else if (G_VALUE_HOLDS_UINT (val)) {
       guint value = g_value_get_uint (val);
       if (strncmp(gst_tag_get_nick(tag), "bitrate", 7) == 0) {
         meta->audiobitrate = value;
@@ -128,7 +136,9 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
       if (strncmp(gst_tag_get_nick(tag), "sampling frequency (Hz)", 23) == 0) {
         meta->samplerate = value;
       }
-    } else {
+    }
+#endif
+    else {
       continue;
     }
   }
@@ -139,86 +149,184 @@ static void analyze_streams (gpointer data)
 {
   gint i;
   GstTagList *tags;
+  GstCaps *caps;
+  GstStructure *st;
+  GstPad *pad;
   gchar *str;
-  guint rate;
+  gint ntracks = 0;
   play_engine *engine = (play_engine *)data;
 
   /* Read some properties */
-  g_object_get (engine->bin, "n-video", &engine->n_video, NULL);
-  g_object_get (engine->bin, "n-audio", &engine->n_audio, NULL);
-  g_object_get (engine->bin, "n-text", &engine->n_text, NULL);
+  g_object_get (engine->bin, "n-video", &engine->meta.n_video, NULL);
+  g_object_get (engine->bin, "n-audio", &engine->meta.n_audio, NULL);
+  g_object_get (engine->bin, "n-text", &engine->meta.n_subtitle, NULL);
 
-  g_print ("%d video stream(s), %d audio stream(s), %d text stream(s)\n",
-      engine->n_video, engine->n_audio, engine->n_text);
+  ntracks = engine->meta.n_video;
+  if (ntracks > MAX_VIDEO_TRACK_COUNT)
+    ntracks = MAX_VIDEO_TRACK_COUNT;
 
-  g_print ("\n");
-  for (i = 0; i < engine->n_video; i++) {
+  for (i = 0; i < ntracks; i++) {
     tags = NULL;
+    pad = NULL;
     /* Retrieve the stream's video tags */
+    g_signal_emit_by_name (engine->bin, "get-video-pad", i, &pad);
+    if (pad) {
+      caps = gst_pad_get_current_caps (pad);
+      st = gst_caps_get_structure (caps, 0);
+      gst_structure_get_int (st, "width", &engine->meta.video_info[i].width);
+      gst_structure_get_int (st, "height", &engine->meta.video_info[i].height);
+      gst_structure_get_fraction (st, "framerate",
+          &engine->meta.video_info[i].framerate_numerator,
+          &engine->meta.video_info[i].framerate_denominator);
+      gst_caps_unref (caps);
+      gst_object_unref (pad);
+    }
+
     g_signal_emit_by_name (engine->bin, "get-video-tags", i, &tags);
     if (tags) {
-      g_print ("video stream %d:\n", i);
+      str = NULL;
       gst_tag_list_get_string (tags, GST_TAG_VIDEO_CODEC, &str);
-      g_print ("  codec: %s\n", str ? str : "unknown");
+      strncpy (engine->meta.video_info[i].codec_type, str ? str : "unknown",
+               METADATA_ITEM_SIZE_SMALL);
+      engine->meta.video_info[i].codec_type[METADATA_ITEM_SIZE_SMALL-1] = '\0';
       g_free (str);
+
+      str = NULL;
+      gst_tag_list_get_string (tags, GST_TAG_LANGUAGE_CODE, &str);
+      strncpy (engine->meta.video_info[i].language, str ? str : "unknown",
+               METADATA_ITEM_SIZE_SMALL);
+      engine->meta.video_info[i].language[METADATA_ITEM_SIZE_SMALL-1] = '\0';
+      g_free (str);
+
+      gst_tag_list_get_uint (tags, GST_TAG_BITRATE,
+                             &engine->meta.video_info[i].bitrate);
+
       gst_tag_list_free (tags);
     }
   }
 
-  g_print ("\n");
-  for (i = 0; i < engine->n_audio; i++) {
+  ntracks = engine->meta.n_audio;
+  if (ntracks > MAX_AUDIO_TRACK_COUNT)
+    ntracks = MAX_AUDIO_TRACK_COUNT;
+
+  for (i = 0; i < ntracks; i++) {
     tags = NULL;
+    pad = NULL;
     /* Retrieve the stream's audio tags */
+    g_signal_emit_by_name (engine->bin, "get-audio-pad", i, &pad);
+    if (pad) {
+      caps = gst_pad_get_current_caps (pad);
+      st = gst_caps_get_structure (caps, 0);
+      gst_structure_get_int (st, "rate",
+                             &engine->meta.audio_info[i].samplerate);
+      gst_structure_get_int (st, "channels",
+                             &engine->meta.audio_info[i].channels);
+      gst_caps_unref (caps);
+      gst_object_unref (pad);
+    }
+
     g_signal_emit_by_name (engine->bin, "get-audio-tags", i, &tags);
     if (tags) {
-      g_print ("audio stream %d:\n", i);
-      if (gst_tag_list_get_string (tags, GST_TAG_AUDIO_CODEC, &str)) {
-        g_print ("  codec: %s\n", str);
-        g_free (str);
-      }
-      if (gst_tag_list_get_string (tags, GST_TAG_LANGUAGE_CODE, &str)) {
-        g_print ("  language: %s\n", str);
-        if (i < AUDIO_STREAM_MAX) {
-          strncpy(engine->audio_lang[i], str, METADATA_ITEM_SIZE_SMALL);
-          engine->audio_lang[i][METADATA_ITEM_SIZE_SMALL-1] = '\0';
-        }
-        g_free (str);
-      }
-      if (gst_tag_list_get_uint (tags, GST_TAG_BITRATE, &rate)) {
-        g_print ("  bitrate: %d\n", rate);
-      }
+      str = NULL;
+      gst_tag_list_get_string (tags, GST_TAG_AUDIO_CODEC, &str);
+      strncpy (engine->meta.audio_info[i].codec_type, str ? str : "unknown",
+               METADATA_ITEM_SIZE_SMALL);
+      engine->meta.audio_info[i].codec_type[METADATA_ITEM_SIZE_SMALL-1] = '\0';
+      g_free (str);
+
+      str = NULL;
+      gst_tag_list_get_string (tags, GST_TAG_LANGUAGE_CODE, &str);
+      strncpy(engine->meta.audio_info[i].language, str ? str : "unknown",
+              METADATA_ITEM_SIZE_SMALL);
+      engine->meta.audio_info[i].language[METADATA_ITEM_SIZE_SMALL-1] = '\0';
+      g_free (str);
+      gst_tag_list_get_uint (tags, GST_TAG_BITRATE,
+                             &engine->meta.audio_info[i].bitrate);
+
       gst_tag_list_free (tags);
     }
   }
 
-  g_print ("\n");
-  for (i = 0; i < engine->n_text; i++) {
+  ntracks = engine->meta.n_subtitle;
+  if (ntracks > MAX_SUBTITLE_TRACK_COUNT)
+    ntracks = MAX_SUBTITLE_TRACK_COUNT;
+  for (i = 0; i < ntracks; i++) {
     tags = NULL;
     /* Retrieve the stream's subtitle tags */
-    g_print ("subtitle stream %d:\n", i);
     g_signal_emit_by_name (engine->bin, "get-text-tags", i, &tags);
     if (tags) {
-      if (gst_tag_list_get_string (tags, GST_TAG_LANGUAGE_CODE, &str)) {
-        g_print ("  language: %s\n", str);
-        if (i < SUBTITLE_STREAM_MAX) {
-          strncpy(engine->text_lang[i], str, METADATA_ITEM_SIZE_SMALL);
-          engine->text_lang[i][METADATA_ITEM_SIZE_SMALL-1] = '\0';
-        }
-        g_free (str);
-      }
+      str = NULL;
+      gst_tag_list_get_string (tags, GST_TAG_SUBTITLE_CODEC, &str);
+      strncpy (engine->meta.subtitle_info[i].codec_type, str ? str : "unknown",
+               METADATA_ITEM_SIZE_SMALL);
+      engine->meta.subtitle_info[i].codec_type[METADATA_ITEM_SIZE_SMALL-1]='\0';
+      g_free (str);
+
+      str = NULL;
+      gst_tag_list_get_string (tags, GST_TAG_LANGUAGE_CODE, &str);
+      strncpy(engine->meta.subtitle_info[i].language, str ? str : "unknown",
+              METADATA_ITEM_SIZE_SMALL);
+      engine->meta.subtitle_info[i].language[METADATA_ITEM_SIZE_SMALL-1] = '\0';
+      g_free (str);
+
       gst_tag_list_free (tags);
-    } else {
-      g_print ("  no tags found\n");
     }
   }
 
   g_object_get (engine->bin, "current-video", &engine->cur_video, NULL);
   g_object_get (engine->bin, "current-audio", &engine->cur_audio, NULL);
-  g_object_get (engine->bin, "current-text", &engine->cur_text, NULL);
+  g_object_get (engine->bin, "current-text", &engine->cur_subtitle, NULL);
+
+#ifdef PRINT_STREAM_INFO
+  /* print the streams info */
+  g_print ("%d video stream(s), %d audio stream(s), %d text stream(s)\n",
+      engine->meta.n_video, engine->meta.n_audio,
+      engine->meta.n_subtitle);
+
+  ntracks = engine->meta.n_video;
+  if (ntracks > MAX_VIDEO_TRACK_COUNT)
+    ntracks = MAX_VIDEO_TRACK_COUNT;
+  for (i = 0; i < ntracks; i++) {
+    g_print ("\n");
+    g_print ("video stream %d:\n", i);
+    g_print ("  codec: %s\n", engine->meta.video_info[i].codec_type);
+    g_print ("  language: %s\n", engine->meta.video_info[i].language);
+    g_print ("  resolution: %d x %d \n", engine->meta.video_info[i].width,
+        engine->meta.video_info[i].height);
+    g_print ("  framerate: %d/%d\n",
+        engine->meta.video_info[i].framerate_numerator,
+        engine->meta.video_info[i].framerate_denominator);
+    g_print ("  bitrate: %d\n", engine->meta.video_info[i].bitrate);
+  }
+
+  ntracks = engine->meta.n_audio;
+  if (ntracks > MAX_AUDIO_TRACK_COUNT)
+    ntracks = MAX_AUDIO_TRACK_COUNT;
+  for (i = 0; i < ntracks; i++) {
+    g_print ("\n");
+    g_print ("audio stream %d:\n", i);
+    g_print ("  codec: %s\n", engine->meta.audio_info[i].codec_type);
+    g_print ("  language: %s\n", engine->meta.audio_info[i].language);
+    g_print ("  channels: %d\n", engine->meta.audio_info[i].channels);
+    g_print ("  sample rate: %d\n", engine->meta.audio_info[i].samplerate);
+    g_print ("  bitrate: %d\n", engine->meta.audio_info[i].bitrate);
+  }
+
+  ntracks = engine->meta.n_subtitle;
+  if (ntracks > MAX_SUBTITLE_TRACK_COUNT)
+    ntracks = MAX_SUBTITLE_TRACK_COUNT;
+  for (i = 0; i < ntracks; i++) {
+    g_print ("\n");
+    g_print ("subtitle stream %d:\n", i);
+    g_print ("  codec: %s\n", engine->meta.subtitle_info[i].codec_type);
+    g_print ("  language: %s\n", engine->meta.subtitle_info[i].language);
+  }
 
   g_print ("\n");
   g_print ("Currently playing video %d, audio %d and subtitle %d\n",
-            engine->cur_video, engine->cur_audio, engine->cur_text);
+            engine->cur_video, engine->cur_audio, engine->cur_subtitle);
+#endif
+
 }
 
 static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data)
@@ -239,9 +347,10 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data)
     g_free(debug);
 
     g_warning("Error: %s\n", err->message);
-    g_error_free(err);
+
     if (engine->error_cb)
       engine->error_cb(engine->player, err->message);
+    g_error_free(err);
     break;
   }
   case GST_MESSAGE_TAG: {
@@ -252,13 +361,18 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data)
       break;
   }
   case GST_MESSAGE_STATE_CHANGED: {
-    GstState old_state, new_state, pending_state;
-    gst_message_parse_state_changed (msg, &old_state, &new_state, &pending_state);
+    GstState old_st, new_st, pending_st;
+    gst_message_parse_state_changed (msg, &old_st, &new_st, &pending_st);
     if (GST_MESSAGE_SRC (msg) == GST_OBJECT (engine->bin)) {
-      if (new_state == GST_STATE_PLAYING) {
+      if (new_st == GST_STATE_PLAYING) {
         /* Once we are in the playing state, analyze the streams */
         analyze_streams (data);
       }
+
+      /* inform application state changed */
+      //g_print("old: %d, new: %d, pending: %d\n",old_st, new_st, pending_st);
+      if (engine->state_change_cb)
+        engine->state_change_cb(engine->player, old_st, new_st, pending_st);
     }
   }
   break;
@@ -364,7 +478,7 @@ static void playengine_set_play_rate(play_engine *engine, double rate)
   query = gst_query_new_position(GST_FORMAT_TIME);
   if( gst_element_query(engine->bin, query) ) {
     gst_query_parse_position(query,NULL,&cur);
-    g_print("current_position = %"GST_TIME_FORMAT"\n", GST_TIME_ARGS (cur));
+    //g_print("current_position = %"GST_TIME_FORMAT"\n", GST_TIME_ARGS (cur));
   } else {
     g_print ("current_postion query failed...\n");
   }
@@ -429,41 +543,60 @@ static void playengine_set_force_ratio (play_engine *engine, gboolean force)
 static void playengine_get_metadata(play_engine *engine, imx_metadata *meta)
 {
   if (engine && meta)
-    memcpy(meta, &engine->metadata, sizeof (imx_metadata));
+    memcpy(meta, &engine->meta, sizeof (imx_metadata));
 }
 
 static gint playengine_get_subtitle_num(play_engine *engine)
 {
-  if (engine && engine->n_text == 0)
-    g_object_get( G_OBJECT(engine->bin), "n-text", &engine->n_text, NULL);
+  if (engine && engine->meta.n_subtitle == 0)
+    g_object_get (G_OBJECT(engine->bin), "n-text",
+                  &engine->meta.n_subtitle, NULL);
 
-  return engine->n_text;
+  return engine->meta.n_subtitle;
 }
 
 static gint playengine_get_audio_num(play_engine *engine)
 {
-  if (engine && engine->n_audio == 0)
-    g_object_get( G_OBJECT(engine->bin), "n-audio", &engine->n_audio, NULL);
+  if (engine && engine->meta.n_audio == 0)
+    g_object_get (G_OBJECT(engine->bin), "n-audio",
+                  &engine->meta.n_audio, NULL);
 
-  return engine->n_audio;
+  return engine->meta.n_audio;
 }
 
 static gint playengine_get_video_num(play_engine *engine)
 {
-  if (engine && engine->n_video == 0)
-    g_object_get( G_OBJECT(engine->bin), "n-video", &engine->n_video, NULL);
+  if (engine && engine->meta.n_video == 0)
+    g_object_get (G_OBJECT(engine->bin), "n-video",
+                  &engine->meta.n_video, NULL);
 
-  return engine->n_video;
+  return engine->meta.n_video;
+}
+
+static gint playengine_get_current_audio_no(play_engine *engine)
+{
+  return engine->cur_audio;
+}
+
+static gint playengine_get_current_video_no(play_engine *engine)
+{
+  return engine->cur_video;
+}
+
+static gint playengine_get_current_subtitle_no(play_engine *engine)
+{
+  return engine->cur_subtitle;
 }
 
 static void playengine_select_subtitle(play_engine *engine, gint text_no)
 {
-  if (engine && text_no != engine->cur_text) {
-    if (text_no < engine->n_text) {
+  if (engine && text_no != engine->cur_subtitle) {
+    if (text_no < engine->meta.n_subtitle) {
       g_object_set( engine->bin, "current-text", text_no, NULL );
-      g_object_get (engine->bin, "current-text", &engine->cur_text, NULL);
+      g_object_get (engine->bin, "current-text", &engine->cur_subtitle, NULL);
     } else {
-      g_print("subtitle number out of range %d, %d\n", text_no, engine->n_text);
+      g_print("subtitle number out of range %d, %d\n", text_no,
+              engine->meta.n_subtitle);
     }
   }
 }
@@ -471,11 +604,12 @@ static void playengine_select_subtitle(play_engine *engine, gint text_no)
 static void playengine_select_audio(play_engine *engine, gint audio_no)
 {
   if (engine && audio_no != engine->cur_audio) {
-    if (audio_no < engine->n_audio) {
+    if (audio_no < engine->meta.n_audio) {
       g_object_set( engine->bin, "current-audio", audio_no, NULL );
-      g_object_get( engine->bin, "current-audio", &engine->n_audio, NULL );
+      g_object_get( engine->bin, "current-audio", &engine->cur_audio, NULL );
     } else {
-      g_print("audio number out of range %d, %d\n", audio_no, engine->n_audio);
+      g_print("audio number out of range %d, %d\n", audio_no,
+              engine->meta.n_audio);
     }
   }
 }
@@ -483,11 +617,12 @@ static void playengine_select_audio(play_engine *engine, gint audio_no)
 static void playengine_select_video(play_engine *engine, gint video_no)
 {
   if (engine && video_no != engine->cur_video) {
-    if (video_no < engine->n_video) {
+    if (video_no < engine->meta.n_video) {
       g_object_set( engine->bin, "current-video", video_no, NULL );
       g_object_get( engine->bin, "current-video", &engine->cur_video, NULL );
     } else {
-      g_print("video number out of range %d, %d\n", video_no, engine->n_video);
+      g_print("video number out of range %d, %d\n", video_no,
+              engine->meta.n_video);
     }
   }
 }
@@ -585,7 +720,9 @@ static void playengine_expose_video(play_engine *engine)
 }
 
 play_engine * play_engine_create(int *argc, char **argv[],
-               void (*eos_cb)(void *), void (*error_cb)(void *, const gchar *))
+               void (*eos_cb)(void *),
+               void (*error_cb)(void *, const gchar *),
+               void (*state_change_cb)(void *, GstState, GstState, GstState))
 {
   play_engine *engine = NULL;
   guint major, minor, micro, nano;
@@ -638,6 +775,9 @@ play_engine * play_engine_create(int *argc, char **argv[],
   engine->get_subtitle_num = playengine_get_subtitle_num;
   engine->get_audio_num = playengine_get_audio_num;
   engine->get_video_num = playengine_get_video_num;
+  engine->get_cur_subtitle_no = playengine_get_current_subtitle_no;
+  engine->get_cur_audio_no = playengine_get_current_audio_no;
+  engine->get_cur_video_no = playengine_get_current_video_no;
   engine->set_volume = playengine_set_volume;
   engine->get_volume = playengine_get_volume;
   engine->set_mute = playengine_set_mute;
@@ -651,7 +791,7 @@ play_engine * play_engine_create(int *argc, char **argv[],
   engine->get_subtitle_text = playengine_get_subtitle_text;
   engine->eos_cb = eos_cb;
   engine->error_cb = error_cb;
-
+  engine->state_change_cb = state_change_cb;
   return engine;
 }
 

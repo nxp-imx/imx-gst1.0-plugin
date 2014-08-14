@@ -31,15 +31,16 @@ void subtitle_create(void *imxplayer)
   subtitle->subtitle = gtk_event_box_new();
   gtk_widget_modify_bg(subtitle->subtitle, GTK_STATE_NORMAL,
                         &player->color_key);
-  gtk_widget_set_size_request(subtitle->subtitle, SUBTITLE_BOX_W, SUBTITLE_BOX_H);
+  gtk_widget_set_size_request(subtitle->subtitle,
+                              player->video_w, SUBTITLE_BOX_H);
   gtk_fixed_put(GTK_FIXED(player->fixed_ct), subtitle->subtitle,
-                (player->window_w-SUBTITLE_BOX_W)/2,
-                player->window_h - CTRLBAR_H - SUBTITLE_BOX_H * 2);
+                player->video_x,
+                player->video_y + (player->video_h*SUBTITLE_Y_PROPOTION));
   subtitle->text = gtk_label_new(" ");
-  gdk_color_parse ("white", &color);
+  gdk_color_parse ("blue", &color);
   gtk_widget_modify_fg (subtitle->text, GTK_STATE_NORMAL, &color);
   gtk_widget_modify_font(subtitle->text,
-        pango_font_description_from_string("Tahoma Bold 14"));
+        pango_font_description_from_string("Tahoma Bold 18"));
   gtk_container_add(GTK_CONTAINER(subtitle->subtitle), subtitle->text);
 }
 
@@ -54,8 +55,9 @@ void subtitle_show(SubTitle *subtitle, gboolean show)
 void subtitle_resize(GtkWidget *container, SubTitle *subtitle,
                      gint x, gint y, gint w, gint h)
 {
-  gtk_widget_set_size_request(subtitle->subtitle, w, h);
-  gtk_fixed_move(GTK_FIXED(container), subtitle->subtitle, x, y);
+  gtk_widget_set_size_request(subtitle->subtitle, w, SUBTITLE_BOX_H);
+  gtk_fixed_move(GTK_FIXED(container), subtitle->subtitle, x,
+                  (y + (h * SUBTITLE_Y_PROPOTION)));
 }
 
 void subtitle_set_text(SubTitle *subtitle, const gchar *text)

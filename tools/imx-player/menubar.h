@@ -24,7 +24,9 @@
 #define MENUBAR_H_
 
 #define WINDOW_MOVE_STEP    50
-#define MENUBAR_H           30
+#define MENUBAR_H           40
+#define MENU_ITEM_W         150
+#define MENU_ITEM_H         40
 
 typedef enum
 {

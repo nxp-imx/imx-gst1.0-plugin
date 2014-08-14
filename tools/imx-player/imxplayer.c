@@ -20,6 +20,9 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#include <glib.h>
+#include <glib/gprintf.h>
+#include <glib/gstdio.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <gdk/gdkx.h>
@@ -38,6 +41,8 @@
 
 void eos_callback(void* player);
 void show_error(void* player, const gchar *error);
+void state_change(void* player,
+                  GstState old_st, GstState new_st, GstState pending_st);
 
 static gboolean config_change(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
@@ -74,6 +79,8 @@ static gboolean config_change(GtkWidget *widget, GdkEvent *event, gpointer data)
 
     ctrlbar_resize(player->fixed_ct, &player->ctrlbar,
                     0, h-CTRLBAR_H, w, CTRLBAR_H);
+    subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
+        player->video_y, player->video_w, player->video_h);
   }
 
   // return FALSE to let parent to handle this event further
@@ -89,10 +96,12 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer data)
   case GDK_space:
     gtk_button_clicked(GTK_BUTTON(player->ctrlbar.play_pause));
     break;
+#ifdef ENABLE_STOP_BUTTON
   case GDK_S:
   case GDK_s:
     gtk_button_clicked(GTK_BUTTON(player->ctrlbar.play_stop));
     break;
+#endif
   case GDK_F:
   case GDK_f:
     gtk_button_clicked(GTK_BUTTON(player->ctrlbar.full));
@@ -132,18 +141,39 @@ static gboolean button_press(GtkWidget *widget, GdkEvent  *event, gpointer data)
 {
   ImxPlayer *player = (ImxPlayer*)data;
   if (GDK_2BUTTON_PRESS == event->type && 0x01 == event->button.button) {
-    gtk_button_clicked(GTK_BUTTON(player->ctrlbar.full));
+/*
+    g_print("%d,%d [%d,%d,%d,%d]\n",
+        (gint)event->button.x_root, (gint)event->button.y_root,
+        player->video_x, player->video_y, player->video_w, player->video_h);
+*/
+    if ((gint)event->button.x_root < player->video_w + player->video_x &&
+        (gint)event->button.y_root < player->video_h + player->video_y) {
+      gtk_button_clicked(GTK_BUTTON(player->ctrlbar.full));
+    }
   }
 
   if (GDK_BUTTON_PRESS == event->type && 0x01 == event->button.button) {
     if (player->fullscreen) {
-      player->show_ctrlbar = !player->show_ctrlbar;
-      ctrlbar_show(&player->ctrlbar, player->show_ctrlbar);
-      player->show_menubar = !player->show_menubar;
-      menubar_show(&player->menubar, player->show_menubar);
-      if (!player->show_ctrlbar) {
-        player->show_volbar = FALSE;
-        volumebar_show(&player->volumebar, player->show_volbar);
+      if ((gint)event->button.x_root < player->video_w + player->video_x &&
+          (gint)event->button.y_root < player->video_h+player->video_y-CTRLBAR_H
+          && (gint)event->button.y_root > MENUBAR_H) {
+        player->show_ctrlbar = !player->show_ctrlbar;
+        ctrlbar_show(&player->ctrlbar, player->show_ctrlbar);
+        player->show_menubar = !player->show_menubar;
+        menubar_show(&player->menubar, player->show_menubar);
+        if (!player->show_ctrlbar) {
+          player->show_volbar = FALSE;
+          volumebar_show(&player->volumebar, player->show_volbar);
+        }
+
+        if (player->show_ctrlbar || player->show_menubar ||
+            player->show_playlist) {
+          gdk_window_set_cursor(gtk_widget_get_window(player->top_window),
+                gdk_cursor_new(GDK_HAND2));
+        } else {
+          gdk_window_set_cursor(gtk_widget_get_window(player->top_window),
+                gdk_cursor_new(GDK_BLANK_CURSOR));
+        }
       }
     }
   }
@@ -174,6 +204,8 @@ static void video_win_realize(GtkWidget * widget, gpointer data)
   GtkWidget *win = GTK_WIDGET(widget);
   guintptr win_id = (guintptr)(GDK_WINDOW_XID(gtk_widget_get_window(win)));
   player->playengine->set_window(player->playengine, win_id);
+  gdk_window_set_cursor(gtk_widget_get_window(player->top_window),
+          gdk_cursor_new(GDK_HAND2));
 }
 
 #ifdef EXPOSE_VIDEO_FOR_EACH_EXPOSE_EVENT
@@ -217,11 +249,13 @@ static gboolean position_update_cb(gpointer data) {
       gtk_range_set_value(GTK_RANGE(player->ctrlbar.progress), value);
       gtk_label_set_text(GTK_LABEL(player->ctrlbar.current), cur_str);
       gtk_label_set_text(GTK_LABEL(player->ctrlbar.duration), dur_str);
+#if 0
       if (player->metainfo_refresh) {
         infobox_update(player);
         menubar_update(player);
         player->metainfo_refresh = FALSE;
       }
+#endif
     }
   }
   return TRUE;
@@ -271,14 +305,68 @@ void show_error(void* player, const gchar *error)
   }
 }
 
+void state_change(void* imxplayer,
+                  GstState old_st, GstState new_st, GstState pending_st)
+{
+  if (new_st == GST_STATE_PLAYING) {
+    ImxPlayer *player = (ImxPlayer *)imxplayer;
+    imx_metadata *meta = &player->meta;
+    player->playengine->get_metadata(player->playengine, meta);
+    infobox_update(player);
+    menubar_update(player);
+  }
+}
+
 int main(int argc, char *argv[])
 {
   ImxPlayer player = {0};
   GdkColor color;
   gchar colorstr[8] = {0};
 
+  const gchar *disp = g_getenv ("DISPLAY");
+  if (!disp || strlen(disp) < 2) {
+    /* DISPLAY not set, set to :0 */
+    g_setenv("DISPLAY", ":0", TRUE);
+  }
+
+  /* check if ~/.local/share exit, this folder is used to record the recent
+   * opened file or folder by GTK
+   */
+  gchar s1[64] = {0};
+  gchar s2[64] = {0};
+  const gchar *guname = g_get_user_name();
+  g_sprintf(s1, "/home/%s/.local", guname);
+  g_sprintf(s2, "/home/%s/.local/share", guname);
+
+  if (!g_file_test(s1, G_FILE_TEST_EXISTS)) {
+    g_mkdir(s1, 0755);
+    g_mkdir(s2, 0755);
+  } else {
+    if (!g_file_test(s2, G_FILE_TEST_EXISTS)) {
+      g_mkdir(s2, 0755);
+    } else {
+      if (!g_file_test(s2, G_FILE_TEST_IS_DIR)) {
+        g_remove(s2);
+        g_mkdir(s2, 0755);
+      }
+    }
+  }
+
   gtk_init(&argc, &argv);
-  player.playengine = play_engine_create(&argc, &argv, eos_callback,show_error);
+
+  /* make sure the type is realized */
+  GtkSettings *gtk_setting = gtk_settings_get_default ();
+  g_type_class_unref (g_type_class_ref (GTK_TYPE_IMAGE_MENU_ITEM));
+  g_type_class_unref (g_type_class_ref (GTK_TYPE_ICON_SIZE));
+  g_object_set (gtk_setting, "gtk-menu-images", TRUE, NULL);
+  g_object_set (gtk_setting, "gtk-icon-sizes",
+      "gtk-menu=20,20:gtk-button=32,32", NULL);
+  g_object_set (gtk_setting, "gtk-font-name", "Sans Bold 12", NULL);
+
+  player.playengine = play_engine_create(&argc, &argv,
+                                         eos_callback,
+                                         show_error,
+                                         state_change);
   player.playengine->player = &player;
 
   player.top_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
@@ -343,9 +431,10 @@ int main(int argc, char *argv[])
 
   subtitle_set_text(&player.subtitle, "DEMO SUBTITLE TEXT");
 
-  player.metainfo_refresh = TRUE;
+//  player.metainfo_refresh = TRUE;
   player.show_ctrlbar = TRUE;
   player.show_menubar = TRUE;
+  player.show_subtitle = FALSE;
 
   g_timeout_add(1000, position_update_cb, (gpointer)&player);
   GtkSettings *default_settings = gtk_settings_get_default();
@@ -356,6 +445,7 @@ int main(int argc, char *argv[])
   volumebar_show(&player.volumebar, player.show_volbar);
   playlistbox_show(&player.playlistbox, player.show_playlist);
   speedbox_show(&player.speed, FALSE);
+  subtitle_show(&player.subtitle, player.show_subtitle);
 
   if (argc > 1) {
     player.playlistbox.add_file(&player.playlistbox, argv[1], TRUE, TRUE);

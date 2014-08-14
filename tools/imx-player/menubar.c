@@ -117,6 +117,8 @@ static void playlist_cb(GtkWidget *widget, gpointer data)
   player->playengine->set_render_rect(player->playengine, 0, 0,
                                       player->video_w, player->video_h);
   player->playengine->expose_video(player->playengine);
+  subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
+          player->video_y, player->video_w, player->video_h);
   playlistbox_show(&player->playlistbox, player->show_playlist);
 }
 
@@ -158,6 +160,8 @@ static void resize_0(GtkWidget *widget, gpointer data) //full window
                               player->video_w, player->video_h);
   gtk_fixed_move(GTK_FIXED(player->fixed_ct), GTK_WIDGET(player->video_win),
                            player->video_x, player->video_y);
+  subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
+          player->video_y, player->video_w, player->video_h);
 }
 
 static void resize_1(GtkWidget *widget, gpointer data)  //1/2 left top
@@ -171,6 +175,8 @@ static void resize_1(GtkWidget *widget, gpointer data)  //1/2 left top
                               player->video_w, player->video_h);
   gtk_fixed_move(GTK_FIXED(player->fixed_ct), GTK_WIDGET(player->video_win),
                            player->video_x, player->video_y);
+  subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
+          player->video_y, player->video_w, player->video_h);
 }
 
 static void resize_2(GtkWidget *widget, gpointer data)  //1/4 right top
@@ -184,6 +190,8 @@ static void resize_2(GtkWidget *widget, gpointer data)  //1/4 right top
                               player->video_w, player->video_h);
   gtk_fixed_move(GTK_FIXED(player->fixed_ct), GTK_WIDGET(player->video_win),
                            player->video_x, player->video_y);
+  subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
+          player->video_y, player->video_w, player->video_h);
 }
 
 static void resize_3(GtkWidget *widget, gpointer data)  //1/2 left bottom
@@ -197,6 +205,8 @@ static void resize_3(GtkWidget *widget, gpointer data)  //1/2 left bottom
                               player->video_w, player->video_h);
   gtk_fixed_move(GTK_FIXED(player->fixed_ct), GTK_WIDGET(player->video_win),
                            player->video_x, player->video_y);
+  subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
+          player->video_y, player->video_w, player->video_h);
 }
 
 static void resize_4(GtkWidget *widget, gpointer data)  //1/4 right bottom
@@ -210,6 +220,8 @@ static void resize_4(GtkWidget *widget, gpointer data)  //1/4 right bottom
                               player->video_w, player->video_h);
   gtk_fixed_move(GTK_FIXED(player->fixed_ct), GTK_WIDGET(player->video_win),
                            player->video_x, player->video_y);
+  subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
+          player->video_y, player->video_w, player->video_h);
 }
 
 static void resize_5(GtkWidget *widget, gpointer data)  //1/8 center
@@ -224,6 +236,8 @@ static void resize_5(GtkWidget *widget, gpointer data)  //1/8 center
                               player->video_w, player->video_h);
   gtk_fixed_move(GTK_FIXED(player->fixed_ct), GTK_WIDGET(player->video_win),
                            player->video_x, player->video_y);
+  subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
+          player->video_y, player->video_w, player->video_h);
 }
 
 static void resize_6(GtkWidget *widget, gpointer data)  //1/2 render rectangle
@@ -241,6 +255,8 @@ static void resize_6(GtkWidget *widget, gpointer data)  //1/2 render rectangle
                               player->video_w, player->video_h);
   gtk_fixed_move(GTK_FIXED(player->fixed_ct), GTK_WIDGET(player->video_win),
                            player->video_x, player->video_y);
+  subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
+          player->video_y, player->video_w, player->video_h);
 }
 
 static void move_left(GtkWidget *widget, gpointer data)
@@ -339,7 +355,7 @@ static void subtitle_chose(GtkWidget *widget, gpointer data)
   for (; list; list = list->next) {
     item_label = gtk_menu_item_get_label(list->data);
     if(!strcmp(item_label, label)) {
-      player->playengine->select_subtitle(player->playengine, index);
+      player->playengine->select_subtitle(player->playengine, index - 2);
       break;
     }
     index++;
@@ -378,6 +394,13 @@ static void load_subtitle(GtkWidget *widget, gpointer data)
   gtk_widget_destroy (dialog);
 }
 
+static void subtitle_onoff(GtkWidget *widget, gpointer data)
+{
+  ImxPlayer *player = (ImxPlayer *)data;
+  player->show_subtitle = !player->show_subtitle;
+  subtitle_show(&player->subtitle, player->show_subtitle);
+}
+
 static void origin_ratio(GtkWidget *widget, gpointer data)
 {
   ImxPlayer *player = (ImxPlayer *)data;
@@ -385,6 +408,8 @@ static void origin_ratio(GtkWidget *widget, gpointer data)
   player->playengine->set_render_rect(player->playengine,
                                       0, 0, player->video_w, player->video_h);
   player->playengine->expose_video(player->playengine);
+  subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
+          player->video_y, player->video_w, player->video_h);
 }
 
 static void full_fill(GtkWidget *widget, gpointer data)
@@ -394,14 +419,17 @@ static void full_fill(GtkWidget *widget, gpointer data)
   player->playengine->set_render_rect(player->playengine,
                                       0, 0, player->video_w, player->video_h);
   player->playengine->expose_video(player->playengine);
+  subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
+          player->video_y, player->video_w, player->video_h);
 }
 
 static void origin_size(GtkWidget *widget, gpointer data)
 {
   ImxPlayer *player = (ImxPlayer *)data;
   gint video_w, video_h;
-  video_w = player->meta.width;
-  video_h = player->meta.height;
+  gint cur_video = player->playengine->get_cur_video_no(player->playengine);
+  video_w = player->meta.video_info[cur_video].width;
+  video_h = player->meta.video_info[cur_video].height;
   GtkWidget *dialog;
 
   if (video_w == 0 || video_h == 0) {
@@ -432,12 +460,14 @@ static void origin_size(GtkWidget *widget, gpointer data)
     player->playengine->set_render_rect(player->playengine,
                                         x, y, video_w, video_h);
     player->playengine->expose_video(player->playengine);
+    subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
+            player->video_y, player->video_w, player->video_h);
   }
 }
 
 static void about(GtkWidget *widget, gpointer data)
 {
-  GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file("logo.png", NULL);
+  GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file("./icons/logo.png", NULL);
 
   GtkWidget *dialog = gtk_about_dialog_new();
   gtk_about_dialog_set_name(GTK_ABOUT_DIALOG(dialog), "IMXPlayer");
@@ -488,32 +518,52 @@ void menubar_create(void *imxplayer)
   GtkAccelGroup *accel_group = NULL;
   ImxPlayer *player = (ImxPlayer *)imxplayer;
   MenuBar *menubar = &player->menubar;
+  GtkWidget *image;
+  GdkColor color;
 
   menubar->menubar = gtk_menu_bar_new();
   gtk_fixed_put(GTK_FIXED(player->fixed_ct), menubar->menubar, 0, 0);
   gtk_widget_set_size_request(menubar->menubar, player->window_w, MENUBAR_H);
+  gtk_widget_modify_font(menubar->menubar,
+      pango_font_description_from_string("Tahoma Bold 14"));
   accel_group = gtk_accel_group_new();
   gtk_window_add_accel_group(GTK_WINDOW(player->top_window), accel_group);
+  gdk_color_parse ("lightgray", &color);
+  gtk_widget_modify_bg (menubar->menubar, GTK_STATE_NORMAL, &color);
   //gtk_widget_modify_bg(menubar->menubar, GTK_STATE_NORMAL, &player->color_key);
 
   // File menu
   menubar->filemenu = gtk_menu_new();
-  submenu = gtk_menu_item_new_with_mnemonic("_File");
+  submenu = gtk_menu_item_new_with_mnemonic("  _File  ");
   gtk_menu_item_set_submenu(GTK_MENU_ITEM(submenu), menubar->filemenu);
 
-  item = gtk_image_menu_item_new_from_stock(GTK_STOCK_OPEN, NULL);
+  item = gtk_image_menu_item_new_with_label ("Open File");
+  image = gtk_image_new_from_stock(GTK_STOCK_NEW, GTK_ICON_SIZE_MENU);
+  gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(item), image);
+  gtk_image_menu_item_set_always_show_image(GTK_IMAGE_MENU_ITEM(item), TRUE);
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
+  gtk_widget_modify_font(item,
+      pango_font_description_from_string("Tahoma Bold 14"));
   gtk_widget_add_accelerator(item, "activate", accel_group,
-       GDK_q, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+       GDK_o, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
   g_signal_connect(G_OBJECT(item), "activate",G_CALLBACK(file_open_cb), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->filemenu), item);
 
-  item = gtk_menu_item_new_with_label("Open Folder");
+  item = gtk_image_menu_item_new_with_label("Open Folder");
+  image = gtk_image_new_from_stock(GTK_STOCK_OPEN, GTK_ICON_SIZE_MENU);
+  gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(item), image);
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
+  gtk_image_menu_item_set_always_show_image(GTK_IMAGE_MENU_ITEM(item), TRUE);
   gtk_widget_add_accelerator(item, "activate", accel_group,
        GDK_d, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(dir_open_cb), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->filemenu), item);
 
-  item = gtk_menu_item_new_with_label("Playlist");
+  item = gtk_image_menu_item_new_with_label("Playlist");
+  image = gtk_image_new_from_stock(GTK_STOCK_INDEX, GTK_ICON_SIZE_MENU);
+  gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(item), image);
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
+  gtk_image_menu_item_set_always_show_image(GTK_IMAGE_MENU_ITEM(item), TRUE);
   gtk_widget_add_accelerator(item, "activate", accel_group,
        GDK_p, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(playlist_cb), player);
@@ -523,6 +573,8 @@ void menubar_create(void *imxplayer)
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->filemenu), sep);
 
   item = gtk_image_menu_item_new_from_stock(GTK_STOCK_QUIT, accel_group);
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
+  gtk_image_menu_item_set_always_show_image(GTK_IMAGE_MENU_ITEM(item), TRUE);
   gtk_widget_add_accelerator(item, "activate", accel_group,
        GDK_o, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(gtk_main_quit), NULL);
@@ -532,22 +584,26 @@ void menubar_create(void *imxplayer)
 
   //Rotate menu
   menubar->rotatemenu = gtk_menu_new();
-  submenu = gtk_menu_item_new_with_mnemonic("_Rotate");
+  submenu = gtk_menu_item_new_with_mnemonic(" _Rotate ");
   gtk_menu_item_set_submenu(GTK_MENU_ITEM(submenu), menubar->rotatemenu);
 
-  item = gtk_menu_item_new_with_label("Rotate 0");
+  item = gtk_menu_item_new_with_label("Rotate  0");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(rotate_0), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->rotatemenu), item);
 
-  item = gtk_menu_item_new_with_label("Rotate 90");
+  item = gtk_menu_item_new_with_label("Rotate  90");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(rotate_90), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->rotatemenu), item);
 
-  item = gtk_menu_item_new_with_label("Rotate 180");
+  item = gtk_menu_item_new_with_label("Rotate  180");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(rotate_180), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->rotatemenu), item);
 
-  item = gtk_menu_item_new_with_label("Rotate 270");
+  item = gtk_menu_item_new_with_label("Rotate  270");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(rotate_270), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->rotatemenu), item);
 
@@ -555,34 +611,41 @@ void menubar_create(void *imxplayer)
 
   //Resize menu
   menubar->resizemenu = gtk_menu_new();
-  submenu = gtk_menu_item_new_with_mnemonic("Resi_ze");
+  submenu = gtk_menu_item_new_with_mnemonic(" Resi_ze ");
   gtk_menu_item_set_submenu(GTK_MENU_ITEM(submenu), menubar->resizemenu);
 
-  item = gtk_menu_item_new_with_label("FULL_WINDOW");
+  item = gtk_menu_item_new_with_label("Full Window");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(resize_0), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->resizemenu), item);
 
-  item = gtk_menu_item_new_with_label("TOP_LEFT_HALF");
+  item = gtk_menu_item_new_with_label("1/2 Top Left");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(resize_1), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->resizemenu), item);
 
-  item = gtk_menu_item_new_with_label("TOP_RIGHT_QUARTER");
+  item = gtk_menu_item_new_with_label("Center Top Right");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(resize_2), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->resizemenu), item);
 
-  item = gtk_menu_item_new_with_label("BOTTOM_LEFT_HALF");
+  item = gtk_menu_item_new_with_label("1/2 Bottom Left");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(resize_3), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->resizemenu), item);
 
-  item = gtk_menu_item_new_with_label("BOTTOM_RIGHT_QUARTER");
+  item = gtk_menu_item_new_with_label("1/4 Bottom Right");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(resize_4), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->resizemenu), item);
 
-  item = gtk_menu_item_new_with_label("CENTER_EIGHTH");
+  item = gtk_menu_item_new_with_label("1/8 Center");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(resize_5), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->resizemenu), item);
 
-  item = gtk_menu_item_new_with_label("CENTER_HALF_RENDER_RECT");
+  item = gtk_menu_item_new_with_label("Center 1/2 Render Area");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(resize_6), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->resizemenu), item);
 
@@ -590,22 +653,26 @@ void menubar_create(void *imxplayer)
 
   //Move menu
   menubar->movemenu = gtk_menu_new();
-  submenu = gtk_menu_item_new_with_mnemonic("_Move");
+  submenu = gtk_menu_item_new_with_mnemonic("  _Move  ");
   gtk_menu_item_set_submenu(GTK_MENU_ITEM(submenu), menubar->movemenu);
 
   item = gtk_menu_item_new_with_label("Move Left");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(move_left), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->movemenu), item);
 
   item = gtk_menu_item_new_with_label("Move Right");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(move_right), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->movemenu), item);
 
   item = gtk_menu_item_new_with_label("Move Up");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(move_up), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->movemenu), item);
 
   item = gtk_menu_item_new_with_label("Move Down");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(move_down), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->movemenu), item);
 
@@ -613,7 +680,7 @@ void menubar_create(void *imxplayer)
 
   //Video menu, empty menu, updated when got video numbers
   menubar->videomenu = gtk_menu_new();
-  submenu = gtk_menu_item_new_with_mnemonic("_Video");
+  submenu = gtk_menu_item_new_with_mnemonic("_Video Track");
   gtk_menu_item_set_submenu(GTK_MENU_ITEM(submenu), menubar->videomenu);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->menubar), submenu);
 
@@ -629,26 +696,36 @@ void menubar_create(void *imxplayer)
   gtk_menu_item_set_submenu(GTK_MENU_ITEM(submenu), menubar->subtitlemenu);
 
   item = gtk_menu_item_new_with_label("Load from File...");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate",
       G_CALLBACK(load_subtitle), player);
+  gtk_menu_shell_append(GTK_MENU_SHELL(player->menubar.subtitlemenu), item);
+
+  item = gtk_menu_item_new_with_label("Subtitle On/Off");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
+  g_signal_connect(G_OBJECT(item), "activate",
+      G_CALLBACK(subtitle_onoff), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(player->menubar.subtitlemenu), item);
 
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->menubar), submenu);
 
   //Aspect menu
   menubar->aspectmenu = gtk_menu_new();
-  submenu = gtk_menu_item_new_with_mnemonic("Aspec_t");
+  submenu = gtk_menu_item_new_with_mnemonic("Aspec_t ");
   gtk_menu_item_set_submenu(GTK_MENU_ITEM(submenu), menubar->aspectmenu);
 
   item = gtk_menu_item_new_with_label("Original Ratio");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(origin_ratio),player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->aspectmenu), item);
 
   item = gtk_menu_item_new_with_label("Full Fill");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(full_fill), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->aspectmenu), item);
 
   item = gtk_menu_item_new_with_label("Original Size");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(origin_size), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->aspectmenu), item);
 
@@ -656,14 +733,18 @@ void menubar_create(void *imxplayer)
 
   //Help menu
   menubar->helpmenu = gtk_menu_new();
-  submenu = gtk_menu_item_new_with_mnemonic("_Help");
+  submenu = gtk_menu_item_new_with_mnemonic("  _Help  ");
   gtk_menu_item_set_submenu(GTK_MENU_ITEM(submenu), menubar->helpmenu);
 
   item = gtk_image_menu_item_new_from_stock(GTK_STOCK_ABOUT, NULL);
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
+  gtk_image_menu_item_set_always_show_image(GTK_IMAGE_MENU_ITEM(item), TRUE);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(about),player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->helpmenu), item);
 
   item = gtk_image_menu_item_new_from_stock(GTK_STOCK_HELP, NULL);
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
+  gtk_image_menu_item_set_always_show_image(GTK_IMAGE_MENU_ITEM(item), TRUE);
   g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(help), player);
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->helpmenu), item);
 
@@ -694,8 +775,13 @@ void menubar_update(void *imxplayer)
   }
 
   menu = GTK_MENU_SHELL(player->menubar.subtitlemenu);
-  for (list = menu->children->next; list; list = list->next) {
+  gint cnt = 0;
+  for (list = menu->children; list; list = list->next) {
+    /* ignore the first two fixed menu item */
+    if (cnt < 2)
+      continue;
     menu->children = g_list_remove(menu->children, list->data);
+    cnt++;
   }
 
 
@@ -706,12 +792,13 @@ void menubar_update(void *imxplayer)
   GtkWidget *item;
   gint i;
   gchar label[128];
-
-  printf("video,audio,text: %d %d %d\n", video_no, audio_no, text_no);
+  gint menu_item_width = MENU_ITEM_W + 50;
 
   for (i = 0; i < video_no; i++) {
-    sprintf(label, "Video %d", i+1);
+    sprintf(label, "Video %d: language: %s", i+1,
+            player->meta.video_info[i].language);
     item = gtk_menu_item_new_with_label(label);
+    gtk_widget_set_size_request(item, menu_item_width, MENU_ITEM_H);
     g_signal_connect(G_OBJECT(item), "activate",
         G_CALLBACK(video_chose), player);
     gtk_menu_shell_append(GTK_MENU_SHELL(player->menubar.videomenu), item);
@@ -719,8 +806,10 @@ void menubar_update(void *imxplayer)
   }
 
   for (i = 0; i < audio_no; i++) {
-    sprintf(label, "Audio %d: %s", i+1, player->playengine->audio_lang[i]);
+    sprintf(label, "Audio %d: languange: %s", i+1,
+            player->meta.audio_info[i].language);
     item = gtk_menu_item_new_with_label(label);
+    gtk_widget_set_size_request(item, menu_item_width, MENU_ITEM_H);
     g_signal_connect(G_OBJECT(item), "activate",
         G_CALLBACK(audio_chose), player);
     gtk_menu_shell_append(GTK_MENU_SHELL(player->menubar.audiomenu), item);
@@ -728,8 +817,10 @@ void menubar_update(void *imxplayer)
   }
 
   for (i = 0; i < text_no; i++) {
-    sprintf(label, "Subtitle %d: %s", i+1, player->playengine->text_lang[i]);
+    sprintf(label, "Subtitle %d: %s", i+1,
+            player->meta.subtitle_info[i].language);
     item = gtk_menu_item_new_with_label(label);
+    gtk_widget_set_size_request(item, menu_item_width, MENU_ITEM_H);
     g_signal_connect(G_OBJECT(item), "activate",
         G_CALLBACK(subtitle_chose), player);
     gtk_menu_shell_append(GTK_MENU_SHELL(player->menubar.subtitlemenu), item);

@@ -47,11 +47,12 @@ static void playlist_set_file(ImxPlayer *player, gchar *filename)
   gtk_range_set_value(GTK_RANGE(player->ctrlbar.progress), 0);
   gtk_label_set_text(GTK_LABEL(player->ctrlbar.current), "00:00");
   gtk_label_set_text(GTK_LABEL(player->ctrlbar.duration), "00:00");
-  GtkImage *image = (GtkImage *)gtk_image_new_from_stock(
-                      GTK_STOCK_MEDIA_STOP, GTK_ICON_SIZE_BUTTON);
+#ifdef ENABLE_STOP_BUTTON
+  GtkImage *image = (GtkImage *)gtk_image_new_from_file("./icons/stop.png");
   gtk_button_set_image(GTK_BUTTON(player->ctrlbar.play_stop),
                        (GtkWidget *)image);
-  player->metainfo_refresh = TRUE;
+#endif
+//  player->metainfo_refresh = TRUE;
 }
 
 static void playlist_set_repeat(PlaylistBox *playlistbox, RepeatMode repeat)
@@ -376,6 +377,8 @@ static void close_list(GtkWidget *widget, gpointer data)
     player->playengine->set_render_rect(player->playengine, 0, 0,
                                         player->video_w, player->video_h);
     player->playengine->expose_video(player->playengine);
+    subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
+            player->video_y, player->video_w, player->video_h);
   }
 }
 
