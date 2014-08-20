@@ -30,7 +30,7 @@ SeekToDialog * seekto_dialog_create(void)
   SeekToDialog *seekto = (SeekToDialog *)malloc(sizeof (SeekToDialog));
   GtkWidget *lbl1;
 
-  seekto->dialog = gtk_dialog_new_with_buttons ("Direct Seek To", NULL,
+  seekto->dialog = gtk_dialog_new_with_buttons ("Seek To", NULL,
                                   GTK_DIALOG_MODAL,
                                   GTK_STOCK_OK, GTK_RESPONSE_OK,
                                   GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,

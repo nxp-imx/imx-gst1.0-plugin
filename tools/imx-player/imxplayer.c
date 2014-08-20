@@ -110,16 +110,20 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer data)
   case GDK_I:
     gtk_button_clicked(GTK_BUTTON(player->ctrlbar.info));
     break;
+#ifdef ENABLE_REPEAT_MODE_BUTTON
   case GDK_R:
   case GDK_r:
     gtk_button_clicked(GTK_BUTTON(player->ctrlbar.repeat));
     break;
+#endif
+#ifdef ENABLE_STEP_SEEK_BUTTON
   case GDK_Right:
     gtk_button_clicked(GTK_BUTTON(player->ctrlbar.step_forward));
     break;
   case GDK_Left:
     gtk_button_clicked(GTK_BUTTON(player->ctrlbar.step_rewind));
     break;
+#endif
   case GDK_Page_Up:
     gtk_button_clicked(GTK_BUTTON(player->ctrlbar.trick_forward));
     break;
@@ -308,7 +312,7 @@ void show_error(void* player, const gchar *error)
 void state_change(void* imxplayer,
                   GstState old_st, GstState new_st, GstState pending_st)
 {
-  if (new_st == GST_STATE_PLAYING) {
+  if (old_st == GST_STATE_READY && new_st == GST_STATE_PAUSED) {
     ImxPlayer *player = (ImxPlayer *)imxplayer;
     imx_metadata *meta = &player->meta;
     player->playengine->get_metadata(player->playengine, meta);
@@ -323,6 +327,7 @@ int main(int argc, char *argv[])
   GdkColor color;
   gchar colorstr[8] = {0};
 
+  /* check if DISPLAY envionment variable set */
   const gchar *disp = g_getenv ("DISPLAY");
   if (!disp || strlen(disp) < 2) {
     /* DISPLAY not set, set to :0 */
@@ -350,6 +355,14 @@ int main(int argc, char *argv[])
         g_mkdir(s2, 0755);
       }
     }
+  }
+
+  /* load gtk style configuration */
+  if (g_file_test(MY_GTK_STYLE_CONFIG_FILE, G_FILE_TEST_EXISTS)) {
+    if (g_file_test(SYS_GTK_STYLE_CONFIG_FILE, G_FILE_TEST_EXISTS)) {
+      system("cp /etc/gtk-2.0/gtkrc ./config/gtkrc.bak");
+    }
+    system("cp ./config/gtkrc /etc/gtk-2.0/gtkrc");
   }
 
   gtk_init(&argc, &argv);
@@ -456,6 +469,12 @@ int main(int argc, char *argv[])
   gtk_main();
 
   play_engine_destroy(player.playengine);
+
+  /* recover the gtk style configuration */
+  if (g_file_test(BAK_GTK_STYLE_CONFIG_FILE, G_FILE_TEST_EXISTS)) {
+    system("cp ./config/gtkrc.bak /etc/gtk-2.0/gtkrc");
+    g_remove(BAK_GTK_STYLE_CONFIG_FILE);
+  }
 
   return 0;
 }

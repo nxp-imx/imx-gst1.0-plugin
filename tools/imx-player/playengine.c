@@ -364,7 +364,7 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data)
     GstState old_st, new_st, pending_st;
     gst_message_parse_state_changed (msg, &old_st, &new_st, &pending_st);
     if (GST_MESSAGE_SRC (msg) == GST_OBJECT (engine->bin)) {
-      if (new_st == GST_STATE_PLAYING) {
+      if (old_st == GST_STATE_READY && new_st == GST_STATE_PAUSED) {
         /* Once we are in the playing state, analyze the streams */
         analyze_streams (data);
       }

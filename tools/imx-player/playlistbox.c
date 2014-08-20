@@ -47,10 +47,12 @@ static void playlist_set_file(ImxPlayer *player, gchar *filename)
   gtk_range_set_value(GTK_RANGE(player->ctrlbar.progress), 0);
   gtk_label_set_text(GTK_LABEL(player->ctrlbar.current), "00:00");
   gtk_label_set_text(GTK_LABEL(player->ctrlbar.duration), "00:00");
+
+  GtkWidget *image = gtk_image_new_from_file("./icons/pause.png");
+  gtk_button_set_image(GTK_BUTTON(player->ctrlbar.play_pause), image);
 #ifdef ENABLE_STOP_BUTTON
-  GtkImage *image = (GtkImage *)gtk_image_new_from_file("./icons/stop.png");
-  gtk_button_set_image(GTK_BUTTON(player->ctrlbar.play_stop),
-                       (GtkWidget *)image);
+  image = gtk_image_new_from_file("./icons/stop.png");
+  gtk_button_set_image(GTK_BUTTON(player->ctrlbar.play_stop), image);
 #endif
 //  player->metainfo_refresh = TRUE;
 }
@@ -73,6 +75,7 @@ static void playlist_next_previous(PlaylistBox *playlistbox, gboolean next)
   gboolean no_more = FALSE;
   GtkTreeModel *model;
   GtkTreeIter  iter;
+  GtkWidget *image;
   gchar *name;
   gchar *folder;
   gchar pathname[256];
@@ -113,6 +116,12 @@ static void playlist_next_previous(PlaylistBox *playlistbox, gboolean next)
       //stop the playing
       player->playengine->stop(player->playengine);
       g_print("No more %s file, stopped\n", next ? "next": "previous");
+#ifdef ENABLE_STOP_BUTTON
+      image = gtk_image_new_from_file("./icons/play.png");
+      gtk_button_set_image(GTK_BUTTON(player->ctrlbar.play_stop), image);
+#endif
+      image = gtk_image_new_from_file("./icons/play.png");
+      gtk_button_set_image(GTK_BUTTON(player->ctrlbar.play_pause), image);
     } else {
       model = gtk_tree_view_get_model (GTK_TREE_VIEW (playlistbox->list));
 

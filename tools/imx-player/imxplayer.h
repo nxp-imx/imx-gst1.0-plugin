@@ -33,6 +33,10 @@
 #include "speedbox.h"
 #include "playengine.h"
 
+#define SYS_GTK_STYLE_CONFIG_FILE "/etc/gtk-2.0/gtkrc"
+#define MY_GTK_STYLE_CONFIG_FILE  "./config/gtkrc"
+#define BAK_GTK_STYLE_CONFIG_FILE  "./config/gtkrc.bak"
+
 //#define EXPOSE_VIDEO_FOR_EACH_EXPOSE_EVENT
 //#define REMOVE_WINDOW_MANAGER_DECORATION
 //#define ENABLE_SET_COLOR_KEY
@@ -42,7 +46,7 @@
 #define PLAYLISTBOX_W   INFO_BOX_W
 #define PLAYLISTBOX_H   400
 #define SUBTITLE_BOX_W  800
-#define SUBTITLE_BOX_H  50
+#define SUBTITLE_BOX_H  40
 #define SPEED_BOX_W     100
 #define SPEED_BOX_H     50
 #define SPEED_BOX_X     50
@@ -66,6 +70,7 @@ typedef struct
   imx_metadata meta;
 
   gboolean fullscreen;
+  gboolean accurate_seek;
 //  gboolean metainfo_refresh;
   gboolean show_info;
   gboolean show_ctrlbar;

@@ -52,6 +52,7 @@ typedef struct
   GtkWidget *audiomenu;
   GtkWidget *subtitlemenu;
   GtkWidget *aspectmenu;
+  GtkWidget *optionmenu;
   GtkWidget *helpmenu;
 } MenuBar;
 

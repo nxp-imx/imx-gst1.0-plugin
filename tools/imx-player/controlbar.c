@@ -111,6 +111,7 @@ static gboolean idle_seek(gpointer data)
 }
 #endif
 
+#ifdef ENABLE_STEP_SEEK_BUTTON
 static void step_forward_cb(GtkWidget *widget, gpointer data)
 {
   ImxPlayer *player = (ImxPlayer*)data;
@@ -126,35 +127,36 @@ static void step_rewind_cb(GtkWidget *widget, gpointer data)
   cur -= (STEP_SEEK_STEP * GST_SECOND);
   player->playengine->seek(player->playengine, cur, FALSE);
 }
+#endif
 
 #ifdef ENABLE_STOP_BUTTON
 static void stop_cb(GtkWidget *widget, gpointer data) {
   ImxPlayer *player = (ImxPlayer*)data;
   if (PLAYENGINE_STOPPED == player->playengine->get_state(player->playengine)) {
     player->playengine->play(player->playengine);
-    GtkImage *image = (GtkImage *)gtk_image_new_from_file("./icons/stop.png");
-    gtk_button_set_image(GTK_BUTTON(widget), (GtkWidget *)image);
+    GtkWidget *image = gtk_image_new_from_file("./icons/stop.png");
+    gtk_button_set_image(GTK_BUTTON(widget), image);
   } else {
     player->playengine->stop(player->playengine);
     gtk_range_set_value(GTK_RANGE(player->ctrlbar.progress), 0);
     gtk_label_set_text(GTK_LABEL(player->ctrlbar.current), "00:00");
     gtk_label_set_text(GTK_LABEL(player->ctrlbar.duration), "00:00");
-    GtkImage *image = (GtkImage *)gtk_image_new_from_file("./icons/play.png");
-    gtk_button_set_image(GTK_BUTTON(widget), (GtkWidget *)image);
+    GtkWidget *image = gtk_image_new_from_file("./icons/play.png");
+    gtk_button_set_image(GTK_BUTTON(widget), image);
   }
 }
 #endif
 
 static void pause_cb(GtkWidget *widget, gpointer data) {
   ImxPlayer *player = (ImxPlayer*)data;
-  if (PLAYENGINE_PAUSED == player->playengine->get_state(player->playengine)) {
-    player->playengine->play(player->playengine);
-    GtkImage *image = (GtkImage *)gtk_image_new_from_file("./icons/pause.png");
-    gtk_button_set_image(GTK_BUTTON(widget), (GtkWidget *)image);
-  } else {
+  if (PLAYENGINE_PLAYING == player->playengine->get_state(player->playengine)) {
     player->playengine->pause(player->playengine);
-    GtkImage *image = (GtkImage *)gtk_image_new_from_file("./icons/play.png");
-    gtk_button_set_image(GTK_BUTTON(widget), (GtkWidget *)image);
+    GtkWidget *image = gtk_image_new_from_file("./icons/play.png");
+    gtk_button_set_image(GTK_BUTTON(widget), image);
+  } else {
+    player->playengine->play(player->playengine);
+    GtkWidget *image = gtk_image_new_from_file("./icons/pause.png");
+    gtk_button_set_image(GTK_BUTTON(widget), image);
   }
 }
 
@@ -177,29 +179,31 @@ static void info_cb(GtkWidget *widget, gpointer data) {
   infobox_show(&player->infobox, player->show_info);
 }
 
+#ifdef ENABLE_REPEAT_MODE_BUTTON
 static void repeat_cb(GtkWidget *widget, gpointer data)
 {
   ImxPlayer *player = (ImxPlayer*)data;
-  GtkImage *image;
+  GtkWidget *image;
   RepeatMode repeat = player->playlistbox.get_repeat(&player->playlistbox);
 
   if (REPEAT_OFF == repeat) {
     repeat = REPEAT_ONE;
-    image = (GtkImage *)gtk_image_new_from_file("./icons/repeat-one.png");
+    image = gtk_image_new_from_file("./icons/repeat-one.png");
   } else if (REPEAT_ONE == repeat) {
     repeat = REPEAT_ALL;
-    image = (GtkImage *)gtk_image_new_from_file("./icons/repeat-all.png");
+    image = gtk_image_new_from_file("./icons/repeat-all.png");
   } else if (REPEAT_ALL == repeat) {
     repeat = REPEAT_RANDOM;
-    image = (GtkImage *)gtk_image_new_from_file("./icons/repeat-random.png");
+    image = gtk_image_new_from_file("./icons/repeat-random.png");
   } else {
     repeat = REPEAT_OFF;
-    image = (GtkImage *)gtk_image_new_from_file("./icons/repeat-off.png");
+    image = gtk_image_new_from_file("./icons/repeat-off.png");
   }
 
   player->playlistbox.set_repeat(&player->playlistbox, repeat);
-  gtk_button_set_image(GTK_BUTTON(widget), (GtkWidget *)image);
+  gtk_button_set_image(GTK_BUTTON(widget), image);
 }
+#endif
 
 static void full_cb(GtkWidget *widget, gpointer data)
 {
@@ -217,9 +221,8 @@ static void full_cb(GtkWidget *widget, gpointer data)
     gtk_widget_show(player->ctrl_bar);
     player->hide_ctrl_bar = FALSE;
 #endif
-    GtkImage *image =
-        (GtkImage *)gtk_image_new_from_file("./icons/full-screen.png");
-    gtk_button_set_image(GTK_BUTTON(widget), (GtkWidget *)image);
+    GtkWidget *image = gtk_image_new_from_file("./icons/full-screen.png");
+    gtk_button_set_image(GTK_BUTTON(widget), image);
     player->show_ctrlbar = TRUE;
     player->show_menubar = TRUE;
     subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
@@ -241,9 +244,8 @@ static void full_cb(GtkWidget *widget, gpointer data)
                                player->video_w, player->video_h);
     player->playengine->expose_video(player->playengine);
 
-    GtkImage *image =
-        (GtkImage *)gtk_image_new_from_file("./icons/unfull-screen.png");
-    gtk_button_set_image(GTK_BUTTON(widget), (GtkWidget *)image);
+    GtkWidget *image = gtk_image_new_from_file("./icons/unfull-screen.png");
+    gtk_button_set_image(GTK_BUTTON(widget), image);
     player->show_ctrlbar = FALSE;
     player->show_menubar = FALSE;
     subtitle_resize(player->fixed_ct, &player->subtitle, player->video_x,
@@ -255,6 +257,7 @@ static void full_cb(GtkWidget *widget, gpointer data)
   menubar_show(&player->menubar, player->show_menubar);
 }
 
+#ifdef ENABLE_DIRECT_SEEK_BUTTON
 static void seekto_cb (GtkWidget *widget, gpointer data)
 {
   gchar str[20];
@@ -304,13 +307,16 @@ static void seekto_cb (GtkWidget *widget, gpointer data)
 
   seekto_dialog_destroy(seektodialog);
 }
+#endif
 
+#ifdef ENABLE_VOLUME_BUTTON
 static void volume_cb (GtkWidget *widget, gpointer data)
 {
   ImxPlayer *player = (ImxPlayer*)data;
   player->show_volbar = !player->show_volbar;
   volumebar_show(&player->volumebar, player->show_volbar);
 }
+#endif
 
 static gboolean progress_seek_cb(GtkRange *range, GtkScrollType scroll,
                               gdouble value, gpointer data)
@@ -320,6 +326,7 @@ static gboolean progress_seek_cb(GtkRange *range, GtkScrollType scroll,
 
   if (dur > 0) {
     gint64 to_seek = (gint64)((value / 100) * dur);
+    gtk_range_set_value(GTK_RANGE(player->ctrlbar.progress), value);
 #ifdef USE_IDLE_SEEK
     seek_param *pm = g_new0(seek_param, 1);
     if (pm) {
@@ -331,9 +338,8 @@ static gboolean progress_seek_cb(GtkRange *range, GtkScrollType scroll,
       player->playengine->seek(player->playengine, to_seek, FALSE);
     }
 #else
-    player->playengine->seek(player->playengine, to_seek, FALSE);
+    player->playengine->seek(player->playengine, to_seek,player->accurate_seek);
 #endif
-    gtk_range_set_value(GTK_RANGE(player->ctrlbar.progress), value);
   }
 
   return TRUE;
@@ -346,7 +352,7 @@ void ctrlbar_create(void *imxplayer)
   GtkWidget *hbox;
   GtkWidget *vbox;
   GtkWidget *hbox2;
-  GtkImage *image;
+  GtkWidget *image;
   GtkWidget *halign;
 
   ImxPlayer *player = (ImxPlayer *)imxplayer;
@@ -355,10 +361,11 @@ void ctrlbar_create(void *imxplayer)
   ctrlbar->control_bar = gtk_event_box_new();
   gtk_widget_modify_bg (ctrlbar->control_bar, GTK_STATE_NORMAL,
                         &player->color_key);
-  gtk_widget_set_size_request(ctrlbar->control_bar, CTRLBAR_W, CTRLBAR_H);
+  gtk_widget_set_size_request(ctrlbar->control_bar, CTRLBAR_W,
+                              CTRLBAR_H + CTRLBAR_Y_OFFSET);
   gtk_fixed_put(GTK_FIXED(player->fixed_ct), ctrlbar->control_bar,
                           (player->window_w - CTRLBAR_W) / 2,
-                          (player->window_h - CTRLBAR_H));
+                          (player->window_h - CTRLBAR_H - CTRLBAR_Y_OFFSET));
 
   vbox = gtk_vbox_new(FALSE, 0);
   gtk_container_add(GTK_CONTAINER(ctrlbar->control_bar), vbox);
@@ -397,8 +404,8 @@ void ctrlbar_create(void *imxplayer)
   gtk_box_pack_end(GTK_BOX(hbox2), ctrlbar->duration, FALSE, FALSE, 0);
 
   button = gtk_button_new();
-  image = (GtkImage *)gtk_image_new_from_file("./icons/previous.png");
-  gtk_button_set_image(GTK_BUTTON(button), (GtkWidget *)image);
+  image = gtk_image_new_from_file("./icons/previous.png");
+  gtk_button_set_image(GTK_BUTTON(button), image);
   g_signal_connect(G_OBJECT (button), "clicked",
       G_CALLBACK (previous_cb), player);
   gtk_widget_set_size_request(button, CTRLBAR_BOTTON_W, CTRLBAR_BOTTON_H);
@@ -406,27 +413,29 @@ void ctrlbar_create(void *imxplayer)
   ctrlbar->previous = button;
 
   button = gtk_button_new();
-  image = (GtkImage *)gtk_image_new_from_file("./icons/fast-backward.png");
-  gtk_button_set_image(GTK_BUTTON(button), (GtkWidget *)image);
+  image = gtk_image_new_from_file("./icons/fast-backward.png");
+  gtk_button_set_image(GTK_BUTTON(button), image);
   g_signal_connect(G_OBJECT (button), "clicked",
       G_CALLBACK (trick_play_backward_cb), player);
   gtk_widget_set_size_request(button, CTRLBAR_BOTTON_W, CTRLBAR_BOTTON_H);
   gtk_box_pack_start(GTK_BOX(hbox), button, FALSE, FALSE, 0);
   ctrlbar->trick_backward = button;
 
+#ifdef ENABLE_STEP_SEEK_BUTTON
   button = gtk_button_new();
-  image = (GtkImage *)gtk_image_new_from_file("./icons/step-backward.png");
-  gtk_button_set_image(GTK_BUTTON(button), (GtkWidget *)image);
+  image = gtk_image_new_from_file("./icons/step-backward.png");
+  gtk_button_set_image(GTK_BUTTON(button), image);
   g_signal_connect(G_OBJECT (button), "clicked",
       G_CALLBACK (step_rewind_cb), player);
   gtk_widget_set_size_request(button, CTRLBAR_BOTTON_W, CTRLBAR_BOTTON_H);
   gtk_box_pack_start(GTK_BOX(hbox), button, FALSE, FALSE, 0);
   ctrlbar->step_rewind = button;
+#endif
 
 #ifdef ENABLE_STOP_BUTTON
   button = gtk_button_new();
-  image = (GtkImage *)gtk_image_new_from_file("./icons/stop.png");
-  gtk_button_set_image(GTK_BUTTON(button), (GtkWidget *)image);
+  image = gtk_image_new_from_file("./icons/stop.png");
+  gtk_button_set_image(GTK_BUTTON(button), image);
   g_signal_connect(G_OBJECT (button), "clicked", G_CALLBACK (stop_cb), player);
   gtk_widget_set_size_request(button, CTRLBAR_BOTTON_W, CTRLBAR_BOTTON_H);
   gtk_box_pack_start(GTK_BOX(hbox), button, FALSE, FALSE, 0);
@@ -434,25 +443,27 @@ void ctrlbar_create(void *imxplayer)
 #endif
 
   button = gtk_button_new();
-  image = (GtkImage *)gtk_image_new_from_file("./icons/pause.png");
-  gtk_button_set_image(GTK_BUTTON(button), (GtkWidget *)image);
+  image = gtk_image_new_from_file("./icons/play.png");
+  gtk_button_set_image(GTK_BUTTON(button), image);
   g_signal_connect(G_OBJECT (button), "clicked", G_CALLBACK (pause_cb), player);
   gtk_widget_set_size_request(button, CTRLBAR_BOTTON_W, CTRLBAR_BOTTON_H);
   gtk_box_pack_start(GTK_BOX(hbox), button, FALSE, FALSE, 0);
   ctrlbar->play_pause = button;
 
+#ifdef ENABLE_STEP_SEEK_BUTTON
   button = gtk_button_new();
-  image = (GtkImage *)gtk_image_new_from_file("./icons/step-forward.png");
-  gtk_button_set_image(GTK_BUTTON(button), (GtkWidget *)image);
+  image = gtk_image_new_from_file("./icons/step-forward.png");
+  gtk_button_set_image(GTK_BUTTON(button), image);
   g_signal_connect(G_OBJECT (button), "clicked",
       G_CALLBACK (step_forward_cb), player);
   gtk_widget_set_size_request(button, CTRLBAR_BOTTON_W, CTRLBAR_BOTTON_H);
   gtk_box_pack_start(GTK_BOX(hbox), button, FALSE, FALSE, 0);
   ctrlbar->step_forward = button;
+#endif
 
   button = gtk_button_new();
-  image = (GtkImage *)gtk_image_new_from_file("./icons/fast-forward.png");
-  gtk_button_set_image(GTK_BUTTON(button), (GtkWidget *)image);
+  image = gtk_image_new_from_file("./icons/fast-forward.png");
+  gtk_button_set_image(GTK_BUTTON(button), image);
   g_signal_connect(G_OBJECT (button), "clicked",
       G_CALLBACK (trick_play_forward_cb), player);
   gtk_widget_set_size_request(button, CTRLBAR_BOTTON_W, CTRLBAR_BOTTON_H);
@@ -460,8 +471,8 @@ void ctrlbar_create(void *imxplayer)
   ctrlbar->trick_forward = button;
 
   button = gtk_button_new();
-  image = (GtkImage *)gtk_image_new_from_file("./icons/next-track.png");
-  gtk_button_set_image(GTK_BUTTON(button), (GtkWidget *)image);
+  image = gtk_image_new_from_file("./icons/next-track.png");
+  gtk_button_set_image(GTK_BUTTON(button), image);
   g_signal_connect(G_OBJECT (button), "clicked",
       G_CALLBACK (next_cb), player);
   gtk_widget_set_size_request(button, CTRLBAR_BOTTON_W, CTRLBAR_BOTTON_H);
@@ -469,44 +480,50 @@ void ctrlbar_create(void *imxplayer)
   ctrlbar->next = button;
 
   button = gtk_button_new();
-  image = (GtkImage *)gtk_image_new_from_file("./icons/info.png");
-  gtk_button_set_image(GTK_BUTTON(button), (GtkWidget *)image);
+  image = gtk_image_new_from_file("./icons/info.png");
+  gtk_button_set_image(GTK_BUTTON(button), image);
   g_signal_connect(G_OBJECT (button), "clicked", G_CALLBACK (info_cb), player);
   gtk_widget_set_size_request(button, CTRLBAR_BOTTON_W, CTRLBAR_BOTTON_H);
   gtk_box_pack_start(GTK_BOX(hbox), button, FALSE, FALSE, 0);
   ctrlbar->info = button;
 
+#ifdef ENABLE_REPEAT_MODE_BUTTON
   button = gtk_button_new();
-  image = (GtkImage *)gtk_image_new_from_file("./icons/repeat-off.png");
-  gtk_button_set_image(GTK_BUTTON(button), (GtkWidget *)image);
+  image = gtk_image_new_from_file("./icons/repeat-off.png");
+  gtk_button_set_image(GTK_BUTTON(button), image);
   g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK (repeat_cb), player);
   gtk_widget_set_size_request(button, CTRLBAR_BOTTON_W, CTRLBAR_BOTTON_H);
   gtk_box_pack_start(GTK_BOX(hbox), button, FALSE, FALSE, 0);
   ctrlbar->repeat = button;
+#endif
 
   button = gtk_button_new();
-  image = (GtkImage *)gtk_image_new_from_file("./icons/full-screen.png");
-  gtk_button_set_image(GTK_BUTTON(button), (GtkWidget *)image);
+  image = gtk_image_new_from_file("./icons/full-screen.png");
+  gtk_button_set_image(GTK_BUTTON(button), image);
   g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK (full_cb), player);
   gtk_widget_set_size_request(button, CTRLBAR_BOTTON_W, CTRLBAR_BOTTON_H);
   gtk_box_pack_start(GTK_BOX(hbox), button, FALSE, FALSE, 0);
   ctrlbar->full = button;
 
+#ifdef ENABLE_DIRECT_SEEK_BUTTON
   button = gtk_button_new();
-  image = (GtkImage *)gtk_image_new_from_file("./icons/seek-to.png");
-  gtk_button_set_image(GTK_BUTTON(button), (GtkWidget *)image);
+  image = gtk_image_new_from_file("./icons/seek-to.png");
+  gtk_button_set_image(GTK_BUTTON(button), image);
   g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK (seekto_cb), player);
   gtk_widget_set_size_request(button, CTRLBAR_BOTTON_W, CTRLBAR_BOTTON_H);
   gtk_box_pack_start(GTK_BOX(hbox), button, FALSE, FALSE, 0);
   ctrlbar->seekto = button;
+#endif
 
+#ifdef ENABLE_VOLUME_BUTTON
   button = gtk_button_new();
-  image = (GtkImage *)gtk_image_new_from_file("./icons/volume.png");
-  gtk_button_set_image(GTK_BUTTON(button), (GtkWidget *)image);
+  image = gtk_image_new_from_file("./icons/volume.png");
+  gtk_button_set_image(GTK_BUTTON(button), image);
   g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK (volume_cb), player);
   gtk_widget_set_size_request(button, CTRLBAR_BOTTON_W, CTRLBAR_BOTTON_H);
   gtk_box_pack_start(GTK_BOX(hbox), button, FALSE, FALSE, 0);
   ctrlbar->volume = button;
+#endif
 }
 
 void ctrlbar_show(CtrlBar *ctrlbar, gboolean show)
@@ -520,6 +537,7 @@ void ctrlbar_show(CtrlBar *ctrlbar, gboolean show)
 void ctrlbar_resize(GtkWidget *container, CtrlBar *ctrlbar,
                     gint x, gint y, gint w, gint h)
 {
-  gtk_widget_set_size_request(ctrlbar->control_bar, w, h);
-  gtk_fixed_move(GTK_FIXED(container), ctrlbar->control_bar, x, y);
+  gtk_widget_set_size_request(ctrlbar->control_bar, w, h + CTRLBAR_Y_OFFSET);
+  gtk_fixed_move(GTK_FIXED(container), ctrlbar->control_bar,
+                  x, y - CTRLBAR_Y_OFFSET);
 }

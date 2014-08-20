@@ -97,7 +97,7 @@ void infobox_update(void *imxplayer)
     ntracks = MAX_VIDEO_TRACK_COUNT;
   for (i = 0; i < ntracks; i++) {
     sprintf(s, "Video %d: %s, Language: %s\n        %d x %d (%d/%d)",
-               i, meta->video_info[i].codec_type, meta->video_info[i].language,
+               i+1, meta->video_info[i].codec_type, meta->video_info[i].language,
                meta->video_info[i].width, meta->video_info[i].height,
                meta->video_info[i].framerate_numerator,
                meta->video_info[i].framerate_denominator);
@@ -117,7 +117,7 @@ void infobox_update(void *imxplayer)
     ntracks = MAX_AUDIO_TRACK_COUNT;
   for (i = 0; i < ntracks; i++) {
     sprintf(s,"Audio %d: %s, Language: %s\n        %d Channels, %d Hz",
-              i, meta->audio_info[i].codec_type, meta->audio_info[i].language,
+              i+1, meta->audio_info[i].codec_type, meta->audio_info[i].language,
               meta->audio_info[i].channels, meta->audio_info[i].samplerate);
     strncat(str, s, INFO_TEXT_LEN_MAX);
 
@@ -135,7 +135,7 @@ void infobox_update(void *imxplayer)
     ntracks = MAX_SUBTITLE_TRACK_COUNT;
   for (i = 0; i < ntracks; i++) {
     sprintf(s,"Subtitle %d: %s, Language: %s\n",
-              i, meta->subtitle_info[i].codec_type,
+              i+1, meta->subtitle_info[i].codec_type,
               meta->subtitle_info[i].language);
     strncat(str, s, INFO_TEXT_LEN_MAX);
   }

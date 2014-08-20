@@ -1,0 +1,7 @@
+gtk-icon-theme-name = "Sato"
+style "mystyle"
+{
+GtkHScale::slider-length=60
+GtkHScale::slider-width=30
+}
+class "GtkHScale" style "mystyle"

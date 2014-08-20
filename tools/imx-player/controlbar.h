@@ -23,22 +23,59 @@
 #ifndef CONTROLBAR_H_
 #define CONTROLBAR_H_
 
+/* Configure the optional buttons on the control bar */
 //#define ENABLE_STOP_BUTTON
+//#define ENABLE_STEP_SEEK_BUTTON
+//#define ENABLE_DIRECT_SEEK_BUTTON
+//#define ENABLE_REPEAT_MODE_BUTTON
+//#define ENABLE_VOLUME_BUTTON
+
+/* Enable this to have the seeking performed in a separated thread */
 //#define USE_IDLE_SEEK
 
 #define CTRLBAR_BOTTON_W      50
 #define CTRLBAR_BOTTON_H      50
-#define CTRLBAR_BOTTON_GAP    1
+#define CTRLBAR_BOTTON_GAP    2
 #define CTRLBAR_PROGRESS_H    50
 #define CTRLBAR_PROGRESS_GAP  1
+#define CTRLBAR_Y_OFFSET      10
+#define CTRLBAR_TIME_W        120
+
+#define NUM_OF_BUTTONS_BASE   9
 
 #ifdef ENABLE_STOP_BUTTON
-#define NUM_OF_BUTTONS        13
+#define STOP_BUTTON           1
 #else
-#define NUM_OF_BUTTONS        12
+#define STOP_BUTTON           0
 #endif
 
-#define CTRLBAR_TIME_W        120
+#ifdef ENABLE_STEP_SEEK_BUTTON
+#define STEP_SEEK_BUTTON      1
+#else
+#define STEP_SEEK_BUTTON      0
+#endif
+
+#ifdef ENABLE_DIRECT_SEEK_BUTTON
+#define DIRECT_SEEK_BUTTON    1
+#else
+#define DIRECT_SEEK_BUTTON    0
+#endif
+
+#ifdef ENABLE_REPEAT_MODE_BUTTON
+#define REPEAT_MODE_BUTTON    1
+#else
+#define REPEAT_MODE_BUTTON    0
+#endif
+
+#ifdef ENABLE_VOLUME_BUTTON
+#define VOLUME_BUTTON         1
+#else
+#define VOLUME_BUTTON         0
+#endif
+
+#define NUM_OF_BUTTONS        (NUM_OF_BUTTONS_BASE + STOP_BUTTON + \
+                                STEP_SEEK_BUTTON + DIRECT_SEEK_BUTTON + \
+                                REPEAT_MODE_BUTTON + VOLUME_BUTTON)
 
 #define CTRLBAR_H (CTRLBAR_BOTTON_H + CTRLBAR_PROGRESS_GAP + CTRLBAR_PROGRESS_H)
 #define CTRLBAR_W ((CTRLBAR_BOTTON_W + CTRLBAR_BOTTON_GAP) * NUM_OF_BUTTONS \
@@ -58,15 +95,23 @@ typedef struct
   GtkWidget *play_pause;
   GtkWidget *trick_forward;
   GtkWidget *trick_backward;
+#ifdef ENABLE_STEP_SEEK_BUTTON
   GtkWidget *step_forward;
   GtkWidget *step_rewind;
+#endif
   GtkWidget *next;
   GtkWidget *previous;
   GtkWidget *info;
+#ifdef ENABLE_REPEAT_MODE_BUTTON
   GtkWidget *repeat;
+#endif
   GtkWidget *full;
+#ifdef ENABLE_DIRECT_SEEK_BUTTON
   GtkWidget *seekto;
+#endif
+#ifdef ENABLE_VOLUME_BUTTON
   GtkWidget *volume;
+#endif
 } CtrlBar;
 
 void ctrlbar_create(void *imxplayer);

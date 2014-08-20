@@ -465,6 +465,62 @@ static void origin_size(GtkWidget *widget, gpointer data)
   }
 }
 
+static void toggle_seek(GtkWidget *widget, gpointer data)
+{
+  ImxPlayer *player = (ImxPlayer *)data;
+  if (gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(widget)))
+    player->accurate_seek = TRUE;
+  else
+    player->accurate_seek = FALSE;
+}
+
+static void repeat_off(GtkWidget *widget, gpointer data)
+{
+  ImxPlayer *player = (ImxPlayer *)data;
+  if (gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(widget))) {
+    player->playlistbox.set_repeat(&player->playlistbox, REPEAT_OFF);
+#ifdef ENABLE_REPEAT_MODE_BUTTON
+    GtkWidget *image = gtk_image_new_from_file("./icons/repeat-off.png");
+    gtk_button_set_image(GTK_BUTTON(player->ctrlbar.repeat), image);
+#endif
+  }
+}
+
+static void repeat_one(GtkWidget *widget, gpointer data)
+{
+  ImxPlayer *player = (ImxPlayer *)data;
+  if (gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(widget))) {
+    player->playlistbox.set_repeat(&player->playlistbox, REPEAT_ONE);
+#ifdef ENABLE_REPEAT_MODE_BUTTON
+    GtkWidget *image = gtk_image_new_from_file("./icons/repeat-one.png");
+    gtk_button_set_image(GTK_BUTTON(player->ctrlbar.repeat), image);
+#endif
+  }
+}
+
+static void repeat_all(GtkWidget *widget, gpointer data)
+{
+  ImxPlayer *player = (ImxPlayer *)data;
+  if (gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(widget))) {
+    player->playlistbox.set_repeat(&player->playlistbox, REPEAT_ALL);
+#ifdef ENABLE_REPEAT_MODE_BUTTON
+    GtkWidget *image = gtk_image_new_from_file("./icons/repeat-all.png");
+    gtk_button_set_image(GTK_BUTTON(player->ctrlbar.repeat), image);
+#endif
+  }
+}
+static void repeat_random(GtkWidget *widget, gpointer data)
+{
+  ImxPlayer *player = (ImxPlayer *)data;
+  if (gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(widget))) {
+    player->playlistbox.set_repeat(&player->playlistbox, REPEAT_RANDOM);
+#ifdef ENABLE_REPEAT_MODE_BUTTON
+    GtkWidget *image = gtk_image_new_from_file("./icons/repeat-random.png");
+    gtk_button_set_image(GTK_BUTTON(player->ctrlbar.repeat), image);
+#endif
+  }
+}
+
 static void about(GtkWidget *widget, gpointer data)
 {
   GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file("./icons/logo.png", NULL);
@@ -731,6 +787,55 @@ void menubar_create(void *imxplayer)
 
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar->menubar), submenu);
 
+  //Option menu
+  menubar->optionmenu = gtk_menu_new();
+  submenu = gtk_menu_item_new_with_mnemonic("_Option ");
+  gtk_menu_item_set_submenu(GTK_MENU_ITEM(submenu), menubar->optionmenu);
+
+  item = gtk_check_menu_item_new_with_label("Accurate Seek");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
+  g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(toggle_seek),player);
+  gtk_menu_shell_append(GTK_MENU_SHELL(menubar->optionmenu), item);
+
+  sep = gtk_separator_menu_item_new();
+  gtk_menu_shell_append(GTK_MENU_SHELL(menubar->optionmenu), sep);
+
+  item = gtk_menu_item_new_with_label("Repeat Mode");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
+  gtk_menu_shell_append(GTK_MENU_SHELL(menubar->optionmenu), item);
+
+  /* repeat sub menu start */
+  GtkWidget *repeat_menu = gtk_menu_new();
+  gtk_menu_item_set_submenu(GTK_MENU_ITEM(item), repeat_menu);
+  GSList *group = NULL;
+  item = gtk_radio_menu_item_new_with_label (group, "Repeat Off");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
+  g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(repeat_off), player);
+  group = gtk_radio_menu_item_get_group (GTK_RADIO_MENU_ITEM (item));
+  gtk_check_menu_item_set_active (GTK_CHECK_MENU_ITEM (item), TRUE);
+  gtk_menu_shell_append(GTK_MENU_SHELL(repeat_menu), item);
+
+  item = gtk_radio_menu_item_new_with_label (group, "Repeat One");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
+  g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(repeat_one), player);
+  group = gtk_radio_menu_item_get_group (GTK_RADIO_MENU_ITEM (item));
+  gtk_menu_shell_append(GTK_MENU_SHELL(repeat_menu), item);
+
+  item = gtk_radio_menu_item_new_with_label (group, "Repeat All");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
+  g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(repeat_all), player);
+  group = gtk_radio_menu_item_get_group (GTK_RADIO_MENU_ITEM (item));
+  gtk_menu_shell_append(GTK_MENU_SHELL(repeat_menu), item);
+
+  item = gtk_radio_menu_item_new_with_label (group, "Repeat Random");
+  gtk_widget_set_size_request(item, MENU_ITEM_W, MENU_ITEM_H);
+  g_signal_connect(G_OBJECT(item), "activate",G_CALLBACK(repeat_random),player);
+  group = gtk_radio_menu_item_get_group (GTK_RADIO_MENU_ITEM (item));
+  gtk_menu_shell_append(GTK_MENU_SHELL(repeat_menu), item);
+  /* repeat sub menu start end */
+
+  gtk_menu_shell_append(GTK_MENU_SHELL(menubar->menubar), submenu);
+
   //Help menu
   menubar->helpmenu = gtk_menu_new();
   submenu = gtk_menu_item_new_with_mnemonic("  _Help  ");
@@ -764,19 +869,22 @@ void menubar_update(void *imxplayer)
   ImxPlayer *player = (ImxPlayer *)imxplayer;
 
   GtkMenuShell *menu = GTK_MENU_SHELL(player->menubar.videomenu);
-  GList *list = NULL;
-  for (list = menu->children; list; list = list->next) {
+  GList *list = NULL, *p;
+  for (list = menu->children; list; list = p) {
+    p = list->next;
     menu->children = g_list_remove(menu->children, list->data);
   }
 
   menu = GTK_MENU_SHELL(player->menubar.audiomenu);
-  for (list = menu->children; list; list = list->next) {
+  for (list = menu->children; list; list = p) {
+    p = list->next;
     menu->children = g_list_remove(menu->children, list->data);
   }
 
   menu = GTK_MENU_SHELL(player->menubar.subtitlemenu);
   gint cnt = 0;
-  for (list = menu->children; list; list = list->next) {
+  for (list = menu->children; list; list = p) {
+    p = list->next;
     /* ignore the first two fixed menu item */
     if (cnt < 2)
       continue;
