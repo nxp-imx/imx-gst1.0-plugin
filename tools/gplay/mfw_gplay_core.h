@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (C) 2009-2014 Freescale Semiconductor, Inc. All rights reserved.
  *
  */
  
@@ -52,6 +52,10 @@ extern "C" {
 /* size of metadata item */
 #define METADATA_ITEM_MAX_SIZE_LARGE 256
 #define METADATA_ITEM_MAX_SIZE_SMALL 64
+
+#define MAX_AUDIO_TRACK_COUNT 8
+#define MAX_VIDEO_TRACK_COUNT 8
+#define MAX_SUBTITLE_TRACK_COUNT 8
 
 
 #define GPLAYCORE_API_VERSION 5
@@ -156,24 +160,48 @@ typedef struct
     fsl_player_s32 height;
 } fsl_player_video_crop;
 
+/* audio stream info */
+typedef struct {
+  fsl_player_s8 codec_type[METADATA_ITEM_MAX_SIZE_SMALL];
+  fsl_player_s32 samplerate;
+  fsl_player_s32 channels;
+  fsl_player_s32 bitrate;
+  fsl_player_s8 language[METADATA_ITEM_MAX_SIZE_SMALL];
+} fsl_player_audio_info;
+
+/* video stream info */
+typedef struct {
+  fsl_player_s8 codec_type[METADATA_ITEM_MAX_SIZE_SMALL];
+  fsl_player_s32 width;
+  fsl_player_s32 height;
+  fsl_player_s32 framerate_numerator;
+  fsl_player_s32 framerate_denominator;
+  fsl_player_s32 bitrate;
+  fsl_player_s8 language[METADATA_ITEM_MAX_SIZE_SMALL];
+} fsl_player_video_info;
+
+/* subtitle stream info */
+typedef struct {
+  fsl_player_s8 codec_type[METADATA_ITEM_MAX_SIZE_SMALL];
+  fsl_player_s8 language[METADATA_ITEM_MAX_SIZE_SMALL];
+} fsl_player_subtitle_info;
+
 /* metadata information */
 typedef struct
 {
+    fsl_player_s8 container[METADATA_ITEM_MAX_SIZE_SMALL];
     fsl_player_s8 currentfilename[METADATA_ITEM_MAX_SIZE_LARGE];
     fsl_player_s8 title[METADATA_ITEM_MAX_SIZE_LARGE];
     fsl_player_s8 artist[METADATA_ITEM_MAX_SIZE_LARGE];
     fsl_player_s8 album[METADATA_ITEM_MAX_SIZE_LARGE];
     fsl_player_s8 year[METADATA_ITEM_MAX_SIZE_SMALL];
     fsl_player_s8 genre[METADATA_ITEM_MAX_SIZE_SMALL];
-    fsl_player_s32 width;
-    fsl_player_s32 height;
-    fsl_player_s32 framerate;
-    fsl_player_s32 videobitrate;
-    fsl_player_s8 videocodec[METADATA_ITEM_MAX_SIZE_SMALL];
-    fsl_player_s32 channels;
-    fsl_player_s32 samplerate;
-    fsl_player_s32 audiobitrate;
-    fsl_player_s8 audiocodec[METADATA_ITEM_MAX_SIZE_SMALL];
+    fsl_player_s32 n_audio;
+    fsl_player_s32 n_video;
+    fsl_player_s32 n_subtitle;
+    fsl_player_audio_info audio_info[MAX_AUDIO_TRACK_COUNT];
+    fsl_player_video_info video_info[MAX_VIDEO_TRACK_COUNT];
+    fsl_player_subtitle_info subtitle_info[MAX_SUBTITLE_TRACK_COUNT];
 } fsl_player_metadata;
 
 typedef enum{

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2012, Freescale Semiconductor, Inc. All rights reserved. 
+ * Copyright (c) 2009-2014, Freescale Semiconductor, Inc. All rights reserved. 
  *
  */
  
@@ -132,6 +132,44 @@ fsl_player_ret_val fsl_player_send_message_exit(fsl_player_handle handle);
 fsl_player_ret_val fsl_player_exit_message_loop(fsl_player_handle handle);
 
 fsl_player_ret_val fsl_player_post_eos_semaphore(fsl_player_handle handle);
+
+static void
+print_one_tag (const GstTagList * list, const gchar * tag, gpointer user_data)
+{
+  int i, num;
+
+  num = gst_tag_list_get_tag_size (list, tag);
+  for (i = 0; i < num; ++i) {
+    const GValue *val;
+
+    /* Note: when looking for specific tags, use the gst_tag_list_get_xyz() API,
+     *      *      * we only use the GValue approach here because it is more generic */
+    val = gst_tag_list_get_value_index (list, tag, i);
+    if (G_VALUE_HOLDS_STRING (val)) {
+      g_print ("\t%20s : %s\n", tag, g_value_get_string (val));
+    } else if (G_VALUE_HOLDS_UINT (val)) {
+      g_print ("\t%20s : %u\n", tag, g_value_get_uint (val));
+    } else if (G_VALUE_HOLDS_DOUBLE (val)) {
+      g_print ("\t%20s : %g\n", tag, g_value_get_double (val));
+    } else if (G_VALUE_HOLDS_BOOLEAN (val)) {
+      g_print ("\t%20s : %s\n", tag,
+          (g_value_get_boolean (val)) ? "true" : "false");
+    } else if (GST_VALUE_HOLDS_BUFFER (val)) {
+      GstBuffer *buf = gst_value_get_buffer (val);
+      guint buffer_size = gst_buffer_get_size (buf);
+
+      g_print ("\t%20s : buffer of size %u\n", tag, buffer_size);
+    } else if (GST_VALUE_HOLDS_DATE_TIME (val)) {
+      GstDateTime *dt = g_value_get_boxed (val);
+      gchar *dt_str = gst_date_time_to_iso8601_string (dt);
+
+      g_print ("\t%20s : %s\n", tag, dt_str);
+      g_free (dt_str);
+    } else {
+      g_print ("\t%20s : tag of type '%s'\n", tag, G_VALUE_TYPE_NAME (val));
+    }
+  }
+}
 
 
 static fsl_player_bool poll_for_state_change(fsl_player_property* pproperty ,GstState sRecState, GstElement * elem, fsl_player_u32 timeout)
@@ -297,7 +335,12 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
         if( 0 == i )
         {
             //FSL_PLAYER_PRINT("%15s: %s\n", gst_tag_get_nick(tag), str);
-
+            
+            if( strncmp(gst_tag_get_nick(tag), "container format", 16) == 0 )
+            {
+                strncpy(pproperty->metadata.container, str, sizeof(pproperty->metadata.container));
+                pproperty->metadata.container[sizeof(pproperty->metadata.container)-1] = '\0';
+            }
             if( strncmp(gst_tag_get_nick(tag), "location", 8) == 0 )
             {
                 strncpy(pproperty->metadata.currentfilename, str, sizeof(pproperty->metadata.currentfilename));
@@ -336,47 +379,6 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
                 strncpy(pproperty->metadata.genre, str, sizeof(pproperty->metadata.genre));
                 pproperty->metadata.genre[sizeof(pproperty->metadata.genre)-1] = '\0';
             }
-            if( strncmp(gst_tag_get_nick(tag), "audio codec", 11) == 0 )
-            {
-                strncpy(pproperty->metadata.audiocodec, str, sizeof(pproperty->metadata.audiocodec));
-                pproperty->metadata.audiocodec[sizeof(pproperty->metadata.audiocodec)-1]= '\0';
-
-             // printf("audio codec [%s]\n", pproperty->metadata.audiocodec);
-            }
-            if( strncmp(gst_tag_get_nick(tag), "bitrate", 7) == 0 )
-            {
-                pproperty->metadata.audiobitrate = atoi(str);
-            }
-            if( strncmp(gst_tag_get_nick(tag), "video codec", 11) == 0 )
-            {
-                strncpy(pproperty->metadata.videocodec, str, sizeof(pproperty->metadata.videocodec));
-                pproperty->metadata.videocodec[sizeof(pproperty->metadata.videocodec)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "image width", 11) == 0 )
-            {
-                pproperty->metadata.width = atoi(str);
-            }
-            if( strncmp(gst_tag_get_nick(tag), "image height", 12) == 0 )
-            {
-                pproperty->metadata.height = atoi(str);
-            }
-            if( strncmp(gst_tag_get_nick(tag), "frame rate", 10) == 0 )
-            {
-                pproperty->metadata.framerate= atoi(str);
-            }
-            if( strncmp(gst_tag_get_nick(tag), "video bitrate", 13) == 0 )
-            {
-                pproperty->metadata.videobitrate = atoi(str);
-            }
-            if( strncmp(gst_tag_get_nick(tag), "number of channels", 18) == 0 )
-            {
-                pproperty->metadata.channels = atoi(str);
-            }
-            if (strncmp(gst_tag_get_nick(tag), "sampling frequency (Hz)", 23) == 0)
-            {
-                pproperty->metadata.samplerate = atoi(str);
-            }
-
         }
         else
         {
@@ -964,6 +966,117 @@ fsl_player_s8* filename2uri(fsl_player_s8* uri, fsl_player_s8* fn)
     return uri;
 }
 
+
+
+void fsl_player_get_stream_info (fsl_player_property* pproperty)
+{
+  fsl_player_s32 nstreams = 0;
+  fsl_player_s32 i = 0;
+  GstPad *pad;
+  GstTagList *tags;
+  gchar *str, *str1;
+
+  g_object_get( G_OBJECT(pproperty->playbin), "n-audio", &nstreams, NULL);
+  if (nstreams > MAX_AUDIO_TRACK_COUNT)
+    nstreams = MAX_AUDIO_TRACK_COUNT;
+
+  pproperty->metadata.n_audio = nstreams;
+  for (i=0; i<nstreams; i++) {
+    tags = pad = NULL;
+    g_signal_emit_by_name (G_OBJECT(pproperty->playbin), "get-audio-pad", i, &pad);
+    if (pad) {
+      GstCaps *caps = gst_pad_get_current_caps (pad);
+      GstStructure *str = gst_caps_get_structure (caps, 0);
+      gst_structure_get_int (str, "rate", &pproperty->metadata.audio_info[i].samplerate);
+      gst_structure_get_int (str, "channels", &pproperty->metadata.audio_info[i].channels);
+      gst_caps_unref (caps);
+      gst_object_unref (pad);
+    }
+
+    g_signal_emit_by_name (G_OBJECT(pproperty->playbin), "get-audio-tags", i, &tags);
+    if (tags) {
+      str = NULL;
+      gst_tag_list_get_string (tags, GST_TAG_AUDIO_CODEC, &str);
+      strcpy (pproperty->metadata.audio_info[i].codec_type, str ? str : "unknown");
+      g_free (str);
+
+      str = NULL;
+      gst_tag_list_get_string (tags, GST_TAG_LANGUAGE_CODE, &str);
+      strcpy (pproperty->metadata.audio_info[i].language, str ? str : "unknown");
+      g_free (str);
+
+      gst_tag_list_get_uint (tags, GST_TAG_BITRATE, &pproperty->metadata.audio_info[i].bitrate);
+      //gst_tag_list_foreach (tags, print_one_tag, NULL);
+      gst_tag_list_free (tags);
+    }
+  }
+
+  nstreams = 0;
+  g_object_get( G_OBJECT(pproperty->playbin), "n-video", &nstreams, NULL);
+  if (nstreams > MAX_VIDEO_TRACK_COUNT)
+    nstreams = MAX_VIDEO_TRACK_COUNT;
+
+  pproperty->metadata.n_video = nstreams;
+  for (i=0; i<nstreams; i++) {
+    tags = pad = NULL;
+    g_signal_emit_by_name (G_OBJECT(pproperty->playbin), "get-video-pad", i, &pad);
+    if (pad) {
+      GstCaps *caps = gst_pad_get_current_caps (pad);
+      GstStructure *str = gst_caps_get_structure (caps, 0);
+      gst_structure_get_int (str, "width", &pproperty->metadata.video_info[i].width);
+      gst_structure_get_int (str, "height", &pproperty->metadata.video_info[i].height);
+      gst_structure_get_fraction (str, "framerate", 
+          &pproperty->metadata.video_info[i].framerate_numerator, &pproperty->metadata.video_info[i].framerate_denominator);
+      gst_caps_unref (caps);
+      gst_object_unref (pad);
+    }
+
+    g_signal_emit_by_name (G_OBJECT(pproperty->playbin), "get-video-tags", i, &tags);
+    if (tags) {
+      str = NULL;
+      gst_tag_list_get_string (tags, GST_TAG_VIDEO_CODEC, &str);
+      strcpy (pproperty->metadata.video_info[i].codec_type, str ? str : "unknown");
+      g_free (str);
+
+      str = NULL;
+      gst_tag_list_get_string (tags, GST_TAG_LANGUAGE_CODE, &str);
+      strcpy (pproperty->metadata.video_info[i].language, str ? str : "unknown");
+      g_free (str);
+
+      gst_tag_list_get_uint (tags, GST_TAG_BITRATE, &pproperty->metadata.video_info[i].bitrate);
+      //gst_tag_list_foreach (tags, print_one_tag, NULL);
+      gst_tag_list_free (tags);
+    }
+  }
+
+  nstreams = 0;
+  g_object_get( G_OBJECT(pproperty->playbin), "n-text", &nstreams, NULL);
+  if (nstreams > MAX_SUBTITLE_TRACK_COUNT)
+    nstreams = MAX_SUBTITLE_TRACK_COUNT;
+
+  pproperty->metadata.n_subtitle = nstreams;
+  for (i=0; i<nstreams; i++) {
+    tags = NULL;
+    g_signal_emit_by_name (G_OBJECT(pproperty->playbin), "get-text-tags", i, &tags);
+    if (tags) {
+      str = NULL;
+      gst_tag_list_get_string (tags, GST_TAG_SUBTITLE_CODEC, &str);
+      strcpy (pproperty->metadata.subtitle_info[i].codec_type, str ? str : "unknown");
+      g_free (str);
+
+      str = NULL;
+      gst_tag_list_get_string (tags, GST_TAG_LANGUAGE_CODE, &str);
+      strcpy (pproperty->metadata.subtitle_info[i].language, str ? str : "unknown");
+      g_free (str);
+
+      //gst_tag_list_foreach (tags, print_one_tag, NULL);
+      gst_tag_list_free (tags);
+    }
+  }
+
+  return;
+}
+
 fsl_player_ret_val fsl_player_set_media_location(fsl_player_handle handle, fsl_player_s8* filename, fsl_player_drm_format* drm_format)
 {
     fsl_player* pplayer = (fsl_player*)handle;
@@ -998,11 +1111,12 @@ fsl_player_ret_val fsl_player_play(fsl_player_handle handle)
         return FSL_PLAYER_FAILURE;
     }
 
+    fsl_player_get_stream_info (pproperty);
+
     if ((pproperty->fade) && (!pproperty->bmute)){
       _player_mute(handle, FALSE);
     }
 
-    
     pproperty->player_state = FSL_PLAYER_STATUS_PLAYING;
     FSL_PLAYER_PRINT("%s()\n", __FUNCTION__);
 

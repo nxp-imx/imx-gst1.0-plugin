@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (C) 2009-2014 Freescale Semiconductor, Inc. All rights reserved.
  *
  */
 
@@ -412,27 +412,44 @@ void print_metadata(fsl_player_handle handle)
     fsl_player* pplayer = (fsl_player*)handle;
     fsl_player_u64 duration=0;
     fsl_player_metadata metadata;
+    fsl_player_s32 i;
+
     pplayer->klass->get_property(pplayer, FSL_PLAYER_PROPERTY_METADATA, (void*)(&metadata));
     pplayer->klass->get_property(pplayer, FSL_PLAYER_PROPERTY_DURATION, (void*)(&duration));
 
     PRINT("\nMetadata of File: %s\n", metadata.currentfilename);
+    PRINT("\tContainer: %s\n", metadata.container);
     PRINT("\tTitle: %s\n", metadata.title);
     PRINT("\tAritist: %s\n", metadata.artist);
     PRINT("\tAlbum: %s\n", metadata.album);
     PRINT("\tYear: %s\n", metadata.year);
     PRINT("\tGenre: %s\n", metadata.genre);
     PRINT("\tDuration: %d seconds\n", (fsl_player_s32)(duration/1000000000));
-    PRINT("Video:\n");
-    PRINT("\tWidth: %d\n", metadata.width);
-    PRINT("\tHeight: %d\n", metadata.height);
-    PRINT("\tFrame Rate: %d\n", metadata.framerate);
-    PRINT("\tBitrate: %d\n", metadata.videobitrate);
-    PRINT("\tCodec: %s\n", metadata.videocodec);
-    PRINT("Audio:\n");
-    PRINT("\tChannels: %d\n", metadata.channels);
-    PRINT("\tSample Rate: %d\n", metadata.samplerate);
-    PRINT("\tBitrate: %d\n", metadata.audiobitrate);
-    PRINT("\tCodec: %s\n", metadata.audiocodec);
+    for (i=0; i<metadata.n_audio; i++) {
+      PRINT("Audio%d:\n", i);
+      PRINT("\tCodec: %s\n", metadata.audio_info[i].codec_type);
+      PRINT("\tSample Rate: %d\n", metadata.audio_info[i].samplerate);
+      PRINT("\tChannels: %d\n", metadata.audio_info[i].channels);
+      PRINT("\tBitrate: %d\n", metadata.audio_info[i].bitrate);
+      PRINT("\tLanguage Code: %s\n", metadata.audio_info[i].language);
+    }
+
+    for (i=0; i<metadata.n_video; i++) {
+      PRINT("Video%d:\n", i);
+      PRINT("\tCodec: %s\n", metadata.video_info[i].codec_type);
+      PRINT("\tWidth: %d\n", metadata.video_info[i].width);
+      PRINT("\tHeight: %d\n", metadata.video_info[i].height);
+      PRINT("\tFrame Rate: %f\n", (float)metadata.video_info[i].framerate_numerator / (float)metadata.video_info[i].framerate_denominator);
+      PRINT("\tBitrate: %d\n", metadata.video_info[i].bitrate);
+      PRINT("\tLanguage Code: %s\n", metadata.video_info[i].language);
+    }
+
+    for (i=0; i<metadata.n_subtitle; i++) {
+      PRINT("subtitle%d:\n", i);
+      PRINT("\tCodec: %s\n", metadata.subtitle_info[i].codec_type);
+      PRINT("\tLanguage Code: %s\n", metadata.subtitle_info[i].language);
+    }
+
     return;
 }
 
