@@ -45,8 +45,6 @@ GST_DEBUG_CATEGORY (beep_dec_debug);
 #define CORE_STATUS_MASK (~(uint32)0xff)
 #define MAX_PROFILE_ERROR_COUNT 50 //about 1 second decoding time, 1 seconds' audio data length
 #define VORBIS_HEADER_FRAME 3
-#define GST_TAG_BEEP_SAMPLING_RATE  "sampling_frequency"
-#define GST_TAG_BEEP_CHANNELS       "channels"
 
 #define GST_BUFFER_TIMESTAMP GST_BUFFER_PTS
 
@@ -446,11 +444,6 @@ static gboolean beep_dec_start (GstAudioDecoder * dec)
     
     gst_audio_decoder_set_estimate_rate(dec, TRUE);
     
-    gst_tag_register (GST_TAG_BEEP_CHANNELS, GST_TAG_FLAG_DECODED,
-        G_TYPE_UINT, "number of channels", "number of channels", NULL);
-    gst_tag_register (GST_TAG_BEEP_SAMPLING_RATE, GST_TAG_FLAG_DECODED,
-        G_TYPE_UINT, "sampling frequency (Hz)", "sampling frequency (Hz)",
-        NULL);
 
     GST_LOG_OBJECT (beepdec,"beep_dec_start called ");
 
@@ -651,18 +644,12 @@ static void beep_dec_handle_output_changed(GstBeepDec *beepdec)
 
         list = gst_tag_list_new_empty ();
 
-        gst_tag_list_add (list, GST_TAG_MERGE_REPLACE, GST_TAG_BEEP_CHANNELS,
-            parameter.outputFormat.channels, NULL);
 
         IDecoder->getDecoderPara(handle,UNIA_BITRATE,&parameter);
         if(parameter.bitrate > 0){
             gst_tag_list_add (list, GST_TAG_MERGE_REPLACE, GST_TAG_BITRATE,
                 parameter.bitrate, NULL);
         }
-
-        IDecoder->getDecoderPara(handle,UNIA_SAMPLERATE,&parameter);
-        gst_tag_list_add (list, GST_TAG_MERGE_REPLACE,
-            GST_TAG_BEEP_SAMPLING_RATE, parameter.samplerate, NULL);
 
         IDecoder->getDecoderPara(handle,UNIA_CODEC_DESCRIPTION,&parameter);
         gst_tag_list_add (list, GST_TAG_MERGE_REPLACE, GST_TAG_AUDIO_CODEC,
