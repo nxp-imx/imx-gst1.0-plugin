@@ -227,7 +227,8 @@ typedef enum
 {
     AUDIO_WMA1 = 1,
     AUDIO_WMA2,
-    AUDIO_WMA3
+    AUDIO_WMA3,
+    AUDIO_WMALL
     
 }WMAAudioTypes; 
 

@@ -2098,7 +2098,11 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
             codec_mime = "audio/x-wma, wmaversion=(int)3";
             codec = "WMA9";
             break;
-          default:
+            case AUDIO_WMALL:
+            codec_mime = "audio/x-wma, wmaversion=(int)4";
+            codec = "WMA9 Lossless";
+            break;
+        default:
             goto bail;
             break;
         }
