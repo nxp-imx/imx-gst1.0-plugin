@@ -320,8 +320,13 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
             }
             if( strncmp(gst_tag_get_nick(tag), "date", 4) == 0 )
             {
-                strncpy(pproperty->metadata.year, str, sizeof(pproperty->metadata.year));
+                const GValue *val;
+                val = gst_tag_list_get_value_index(list, tag, i);
+                GstDateTime *dt = g_value_get_boxed(val);
+                gchar *dt_str = gst_date_time_to_iso8601_string(dt);
+                strncpy(pproperty->metadata.year, dt_str, sizeof(pproperty->metadata.year));
                 pproperty->metadata.year[sizeof(pproperty->metadata.year)-1] = '\0';
+                g_free(dt_str);                
             }
             if( strncmp(gst_tag_get_nick(tag), "genre", 5) == 0 )
             {
