@@ -543,6 +543,11 @@ gst_vpu_dec_object_config (GstVpuDecObject * vpu_dec_object, \
       return FALSE;
     }
 
+    vpu_dec_object->new_segment = TRUE;
+    g_list_free (vpu_dec_object->system_frame_number_in_vpu);
+    vpu_dec_object->system_frame_number_in_vpu = NULL;
+    GST_DEBUG_OBJECT (vpu_dec_object, "system_frame_number_in_vpu list free\n");
+
     if (!gst_vpu_dec_object_free_mv_buffer(vpu_dec_object)) {
       GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_free_mv_buffer fail");
       return GST_FLOW_ERROR;
@@ -693,8 +698,8 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
         vpu_dec_object->gstbuffer_in_vpudec, buffer);
     GST_DEBUG_OBJECT (vpu_dec_object, "gst_video_decoder_allocate_output_buffer end");
     GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer get from buffer pool: %x\n", buffer);
-    GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer_in_vpudec list length: %d\n", \
-        g_list_length (vpu_dec_object->gstbuffer_in_vpudec));
+    GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer_in_vpudec list length: %d actual_buf_cnt: %d \n", \
+        g_list_length (vpu_dec_object->gstbuffer_in_vpudec), vpu_dec_object->actual_buf_cnt);
   }
 
   if (!gst_vpu_dec_object_allocate_mv_buffer(vpu_dec_object)) {
@@ -766,7 +771,8 @@ gst_vpu_dec_object_process_qos (GstVpuDecObject * vpu_dec_object, \
             gst_vpu_dec_object_strerror(ret));
         return FALSE;
       }
-      GST_WARNING_OBJECT(vpu_dec_object, "decoder can catch up. needn't drop frame. diff: %lld\n", diff);
+      GST_WARNING_OBJECT(vpu_dec_object, "decoder can catch up. needn't drop frame. diff: %lld\n", \
+          diff);
       vpu_dec_object->dropping = FALSE;
     }
   }
@@ -928,6 +934,11 @@ gst_vpu_dec_object_get_gst_buffer (GstVideoDecoder * bdec, GstVpuDecObject * vpu
       gst_buffer_unref (buffer);
       GST_DEBUG_OBJECT(vpu_dec_object, "gstbuffer isn't physical buffer.");
       return GST_FLOW_FLUSHING;
+    }
+    if (vpu_dec_object->state < STATE_REGISTRIED_FRAME_BUFFER) {
+      gst_buffer_unref (buffer);
+      GST_DEBUG_OBJECT(vpu_dec_object, "should set buffer to VPU in wrong state when down stream send reconfigure.");
+      return GST_FLOW_OK;
     }
     if (!gst_vpu_dec_object_release_frame_buffer_to_vpu (vpu_dec_object, buffer)) {
       GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_release_frame_buffer_to_vpu fail.");

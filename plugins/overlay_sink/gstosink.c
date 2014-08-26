@@ -407,21 +407,6 @@ gst_overlay_sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
 
   GST_DEBUG_OBJECT (sink, "set caps %" GST_PTR_FORMAT, caps);
 
-  if (sink->pool) {
-    gst_buffer_pool_set_active (sink->pool, FALSE);
-    gst_object_unref (sink->pool);
-    sink->pool = NULL;
-  }
-
-
-  if (gst_overlay_sink_setup_buffer_pool (sink, caps) < 0) {
-    GST_ERROR_OBJECT (sink, "setup buffer pool failed.");
-    return FALSE;
-  }
-
-  sink->pool_alignment_checked = FALSE;
-  sink->self_pool_configed = FALSE;
-
   w = GST_VIDEO_INFO_WIDTH (&info);
   h = GST_VIDEO_INFO_HEIGHT (&info);
 
@@ -471,11 +456,12 @@ static gboolean
 gst_overlay_sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
 {
   GstOverlaySink *sink = GST_OVERLAY_SINK (bsink);
-  GstBufferPool *pool = sink->pool;
-  GstAllocator *allocator = sink->allocator;
   guint size = 0;
   GstCaps *caps;
   gboolean need_pool;
+  GstCaps *pcaps;
+  GstStructure *config;
+
 
   gst_query_parse_allocation (query, &caps, &need_pool);
 
@@ -484,28 +470,30 @@ gst_overlay_sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
     return FALSE;
   }
 
-  GST_DEBUG_OBJECT (sink, "propose_allocation, pool(%p).", pool);
-
-  if (pool != NULL) {
-    GstCaps *pcaps;
-    GstStructure *config;
-
-    /* we had a pool, check caps */
-    config = gst_buffer_pool_get_config (pool);
-    gst_buffer_pool_config_get_params (config, &pcaps, &size, NULL, NULL);
-#if 0 //FIXME:
-    if (!gst_caps_is_equal (caps, pcaps)) {
-      GST_ERROR_OBJECT (sink, "different caps in propose, pool with caps %" GST_PTR_FORMAT, pcaps);
-      GST_ERROR_OBJECT (sink, "upstream caps %" GST_PTR_FORMAT, caps);
-      gst_structure_free (config);
-      return FALSE;
-    }
-#endif
-    gst_structure_free (config);
+  if (sink->pool) {
+    /* must re-allocate buffer pool as up-stream need set config, video buffer
+     * pool should in inactive state */
+    gst_buffer_pool_set_active (sink->pool, FALSE);
+    gst_object_unref (sink->pool);
+    sink->pool = NULL;
   }
 
-  gst_query_add_allocation_pool (query, pool, size, sink->min_buffers, sink->max_buffers);
-  gst_query_add_allocation_param (query, allocator, NULL);
+  if (gst_overlay_sink_setup_buffer_pool (sink, caps) < 0) {
+    GST_ERROR_OBJECT (sink, "setup buffer pool failed.");
+    return FALSE;
+  }
+
+  config = gst_buffer_pool_get_config (sink->pool);
+  gst_buffer_pool_config_get_params (config, &pcaps, &size, NULL, NULL);
+  gst_structure_free (config);
+
+  sink->pool_alignment_checked = FALSE;
+  sink->self_pool_configed = FALSE;
+
+  GST_DEBUG_OBJECT (sink, "propose_allocation, pool(%p).", sink->pool);
+
+  gst_query_add_allocation_pool (query, sink->pool, size, sink->min_buffers, sink->max_buffers);
+  gst_query_add_allocation_param (query, sink->allocator, NULL);
 
   gst_query_add_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL);
   gst_query_add_allocation_meta (query, GST_VIDEO_CROP_META_API_TYPE, NULL);
