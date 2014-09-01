@@ -167,7 +167,7 @@ static AiurDemuxTagEntry g_user_data_entry[] = {
   {USER_DATA_ACODECNAME, USER_DATA_FORMAT_UTF8, GST_TAG_AUDIO_CODEC,
       "Audio Codec Name : %s\n"},
   {USER_DATA_ARTWORK, USER_DATA_FORMAT_JPEG, GST_TAG_IMAGE,
-      "Found Artwork : %" GST_PTR_FORMAT ", %d bytes\n"},
+      "Found Artwork : foamrt %d , %d bytes\n"},
   {USER_DATA_COMPOSER, USER_DATA_FORMAT_UTF8, GST_TAG_COMPOSER,
       "Composer : %s\n"},
   //{USER_DATA_DIRECTOR,        USER_DATA_FORMAT_UTF8, ?,                       "Director : %s\n"}, /* tag is not defined */
@@ -187,6 +187,10 @@ static AiurDemuxTagEntry g_user_data_entry[] = {
       "Track Number : %s\n"},
   {USER_DATA_TOTALTRACKNUMBER, USER_DATA_FORMAT_UTF8, GST_TAG_TRACK_COUNT,
       "Track Count : %s\n"},
+  {USER_DATA_LOCATION, USER_DATA_FORMAT_UTF8, -1,
+      "Location : %s\n"},
+  {USER_DATA_KEYWORDS, USER_DATA_FORMAT_UTF8, GST_TAG_KEYWORDS,
+      "Keywords : %s\n"},
 
 };
 
@@ -1634,6 +1638,43 @@ aiurdemux_add_user_tags (GstAiurDemux * demux)
           if (string) {
             /* FIXME : create GDate object for GST_TAG_DATA */
             if (USER_DATA_CREATION_DATE == id) {
+              guint y, m = 1, d = 1;
+              gint ret;
+              ret = sscanf (string->str, "%u-%u-%u", &y, &m, &d);
+              if (ret >= 1 && y > 1500 && y < 3000) {
+                GDate *date;
+                date = g_date_new_dmy (d, m, y);
+                gst_tag_list_add (list, GST_TAG_MERGE_REPLACE, g_user_data_entry[i].gst_tag_name,
+                  date, NULL);
+                GST_INFO_OBJECT (demux, g_user_data_entry[i].print_string, string->str);
+                g_date_free (date);
+              }
+              g_string_free (string, TRUE);
+              continue;
+            }else if(USER_DATA_LOCATION == id){
+              gdouble latitude;
+              gdouble longitude;
+              guint longitude_pos = 0;
+              guint8* latitude_ptr = g_strndup ((gchar *) userData, 8);
+              guint8* longitude_ptr = g_strndup ((gchar *) userData+8, 9);
+              if ((sscanf (latitude_ptr, "%lf", &latitude) == 1)
+                && (sscanf (longitude_ptr, "%lf", &longitude) == 1)) {
+                gst_tag_list_add (list, GST_TAG_MERGE_APPEND,
+                  GST_TAG_GEO_LOCATION_LATITUDE, latitude, NULL);
+                gst_tag_list_add (list, GST_TAG_MERGE_APPEND,
+                  GST_TAG_GEO_LOCATION_LONGITUDE, longitude, NULL);
+                GST_INFO_OBJECT (demux, "LATITUDE=%lf,LONGITUDE=%lf", latitude,longitude);
+              }
+              g_free (latitude_ptr);
+              g_free (longitude_ptr);
+              g_string_free (string, TRUE);
+              continue;
+            }else if(USER_DATA_TRACKNUMBER == id || USER_DATA_TOTALTRACKNUMBER == id){
+              guint32 value;
+              value = atoi(string->str);
+              gst_tag_list_add (list, GST_TAG_MERGE_APPEND,
+                g_user_data_entry[i].gst_tag_name, value, NULL);
+              GST_INFO_OBJECT (demux, g_user_data_entry[i].print_string, string->str);
               g_string_free (string, TRUE);
               continue;
             }
