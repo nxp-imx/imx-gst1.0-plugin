@@ -44,6 +44,7 @@ static VPUMapper vpu_mappers[] = {
   {VPU_V_MPEG2, "video/mpeg, systemstream=(boolean)false, mpegversion=(int){1,2}"},
   {VPU_V_MJPG, "image/jpeg"},
   {VPU_V_VP8, "video/x-vp8"},
+  {VPU_V_RV, "video/x-pn-realvideo"},
   {-1, NULL}
 };
 
