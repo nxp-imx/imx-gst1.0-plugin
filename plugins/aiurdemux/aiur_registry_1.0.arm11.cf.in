@@ -28,4 +28,8 @@ library = @mkv_arm11_SONAME@
 mime= application/ogg; application/x-annodex; audio/ogg
 library = @ogg_arm11_SONAME@
 
+[realmedia]
+mime = application/vnd.rn-realmedia
+library = @rm_arm11_SONAME@
+
 

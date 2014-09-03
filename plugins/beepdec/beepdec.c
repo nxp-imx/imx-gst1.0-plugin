@@ -309,6 +309,12 @@ static gboolean beep_dec_set_init_parameter(GstBeepDec * beep_dec,
             IDecoder->setDecoderPara(handle,UNIA_WMA_BlOCKALIGN, &parameter);
         }
 
+        if (gst_structure_get_int (structure, "frame_bit", &intvalue)) {
+            GST_INFO ("Set frame_bits %d", intvalue);
+            parameter.frame_bits= intvalue;
+            IDecoder->setDecoderPara(handle,UNIA_RA_FRAME_BITS, &parameter);
+        }
+
         if (gst_structure_get_int (structure, "wmaversion", &intvalue)) {
             GST_INFO ("Set wma version %d", intvalue);
             parameter.version = intvalue;

@@ -50,3 +50,10 @@ description = decode amr wb audio to raw data
 mime = audio/AMR-WB
 library = @wbamrd_arm12_SONAME@
 
+[realaudio]                                                                 
+longname = Real Audio decoder
+description = decode real audio cook to raw data
+mime = audio/x-pn-realaudio
+library = @realad_arm11_SONAME@
+
+
