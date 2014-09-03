@@ -798,5 +798,8 @@ gst_imx_v4l2src_init (GstImxV4l2Src * v4l2src)
 
   gst_base_src_set_format (GST_BASE_SRC (v4l2src), GST_FORMAT_TIME);
   gst_base_src_set_live (GST_BASE_SRC (v4l2src), TRUE);
+
+  g_print("====== IMXV4L2SRC: %s build on %s %s. ======\n",  (VERSION),__DATE__,__TIME__);
+
 }
 

@@ -187,6 +187,8 @@ gst_imx_mp3enc_init (GstImxMp3Enc * imx_mp3enc)
   memset(&imx_mp3enc->enc_config, 0, sizeof(MP3E_Encoder_Config));
   memset(&imx_mp3enc->enc_param, 0, sizeof(MP3E_Encoder_Parameter));
 
+  g_print("====== MP3ENC: %s build on %s %s. ======\n",  (VERSION),__DATE__,__TIME__);
+
 }
 
 static gboolean

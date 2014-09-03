@@ -955,6 +955,9 @@ gst_overlay_sink_init (GstOverlaySink * overlay_sink)
                                               overlay_sink_config_color_key,
                                               overlay_sink_config_global_alpha);
 #endif
+
+  g_print("====== OVERLAYSINK: %s build on %s %s. ======\n",  (VERSION),__DATE__,__TIME__);
+
 }
 
 

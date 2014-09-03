@@ -1386,25 +1386,27 @@ aiurdemux_print_track_info (AiurDemuxStream * stream)
   if ((stream) && (stream->pad) && (stream->caps)) {
     gchar *mime = gst_caps_to_string (stream->caps);
     gchar *padname = gst_pad_get_name (stream->pad);
-    g_print ("Track %02d [%s] Enabled\n", stream->track_idx,
+    g_print("------------------------\n");  
+    g_print ("    Track %02d [%s] Enabled\n", stream->track_idx,
             padname ? padname : "");
 
     g_print ("\tDuration: %" GST_TIME_FORMAT "\n",
             GST_TIME_ARGS (stream->track_duration));
     g_print ("\tLanguage: %s\n", stream->lang);
     if (mime) {
-      g_print ("Mime %s \r\n", mime);
+      g_print ("    Mime:\n\t%s \r\n", mime);
       g_free (mime);
     }
     if (padname) {
       g_free (padname);
     }
   } else {
-    g_print ("Track %02d [%s]: Disabled\n", stream->track_idx,
+    g_print ("    Track %02d [%s]: Disabled\n", stream->track_idx,
             AIUR_MEDIATYPE2STR (stream->type));
     g_print ("\tCodec: %ld, SubCodec: %ld\n",
             stream->codec_type, stream->codec_sub_type);
   }
+  g_print("------------------------\n");
 }
 
 

@@ -585,6 +585,9 @@ gst_avbsrc_init (GstAvbSrc * avbsrc)
 
   avbsrc->provided_clock = gst_avb_clock_new ("avbclock");
   avbsrc->init_segment = FALSE;
+
+  g_print("======AVBSRC: %s build on %s %s. ======\n",  (VERSION),__DATE__,__TIME__);
+  
   GST_LOG_OBJECT (avbsrc,"gst_avbsrc_init provided_clock=%p",avbsrc->provided_clock);
 
 }

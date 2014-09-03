@@ -112,8 +112,8 @@ _beep_core_create_interface_from_entry (gchar * dl_name)
   if (inf->getVersionInfo) {
     inf->coreid = (inf->getVersionInfo) ();
     if (inf->coreid) {
-      g_print ("Beep: %s \nCore: %s\n file: %s\n",
-              VERSION, inf->coreid, dl_name);
+      g_print ("\n====== BEEP: %s build on %s %s. ======\n\tCore: %s\n file: %s\n",
+              VERSION, __DATE__,__TIME__, inf->coreid, dl_name);
     }
   }
 

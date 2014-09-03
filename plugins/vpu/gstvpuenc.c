@@ -302,13 +302,12 @@ gst_vpu_enc_start (GstVideoEncoder * benc)
         gst_vpu_enc_strerror(ret));
   }
 
-  GST_INFO_OBJECT(enc, "VPU firmware version %d.%d.%d_r%d", \
-      version.nFwMajor, version.nFwMinor, version.nFwRelease, version.nFwCode);
-  GST_INFO_OBJECT(enc, "VPU library version %d.%d.%d", version.nLibMajor, \
-      version.nLibMinor, version.nLibRelease);
-  GST_INFO_OBJECT(enc, "VPU wrapper version %d.%d.%d %s", \
-      wrapper_version.nMajor, wrapper_version.nMinor, wrapper_version.nRelease, \
-      wrapper_version.pBinary);
+  g_print("====== VPUENC: %s build on %s %s. ======\n",  (VERSION),__DATE__,__TIME__);
+  g_print("\twrapper: %d.%d.%d (%s)\n", wrapper_version.nMajor, wrapper_version.nMinor, 
+    wrapper_version.nRelease, (wrapper_version.pBinary? wrapper_version.pBinary:"unknow"));
+  g_print("\tvpulib: %d.%d.%d\n", version.nLibMajor, version.nLibMinor, version.nLibRelease);
+  g_print("\tfirmware: %d.%d.%d.%d\n", version.nFwMajor, version.nFwMinor, version.nFwRelease, version.nFwCode);
+
 
   /* mem_info contains information about how to set up memory blocks
    * the VPU uses as temporary storage (they are "work buffers") */

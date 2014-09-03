@@ -766,6 +766,8 @@ static void gst_avbsink_init (GstAvbSink * sink)
   sink->provided_clock = gst_avb_clock_new("avbclock");
   //gst_element_set_clock (sink,sink->provided_clock);
 
+  g_print("====== AVBSINK: %s build on %s %s. ======\n",  (VERSION),__DATE__,__TIME__);
+
   GST_LOG_OBJECT (sink,"gst_avbsink_init");
 
 }

@@ -921,5 +921,8 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
                                               v4l2sink_config_color_key,
                                               v4l2sink_config_global_alpha);
 #endif
+
+  g_print("====== IMXV4L2SINK: %s build on %s %s. ======\n",  (VERSION),__DATE__,__TIME__);
+
 }
 
