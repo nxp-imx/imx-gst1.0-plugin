@@ -375,11 +375,13 @@ gst_vpu_dec_object_stop (GstVpuDecObject * vpu_dec_object)
     vpu_dec_object->tsm = NULL;
   }
 
-  dec_ret = VPU_DecClose(vpu_dec_object->handle);
-  if (dec_ret != VPU_DEC_RET_SUCCESS) {
-    GST_ERROR_OBJECT(vpu_dec_object, "closing decoder failed: %s", \
-        gst_vpu_dec_object_strerror(dec_ret));
-    return FALSE;
+  if (vpu_dec_object->handle) {
+    dec_ret = VPU_DecClose(vpu_dec_object->handle);
+    if (dec_ret != VPU_DEC_RET_SUCCESS) {
+      GST_ERROR_OBJECT(vpu_dec_object, "closing decoder failed: %s", \
+          gst_vpu_dec_object_strerror(dec_ret));
+      return FALSE;
+    }
   }
 
   if (!gst_vpu_dec_object_free_mv_buffer(vpu_dec_object)) {
