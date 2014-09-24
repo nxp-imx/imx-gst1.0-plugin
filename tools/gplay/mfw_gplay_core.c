@@ -986,10 +986,15 @@ void fsl_player_get_stream_info (fsl_player_property* pproperty)
     g_signal_emit_by_name (G_OBJECT(pproperty->playbin), "get-audio-pad", i, &pad);
     if (pad) {
       GstCaps *caps = gst_pad_get_current_caps (pad);
-      GstStructure *str = gst_caps_get_structure (caps, 0);
-      gst_structure_get_int (str, "rate", &pproperty->metadata.audio_info[i].samplerate);
-      gst_structure_get_int (str, "channels", &pproperty->metadata.audio_info[i].channels);
-      gst_caps_unref (caps);
+      if (caps) {
+        GstStructure *str = gst_caps_get_structure (caps, 0);
+        gst_structure_get_int (str, "rate", &pproperty->metadata.audio_info[i].samplerate);
+        gst_structure_get_int (str, "channels", &pproperty->metadata.audio_info[i].channels);
+        gst_caps_unref (caps);
+      }
+      else {
+        FSL_PLAYER_PRINT("No caps for audio track %d \n", i);
+      }
       gst_object_unref (pad);
     }
 
@@ -1009,6 +1014,9 @@ void fsl_player_get_stream_info (fsl_player_property* pproperty)
       //gst_tag_list_foreach (tags, print_one_tag, NULL);
       gst_tag_list_free (tags);
     }
+    else {
+      FSL_PLAYER_PRINT("No taglist for audio track %d \n", i);
+    }
   }
 
   nstreams = 0;
@@ -1022,12 +1030,17 @@ void fsl_player_get_stream_info (fsl_player_property* pproperty)
     g_signal_emit_by_name (G_OBJECT(pproperty->playbin), "get-video-pad", i, &pad);
     if (pad) {
       GstCaps *caps = gst_pad_get_current_caps (pad);
-      GstStructure *str = gst_caps_get_structure (caps, 0);
-      gst_structure_get_int (str, "width", &pproperty->metadata.video_info[i].width);
-      gst_structure_get_int (str, "height", &pproperty->metadata.video_info[i].height);
-      gst_structure_get_fraction (str, "framerate", 
-          &pproperty->metadata.video_info[i].framerate_numerator, &pproperty->metadata.video_info[i].framerate_denominator);
-      gst_caps_unref (caps);
+      if (caps) {
+        GstStructure *str = gst_caps_get_structure (caps, 0);
+        gst_structure_get_int (str, "width", &pproperty->metadata.video_info[i].width);
+        gst_structure_get_int (str, "height", &pproperty->metadata.video_info[i].height);
+        gst_structure_get_fraction (str, "framerate", 
+            &pproperty->metadata.video_info[i].framerate_numerator, &pproperty->metadata.video_info[i].framerate_denominator);
+        gst_caps_unref (caps);
+      }
+      else {
+        FSL_PLAYER_PRINT("No caps for video track %d \n", i);
+      }
       gst_object_unref (pad);
     }
 
@@ -1046,6 +1059,9 @@ void fsl_player_get_stream_info (fsl_player_property* pproperty)
       gst_tag_list_get_uint (tags, GST_TAG_BITRATE, &pproperty->metadata.video_info[i].bitrate);
       //gst_tag_list_foreach (tags, print_one_tag, NULL);
       gst_tag_list_free (tags);
+    }
+    else {
+      FSL_PLAYER_PRINT("No taglist for video track %d \n", i);
     }
   }
 
@@ -1071,6 +1087,9 @@ void fsl_player_get_stream_info (fsl_player_property* pproperty)
 
       //gst_tag_list_foreach (tags, print_one_tag, NULL);
       gst_tag_list_free (tags);
+    }
+    else {
+      FSL_PLAYER_PRINT("No taglist for text track %d \n", i);
     }
   }
 
