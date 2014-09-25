@@ -1249,7 +1249,9 @@ gst_vpu_dec_object_flush (GstVideoDecoder * bdec, GstVpuDecObject * vpu_dec_obje
 
   // FIXME: workaround for VP8 seek. VPU will block if VPU need framebuffer
   // before seek.
-  gst_vpu_dec_object_get_gst_buffer(bdec, vpu_dec_object);
+  if (vpu_dec_object->state >= STATE_REGISTRIED_FRAME_BUFFER) {
+    gst_vpu_dec_object_get_gst_buffer(bdec, vpu_dec_object);
+  }
 
   return TRUE;
 }
