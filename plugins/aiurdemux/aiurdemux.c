@@ -752,6 +752,30 @@ gst_aiurdemux_handle_src_query (GstPad * pad, GstObject * parent, GstQuery * que
         res = TRUE;
       }
       break;
+    case GST_QUERY_SEGMENT:
+      {
+        GstFormat format;
+        gint64 start, stop = GST_CLOCK_TIME_NONE;
+
+        format = demux->segment.format;
+
+        start =
+          gst_segment_to_stream_time (&demux->segment, format,
+              demux->segment.start);
+
+        if (format == GST_FORMAT_TIME) {
+          gint64 duration = GST_CLOCK_TIME_NONE;
+
+          gst_aiurdemux_get_duration (demux, &duration);
+          if (duration > 0) {
+            stop = duration;
+          }
+        }
+
+        gst_query_set_segment (query, demux->segment.rate, format, start, stop);
+        res = TRUE;
+        break;
+      }
 
     default:
       GST_LOG_OBJECT(demux,"gst_aiurdemux_handle_src_query event=%x",GST_QUERY_TYPE (query));
@@ -2889,10 +2913,9 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
     segment.format = GST_FORMAT_TIME;
     segment.rate = demux->segment.rate;
     segment.start = stream->time_position;
-    if (stream->track_duration) {
-      segment.stop = stream->track_duration;
-    } else {
-      segment.stop = GST_CLOCK_TIME_NONE;
+    segment.stop = GST_CLOCK_TIME_NONE;
+    if (stream->track_duration > 0) {
+      segment.duration = stream->track_duration;
     }
     segment.position = segment.time = stream->time_position;
     GST_DEBUG ("segment event %" GST_SEGMENT_FORMAT, &segment);
