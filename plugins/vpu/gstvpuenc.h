@@ -56,8 +56,6 @@ struct _GstVpuEnc {
 	GstBufferPool *pool;
 	GList * gstbuffer_in_vpuenc;
 	GstBuffer *internal_input_buffer;
-  GstMemory *output_gst_memory;
-  PhyMemBlock *output_phys_buffer;
   guint gop_count;
 };
 

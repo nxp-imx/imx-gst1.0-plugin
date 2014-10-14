@@ -177,7 +177,6 @@ gst_vpu_enc_init (GstVpuEnc * enc)
   enc->gop_size = DEFAULT_GOP_SIZE;
   enc->quant = DEFAULT_QUANT;
   enc->gstbuffer_in_vpuenc = NULL;
-  enc->output_gst_memory = NULL;
   enc->gop_count = 0;
   enc->handle = NULL;
   enc->state = NULL;
@@ -340,11 +339,6 @@ gst_vpu_enc_reset (GstVpuEnc * enc)
       return FALSE;
     }
     enc->handle = NULL;
-  }
-
-	if (enc->output_gst_memory) {
-    gst_memory_unref (enc->output_gst_memory);
-    enc->output_gst_memory = NULL;
   }
 
   if (enc->gstbuffer_in_vpuenc) {
@@ -738,16 +732,6 @@ gst_vpu_enc_allocate_physical_mem (GstVpuEnc * enc, gint src_stride)
     g_free(vpuframebuffers);
   }
 
-  if (enc->output_gst_memory == NULL) {
-    enc->output_gst_memory = gst_allocator_alloc( \
-        gst_vpu_allocator_obtain(), enc->state->info.size, NULL);
-    enc->output_phys_buffer = gst_memory_query_phymem_block (enc->output_gst_memory);
-		if (enc->output_phys_buffer == NULL) {
-			GST_ERROR_OBJECT(enc, "could not allocate physical buffer for output data");
-			return FALSE;
-		}
-	}
-
 	return TRUE;
 }
 
@@ -761,6 +745,8 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 	VpuFrameBuffer input_framebuf;
   GstVideoCropMeta *cropmeta = NULL;
 	GstBuffer *input_buffer;
+	GstBuffer *output_buffer = NULL;
+  GstMapInfo minfo;
 	GstBuffer *pool_buffer = NULL;
 	gint src_stride;
 
@@ -835,9 +821,8 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
     input_phys_buffer = gst_buffer_query_phymem_block (input_buffer);
 		if (input_phys_buffer == NULL) {
       GST_ERROR_OBJECT(enc, "could not get physical address from input buffer.");
-      if (pool_buffer)
-        gst_buffer_unref (pool_buffer);
-      return GST_FLOW_ERROR;
+      ret = GST_FLOW_ERROR;
+      goto bail;
     }
 
 		phys_ptr = (unsigned char*)(input_phys_buffer->paddr);
@@ -857,16 +842,25 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 
   // Allocate needed physical buffer.
   if (!gst_vpu_enc_allocate_physical_mem (enc, src_stride)) {
-			GST_ERROR_OBJECT(enc, "gst_vpu_enc_allocate_physical_mem failed.");
-      if (pool_buffer)
-        gst_buffer_unref (pool_buffer);
-			return GST_FLOW_ERROR;
+    GST_ERROR_OBJECT(enc, "gst_vpu_enc_allocate_physical_mem failed.");
+    ret = GST_FLOW_ERROR;
+    goto bail;
   }
 
+  output_buffer = gst_video_encoder_allocate_output_buffer(benc,
+      enc->state->info.size);
+  if (output_buffer == NULL) {
+    GST_ERROR_OBJECT(enc, "can't get output buffer from video encoder.");
+    ret = GST_FLOW_ERROR;
+    goto bail;
+  }
+  frame->output_buffer = output_buffer;
+
+  gst_buffer_map (output_buffer, &minfo, GST_MAP_READ);
+
 	/* Set up encoding parameters */
-	enc_enc_param.nInVirtOutput = (unsigned int)(enc->output_phys_buffer->vaddr);
-	enc_enc_param.nInPhyOutput = (unsigned int)(enc->output_phys_buffer->paddr);
-	enc_enc_param.nInOutputBufLen = enc->output_phys_buffer->size;
+	enc_enc_param.nInVirtOutput = (unsigned int)(minfo.data);
+	enc_enc_param.nInOutputBufLen = enc->state->info.size;
 	enc_enc_param.nPicWidth = enc->open_param.nPicWidth;
 	enc_enc_param.nPicHeight = enc->open_param.nPicHeight;
 	enc_enc_param.nFrameRate = enc->open_param.nFrameRate;
@@ -886,59 +880,49 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 	}
 
 	{
-		GstBuffer *output_buffer = NULL;
 		gsize output_buffer_offset = 0;
 		gboolean frame_finished = FALSE;
 
-		frame->output_buffer = NULL;
-
 		do
-		{
-			/* Feed input data */
-			enc_ret = VPU_EncEncodeFrame(enc->handle, &enc_enc_param);
-			if (enc_ret != VPU_ENC_RET_SUCCESS) {
-				GST_ERROR_OBJECT(enc, "failed to encode frame: %s", gst_vpu_enc_strerror(enc_ret));
-				VPU_EncReset(enc->handle);
-        if (pool_buffer)
-          gst_buffer_unref (pool_buffer);
-        return GST_FLOW_ERROR;
-			}
+    {
+      gint64 start_time;
+
+      start_time = g_get_monotonic_time ();
+
+      enc_ret = VPU_EncEncodeFrame(enc->handle, &enc_enc_param);
+      if (enc_ret != VPU_ENC_RET_SUCCESS) {
+        GST_ERROR_OBJECT(enc, "failed to encode frame: %s", \
+            gst_vpu_enc_strerror(enc_ret));
+        VPU_EncReset(enc->handle);
+        gst_buffer_unmap (output_buffer, &minfo);
+        ret = GST_FLOW_ERROR;
+        goto bail;
+      }
+
+      GST_ERROR_OBJECT(enc, "encoder consume time: %lld\n", \
+          g_get_monotonic_time () - start_time);
 
       if (enc_enc_param.eOutRetCode & VPU_ENC_OUTPUT_SEQHEADER) {
-        if (!gst_vpu_enc_set_caps(benc, enc->output_phys_buffer->vaddr, \
-            enc_enc_param.nOutOutputSize)) {
+        if (!gst_vpu_enc_set_caps(benc, minfo.data, enc_enc_param.nOutOutputSize)) {
           GST_ERROR_OBJECT(enc, "gst_vpu_enc_set_caps fail.");
-          if (pool_buffer)
-            gst_buffer_unref (pool_buffer);
-          return GST_FLOW_ERROR;
+          gst_buffer_unmap (output_buffer, &minfo);
+          ret = GST_FLOW_ERROR;
+          goto bail;
         }
         continue;
       }
 
       if (enc_enc_param.eOutRetCode & VPU_ENC_OUTPUT_DIS) {
-        if (output_buffer == NULL) {
-          output_buffer = gst_video_encoder_allocate_output_buffer(benc,
-              enc->output_phys_buffer->size);
-          if (output_buffer == NULL) {
-            GST_ERROR_OBJECT(enc, "can't get output buffer from video encoder.");
-            if (pool_buffer)
-              gst_buffer_unref (pool_buffer);
-            return GST_FLOW_ERROR;
-          }
-          frame->output_buffer = output_buffer;
-        }
-
         GST_LOG_OBJECT(enc, "processing output data: %u bytes, output buffer offset %u", \
             enc_enc_param.nOutOutputSize, output_buffer_offset);
+
+        gst_buffer_unmap (output_buffer, &minfo);
 
         if (!(enc->gop_count % enc->gop_size)) { //frame_type == IDR) {
           GST_LOG_OBJECT(enc, "setting sync point");
           GST_VIDEO_CODEC_FRAME_SET_SYNC_POINT(frame);
         }
         enc->gop_count ++;
-        gst_buffer_fill(output_buffer, output_buffer_offset,\
-            enc->output_phys_buffer->vaddr, \
-            enc_enc_param.nOutOutputSize);
         output_buffer_offset += enc_enc_param.nOutOutputSize;
 
         gst_buffer_set_size(output_buffer, output_buffer_offset);
@@ -951,11 +935,11 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
           GST_WARNING_OBJECT(enc, "frame finished, but VPU did not report the input as used");
         break;
       }
-		}
-		while (!(enc_enc_param.eOutRetCode & VPU_ENC_INPUT_USED));
+		} while (!(enc_enc_param.eOutRetCode & VPU_ENC_INPUT_USED));
 
-      if (pool_buffer)
-        gst_buffer_unref (pool_buffer);
+bail:
+    if (pool_buffer)
+      gst_buffer_unref (pool_buffer);
 
 		/* If output_buffer is NULL at this point, it means VPU_ENC_OUTPUT_DIS was never communicated
 		 * by the VPU, and the buffer is unfinished. -> Drop it. */
