@@ -190,7 +190,6 @@ AC_SUBST(FSL_MM_CORE_CFLAGS)
 FSL_MM_CORE_LIBS=`$PKG_CONFIG --libs libfslaudiocodec 2>/dev/null`
 FSL_MM_CORE_LIBS+=`$PKG_CONFIG --libs libfslvideocodec 2>/dev/null`
 FSL_MM_CORE_LIBS+=`$PKG_CONFIG --libs libfslparser 2>/dev/null`
-FSL_MM_CORE_LIBS+=`$PKG_CONFIG --libs libfslvpuwrap 2>/dev/null`
 AC_SUBST(FSL_MM_CORE_LIBS)
 
 EXTRAPLATFORMCFLAGS="-DARM -D_GNUC_"
