@@ -18,26 +18,32 @@
  */
 
 #include "videoprocessdevice.h"
-
+#ifdef USE_IPU
 extern ImxVideoProcessDevice * imx_ipu_create(void);
 extern gint imx_ipu_destroy(ImxVideoProcessDevice *device);
-
+#endif
+#ifdef USE_G2D
 extern ImxVideoProcessDevice * imx_g2d_create(void);
 extern gint imx_g2d_destroy(ImxVideoProcessDevice *device);
-
+#endif
 static const ImxVideoProcessDeviceInfo VPDevices[] = {
+#ifdef USE_IPU
     { .name                     ="ipu",
       .description              ="IMX IPU Video Converter",
       .detail                   ="Video CSC/resize/rotate/deinterlace",
       .create                   =imx_ipu_create,
       .destroy                  =imx_ipu_destroy
     },
+#endif
+
+#ifdef USE_G2D
     { .name                     ="g2d",
       .description              ="IMX G2D Video Converter",
       .detail                   ="Video CSC/resize/rotate",
       .create                   =imx_g2d_create,
       .destroy                  =imx_g2d_destroy
     },
+#endif
     {
       NULL
     }

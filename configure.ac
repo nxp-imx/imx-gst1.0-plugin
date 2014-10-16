@@ -253,6 +253,8 @@ CHECK_DISABLE_FEATURE(beep, [Disable beep audio decoder], [BEEP], [fsl_unia.h], 
 CHECK_DISABLE_FEATURE(v4lsink, [Disable fsl v4l sink], [V4L_SINK], [linux/videodev2.h], [plugin: v4lsink])
 CHECK_DISABLE_FEATURE(overlaysink, [Disable fsl overlaysink], [OVERLAY_SINK], [g2d.h], [plugin: overlaysink])
 CHECK_DISABLE_FEATURE(x11, [Disable x11 lib], [X11], [X11/Xlib.h], [library: libX11])
+CHECK_DISABLE_FEATURE(imxvideoconvert_g2d, [Disable fsl imxvideoconvert_g2d], [G2D], [g2d.h], [plugin: imxvideoconvert_g2d])
+CHECK_DISABLE_FEATURE(imxvideoconvert_ipu, [Disable fsl imxvideoconvert_ipu], [IPU], [ipu.h], [plugin: imxvideoconvert_ipu])
 
 # Allow headers to be inside include/uapi and include/linux
 #saved_CFLAGS="$CFLAGS"

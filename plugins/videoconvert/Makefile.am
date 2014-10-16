@@ -1,8 +1,6 @@
 plugin_LTLIBRARIES = libgstimxvideoconvert.la
 
-libgstimxvideoconvert_la_SOURCES = videoprocessdevice_g2d.c \
-                                   videoprocessdevice_ipu.c \
-                                   videoprocessdevice.c \
+libgstimxvideoconvert_la_SOURCES = videoprocessdevice.c \
                                    gstimxvideoconvertallocator.c \
                                    gstimxvideoconvert.c
 
@@ -16,9 +14,19 @@ libgstimxvideoconvert_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 				 $(GST_PLUGINS_BASE_LIBS) \
 				 -lgstvideo-$(GST_API_VERSION) \
 				 $(GST_LIBS) \
-				 -lg2d \
 				 ../../libs/libgstfsl-@GST_API_VERSION@.la
 				 
+if USE_IPU
+libgstimxvideoconvert_la_SOURCES += videoprocessdevice_ipu.c
+libgstimxvideoconvert_la_CFLAGS += -DUSE_IPU
+endif
+
+if USE_G2D
+libgstimxvideoconvert_la_SOURCES += videoprocessdevice_g2d.c
+libgstimxvideoconvert_la_CFLAGS += -DUSE_G2D
+libgstimxvideoconvert_la_LIBADD += -lg2d
+endif
+
 libgstimxvideoconvert_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstimxvideoconvert_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 
