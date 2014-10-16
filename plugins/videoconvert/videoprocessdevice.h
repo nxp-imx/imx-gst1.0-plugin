@@ -64,6 +64,19 @@ typedef struct {
   gint  loss;
 } ImxVideoTransformMap;
 
+typedef struct {
+  GstVideoFormat fmt;
+  guint width;
+  guint height;
+  guint stride;
+  gboolean interlace;
+  guint crop_x;
+  guint crop_y;
+  guint crop_w;
+  guint crop_h;
+  PhyMemBlock *memblk;
+} ImxVideoFrame;
+
 typedef struct _ImxVideoProcessDevice  ImxVideoProcessDevice;
 struct _ImxVideoProcessDevice {
   ImxVpDeviceType  device_type;
@@ -80,20 +93,12 @@ struct _ImxVideoProcessDevice {
                                         PhyMemBlock *memblk);
   gint     (*frame_copy)              (ImxVideoProcessDevice* device,
                                         PhyMemBlock *from, PhyMemBlock *to);
-  //TODO : remove set_input_frame and set_output_frame interface if they can be
-  //       merge into do_convert interface
-  gint     (*set_input_frame)         (ImxVideoProcessDevice* device,
-                                        GstVideoFrame *input);
-  gint     (*set_output_frame)        (ImxVideoProcessDevice* device,
-                                        GstVideoFrame *output);
   gint     (*set_deinterlace)         (ImxVideoProcessDevice* device,
                                         ImxVideoDeinterlaceMode mode);
   gint     (*set_rotate)              (ImxVideoProcessDevice* device,
                                         ImxVideoRotationMode mode);
-  //TODO : replace GstVideoFrame with general buffer, so that we can make
-  //       the device independent with Gstreamer completely.
   gint     (*do_convert)              (ImxVideoProcessDevice* device,
-                                        GstVideoFrame *from, GstVideoFrame *to);
+                                      ImxVideoFrame *from, ImxVideoFrame *to);
 
   gint                    (*get_capabilities)        (void);
   GList*                  (*get_supported_in_fmts)   (void);

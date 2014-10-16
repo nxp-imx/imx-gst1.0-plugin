@@ -188,50 +188,55 @@ static gint imx_g2d_frame_copy(ImxVideoProcessDevice *device,
   return ret;
 }
 
-static gint imx_g2d_set_input_frame(ImxVideoProcessDevice *device,
-                                    GstVideoFrame *input)
+static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
+                                ImxVideoFrame *input, ImxVideoFrame *output)
 {
-  if (!device || !device->priv || !input)
+  gint ret = 0;
+  void *g2d_handle = NULL;
+
+  if (!device || !device->priv || !input || !output)
     return -1;
+
+  // Open g2d
+  if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
+    GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
+    return -1;
+  }
 
   ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
-  PhyMemBlock *memblk = gst_buffer_query_phymem_block (input->buffer);
-  if (!memblk)
+
+  // Set input frame info
+  const G2dFmtMap *in_map = imx_g2d_get_format(input->fmt);
+  if (!in_map)
     return -1;
 
-  GstVideoFormat gst_fmt = GST_VIDEO_INFO_FORMAT(&(input->info));
-  const G2dFmtMap *fmtmap = imx_g2d_get_format(gst_fmt);
-  if (!fmtmap)
-    return -1;
-
-  GstVideoCropMeta *crop_meta = gst_buffer_get_video_crop_meta(input->buffer);
-
-  GST_LOG ("Input: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(input->info.finfo),
-                    input->info.width, input->info.height);
-
-  g2d->src.width = input->info.width;
-  g2d->src.height = input->info.height;
-  g2d->src.stride = input->info.stride[0] / (fmtmap->bpp/8);
-  g2d->src.format = fmtmap->g2d_format;
+  g2d->src.width = input->width;
+  g2d->src.height = input->height;
+  g2d->src.stride = input->stride / (in_map->bpp/8);
+  g2d->src.format = in_map->g2d_format;
+  g2d->src.left = input->crop_x;
+  g2d->src.top = input->crop_y;
+  g2d->src.right = MIN((input->crop_x + input->crop_w), input->width);
+  g2d->src.bottom = MIN((input->crop_y + input->crop_h), input->height);
 
   switch(g2d->src.format) {
     case G2D_I420:
     case G2D_YV12:
-      g2d->src.planes[0] = (gint)(memblk->paddr);
-      g2d->src.planes[1] = (gint)(memblk->paddr +
+      g2d->src.planes[0] = (gint)(input->memblk->paddr);
+      g2d->src.planes[1] = (gint)(input->memblk->paddr +
                                   g2d->src.width * g2d->src.height);
       g2d->src.planes[2] = g2d->src.planes[1]
                            + g2d->src.width * g2d->src.height / 4;
       break;
     case G2D_NV12:
     case G2D_NV21:
-      g2d->src.planes[0] = (gint)(memblk->paddr);
-      g2d->src.planes[1] = (gint)(memblk->paddr
+      g2d->src.planes[0] = (gint)(input->memblk->paddr);
+      g2d->src.planes[1] = (gint)(input->memblk->paddr
                                   + g2d->src.width * g2d->src.height);
       break;
     case G2D_NV16:
-      g2d->src.planes[0] = (gint)(memblk->paddr);
-      g2d->src.planes[1] = (gint)(memblk->paddr
+      g2d->src.planes[0] = (gint)(input->memblk->paddr);
+      g2d->src.planes[1] = (gint)(input->memblk->paddr
                                   + g2d->src.width * g2d->src.height);
       break;
 
@@ -248,111 +253,39 @@ static gint imx_g2d_set_input_frame(ImxVideoProcessDevice *device,
     case G2D_UYVY:
     case G2D_YUYV:
     case G2D_YVYU:
-      g2d->src.planes[0] = (gint)(memblk->paddr);
+      g2d->src.planes[0] = (gint)(input->memblk->paddr);
       break;
     default:
       GST_ERROR ("G2D: not supported format.");
       return -1;
   }
 
-  if (crop_meta != NULL) {
-    GST_LOG ("input crop meta: (%d, %d, %d, %d).", crop_meta->x, crop_meta->y,
-            crop_meta->width, crop_meta->height);
-
-    if ((crop_meta->x >= (guint)(input->info.width))
-        || (crop_meta->y >= (guint)(input->info.height)))
-      return -1;
-
-    g2d->src.left = crop_meta->x;
-    g2d->src.top = crop_meta->y;
-    g2d->src.right = MIN((crop_meta->x + crop_meta->width), input->info.width);
-    g2d->src.bottom = MIN((crop_meta->y+crop_meta->height), input->info.height);
-  } else {
-    g2d->src.left = 0;
-    g2d->src.top = 0;
-    g2d->src.right = g2d->src.width;
-    g2d->src.bottom = g2d->src.height;
-  }
-
   GST_TRACE ("set g2d src : %dx%d,%d(%d,%d-%d,%d), format=%s",
       g2d->src.width, g2d->src.height,g2d->src.stride, g2d->src.left,
       g2d->src.top, g2d->src.right, g2d->src.bottom,
-      gst_video_format_to_string(gst_fmt));
+      gst_video_format_to_string(input->fmt));
 
-  return 0;
-}
-
-static gint imx_g2d_set_output_frame(ImxVideoProcessDevice *device,
-                                     GstVideoFrame *output)
-{
-  if (!device || !device->priv || !output)
+  // Set output frame info
+  const G2dFmtMap *out_map = imx_g2d_get_format(output->fmt);
+  if (!out_map)
     return -1;
 
-  ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
-
-  PhyMemBlock *memblk = gst_buffer_query_phymem_block (output->buffer);
-  if (!memblk)
-    return -1;
-
-  GstVideoFormat gst_fmt = GST_VIDEO_INFO_FORMAT(&(output->info));
-  const G2dFmtMap *fmtmap = imx_g2d_get_format(gst_fmt);
-  if (!fmtmap)
-    return -1;
-
-  GstVideoCropMeta *crop_meta = gst_buffer_get_video_crop_meta(output->buffer);
-
-  GST_LOG ("Output: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(output->info.finfo),
-                    output->info.width, output->info.height);
-
-  g2d->dst.width = output->info.width;
-  g2d->dst.height = output->info.height;
-  g2d->dst.stride = output->info.stride[0] / (fmtmap->bpp / 8);
-  g2d->dst.format = fmtmap->g2d_format;
-  g2d->dst.planes[0] = (gint)(memblk->paddr);
-
-  if (crop_meta != NULL) {
-    GST_LOG ("output crop meta: (%d, %d, %d, %d).", crop_meta->x, crop_meta->y,
-        crop_meta->width, crop_meta->height);
-
-    if ((crop_meta->x >= (guint)(output->info.width))
-        || (crop_meta->y >= (guint)(output->info.height)))
-      return -1;
-    g2d->dst.left = crop_meta->x;
-    g2d->dst.top = crop_meta->y;
-    g2d->dst.right = MIN((crop_meta->x + crop_meta->width), output->info.width);
-    g2d->dst.bottom = MIN((crop_meta->y+crop_meta->height),output->info.height);
-  } else {
-    g2d->dst.left = 0;
-    g2d->dst.top = 0;
-    g2d->dst.right = output->info.width;
-    g2d->dst.bottom = output->info.height;
-  }
+  g2d->dst.width = output->width;
+  g2d->dst.height = output->height;
+  g2d->dst.stride = output->stride / (out_map->bpp / 8);
+  g2d->dst.format = out_map->g2d_format;
+  g2d->dst.planes[0] = (gint)(output->memblk->paddr);
+  g2d->dst.left = output->crop_x;
+  g2d->dst.top = output->crop_y;
+  g2d->dst.right = MIN((output->crop_x + output->crop_w), output->width);
+  g2d->dst.bottom = MIN((output->crop_y + output->crop_h),output->height);
 
   GST_TRACE ("set g2d dest : %dx%d,%d(%d,%d-%d,%d), format=%s",
       g2d->dst.width, g2d->dst.height,g2d->dst.stride, g2d->dst.left,
       g2d->dst.top, g2d->dst.right, g2d->dst.bottom,
-      gst_video_format_to_string(gst_fmt));
+      gst_video_format_to_string(output->fmt));
 
-  return 0;
-}
-
-static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
-                               GstVideoFrame *from, GstVideoFrame *to)
-{
-  gint ret = 0;
-
-  if (!device || !device->priv || !from || !to)
-    return -1;
-
-  void *g2d_handle = NULL;
-
-  if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
-    GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
-    return -1;
-  }
-
-  ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
-
+  // Final conversion
   ret = g2d_blit(g2d_handle, &g2d->src, &g2d->dst);
   ret |= g2d_finish(g2d_handle);
   g2d_close(g2d_handle);
@@ -478,8 +411,6 @@ ImxVideoProcessDevice * imx_g2d_create(void)
   device->alloc_mem           = imx_g2d_alloc_mem;
   device->free_mem            = imx_g2d_free_mem;
   device->frame_copy          = imx_g2d_frame_copy;
-  device->set_input_frame     = imx_g2d_set_input_frame;
-  device->set_output_frame    = imx_g2d_set_output_frame;
   device->do_convert          = imx_g2d_do_convert;
   device->set_rotate          = imx_g2d_set_rotate;
   device->set_deinterlace     = imx_g2d_set_deinterlace;

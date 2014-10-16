@@ -1125,15 +1125,109 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     }
   }
 
-  GstFlowReturn ret = GST_FLOW_ERROR;
-  if (device->set_input_frame(device, input_frame) == 0)
-    if (device->set_output_frame(device, out) == 0)
-      if (device->do_convert(device, input_frame, out) == 0) {
-        GST_TRACE ("frame conversion done");
-        ret = GST_FLOW_OK;
-      }
+  ImxVideoFrame input, output;
+  PhyMemBlock *memblk;
+  GstVideoCropMeta *in_crop = NULL, *out_crop = NULL;
 
-  return ret;
+  // config input frame
+  input.fmt = GST_VIDEO_INFO_FORMAT(&(input_frame->info));
+  memblk = gst_buffer_query_phymem_block (input_frame->buffer);
+  if (!memblk)
+    return GST_FLOW_ERROR;
+  input.memblk = memblk;
+  input.width = input_frame->info.width;
+  input.height = input_frame->info.height;
+  input.stride = input_frame->info.stride[0];
+  input.crop_x = 0;
+  input.crop_y = 0;
+  input.crop_w = input_frame->info.width;
+  input.crop_h = input_frame->info.height;
+
+  GST_LOG ("Input: %s, %dx%d",
+      GST_VIDEO_FORMAT_INFO_NAME(input_frame->info.finfo),
+      input_frame->info.width, input_frame->info.height);
+
+  in_crop = gst_buffer_get_video_crop_meta(input_frame->buffer);
+  if (in_crop != NULL) {
+    GST_LOG ("input crop meta: (%d, %d, %d, %d).", in_crop->x, in_crop->y,
+        in_crop->width, in_crop->height);
+    if ((in_crop->x >= (guint)(input_frame->info.width))
+        || (in_crop->y >= (guint)(input_frame->info.height)))
+      return GST_FLOW_ERROR;
+
+    input.crop_x = in_crop->x;
+    input.crop_y = in_crop->y;
+    input.crop_w = in_crop->width;
+    input.crop_h = in_crop->height;
+  }
+
+  input.interlace = FALSE;
+  GstVideoMeta *video_meta = gst_buffer_get_video_meta(input_frame->buffer);
+  switch (input_frame->info.interlace_mode) {
+    case GST_VIDEO_INTERLACE_MODE_INTERLEAVED:
+      GST_TRACE("input stream is interleaved");
+      input.interlace = TRUE;
+      break;
+    case GST_VIDEO_INTERLACE_MODE_MIXED:
+      if (video_meta != NULL) {
+        if (video_meta->flags & GST_VIDEO_FRAME_FLAG_INTERLACED) {
+          GST_TRACE("frame has video metadata and INTERLACED flag");
+          input.interlace = TRUE;
+        } else {
+          GST_TRACE("frame has video metadata but no INTERLACED flag");
+        }
+      } else {
+        GST_TRACE("frame has no video metadata");
+      }
+      break;
+    case GST_VIDEO_INTERLACE_MODE_PROGRESSIVE:
+      GST_TRACE("input stream is progressive");
+      break;
+    case GST_VIDEO_INTERLACE_MODE_FIELDS:
+      GST_FIXME("2-fields deinterlacing not supported yet");
+      break;
+    default:
+      break;
+  }
+
+  // config output frame
+  output.fmt = GST_VIDEO_INFO_FORMAT(&(out->info));
+  memblk = gst_buffer_query_phymem_block (out->buffer);
+  if (!memblk)
+    return GST_FLOW_ERROR;
+  output.memblk = memblk;
+  output.width = out->info.width;
+  output.height = out->info.height;
+  output.stride = out->info.stride[0];
+  output.crop_x = 0;
+  output.crop_y = 0;
+  output.crop_w = out->info.width;
+  output.crop_h = out->info.height;
+
+  GST_LOG ("Output: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(out->info.finfo),
+      out->info.width, out->info.height);
+
+  out_crop = gst_buffer_get_video_crop_meta(out->buffer);
+  if (out_crop != NULL) {
+    GST_LOG ("input crop meta: (%d, %d, %d, %d).", out_crop->x, out_crop->y,
+        out_crop->width, out_crop->height);
+    if ((out_crop->x >= (guint)(out->info.width))
+        || (out_crop->y >= (guint)(out->info.height)))
+      return GST_FLOW_ERROR;
+
+    output.crop_x = out_crop->x;
+    output.crop_y = out_crop->y;
+    output.crop_w = out_crop->width;
+    output.crop_h = out_crop->height;
+  }
+
+  //convert
+  if (device->do_convert(device, &input, &output) == 0) {
+    GST_TRACE ("frame conversion done");
+    return GST_FLOW_OK;
+  }
+
+  return GST_FLOW_ERROR;
 }
 
 static void
