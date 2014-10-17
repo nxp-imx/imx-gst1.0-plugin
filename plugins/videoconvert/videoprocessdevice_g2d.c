@@ -34,45 +34,44 @@ typedef struct _ImxVpDeviceG2d {
 typedef struct {
   GstVideoFormat gst_video_format;
   guint g2d_format;
-  gchar *name;
   guint bpp;
 } G2dFmtMap;
 
 static G2dFmtMap g2d_fmts_map[] = {
-    {GST_VIDEO_FORMAT_RGB16,  G2D_RGB565,   "RGB16",  16},
-    {GST_VIDEO_FORMAT_RGBx,   G2D_RGBX8888, "RGBx",   32},
-    {GST_VIDEO_FORMAT_RGBA,   G2D_RGBA8888, "RGBA",   32},
-    {GST_VIDEO_FORMAT_BGRA,   G2D_BGRA8888, "BGRA",   32},
-    {GST_VIDEO_FORMAT_BGRx,   G2D_BGRX8888, "BGRx",   32},
-    {GST_VIDEO_FORMAT_BGR16,  G2D_BGR565,   "BGR16",  16},
-    {GST_VIDEO_FORMAT_ARGB,   G2D_ARGB8888, "ARGB",   32},
-    {GST_VIDEO_FORMAT_ABGR,   G2D_ABGR8888, "ABGR",   32},
-    {GST_VIDEO_FORMAT_xRGB,   G2D_XRGB8888, "xRGB",   32},
-    {GST_VIDEO_FORMAT_xBGR,   G2D_XBGR8888, "xBGR",   32},
+    {GST_VIDEO_FORMAT_RGB16,  G2D_RGB565,   16},
+    {GST_VIDEO_FORMAT_RGBx,   G2D_RGBX8888, 32},
+    {GST_VIDEO_FORMAT_RGBA,   G2D_RGBA8888, 32},
+    {GST_VIDEO_FORMAT_BGRA,   G2D_BGRA8888, 32},
+    {GST_VIDEO_FORMAT_BGRx,   G2D_BGRX8888, 32},
+    {GST_VIDEO_FORMAT_BGR16,  G2D_BGR565,   16},
+    {GST_VIDEO_FORMAT_ARGB,   G2D_ARGB8888, 32},
+    {GST_VIDEO_FORMAT_ABGR,   G2D_ABGR8888, 32},
+    {GST_VIDEO_FORMAT_xRGB,   G2D_XRGB8888, 32},
+    {GST_VIDEO_FORMAT_xBGR,   G2D_XBGR8888, 32},
 
     //this only for separate YUV format and RGB format
-    {GST_VIDEO_FORMAT_UNKNOWN, -1,          "yuv",     1},
+    {GST_VIDEO_FORMAT_UNKNOWN, -1,          1},
 
-    {GST_VIDEO_FORMAT_I420,   G2D_I420,     "I420",   12},
-    {GST_VIDEO_FORMAT_NV12,   G2D_NV12,     "NV12",   12},
-    {GST_VIDEO_FORMAT_UYVY,   G2D_UYVY,     "UYVY",   16},
-    {GST_VIDEO_FORMAT_YV12,   G2D_YV12,     "YV12",   12},
-    {GST_VIDEO_FORMAT_YUY2,   G2D_YUYV,     "YUY2",   16},
-    {GST_VIDEO_FORMAT_NV16,   G2D_NV16,     "NV16",   16},
-    {GST_VIDEO_FORMAT_NV21,   G2D_NV21,     "NV21",   12},
-    {GST_VIDEO_FORMAT_YVYU,   G2D_YVYU,     "YVYU",   16},
+    {GST_VIDEO_FORMAT_I420,   G2D_I420,     12},
+    {GST_VIDEO_FORMAT_NV12,   G2D_NV12,     12},
+    {GST_VIDEO_FORMAT_UYVY,   G2D_UYVY,     16},
+    {GST_VIDEO_FORMAT_YV12,   G2D_YV12,     12},
+    {GST_VIDEO_FORMAT_YUY2,   G2D_YUYV,     16},
+    {GST_VIDEO_FORMAT_NV16,   G2D_NV16,     16},
+    {GST_VIDEO_FORMAT_NV21,   G2D_NV21,     12},
+    {GST_VIDEO_FORMAT_YVYU,   G2D_YVYU,     16},
 
 /* There is no corresponding GST Video format for those G2D formats
     {GST_VIDEO_FORMAT_VYUY,   G2D_VYUY,     "VYUY",   16},
     {GST_VIDEO_FORMAT_NV61,   G2D_NV61,     "NV61",   16},
 */
-    {GST_VIDEO_FORMAT_UNKNOWN, -1,          NULL,     0}
+    {GST_VIDEO_FORMAT_UNKNOWN, -1,          0}
 };
 
 static const G2dFmtMap * imx_g2d_get_format(GstVideoFormat format)
 {
   const G2dFmtMap *map = g2d_fmts_map;
-  while(map->name) {
+  while(map->bpp > 0) {
     if (map->gst_video_format == format)
       return map;
     map++;
@@ -188,8 +187,59 @@ static gint imx_g2d_frame_copy(ImxVideoProcessDevice *device,
   return ret;
 }
 
+static gint imx_g2d_config_input(ImxVideoProcessDevice *device,
+                                  GstVideoFormat fmt,
+                                  GstVideoInterlaceMode interlace_mode,
+                                  guint w, guint h, guint stride)
+{
+  if (!device || !device->priv)
+    return -1;
+
+  ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
+  const G2dFmtMap *in_map = imx_g2d_get_format(fmt);
+  if (!in_map)
+    return -1;
+
+  g2d->src.width = w;
+  g2d->src.height = h;
+  g2d->src.stride = w;//stride / (in_map->bpp/8);
+  g2d->src.format = in_map->g2d_format;
+  g2d->src.left = 0;
+  g2d->src.top = 0;
+  g2d->src.right = w;
+  g2d->src.bottom = h;
+  GST_TRACE("input format = %s", gst_video_format_to_string(fmt));
+
+  return 0;
+}
+
+static gint imx_g2d_config_output(ImxVideoProcessDevice *device,
+                                  GstVideoFormat fmt,
+                                  guint w, guint h, guint stride)
+{
+  if (!device || !device->priv)
+    return -1;
+
+  ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
+  const G2dFmtMap *out_map = imx_g2d_get_format(fmt);
+  if (!out_map)
+    return -1;
+
+  g2d->dst.width = w;
+  g2d->dst.height = h;
+  g2d->dst.stride = w;//stride / (out_map->bpp / 8);
+  g2d->dst.format = out_map->g2d_format;
+  g2d->dst.left = 0;
+  g2d->dst.top = 0;
+  g2d->dst.right = w;
+  g2d->dst.bottom = h;
+  GST_TRACE("output format = %s", gst_video_format_to_string(fmt));
+
+  return 0;
+}
+
 static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
-                                ImxVideoFrame *input, ImxVideoFrame *output)
+                                GstBuffer *input, GstBuffer *output)
 {
   gint ret = 0;
   void *g2d_handle = NULL;
@@ -204,39 +254,51 @@ static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
   }
 
   ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
+  GstVideoCropMeta *in_crop = NULL, *out_crop = NULL;
 
-  // Set input frame info
-  const G2dFmtMap *in_map = imx_g2d_get_format(input->fmt);
-  if (!in_map)
+  // Set input
+  in_crop = gst_buffer_get_video_crop_meta(input);
+  if (in_crop != NULL) {
+    GST_LOG ("input crop meta: (%d, %d, %d, %d).", in_crop->x, in_crop->y,
+        in_crop->width, in_crop->height);
+    if ((in_crop->x >= g2d->src.width)
+        || (in_crop->y >= g2d->src.height))
+      return -1;
+
+    g2d->src.left = in_crop->x;
+    g2d->src.top = in_crop->y;
+    g2d->src.right = MIN((in_crop->x + in_crop->width), g2d->src.width);
+    g2d->src.bottom = MIN((in_crop->y + in_crop->height), g2d->src.height);
+  }
+
+  PhyMemBlock *from_memblk = gst_buffer_query_phymem_block (input);
+  if (!from_memblk)
     return -1;
-
-  g2d->src.width = input->width;
-  g2d->src.height = input->height;
-  g2d->src.stride = input->stride / (in_map->bpp/8);
-  g2d->src.format = in_map->g2d_format;
-  g2d->src.left = input->crop_x;
-  g2d->src.top = input->crop_y;
-  g2d->src.right = MIN((input->crop_x + input->crop_w), input->width);
-  g2d->src.bottom = MIN((input->crop_y + input->crop_h), input->height);
 
   switch(g2d->src.format) {
     case G2D_I420:
-    case G2D_YV12:
-      g2d->src.planes[0] = (gint)(input->memblk->paddr);
-      g2d->src.planes[1] = (gint)(input->memblk->paddr +
+      g2d->src.planes[0] = (gint)(from_memblk->paddr);
+      g2d->src.planes[1] = (gint)(from_memblk->paddr +
                                   g2d->src.width * g2d->src.height);
       g2d->src.planes[2] = g2d->src.planes[1]
                            + g2d->src.width * g2d->src.height / 4;
       break;
+    case G2D_YV12:
+      g2d->src.planes[0] = (gint)(from_memblk->paddr);
+      g2d->src.planes[2] = (gint)(from_memblk->paddr +
+                                  g2d->src.width * g2d->src.height);
+      g2d->src.planes[1] = g2d->src.planes[2]
+                           + g2d->src.width * g2d->src.height / 4;
+      break;
     case G2D_NV12:
     case G2D_NV21:
-      g2d->src.planes[0] = (gint)(input->memblk->paddr);
-      g2d->src.planes[1] = (gint)(input->memblk->paddr
+      g2d->src.planes[0] = (gint)(from_memblk->paddr);
+      g2d->src.planes[1] = (gint)(from_memblk->paddr
                                   + g2d->src.width * g2d->src.height);
       break;
     case G2D_NV16:
-      g2d->src.planes[0] = (gint)(input->memblk->paddr);
-      g2d->src.planes[1] = (gint)(input->memblk->paddr
+      g2d->src.planes[0] = (gint)(from_memblk->paddr);
+      g2d->src.planes[1] = (gint)(from_memblk->paddr
                                   + g2d->src.width * g2d->src.height);
       break;
 
@@ -253,37 +315,42 @@ static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
     case G2D_UYVY:
     case G2D_YUYV:
     case G2D_YVYU:
-      g2d->src.planes[0] = (gint)(input->memblk->paddr);
+      g2d->src.planes[0] = (gint)(from_memblk->paddr);
       break;
     default:
       GST_ERROR ("G2D: not supported format.");
       return -1;
   }
 
-  GST_TRACE ("set g2d src : %dx%d,%d(%d,%d-%d,%d), format=%s",
+  GST_TRACE ("set g2d src : %dx%d,%d(%d,%d-%d,%d), format=%d",
       g2d->src.width, g2d->src.height,g2d->src.stride, g2d->src.left,
       g2d->src.top, g2d->src.right, g2d->src.bottom,
-      gst_video_format_to_string(input->fmt));
+      g2d->src.format);
 
-  // Set output frame info
-  const G2dFmtMap *out_map = imx_g2d_get_format(output->fmt);
-  if (!out_map)
+  // Set output
+  PhyMemBlock *to_memblk = gst_buffer_query_phymem_block (output);
+  if (!to_memblk)
     return -1;
 
-  g2d->dst.width = output->width;
-  g2d->dst.height = output->height;
-  g2d->dst.stride = output->stride / (out_map->bpp / 8);
-  g2d->dst.format = out_map->g2d_format;
-  g2d->dst.planes[0] = (gint)(output->memblk->paddr);
-  g2d->dst.left = output->crop_x;
-  g2d->dst.top = output->crop_y;
-  g2d->dst.right = MIN((output->crop_x + output->crop_w), output->width);
-  g2d->dst.bottom = MIN((output->crop_y + output->crop_h),output->height);
+  g2d->dst.planes[0] = (gint)(to_memblk->paddr);
+  out_crop = gst_buffer_get_video_crop_meta(output);
+  if (out_crop != NULL) {
+    GST_LOG ("input crop meta: (%d, %d, %d, %d).", out_crop->x, out_crop->y,
+        out_crop->width, out_crop->height);
+    if ((out_crop->x >= g2d->dst.width)
+        || (out_crop->y >= g2d->dst.height))
+      return -1;
 
-  GST_TRACE ("set g2d dest : %dx%d,%d(%d,%d-%d,%d), format=%s",
+    g2d->dst.left = in_crop->x;
+    g2d->dst.top = in_crop->y;
+    g2d->dst.right = MIN((in_crop->x + in_crop->width), g2d->dst.width);
+    g2d->dst.bottom = MIN((in_crop->y + in_crop->height), g2d->dst.height);
+  }
+
+  GST_TRACE ("set g2d dest : %dx%d,%d(%d,%d-%d,%d), format=%d",
       g2d->dst.width, g2d->dst.height,g2d->dst.stride, g2d->dst.left,
       g2d->dst.top, g2d->dst.right, g2d->dst.bottom,
-      gst_video_format_to_string(output->fmt));
+      g2d->dst.format);
 
   // Final conversion
   ret = g2d_blit(g2d_handle, &g2d->src, &g2d->dst);
@@ -411,6 +478,8 @@ ImxVideoProcessDevice * imx_g2d_create(void)
   device->alloc_mem           = imx_g2d_alloc_mem;
   device->free_mem            = imx_g2d_free_mem;
   device->frame_copy          = imx_g2d_frame_copy;
+  device->config_input        = imx_g2d_config_input;
+  device->config_output       = imx_g2d_config_output;
   device->do_convert          = imx_g2d_do_convert;
   device->set_rotate          = imx_g2d_set_rotate;
   device->set_deinterlace     = imx_g2d_set_deinterlace;

@@ -156,7 +156,6 @@ static void gst_imx_video_convert_finalize (GObject * object)
 {
   GstImxVideoConvert *imxvct = (GstImxVideoConvert *) (object);
   GstStructure *config;
-  GstAllocator *allocator = NULL;
   GstImxVideoConvertClass *klass =
         (GstImxVideoConvertClass *) G_OBJECT_GET_CLASS (imxvct);
 
@@ -305,7 +304,7 @@ static gint get_format_conversion_loss(GstBaseTransform * base,
 
   /* accept input format immediately without loss */
   if (in_info == out_info) {
-    GST_LOG("same foramt %s", GST_VIDEO_FORMAT_INFO_NAME(in_info));
+    GST_LOG("same format %s", GST_VIDEO_FORMAT_INFO_NAME(in_info));
     return 0;
   }
 
@@ -381,7 +380,7 @@ static GstCaps* imx_video_convert_caps_from_fmt_list(GList* list)
   return caps;
 }
 
-static void imx_video_convert_fixate_format_caps(GstBaseTransform *transform,
+static guint imx_video_convert_fixate_format_caps(GstBaseTransform *transform,
                                             GstCaps *caps, GstCaps *othercaps)
 {
   GstStructure *outs;
@@ -434,7 +433,7 @@ static void imx_video_convert_fixate_format_caps(GstBaseTransform *transform,
 
   fmt_name = gst_structure_get_string(ins, "format");
   if (!fmt_name)
-    return;
+    return -1;
 
   GST_LOG("source format : %s", fmt_name);
 
@@ -444,7 +443,7 @@ static void imx_video_convert_fixate_format_caps(GstBaseTransform *transform,
     tests = gst_caps_get_structure(new_caps, i);
     format = gst_structure_get_value(tests, "format");
     if (!format)
-      return;
+      return -1;
 
     if (GST_VALUE_HOLDS_LIST(format)) {
       for (j = 0; j < gst_value_list_get_size(format); j++) {
@@ -489,6 +488,11 @@ static void imx_video_convert_fixate_format_caps(GstBaseTransform *transform,
     fmt_name = GST_VIDEO_FORMAT_INFO_NAME(out_info);
     gst_structure_set(outs, "format", G_TYPE_STRING, fmt_name, NULL);
     GST_LOG("out format %s", fmt_name);
+    return 0;
+  } else {
+    gst_structure_set(outs, "format", G_TYPE_STRING, "UNKNOWN", NULL);
+    GST_LOG("out format not match");
+    return -1;
   }
 }
 
@@ -846,7 +850,7 @@ gst_imx_video_convert_create_bufferpool(GstImxVideoConvert *imxvct,
 {
   GstBufferPool *pool;
   GstStructure *config;
-  GstAllocator *allocator;
+  GstAllocator *allocator = NULL;
   pool = gst_video_buffer_pool_new ();
   if (pool) {
     allocator = gst_imx_video_convert_allocator_new((gpointer)(imxvct->device));
@@ -907,24 +911,17 @@ imx_video_convert_propose_allocation(GstBaseTransform *transform,
     return FALSE;
 
   size = GST_VIDEO_INFO_SIZE (&info);
+  size = PAGE_ALIGN(size);
 
-  if (!imxvct->in_pool) {
-    GST_DEBUG_OBJECT(imxvct, "creating new input pool");
-    pool = gst_imx_video_convert_create_bufferpool(imxvct, caps, size, 1, 0);
-    imxvct->in_pool = pool;
-  } else {
-    pool = imxvct->in_pool;
-    GST_DEBUG_OBJECT(imxvct, "update input pool (%p)", pool);
-    gst_buffer_pool_set_active(pool, FALSE);
-    GstStructure *config = gst_buffer_pool_get_config(pool);
-    gst_buffer_pool_config_set_params(config, caps, size, 1, 0);
-    gst_buffer_pool_set_config(pool, config);
-  }
+  GST_IMX_CONVERT_UNREF_POOL(imxvct->in_pool);
+  GST_DEBUG_OBJECT(imxvct, "creating new input pool");
+  pool = gst_imx_video_convert_create_bufferpool(imxvct, caps, size, 1, 0);
+  imxvct->in_pool = pool;
 
   if (pool) {
     GST_IMX_CONVERT_UNREF_BUFFER (imxvct->in_buf);
     GST_DEBUG_OBJECT (imxvct, "propose_allocation, pool(%p).", pool);
-    gst_query_add_allocation_pool (query, pool, size, 0, 0);
+    gst_query_add_allocation_pool (query, pool, size, 1, 0);
     gst_query_add_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL);
     gst_query_add_allocation_meta (query, GST_VIDEO_CROP_META_API_TYPE, NULL);
   } else {
@@ -979,27 +976,16 @@ static gboolean imx_video_convert_decide_allocation(GstBaseTransform *transform,
   }
 
   size = MAX(size, vinfo.size);
+  size = PAGE_ALIGN(size);
 
   /* downstream doesn't provide a pool or the pool has no ability to allocate
    * physical memory buffers, we need create new pool */
   if (new_pool) {
-    if (!imxvct->out_pool) {
-      GST_DEBUG_OBJECT(imxvct, "creating new output pool");
-      pool = gst_imx_video_convert_create_bufferpool(imxvct, outcaps, size,
-                                                     min, max);
-      imxvct->out_pool = pool;
-    } else {
-      pool = imxvct->out_pool;
-    }
-  }
-
-  if (!new_pool || imxvct->out_pool) {
-    GST_DEBUG_OBJECT(imxvct, "update output pool (%p)", pool);
-    gst_buffer_pool_set_active(pool, FALSE);
-    config = gst_buffer_pool_get_config(pool);
-    gst_buffer_pool_config_set_params(config, outcaps, size, min, max);
-    gst_buffer_pool_config_add_option(config,GST_BUFFER_POOL_OPTION_VIDEO_META);
-    gst_buffer_pool_set_config(pool, config);
+    GST_IMX_CONVERT_UNREF_POOL(imxvct->out_pool);
+    GST_DEBUG_OBJECT(imxvct, "creating new output pool");
+    pool = gst_imx_video_convert_create_bufferpool(imxvct, outcaps, size,
+                                                   min, max);
+    imxvct->out_pool = pool;
     gst_buffer_pool_set_active(pool, TRUE);
   }
 
@@ -1060,8 +1046,23 @@ static gboolean imx_video_convert_set_info(GstVideoFilter *filter,
     gst_structure_remove_fields(outs,"chroma-site", NULL);
   }
 */
+  gint ret = device->config_input(device, GST_VIDEO_INFO_FORMAT(in_info),
+      in_info->interlace_mode, in_info->width, in_info->height,
+      in_info->stride[0]);
+
+  GST_LOG ("Input: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(in_info->finfo),
+      in_info->width, in_info->height);
+
+  ret |= device->config_output(device, GST_VIDEO_INFO_FORMAT(out_info),
+      out_info->width, out_info->height, out_info->stride[0]);
+
+  GST_LOG ("Output: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(out_info->finfo),
+      out_info->width, out_info->height);
 
   GST_DEBUG ("set info from %" GST_PTR_FORMAT " to %" GST_PTR_FORMAT, in, out);
+
+  if (ret != 0)
+    return FALSE;
 
   return TRUE;
 }
@@ -1089,22 +1090,15 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     caps = gst_pad_get_current_caps (GST_BASE_TRANSFORM_SINK_PAD(imxvct));
 
     if (!imxvct->in_pool) {
-      guint size = 0;
       GST_DEBUG_OBJECT(imxvct, "creating new input pool");
       imxvct->in_pool = gst_imx_video_convert_create_bufferpool(imxvct, caps,
-          in->info.size, 1, 0);
-      gst_buffer_pool_set_active(imxvct->in_pool, TRUE);
-    } else {
-      gst_buffer_pool_set_active(imxvct->in_pool, FALSE);
-      GstStructure *config = gst_buffer_pool_get_config(imxvct->in_pool);
-      gst_buffer_pool_config_set_params(config, caps, in->info.size, 1, 0);
-      gst_buffer_pool_set_config(imxvct->in_pool, config);
-      gst_buffer_pool_set_active(imxvct->in_pool, TRUE);
+          PAGE_ALIGN(in->info.size), 1, 0);
     }
 
     gst_caps_unref (caps);
 
     if (imxvct->in_pool && !imxvct->in_buf) {
+      gst_buffer_pool_set_active(imxvct->in_pool, TRUE);
       GstFlowReturn ret = gst_buffer_pool_acquire_buffer(imxvct->in_pool,
                                                   &(imxvct->in_buf), NULL);
       if (ret != GST_FLOW_OK)
@@ -1125,104 +1119,8 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     }
   }
 
-  ImxVideoFrame input, output;
-  PhyMemBlock *memblk;
-  GstVideoCropMeta *in_crop = NULL, *out_crop = NULL;
-
-  // config input frame
-  input.fmt = GST_VIDEO_INFO_FORMAT(&(input_frame->info));
-  memblk = gst_buffer_query_phymem_block (input_frame->buffer);
-  if (!memblk)
-    return GST_FLOW_ERROR;
-  input.memblk = memblk;
-  input.width = input_frame->info.width;
-  input.height = input_frame->info.height;
-  input.stride = input_frame->info.stride[0];
-  input.crop_x = 0;
-  input.crop_y = 0;
-  input.crop_w = input_frame->info.width;
-  input.crop_h = input_frame->info.height;
-
-  GST_LOG ("Input: %s, %dx%d",
-      GST_VIDEO_FORMAT_INFO_NAME(input_frame->info.finfo),
-      input_frame->info.width, input_frame->info.height);
-
-  in_crop = gst_buffer_get_video_crop_meta(input_frame->buffer);
-  if (in_crop != NULL) {
-    GST_LOG ("input crop meta: (%d, %d, %d, %d).", in_crop->x, in_crop->y,
-        in_crop->width, in_crop->height);
-    if ((in_crop->x >= (guint)(input_frame->info.width))
-        || (in_crop->y >= (guint)(input_frame->info.height)))
-      return GST_FLOW_ERROR;
-
-    input.crop_x = in_crop->x;
-    input.crop_y = in_crop->y;
-    input.crop_w = in_crop->width;
-    input.crop_h = in_crop->height;
-  }
-
-  input.interlace = FALSE;
-  GstVideoMeta *video_meta = gst_buffer_get_video_meta(input_frame->buffer);
-  switch (input_frame->info.interlace_mode) {
-    case GST_VIDEO_INTERLACE_MODE_INTERLEAVED:
-      GST_TRACE("input stream is interleaved");
-      input.interlace = TRUE;
-      break;
-    case GST_VIDEO_INTERLACE_MODE_MIXED:
-      if (video_meta != NULL) {
-        if (video_meta->flags & GST_VIDEO_FRAME_FLAG_INTERLACED) {
-          GST_TRACE("frame has video metadata and INTERLACED flag");
-          input.interlace = TRUE;
-        } else {
-          GST_TRACE("frame has video metadata but no INTERLACED flag");
-        }
-      } else {
-        GST_TRACE("frame has no video metadata");
-      }
-      break;
-    case GST_VIDEO_INTERLACE_MODE_PROGRESSIVE:
-      GST_TRACE("input stream is progressive");
-      break;
-    case GST_VIDEO_INTERLACE_MODE_FIELDS:
-      GST_FIXME("2-fields deinterlacing not supported yet");
-      break;
-    default:
-      break;
-  }
-
-  // config output frame
-  output.fmt = GST_VIDEO_INFO_FORMAT(&(out->info));
-  memblk = gst_buffer_query_phymem_block (out->buffer);
-  if (!memblk)
-    return GST_FLOW_ERROR;
-  output.memblk = memblk;
-  output.width = out->info.width;
-  output.height = out->info.height;
-  output.stride = out->info.stride[0];
-  output.crop_x = 0;
-  output.crop_y = 0;
-  output.crop_w = out->info.width;
-  output.crop_h = out->info.height;
-
-  GST_LOG ("Output: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(out->info.finfo),
-      out->info.width, out->info.height);
-
-  out_crop = gst_buffer_get_video_crop_meta(out->buffer);
-  if (out_crop != NULL) {
-    GST_LOG ("input crop meta: (%d, %d, %d, %d).", out_crop->x, out_crop->y,
-        out_crop->width, out_crop->height);
-    if ((out_crop->x >= (guint)(out->info.width))
-        || (out_crop->y >= (guint)(out->info.height)))
-      return GST_FLOW_ERROR;
-
-    output.crop_x = out_crop->x;
-    output.crop_y = out_crop->y;
-    output.crop_w = out_crop->width;
-    output.crop_h = out_crop->height;
-  }
-
   //convert
-  if (device->do_convert(device, &input, &output) == 0) {
+  if (device->do_convert(device, input_frame->buffer, out->buffer) == 0) {
     GST_TRACE ("frame conversion done");
     return GST_FLOW_OK;
   }
@@ -1259,13 +1157,25 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
     GST_ERROR ("Couldn't create caps for device '%s'", in_plugin->name);
     caps = gst_caps_new_empty_simple ("video/x-raw");
   }
-
-  gst_element_class_add_pad_template (element_class,
-      gst_pad_template_new ("src", GST_PAD_SRC, GST_PAD_ALWAYS,
-                            gst_caps_copy(caps)));
   gst_element_class_add_pad_template (element_class,
       gst_pad_template_new ("sink", GST_PAD_SINK, GST_PAD_ALWAYS, caps));
 
+#ifdef PASSTHOUGH_FOR_UNSUPPORTED_OUTPUT_FORMAT
+  gst_element_class_add_pad_template (element_class,
+      gst_pad_template_new ("src", GST_PAD_SRC, GST_PAD_ALWAYS,
+                            gst_caps_copy(caps)));
+#else
+  list = dev->get_supported_out_fmts();
+  caps = imx_video_convert_caps_from_fmt_list(list);
+  g_list_free(list);
+
+  if (!caps) {
+    GST_ERROR ("Couldn't create caps for device '%s'", in_plugin->name);
+    caps = gst_caps_new_empty_simple ("video/x-raw");
+  }
+  gst_element_class_add_pad_template (element_class,
+      gst_pad_template_new ("src", GST_PAD_SRC, GST_PAD_ALWAYS, caps));
+#endif
   klass->in_plugin = in_plugin;
 
   parent_class = g_type_class_peek_parent (klass);

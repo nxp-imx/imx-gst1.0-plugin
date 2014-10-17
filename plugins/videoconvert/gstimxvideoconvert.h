@@ -31,6 +31,8 @@ G_BEGIN_DECLS
  */
 #define COMPARE_CONVERT_LOSS
 
+//#define PASSTHOUGH_FOR_UNSUPPORTED_OUTPUT_FORMAT
+
 /* video convert object and class definition */
 typedef struct _GstImxVideoConvert {
   GstVideoFilter element;

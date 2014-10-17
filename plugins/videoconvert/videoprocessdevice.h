@@ -64,19 +64,6 @@ typedef struct {
   gint  loss;
 } ImxVideoTransformMap;
 
-typedef struct {
-  GstVideoFormat fmt;
-  guint width;
-  guint height;
-  guint stride;
-  gboolean interlace;
-  guint crop_x;
-  guint crop_y;
-  guint crop_w;
-  guint crop_h;
-  PhyMemBlock *memblk;
-} ImxVideoFrame;
-
 typedef struct _ImxVideoProcessDevice  ImxVideoProcessDevice;
 struct _ImxVideoProcessDevice {
   ImxVpDeviceType  device_type;
@@ -97,8 +84,15 @@ struct _ImxVideoProcessDevice {
                                         ImxVideoDeinterlaceMode mode);
   gint     (*set_rotate)              (ImxVideoProcessDevice* device,
                                         ImxVideoRotationMode mode);
+  gint     (*config_input)            (ImxVideoProcessDevice* device,
+                                        GstVideoFormat fmt,
+                                        GstVideoInterlaceMode interlace,
+                                        guint w, guint h, guint stride);
+  gint     (*config_output)           (ImxVideoProcessDevice* device,
+                                        GstVideoFormat fmt,
+                                        guint w, guint h, guint stride);
   gint     (*do_convert)              (ImxVideoProcessDevice* device,
-                                      ImxVideoFrame *from, ImxVideoFrame *to);
+                                       GstBuffer *from, GstBuffer *to);
 
   gint                    (*get_capabilities)        (void);
   GList*                  (*get_supported_in_fmts)   (void);
