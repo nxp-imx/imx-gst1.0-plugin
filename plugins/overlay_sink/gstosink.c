@@ -376,12 +376,14 @@ gst_overlay_sink_setup_buffer_pool (GstOverlaySink *sink, GstCaps *caps)
   }
   GST_DEBUG_OBJECT (sink, "create buffer pool(%p).", sink->pool);
 
-  sink->allocator = gst_osink_allocator_new (sink->osink_obj);
   if (!sink->allocator) {
-    GST_ERROR_OBJECT (sink, "New osink allocator failed.\n");
-    return -1;
+    sink->allocator = gst_osink_allocator_new (sink->osink_obj);
+    if (!sink->allocator) {
+      GST_ERROR_OBJECT (sink, "New osink allocator failed.\n");
+      return -1;
+    }
+    GST_DEBUG_OBJECT (sink, "create allocator(%p).", sink->allocator);
   }
-  GST_DEBUG_OBJECT (sink, "create allocator(%p).", sink->allocator);
 
   structure = gst_buffer_pool_get_config (sink->pool);
   gst_buffer_pool_config_set_params (structure, caps, info.size, sink->min_buffers, sink->max_buffers);

@@ -615,6 +615,7 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
       if (!ISALIGNED (w, ALIGNMENT_8)) {
         if (gst_buffer_pool_set_active (v4l2sink->pool, FALSE) != TRUE) {
           GST_ERROR_OBJECT (v4l2sink, "de-active pool(%p) failed.", v4l2sink->pool);
+          gst_caps_unref (caps);
           return GST_FLOW_ERROR;
         }
 
@@ -635,12 +636,14 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
     if (gst_buffer_pool_set_active (v4l2sink->pool, TRUE) != TRUE) {
       GST_ERROR_OBJECT (v4l2sink, "active pool(%p) failed.", v4l2sink->pool);
+      gst_caps_unref (caps);
       return GST_FLOW_ERROR;
     }
 
     gst_buffer_pool_acquire_buffer (v4l2sink->pool, &v4l2_buffer, NULL);
     if (!v4l2_buffer) {
       GST_ERROR_OBJECT (v4l2sink, "acquire buffer from pool(%p) failed.", v4l2sink->pool);
+      gst_caps_unref (caps);
       return GST_FLOW_ERROR;
     }
 
