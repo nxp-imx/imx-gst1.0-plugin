@@ -866,6 +866,25 @@ gst_imx_video_convert_create_bufferpool(GstImxVideoConvert *imxvct,
     gst_buffer_pool_config_set_allocator(config, allocator, NULL);
     gst_buffer_pool_config_add_option(config,
                                       GST_BUFFER_POOL_OPTION_VIDEO_META);
+
+    GstVideoInfo info;
+    gst_video_info_from_caps (&info, caps);
+    gint w = GST_VIDEO_INFO_WIDTH (&info);
+    if (!ISALIGNED (w, ALIGNMENT)) {
+      GstVideoAlignment alignment;
+      memset (&alignment, 0, sizeof (GstVideoAlignment));
+      alignment.padding_right = ALIGNTO (w, ALIGNMENT) - w;
+
+      GST_DEBUG ("padding_right (%d), padding_bottom (%d)",
+          alignment.padding_right, alignment.padding_bottom);
+
+      gst_buffer_pool_config_add_option (config,
+          GST_BUFFER_POOL_OPTION_VIDEO_META);
+      gst_buffer_pool_config_add_option (config,
+          GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
+      gst_buffer_pool_config_set_video_alignment (config, &alignment);
+    }
+
     if (!gst_buffer_pool_set_config(pool, config)) {
       GST_ERROR ("set buffer pool config failed.");
       gst_buffer_pool_set_active (pool, FALSE);
@@ -1046,6 +1065,7 @@ static gboolean imx_video_convert_set_info(GstVideoFilter *filter,
     gst_structure_remove_fields(outs,"chroma-site", NULL);
   }
 */
+
   gint ret = device->config_input(device, GST_VIDEO_INFO_FORMAT(in_info),
       in_info->interlace_mode, in_info->width, in_info->height,
       in_info->stride[0]);

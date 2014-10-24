@@ -214,7 +214,7 @@ static gint imx_ipu_config_input(ImxVideoProcessDevice *device,
   if (!from_map)
     return -1;
 
-  ipu->task.input.width = w;
+  ipu->task.input.width = ALIGNTO (w, ALIGNMENT);
   ipu->task.input.height = h;
   ipu->task.input.format = from_map->ipu_format;
   ipu->task.input.crop.pos.x = 0;
@@ -294,7 +294,7 @@ static gint imx_ipu_config_output(ImxVideoProcessDevice *device,
   if (!to_map)
     return -1;
 
-  ipu->task.output.width = w;
+  ipu->task.output.width = ALIGNTO (w, ALIGNMENT);
   ipu->task.output.height = h;
   ipu->task.output.format = to_map->ipu_format;
   ipu->task.output.crop.pos.x = 0;

@@ -25,6 +25,10 @@
 #include "gstallocatorphymem.h"
 #include "gstimxcommon.h"
 
+#define ALIGNMENT (16)
+#define ISALIGNED(a, b) (!(a & (b-1)))
+#define ALIGNTO(a, b) ((a + (b-1)) & (~(b-1)))
+
 typedef enum {
   IMX_VP_DEVICE_G2D,
   IMX_VP_DEVICE_IPU,

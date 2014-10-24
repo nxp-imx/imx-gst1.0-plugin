@@ -62,8 +62,8 @@ static G2dFmtMap g2d_fmts_map[] = {
     {GST_VIDEO_FORMAT_YVYU,   G2D_YVYU,     16},
 
 /* There is no corresponding GST Video format for those G2D formats
-    {GST_VIDEO_FORMAT_VYUY,   G2D_VYUY,     "VYUY",   16},
-    {GST_VIDEO_FORMAT_NV61,   G2D_NV61,     "NV61",   16},
+    {GST_VIDEO_FORMAT_VYUY,   G2D_VYUY,     16},
+    {GST_VIDEO_FORMAT_NV61,   G2D_NV61,     16},
 */
     {GST_VIDEO_FORMAT_UNKNOWN, -1,          0}
 };
@@ -200,9 +200,9 @@ static gint imx_g2d_config_input(ImxVideoProcessDevice *device,
   if (!in_map)
     return -1;
 
-  g2d->src.width = w;
+  g2d->src.width = ALIGNTO (w, ALIGNMENT);
   g2d->src.height = h;
-  g2d->src.stride = w;//stride / (in_map->bpp/8);
+  g2d->src.stride = ALIGNTO (w, ALIGNMENT);//stride / (in_map->bpp/8);
   g2d->src.format = in_map->g2d_format;
   g2d->src.left = 0;
   g2d->src.top = 0;
@@ -225,9 +225,9 @@ static gint imx_g2d_config_output(ImxVideoProcessDevice *device,
   if (!out_map)
     return -1;
 
-  g2d->dst.width = w;
+  g2d->dst.width = ALIGNTO (w, ALIGNMENT);
   g2d->dst.height = h;
-  g2d->dst.stride = w;//stride / (out_map->bpp / 8);
+  g2d->dst.stride = ALIGNTO (w, ALIGNMENT);//stride / (out_map->bpp / 8);
   g2d->dst.format = out_map->g2d_format;
   g2d->dst.left = 0;
   g2d->dst.top = 0;
@@ -261,8 +261,7 @@ static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
   if (in_crop != NULL) {
     GST_LOG ("input crop meta: (%d, %d, %d, %d).", in_crop->x, in_crop->y,
         in_crop->width, in_crop->height);
-    if ((in_crop->x >= g2d->src.width)
-        || (in_crop->y >= g2d->src.height))
+    if ((in_crop->x >= g2d->src.width) || (in_crop->y >= g2d->src.height))
       return -1;
 
     g2d->src.left = in_crop->x;
@@ -337,8 +336,7 @@ static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
   if (out_crop != NULL) {
     GST_LOG ("input crop meta: (%d, %d, %d, %d).", out_crop->x, out_crop->y,
         out_crop->width, out_crop->height);
-    if ((out_crop->x >= g2d->dst.width)
-        || (out_crop->y >= g2d->dst.height))
+    if ((out_crop->x >= g2d->dst.width) || (out_crop->y >= g2d->dst.height))
       return -1;
 
     g2d->dst.left = in_crop->x;
