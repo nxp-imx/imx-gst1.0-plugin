@@ -191,10 +191,15 @@ g2d_device_blit_surface (gpointer device, gpointer surface, SurfaceBuffer *buffe
 
   switch(hsurface->src.format) {
     case G2D_I420:
-    case G2D_YV12:
       hsurface->src.planes[0] = buffer->paddr;
       hsurface->src.planes[1] = buffer->paddr + hsurface->src.width * hsurface->src.height;
       hsurface->src.planes[2] = hsurface->src.planes[1]  + hsurface->src.width * hsurface->src.height / 4;
+      //GST_DEBUG ("YUV address: %p, %p, %p", hsurface->src.planes[0], hsurface->src.planes[1], hsurface->src.planes[2]);
+      break;
+    case G2D_YV12:
+      hsurface->src.planes[0] = buffer->paddr;
+      hsurface->src.planes[2] = buffer->paddr + hsurface->src.width * hsurface->src.height;
+      hsurface->src.planes[1] = hsurface->src.planes[2]  + hsurface->src.width * hsurface->src.height / 4;
       //GST_DEBUG ("YUV address: %p, %p, %p", hsurface->src.planes[0], hsurface->src.planes[1], hsurface->src.planes[2]);
       break;
     case G2D_NV12:
