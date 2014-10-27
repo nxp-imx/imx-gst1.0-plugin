@@ -2250,6 +2250,22 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
                 stream->bitrate);
             codec = "AAC";
             break;
+           case REAL_AUDIO_SIPR:
+            mime =
+                g_strdup_printf
+                ("audio/x-sipro, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld",
+                stream->info.audio.n_channels, stream->info.audio.rate,
+                stream->bitrate);
+            codec = "SIPRO";
+            break;
+           case REAL_AUDIO_ATRC:
+           /* mime =
+                g_strdup_printf
+                ("audio/x-vnd.sony.atrac3, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld",
+                stream->info.audio.n_channels, stream->info.audio.rate,
+                stream->bitrate);
+            codec = "ATRC";*/
+            break;
           default:
           {
             uint32 frame_bit;
