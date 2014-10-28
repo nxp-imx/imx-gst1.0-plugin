@@ -742,17 +742,17 @@ fsl_player_handle fsl_player_init(fsl_player_config * config)
       config->video_sink_name = "overlaysink";
 
     g_print("Generate VideoSink %s\n", config->video_sink_name);
-    pproperty->video_sink = gst_parse_launch(config->video_sink_name, NULL);
+    pproperty->video_sink = gst_parse_bin_from_description (config->video_sink_name, TRUE, NULL);
 
     if (config->audio_sink_name){
         g_print("Generate AudioSink %s\n", config->audio_sink_name);
-        pproperty->audio_sink = gst_parse_launch(config->audio_sink_name, NULL);
+        pproperty->audio_sink = gst_parse_bin_from_description(config->audio_sink_name, TRUE, NULL);
     }
 
     
     if (config->visual_name){
         g_print("Generate visualization %s\n", config->visual_name);
-        pproperty->visual = gst_parse_launch(config->visual_name, NULL);
+        pproperty->visual = gst_parse_bin_from_description(config->visual_name, TRUE, NULL);
     }
 
 
