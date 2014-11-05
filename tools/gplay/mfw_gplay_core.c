@@ -752,7 +752,7 @@ fsl_player_handle fsl_player_init(fsl_player_config * config)
     
     if (config->visual_name){
         g_print("Generate visualization %s\n", config->visual_name);
-        pproperty->visual = gst_parse_bin_from_description(config->visual_name, TRUE, NULL);
+        pproperty->visual = gst_parse_launch(config->visual_name, NULL);
     }
 
 
@@ -1655,9 +1655,6 @@ GstElement* get_video_sink(fsl_player_handle handle)
   GstElement* auto_video_sink = NULL;
   GstElement* actual_video_sink = NULL;
 
-  if (pproperty->video_sink)
-    return pproperty->video_sink;
-
   g_object_get(pproperty->playbin, "video-sink", &auto_video_sink, NULL);
   if( NULL == auto_video_sink )
   {
@@ -1665,19 +1662,28 @@ GstElement* get_video_sink(fsl_player_handle handle)
     return NULL;
   }
 
-  actual_video_sink = gst_bin_get_by_name((GstBin*)auto_video_sink, "videosink-actual-sink-imxv4l2");
+  GValue item = { 0, };
+  GstIterator *it = gst_bin_iterate_sinks((GstBin*)auto_video_sink);
+  if (gst_iterator_next (it, &item) != GST_ITERATOR_OK)
+  {
+    FSL_PLAYER_PRINT("%s(): gst_iterator_next failed\n", __FUNCTION__);
+    gst_iterator_free (it);
+    return NULL;
+  }
+
+  actual_video_sink = g_value_get_object (&item);
+  g_value_unset (&item);
+  gst_iterator_free (it);
+
   if( NULL == actual_video_sink )
   {
     FSL_PLAYER_PRINT("%s(): Can not find actual_video-sink\n", __FUNCTION__);
     return NULL;
   }
   FSL_PLAYER_PRINT("%s(): AutoVideoSink = %s : ActualVideoSink = %s\n", __FUNCTION__, GST_OBJECT_NAME(auto_video_sink), GST_OBJECT_NAME(actual_video_sink));
-  pproperty->video_sink = actual_video_sink;
-
-  g_object_unref (actual_video_sink);
   g_object_unref (auto_video_sink);
 
-  return pproperty->video_sink;
+  return actual_video_sink;
 }
 
 fsl_player_ret_val fsl_player_full_screen(fsl_player_handle handle)
