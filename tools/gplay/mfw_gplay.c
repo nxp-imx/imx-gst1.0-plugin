@@ -419,12 +419,24 @@ void print_metadata(fsl_player_handle handle)
 
     PRINT("\nMetadata of File: %s\n", metadata.currentfilename);
     PRINT("\tContainer: %s\n", metadata.container);
+    PRINT("\tDuration: %d seconds\n", (fsl_player_s32)(duration/1000000000));    
     PRINT("\tTitle: %s\n", metadata.title);
     PRINT("\tAritist: %s\n", metadata.artist);
     PRINT("\tAlbum: %s\n", metadata.album);
-    PRINT("\tYear: %s\n", metadata.year);
+    PRINT("\tCreationDate: %s\n", metadata.creation_date);
     PRINT("\tGenre: %s\n", metadata.genre);
-    PRINT("\tDuration: %d seconds\n", (fsl_player_s32)(duration/1000000000));
+    PRINT("\tAlbumartist: %s\n", metadata.albumartist);
+    PRINT("\tComposer: %s\n", metadata.composer);
+    PRINT("\tCopyright: %s\n", metadata.copyright);
+    PRINT("\tDescription: %s\n", metadata.description);
+    PRINT("\tPerformer: %s\n", metadata.performer);
+    PRINT("\tKeywords: %s\n", metadata.keywords);
+    PRINT("\tComment: %s\n", metadata.comment);
+    PRINT("\tTool: %s\n", metadata.tool);
+    PRINT("\tLocation latitude: %s\n", metadata.location_latitude);    
+    PRINT("\tLocation longtitude: %s\n", metadata.location_longtitude);        
+    PRINT("\tTrackCount: %d\n", metadata.track_count);
+    PRINT("\tTrackNumber: %d\n", metadata.track_number);
     for (i=0; i<metadata.n_audio; i++) {
       PRINT("Audio%d:\n", i);
       PRINT("\tCodec: %s\n", metadata.audio_info[i].codec_type);

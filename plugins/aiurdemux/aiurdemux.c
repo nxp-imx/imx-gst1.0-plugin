@@ -179,7 +179,7 @@ static AiurDemuxTagEntry g_user_data_entry[] = {
   //{USER_DATA_REQUIREMENTS,    USER_DATA_FORMAT_UTF8, ?,                       "Requirements : %s\n"}, /* tag is not defined */
   //{USER_DATA_SONGWRITER,      USER_DATA_FORMAT_UTF8, ?,                       "Song Writer : %s\n"}, /* tag is not defined */
   //{USER_DATA_MOVIEWRITER,     USER_DATA_FORMAT_UTF8, ?,                       "Movie Writer : %s\n"}, /* tag is not defined */
-  {USER_DATA_TOOL, USER_DATA_FORMAT_UTF8, GST_TAG_ENCODER,
+  {USER_DATA_TOOL, USER_DATA_FORMAT_UTF8, GST_TAG_APPLICATION_NAME,
       "Writing Application : %s\n"},
   {USER_DATA_DESCRIPTION, USER_DATA_FORMAT_UTF8, GST_TAG_DESCRIPTION,
       "Description  : %s\n"},
@@ -191,6 +191,8 @@ static AiurDemuxTagEntry g_user_data_entry[] = {
       "Location : %s\n"},
   {USER_DATA_KEYWORDS, USER_DATA_FORMAT_UTF8, GST_TAG_KEYWORDS,
       "Keywords : %s\n"},
+  {USER_DATA_ALBUMARTIST, USER_DATA_FORMAT_UTF8, GST_TAG_ALBUM_ARTIST,
+      "Album Artist : %s\n"},
 
 };
 
@@ -1065,7 +1067,8 @@ static gboolean gst_aiurdemux_setcaps(GstPad * pad, GstObject * parent, GstCaps 
     && (demux->core_interface->name)) {
     gst_tag_list_add (demux->tag_list, GST_TAG_MERGE_REPLACE,
         GST_TAG_CONTAINER_FORMAT, (demux->core_interface->name), NULL);
-  }
+    GST_INFO_OBJECT (demux, "Container: %s", demux->core_interface->name);
+ }
 
   if (demux->core_interface) {
     demux->state = AIURDEMUX_STATE_INITIAL;

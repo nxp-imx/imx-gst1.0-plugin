@@ -108,6 +108,7 @@ enum
     PARSER_EOS = 1,    /* reach the end of the track/movie */
     PARSER_BOS = 2,    /* reach the beginning of the track/movie */
     PARSER_NEED_MORE_DATA = 3,  /* No longer used. Shall use "PARSER_INSUFFICIENT_DATA" */
+    PARSER_NOT_READY = 4,  /* did not have subtitle sample when get next sample */
 
     /* errors */
     PARSER_ERR_UNKNOWN = -1, /* Unknown error, not captured by parser logic */
@@ -282,6 +283,9 @@ typedef enum FSL_PARSER_USER_DATA_TYPE
     USER_DATA_SOFTWARE,       /* software */
     USER_DATA_YEAR,           /* year */
     USER_DATA_KEYWORDS,       /* keywords */
+    USER_DATA_ALBUMARTIST,
+    USER_DATA_COMPILATION,
+
     USER_DATA_MAX
 } UserDataID;
 
