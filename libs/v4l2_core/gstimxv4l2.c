@@ -824,7 +824,7 @@ gst_imx_v4l2capture_config_usb_camera (IMXV4l2Handle *handle, guint fmt, guint w
 static gint 
 gst_imx_v4l2capture_config_pxp (IMXV4l2Handle *handle, guint fmt, guint w, guint h, guint fps_n, guint fps_d)
 {
-	struct v4l2_crop crop = {0};
+	// can add crop process if needed.
 
   if (gst_imx_v4l2capture_config_usb_camera (handle, fmt, w, h, fps_n, fps_d) < 0) {
     GST_ERROR ("camera config failed\n");
@@ -848,7 +848,7 @@ gst_imx_v4l2capture_config_camera (IMXV4l2Handle *handle, guint fmt, guint w, gu
 }
 
 static gint 
-gst_imx_v4l2capture_config_tvin (IMXV4l2Handle *handle, guint fmt, guint w, guint h, guint fps_n, guint fps_d)
+gst_imx_v4l2capture_config_tvin_std (IMXV4l2Handle *handle)
 {
   v4l2_std_id id;
 
@@ -862,7 +862,7 @@ gst_imx_v4l2capture_config_tvin (IMXV4l2Handle *handle, guint fmt, guint w, guin
     return -1;
   }
 
-  return gst_imx_v4l2capture_config_camera (handle, fmt, w, h, fps_n, fps_d);
+  return 0;
 }
 
 static gint 
@@ -892,8 +892,12 @@ gst_imx_v4l2capture_set_function (IMXV4l2Handle *handle)
       handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_camera;
       handle->support_format_table = g_camera_format_IPU;
     } else if (!strncmp (chip.match.name, MXC_V4L2_CAPTURE_TVIN_NAME, 3)) {
-      handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_tvin;
+      handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_camera;
       handle->support_format_table = g_camera_format_IPU;
+      if (gst_imx_v4l2capture_config_tvin_std (handle)) {
+        GST_ERROR ("can't set TV-In STD.\n");
+        return -1;
+      }
     } else {
       GST_ERROR ("can't identify capture sensor type.\n");
       return -1;
@@ -910,8 +914,12 @@ gst_imx_v4l2capture_set_function (IMXV4l2Handle *handle)
       handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_pxp;
       handle->support_format_table = g_camera_format_PXP;
     } else if (!strncmp (chip.match.name, MXC_V4L2_CAPTURE_TVIN_VADC_NAME, 3)) {
-      handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_tvin;
+      handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_camera;
       handle->support_format_table = g_camera_format_PXP;
+      if (gst_imx_v4l2capture_config_tvin_std (handle)) {
+        GST_ERROR ("can't set TV-In STD.\n");
+        return -1;
+      }
     } else {
       GST_ERROR ("can't identify capture sensor type.\n");
       return -1;
