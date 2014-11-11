@@ -433,13 +433,13 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
             {
                 const GValue *val;
                 val = gst_tag_list_get_value_index(list, tag, i);
-                pproperty->metadata.track_count = g_value_get_string(val);
+                pproperty->metadata.track_count = g_value_get_uint(val);
             }
             if( strncmp(gst_tag_get_nick(tag), "track number", 11) == 0 )
             {
                 const GValue *val;
                 val = gst_tag_list_get_value_index(list, tag, i);
-                pproperty->metadata.track_number= g_value_get_string(val);
+                pproperty->metadata.track_number= g_value_get_uint(val);
             }
         }
         else
