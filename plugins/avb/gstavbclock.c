@@ -36,6 +36,14 @@
 #include <stdio.h>
 #include <netpacket/packet.h>
 
+#define USE_LINUXPTP 0
+
+#if USE_LINUXPTP
+
+#include <linux/ptp_clock.h>
+//#include <linux/posix-timers.h>
+#endif
+
 typedef struct
 {
   guint64 u48_sec; /* ATTENTION, 48bit !! */
@@ -43,6 +51,10 @@ typedef struct
 }PTP_TIME_STRUCT;
 
 #define k_PTP_GET_TIME (SIOCDEVPRIVATE + 7)
+
+#define CLOCKFD 3
+
+#define FD_TO_CLOCKID(fd)       ((~(clockid_t) (fd) << 3) | CLOCKFD)
 
 
 GST_DEBUG_CATEGORY_STATIC (gst_avb_clock_debug);
@@ -119,6 +131,14 @@ gst_avb_clock_create_socket(GstAvbClock * clock)
   if(clock == NULL)
     return FALSE;
 
+#if USE_LINUXPTP
+  sockfd = open("/dev/ptp0", O_RDWR);
+  if (sockfd < 0) {
+    GST_WARNING_OBJECT(clock,"open devide /dev/ptp0 failed");
+    return FALSE;
+  }
+  GST_INFO_OBJECT(clock,"open /dev/ptp0 success. \r\n");
+#else
   sockfd = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (sockfd < 0) {
     return FALSE;
@@ -137,6 +157,7 @@ gst_avb_clock_create_socket(GstAvbClock * clock)
 
   memset(&clock->net_name, 0, IF_NAMESIZE);
   strncpy(&clock->net_name[0], &ifstruct[intrface].ifr_name[0], IF_NAMESIZE);
+#endif
   clock->socket_fd = sockfd;
 
   return TRUE;
@@ -176,6 +197,23 @@ gst_avb_clock_get_gptp_time(int fd, gchar* name, guint64 *ptp_time)
   PTP_TIME_STRUCT ptp_ts;
   PTP_TIME_STRUCT * ts;
 
+
+#if USE_LINUXPTP
+  struct timespec current_timer;
+  clockid_t clkid;
+
+  if(ptp_time == NULL || fd < 0)
+    return ret;
+
+  clkid = FD_TO_CLOCKID(fd);
+  
+  clock_gettime(clkid , &current_timer);
+
+  *ptp_time= current_timer.tv_sec * GST_SECOND + current_timer.tv_nsec;
+  ret = TRUE;
+
+
+#else
   if(ptp_time == NULL || name == NULL || fd < 0)
     return ret;
 
@@ -191,7 +229,7 @@ gst_avb_clock_get_gptp_time(int fd, gchar* name, guint64 *ptp_time)
     *ptp_time = ts->u48_sec * GST_SECOND + ts->u32_Nsec;
     ret = TRUE;
   }
-
+#endif
   return ret;
 }
 
@@ -203,9 +241,11 @@ gst_avb_clock_get_internal_time (GstClock * clock)
 
   avbclock = GST_AVB_CLOCK_CAST (clock);
 
-  if(gst_avb_clock_get_gptp_time(avbclock->socket_fd, avbclock->net_name, &result))
+
+  if(gst_avb_clock_get_gptp_time(avbclock->socket_fd, avbclock->net_name, &result)){
+    GST_DEBUG_OBJECT(avbclock,"get_internal_time %lld,",result) ;
     return result;
-  else
+  }else
     result = GST_CLOCK_TIME_NONE;
 
   GST_WARNING_OBJECT(avbclock,"get internal time failed");
