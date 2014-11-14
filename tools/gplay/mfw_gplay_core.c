@@ -340,102 +340,83 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
             {
                 strncpy(pproperty->metadata.container, str, sizeof(pproperty->metadata.container));
                 pproperty->metadata.container[sizeof(pproperty->metadata.container)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "location", 8) == 0 )
+            } else if ( strncmp(gst_tag_get_nick(tag), "location", 8) == 0 )
             {
                 strncpy(pproperty->metadata.currentfilename, str, sizeof(pproperty->metadata.currentfilename));
                 pproperty->metadata.currentfilename[sizeof(pproperty->metadata.currentfilename)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "title", 5) == 0 )
+            }else  if( strncmp(gst_tag_get_nick(tag), "title", 5) == 0 )
             {
                 strncpy(pproperty->metadata.title, str, sizeof(pproperty->metadata.title));
                 pproperty->metadata.title[sizeof(pproperty->metadata.title)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "artist", 6) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "artist", 6) == 0 )
             {
                 strncpy(pproperty->metadata.artist, str, sizeof(pproperty->metadata.artist));
                 pproperty->metadata.artist[sizeof(pproperty->metadata.artist)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "album", 5) == 0 )
-            {
-                strncpy(pproperty->metadata.album, str, sizeof(pproperty->metadata.album));
-                pproperty->metadata.album, str[sizeof(pproperty->metadata.album, str)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "date", 4) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "date", 4) == 0 )
             {
                 strncpy(pproperty->metadata.creation_date, str, sizeof(pproperty->metadata.creation_date));
                 pproperty->metadata.creation_date[sizeof(pproperty->metadata.creation_date)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "datetime", 8) == 0 ) {
+            }else if( strncmp(gst_tag_get_nick(tag), "datetime", 8) == 0 ) {
                 const GValue *val;
                 val = gst_tag_list_get_value_index(list, tag, i);
                 GstDateTime *dt = g_value_get_boxed(val);
                 gchar *dt_str = gst_date_time_to_iso8601_string(dt);
                 strcpy(pproperty->metadata.creation_date, dt_str);
                 g_free(dt_str);
-            }
-            if( strncmp(gst_tag_get_nick(tag), "genre", 5) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "genre", 5) == 0 )
             {
                 strncpy(pproperty->metadata.genre, str, sizeof(pproperty->metadata.genre));
                 pproperty->metadata.genre[sizeof(pproperty->metadata.genre)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "album artist", 12) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "album artist", 12) == 0 )
             {
                 strncpy(pproperty->metadata.albumartist, str, sizeof(pproperty->metadata.albumartist));
                 pproperty->metadata.albumartist[sizeof(pproperty->metadata.albumartist)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "composer", 8) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "album", 5) == 0 )
+            {
+                strncpy(pproperty->metadata.album, str, sizeof(pproperty->metadata.album));
+                pproperty->metadata.album, str[sizeof(pproperty->metadata.album, str)-1] = '\0';
+            }else if( strncmp(gst_tag_get_nick(tag), "composer", 8) == 0 )
             {
                 strncpy(pproperty->metadata.composer, str, sizeof(pproperty->metadata.composer));
                 pproperty->metadata.composer[sizeof(pproperty->metadata.composer)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "copyright", 9) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "copyright", 9) == 0 )
             {
                 strncpy(pproperty->metadata.copyright, str, sizeof(pproperty->metadata.copyright));
                 pproperty->metadata.copyright[sizeof(pproperty->metadata.copyright)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "description", 11) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "description", 11) == 0 )
             {
                 strncpy(pproperty->metadata.description, str, sizeof(pproperty->metadata.description));
                 pproperty->metadata.description[sizeof(pproperty->metadata.description)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "performer", 9) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "performer", 9) == 0 )
             {
                 strncpy(pproperty->metadata.performer, str, sizeof(pproperty->metadata.performer));
                 pproperty->metadata.performer[sizeof(pproperty->metadata.performer)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "keywords", 8) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "keywords", 8) == 0 )
             {
                 strncpy(pproperty->metadata.keywords, str, sizeof(pproperty->metadata.keywords));
                 pproperty->metadata.keywords[sizeof(pproperty->metadata.keywords)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "comment", 7) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "comment", 7) == 0 )
             {
                 strncpy(pproperty->metadata.comment, str, sizeof(pproperty->metadata.comment));
                 pproperty->metadata.comment[sizeof(pproperty->metadata.comment)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "application name", 16) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "application name", 16) == 0 )
             {
                 strncpy(pproperty->metadata.tool, str, sizeof(pproperty->metadata.tool));
                 pproperty->metadata.tool[sizeof(pproperty->metadata.tool)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "geo location latitude", 21) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "geo location latitude", 21) == 0 )
             {
                 strncpy(pproperty->metadata.location_latitude, str, sizeof(pproperty->metadata.location_latitude));
                 pproperty->metadata.location_latitude[sizeof(pproperty->metadata.location_latitude)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "geo location longitude", 22) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "geo location longitude", 22) == 0 )
             {
                 strncpy(pproperty->metadata.location_longtitude, str, sizeof(pproperty->metadata.location_longtitude));
                 pproperty->metadata.location_longtitude[sizeof(pproperty->metadata.location_longtitude)-1] = '\0';
-            }
-            if( strncmp(gst_tag_get_nick(tag), "track count", 11) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "track count", 11) == 0 )
             {
                 const GValue *val;
                 val = gst_tag_list_get_value_index(list, tag, i);
                 pproperty->metadata.track_count = g_value_get_uint(val);
-            }
-            if( strncmp(gst_tag_get_nick(tag), "track number", 11) == 0 )
+            }else if( strncmp(gst_tag_get_nick(tag), "track number", 11) == 0 )
             {
                 const GValue *val;
                 val = gst_tag_list_get_value_index(list, tag, i);
