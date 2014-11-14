@@ -421,6 +421,16 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
                 const GValue *val;
                 val = gst_tag_list_get_value_index(list, tag, i);
                 pproperty->metadata.track_number= g_value_get_uint(val);
+            }else if( strncmp(gst_tag_get_nick(tag), "disc number", 10) == 0 )
+            {
+                const GValue *val;
+                val = gst_tag_list_get_value_index(list, tag, i);
+                pproperty->metadata.disc_number= g_value_get_uint(val);
+            }else if( strncmp(gst_tag_get_nick(tag), "user rating", 11) == 0 )
+            {
+                const GValue *val;
+                val = gst_tag_list_get_value_index(list, tag, i);
+                pproperty->metadata.rating= g_value_get_uint(val);
             }
         }
         else

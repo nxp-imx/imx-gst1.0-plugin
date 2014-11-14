@@ -437,6 +437,8 @@ void print_metadata(fsl_player_handle handle)
     PRINT("\tLocation longtitude: %s\n", metadata.location_longtitude);        
     PRINT("\tTrackCount: %d\n", metadata.track_count);
     PRINT("\tTrackNumber: %d\n", metadata.track_number);
+    PRINT("\tDiscNumber: %d\n", metadata.disc_number);
+    PRINT("\tRating: %d\n", metadata.rating);
     for (i=0; i<metadata.n_audio; i++) {
       PRINT("Audio%d:\n", i);
       PRINT("\tCodec: %s\n", metadata.audio_info[i].codec_type);

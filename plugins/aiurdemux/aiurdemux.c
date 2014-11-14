@@ -193,6 +193,10 @@ static AiurDemuxTagEntry g_user_data_entry[] = {
       "Keywords : %s\n"},
   {USER_DATA_ALBUMARTIST, USER_DATA_FORMAT_UTF8, GST_TAG_ALBUM_ARTIST,
       "Album Artist : %s\n"},
+  {USER_DATA_DISCNUMBER, USER_DATA_FORMAT_UTF8, GST_TAG_ALBUM_VOLUME_NUMBER,
+      "Disc Number : %s\n"},
+  {USER_DATA_RATING, USER_DATA_FORMAT_UTF8, GST_TAG_USER_RATING,
+      "User Rating : %s\n"},
 
 };
 

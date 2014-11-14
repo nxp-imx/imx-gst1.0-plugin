@@ -211,6 +211,8 @@ typedef struct
     fsl_player_s32 n_subtitle;
     fsl_player_s32 track_count;
     fsl_player_s32 track_number;
+    fsl_player_s32 disc_number;
+    fsl_player_s32 rating;
     fsl_player_audio_info audio_info[MAX_AUDIO_TRACK_COUNT];
     fsl_player_video_info video_info[MAX_VIDEO_TRACK_COUNT];
     fsl_player_subtitle_info subtitle_info[MAX_SUBTITLE_TRACK_COUNT];
