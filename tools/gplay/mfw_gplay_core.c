@@ -352,10 +352,6 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
             {
                 strncpy(pproperty->metadata.artist, str, sizeof(pproperty->metadata.artist));
                 pproperty->metadata.artist[sizeof(pproperty->metadata.artist)-1] = '\0';
-            }else if( strncmp(gst_tag_get_nick(tag), "date", 4) == 0 )
-            {
-                strncpy(pproperty->metadata.creation_date, str, sizeof(pproperty->metadata.creation_date));
-                pproperty->metadata.creation_date[sizeof(pproperty->metadata.creation_date)-1] = '\0';
             }else if( strncmp(gst_tag_get_nick(tag), "datetime", 8) == 0 ) {
                 const GValue *val;
                 val = gst_tag_list_get_value_index(list, tag, i);
@@ -363,6 +359,10 @@ static void get_metadata_tag(const GstTagList * list, const gchar * tag,
                 gchar *dt_str = gst_date_time_to_iso8601_string(dt);
                 strcpy(pproperty->metadata.creation_date, dt_str);
                 g_free(dt_str);
+            }else if( strncmp(gst_tag_get_nick(tag), "date", 4) == 0 )
+            {
+                strncpy(pproperty->metadata.creation_date, str, sizeof(pproperty->metadata.creation_date));
+                pproperty->metadata.creation_date[sizeof(pproperty->metadata.creation_date)-1] = '\0';
             }else if( strncmp(gst_tag_get_nick(tag), "genre", 5) == 0 )
             {
                 strncpy(pproperty->metadata.genre, str, sizeof(pproperty->metadata.genre));
