@@ -342,7 +342,7 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
       {
         if (sink->osink_obj)
           osink_object_unref (sink->osink_obj);
-
+        sink->osink_obj = NULL;
       }
       break;
     default:
