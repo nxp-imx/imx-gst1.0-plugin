@@ -1702,7 +1702,7 @@ aiurdemux_add_user_tags (GstAiurDemux * demux)
               g_free (longitude_ptr);
               g_string_free (string, TRUE);
               continue;
-            }else if(USER_DATA_TRACKNUMBER == id || USER_DATA_TOTALTRACKNUMBER == id || USER_DATA_DISCNUMBER == id){
+            }else if(USER_DATA_TRACKNUMBER == id || USER_DATA_TOTALTRACKNUMBER == id || USER_DATA_DISCNUMBER == id || USER_DATA_RATING ==id){
               guint32 value;
               value = atoi(string->str);
               gst_tag_list_add (list, GST_TAG_MERGE_APPEND,
