@@ -36,6 +36,7 @@ typedef struct _ImxVpDeviceIpu {
   GstVideoInterlaceMode interlace_mode;
   PhyMemBlock vdi;
   gboolean  first_frame;
+  GstVideoAlignment valign;
 } ImxVpDeviceIpu;
 
 typedef struct {
@@ -202,32 +203,38 @@ static gint imx_ipu_frame_copy(ImxVideoProcessDevice *device,
 }
 
 static gint imx_ipu_config_input(ImxVideoProcessDevice *device,
-                              GstVideoFormat fmt,
-                              GstVideoInterlaceMode interlace_mode,
-                              guint w, guint h, guint stride)
+                                  GstVideoInfo* in_info,
+                                  GstVideoAlignment *valign)
 {
   if (!device || !device->priv)
     return -1;
 
   ImxVpDeviceIpu *ipu = (ImxVpDeviceIpu *) (device->priv);
-  const IpuFmtMap *from_map = imx_ipu_get_format(fmt);
+  const IpuFmtMap *from_map = imx_ipu_get_format(GST_VIDEO_INFO_FORMAT(in_info));
   if (!from_map)
     return -1;
 
-  ipu->task.input.width = ALIGNTO (w, ALIGNMENT);
-  ipu->task.input.height = h;
+  if (valign)
+    memcpy(&ipu->valign, valign, sizeof(GstVideoAlignment));
+
+  ipu->task.input.width =
+      ipu->valign.padding_left + in_info->width + ipu->valign.padding_right;
+  ipu->task.input.height =
+      ipu->valign.padding_top + in_info->height + ipu->valign.padding_bottom;
   ipu->task.input.format = from_map->ipu_format;
-  ipu->task.input.crop.pos.x = 0;
-  ipu->task.input.crop.pos.y = 0;
-  ipu->task.input.crop.w = w;
-  ipu->task.input.crop.h = h;
+  ipu->task.input.crop.pos.x = ipu->valign.padding_left;
+  ipu->task.input.crop.pos.y = ipu->valign.padding_top;
+  ipu->task.input.crop.w = in_info->width;
+  ipu->task.input.crop.h = in_info->height;
+
   ipu->first_frame = FALSE;
-  GST_TRACE("input format = %s", gst_video_format_to_string(fmt));
+  GST_TRACE("input format = %s",
+      gst_video_format_to_string(GST_VIDEO_INFO_FORMAT(in_info)));
 
   ipu->task.input.deinterlace.enable = FALSE;
   if (ipu->deinterlace) {
-    ipu->interlace_mode = interlace_mode;
-    switch (interlace_mode) {
+    ipu->interlace_mode = in_info->interlace_mode;
+    switch (in_info->interlace_mode) {
       case GST_VIDEO_INTERLACE_MODE_INTERLEAVED:
         GST_TRACE("input stream is interleaved");
         ipu->task.input.deinterlace.enable = TRUE;
@@ -282,26 +289,26 @@ static gint imx_ipu_config_input(ImxVideoProcessDevice *device,
 }
 
 static gint imx_ipu_config_output(ImxVideoProcessDevice *device,
-                                GstVideoFormat fmt,
-                                guint w, guint h, guint stride)
+                                  GstVideoInfo* out_info)
 {
   if (!device || !device->priv)
     return -1;
 
   ImxVpDeviceIpu *ipu = (ImxVpDeviceIpu *) (device->priv);
 
-  const IpuFmtMap *to_map = imx_ipu_get_format(fmt);
+  const IpuFmtMap *to_map = imx_ipu_get_format(GST_VIDEO_INFO_FORMAT(out_info));
   if (!to_map)
     return -1;
 
-  ipu->task.output.width = ALIGNTO (w, ALIGNMENT);
-  ipu->task.output.height = h;
+  ipu->task.output.width = ALIGNTO (out_info->width, ALIGNMENT);
+  ipu->task.output.height = out_info->height;
   ipu->task.output.format = to_map->ipu_format;
   ipu->task.output.crop.pos.x = 0;
   ipu->task.output.crop.pos.y = 0;
-  ipu->task.output.crop.w = w;
-  ipu->task.output.crop.h = h;
-  GST_TRACE("output format = %s", gst_video_format_to_string(fmt));
+  ipu->task.output.crop.w = out_info->width;
+  ipu->task.output.crop.h = out_info->height;
+  GST_TRACE("output format = %s",
+      gst_video_format_to_string(GST_VIDEO_INFO_FORMAT(out_info)));
 
   return 0;
 }
@@ -329,8 +336,10 @@ static gint imx_ipu_do_convert(ImxVideoProcessDevice *device,
         || (in_crop->y >= ipu->task.input.height))
       return -1;
 
-    ipu->task.input.crop.pos.x = GST_ROUND_UP_8(in_crop->x);
-    ipu->task.input.crop.pos.y = GST_ROUND_UP_8(in_crop->y);
+    ipu->task.input.crop.pos.x =
+        GST_ROUND_UP_8(ipu->valign.padding_left + in_crop->x);
+    ipu->task.input.crop.pos.y =
+        GST_ROUND_UP_8(ipu->valign.padding_top + in_crop->y);
     ipu->task.input.crop.w = MIN(in_crop->width,
         (ipu->task.input.width - ipu->task.input.crop.pos.x));
     ipu->task.input.crop.h = MIN(in_crop->height,
@@ -355,7 +364,7 @@ static gint imx_ipu_do_convert(ImxVideoProcessDevice *device,
     }
   }
 
-  GST_TRACE ("set ipu input : %dx%d(%d,%d->%d,%d), format=%d, deinterlace=%s"
+  GST_TRACE ("ipu input : %dx%d(%d,%d->%d,%d), format=%d, deinterlace=%s"
       " deinterlace-mode=%d", ipu->task.input.width, ipu->task.input.height,
       ipu->task.input.crop.pos.x, ipu->task.input.crop.pos.y,
       ipu->task.input.crop.w, ipu->task.input.crop.h,
@@ -385,7 +394,7 @@ static gint imx_ipu_do_convert(ImxVideoProcessDevice *device,
         (ipu->task.output.height - ipu->task.output.crop.pos.y));
   }
 
-  GST_TRACE ("set ipu output : %dx%d(%d,%d->%d,%d), format=%d",
+  GST_TRACE ("ipu output : %dx%d(%d,%d->%d,%d), format=%d",
       ipu->task.output.width, ipu->task.output.height,
       ipu->task.output.crop.pos.x, ipu->task.output.crop.pos.y,
       ipu->task.output.crop.w, ipu->task.output.crop.h,

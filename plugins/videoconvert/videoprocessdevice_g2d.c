@@ -29,6 +29,7 @@ typedef struct _ImxVpDeviceG2d {
   gint capabilities;
   struct g2d_surface src;
   struct g2d_surface dst;
+  GstVideoAlignment valign;
 } ImxVpDeviceG2d;
 
 typedef struct {
@@ -188,52 +189,57 @@ static gint imx_g2d_frame_copy(ImxVideoProcessDevice *device,
 }
 
 static gint imx_g2d_config_input(ImxVideoProcessDevice *device,
-                                  GstVideoFormat fmt,
-                                  GstVideoInterlaceMode interlace_mode,
-                                  guint w, guint h, guint stride)
+                                  GstVideoInfo* in_info,
+                                  GstVideoAlignment *valign)
 {
   if (!device || !device->priv)
     return -1;
 
   ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
-  const G2dFmtMap *in_map = imx_g2d_get_format(fmt);
+  const G2dFmtMap *in_map = imx_g2d_get_format(GST_VIDEO_INFO_FORMAT(in_info));
   if (!in_map)
     return -1;
 
-  g2d->src.width = ALIGNTO (w, ALIGNMENT);
-  g2d->src.height = h;
-  g2d->src.stride = ALIGNTO (w, ALIGNMENT);//stride / (in_map->bpp/8);
+  if (valign)
+    memcpy(&g2d->valign, valign, sizeof(GstVideoAlignment));
+
+  g2d->src.width = GST_ROUND_UP_4(g2d->valign.padding_left + in_info->width +
+                                  g2d->valign.padding_right);
+  g2d->src.height = GST_ROUND_UP_4(g2d->valign.padding_top + in_info->height +
+                                   g2d->valign.padding_bottom);
+  g2d->src.stride = g2d->src.width;//stride / (in_map->bpp/8);
   g2d->src.format = in_map->g2d_format;
-  g2d->src.left = 0;
-  g2d->src.top = 0;
-  g2d->src.right = w;
-  g2d->src.bottom = h;
-  GST_TRACE("input format = %s", gst_video_format_to_string(fmt));
+  g2d->src.left = g2d->valign.padding_left;
+  g2d->src.top = g2d->valign.padding_top;
+  g2d->src.right = g2d->valign.padding_left + in_info->width;
+  g2d->src.bottom = g2d->valign.padding_top + in_info->height;
+  GST_TRACE("input format = %s",
+      gst_video_format_to_string(GST_VIDEO_INFO_FORMAT(in_info)));
 
   return 0;
 }
 
 static gint imx_g2d_config_output(ImxVideoProcessDevice *device,
-                                  GstVideoFormat fmt,
-                                  guint w, guint h, guint stride)
+                                  GstVideoInfo* out_info)
 {
   if (!device || !device->priv)
     return -1;
 
   ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
-  const G2dFmtMap *out_map = imx_g2d_get_format(fmt);
+  const G2dFmtMap *out_map = imx_g2d_get_format(GST_VIDEO_INFO_FORMAT(out_info));
   if (!out_map)
     return -1;
 
-  g2d->dst.width = ALIGNTO (w, ALIGNMENT);
-  g2d->dst.height = h;
-  g2d->dst.stride = ALIGNTO (w, ALIGNMENT);//stride / (out_map->bpp / 8);
+  g2d->dst.width = ALIGNTO (out_info->width, ALIGNMENT);
+  g2d->dst.height = out_info->height;
+  g2d->dst.stride = ALIGNTO (out_info->width, ALIGNMENT);//stride / (out_map->bpp / 8);
   g2d->dst.format = out_map->g2d_format;
   g2d->dst.left = 0;
   g2d->dst.top = 0;
-  g2d->dst.right = w;
-  g2d->dst.bottom = h;
-  GST_TRACE("output format = %s", gst_video_format_to_string(fmt));
+  g2d->dst.right = out_info->width;
+  g2d->dst.bottom = out_info->height;
+  GST_TRACE("output format = %s",
+      gst_video_format_to_string(GST_VIDEO_INFO_FORMAT(out_info)));
 
   return 0;
 }
@@ -264,10 +270,12 @@ static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
     if ((in_crop->x >= g2d->src.width) || (in_crop->y >= g2d->src.height))
       return -1;
 
-    g2d->src.left = in_crop->x;
-    g2d->src.top = in_crop->y;
-    g2d->src.right = MIN((in_crop->x + in_crop->width), g2d->src.width);
-    g2d->src.bottom = MIN((in_crop->y + in_crop->height), g2d->src.height);
+    g2d->src.left = g2d->valign.padding_left + in_crop->x;
+    g2d->src.top = g2d->valign.padding_top + in_crop->y;
+    g2d->src.right = g2d->valign.padding_left +
+        MIN((in_crop->x + in_crop->width), g2d->src.width);
+    g2d->src.bottom = g2d->valign.padding_top +
+        MIN((in_crop->y + in_crop->height), g2d->src.height);
   }
 
   PhyMemBlock *from_memblk = gst_buffer_query_phymem_block (input);
@@ -321,7 +329,7 @@ static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
       return -1;
   }
 
-  GST_TRACE ("set g2d src : %dx%d,%d(%d,%d-%d,%d), format=%d",
+  GST_TRACE ("g2d src : %dx%d,%d(%d,%d-%d,%d), format=%d",
       g2d->src.width, g2d->src.height,g2d->src.stride, g2d->src.left,
       g2d->src.top, g2d->src.right, g2d->src.bottom,
       g2d->src.format);
@@ -345,7 +353,7 @@ static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
     g2d->dst.bottom = MIN((in_crop->y + in_crop->height), g2d->dst.height);
   }
 
-  GST_TRACE ("set g2d dest : %dx%d,%d(%d,%d-%d,%d), format=%d",
+  GST_TRACE ("g2d dest : %dx%d,%d(%d,%d-%d,%d), format=%d",
       g2d->dst.width, g2d->dst.height,g2d->dst.stride, g2d->dst.left,
       g2d->dst.top, g2d->dst.right, g2d->dst.bottom,
       g2d->dst.format);

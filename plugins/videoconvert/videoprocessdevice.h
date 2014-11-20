@@ -89,12 +89,10 @@ struct _ImxVideoProcessDevice {
   gint     (*set_rotate)              (ImxVideoProcessDevice* device,
                                         ImxVideoRotationMode mode);
   gint     (*config_input)            (ImxVideoProcessDevice* device,
-                                        GstVideoFormat fmt,
-                                        GstVideoInterlaceMode interlace,
-                                        guint w, guint h, guint stride);
+                                        GstVideoInfo* in_info,
+                                        GstVideoAlignment *video_align);
   gint     (*config_output)           (ImxVideoProcessDevice* device,
-                                        GstVideoFormat fmt,
-                                        guint w, guint h, guint stride);
+                                        GstVideoInfo* out_info);
   gint     (*do_convert)              (ImxVideoProcessDevice* device,
                                        GstBuffer *from, GstBuffer *to);
 

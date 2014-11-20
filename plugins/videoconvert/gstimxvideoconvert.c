@@ -25,6 +25,8 @@
 #include "gstallocatorphymem.h"
 #include "gstimxvideoconvert.h"
 
+#define IMX_VCT_IN_POOL_MAX_BUFFERS   30
+
 #define GST_IMX_VCT_PARAMS_QDATA   g_quark_from_static_string("imxvct-params")
 
 #define GST_IMX_VIDEO_ROTATION_DEFAULT      IMX_VIDEO_ROTATION_0
@@ -162,6 +164,10 @@ static void gst_imx_video_convert_finalize (GObject * object)
   GST_IMX_CONVERT_UNREF_BUFFER (imxvct->in_buf);
   GST_IMX_CONVERT_UNREF_POOL (imxvct->in_pool);
   GST_IMX_CONVERT_UNREF_POOL (imxvct->out_pool);
+  if (imxvct->allocator) {
+    gst_object_unref (imxvct->allocator);
+    imxvct->allocator = NULL;
+  }
 
   if (imxvct->device) {
     imxvct->device->close(imxvct->device);
@@ -432,8 +438,10 @@ static guint imx_video_convert_fixate_format_caps(GstBaseTransform *transform,
   guint i, j;
 
   fmt_name = gst_structure_get_string(ins, "format");
-  if (!fmt_name)
+  if (!fmt_name) {
+    gst_caps_unref(new_caps);
     return -1;
+  }
 
   GST_LOG("source format : %s", fmt_name);
 
@@ -442,8 +450,10 @@ static guint imx_video_convert_fixate_format_caps(GstBaseTransform *transform,
   for (i = 0; i < gst_caps_get_size(new_caps); i++) {
     tests = gst_caps_get_structure(new_caps, i);
     format = gst_structure_get_value(tests, "format");
-    if (!format)
+    if (!format) {
+      gst_caps_unref(new_caps);
       return -1;
+    }
 
     if (GST_VALUE_HOLDS_LIST(format)) {
       for (j = 0; j < gst_value_list_get_size(format); j++) {
@@ -483,6 +493,8 @@ static guint imx_video_convert_fixate_format_caps(GstBaseTransform *transform,
     out_info = gst_video_format_get_info(out_fmt);
   }
 #endif
+
+  gst_caps_unref(new_caps);
 
   if (out_info) {
     fmt_name = GST_VIDEO_FORMAT_INFO_NAME(out_info);
@@ -850,11 +862,13 @@ gst_imx_video_convert_create_bufferpool(GstImxVideoConvert *imxvct,
 {
   GstBufferPool *pool;
   GstStructure *config;
-  GstAllocator *allocator = NULL;
   pool = gst_video_buffer_pool_new ();
   if (pool) {
-    allocator = gst_imx_video_convert_allocator_new((gpointer)(imxvct->device));
-    if (!allocator) {
+    if (!imxvct->allocator)
+      imxvct->allocator =
+          gst_imx_video_convert_allocator_new((gpointer)(imxvct->device));
+
+    if (!imxvct->allocator) {
       GST_ERROR ("new imx video convert allocator failed.");
       gst_buffer_pool_set_active (pool, FALSE);
       gst_object_unref (pool);
@@ -863,27 +877,26 @@ gst_imx_video_convert_create_bufferpool(GstImxVideoConvert *imxvct,
 
     config = gst_buffer_pool_get_config(pool);
     gst_buffer_pool_config_set_params(config, caps, size, min, max);
-    gst_buffer_pool_config_set_allocator(config, allocator, NULL);
+    gst_buffer_pool_config_set_allocator(config, imxvct->allocator, NULL);
     gst_buffer_pool_config_add_option(config,
                                       GST_BUFFER_POOL_OPTION_VIDEO_META);
+    gst_buffer_pool_config_add_option (config,
+                                      GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
 
     GstVideoInfo info;
+    GstVideoAlignment alignment;
+    memset (&alignment, 0, sizeof (GstVideoAlignment));
     gst_video_info_from_caps (&info, caps);
     gint w = GST_VIDEO_INFO_WIDTH (&info);
-    if (!ISALIGNED (w, ALIGNMENT)) {
-      GstVideoAlignment alignment;
-      memset (&alignment, 0, sizeof (GstVideoAlignment));
+    gint h = GST_VIDEO_INFO_HEIGHT (&info);
+    if (!ISALIGNED (w, ALIGNMENT) || !ISALIGNED (h, ALIGNMENT)) {
       alignment.padding_right = ALIGNTO (w, ALIGNMENT) - w;
-
-      GST_DEBUG ("padding_right (%d), padding_bottom (%d)",
-          alignment.padding_right, alignment.padding_bottom);
-
-      gst_buffer_pool_config_add_option (config,
-          GST_BUFFER_POOL_OPTION_VIDEO_META);
-      gst_buffer_pool_config_add_option (config,
-          GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
-      gst_buffer_pool_config_set_video_alignment (config, &alignment);
+      alignment.padding_bottom = ALIGNTO (h, ALIGNMENT) - h;
     }
+
+    GST_DEBUG ("[%d, %d]:padding_right (%d), padding_bottom (%d)", w, h,
+        alignment.padding_right, alignment.padding_bottom);
+    gst_buffer_pool_config_set_video_alignment (config, &alignment);
 
     if (!gst_buffer_pool_set_config(pool, config)) {
       GST_ERROR ("set buffer pool config failed.");
@@ -907,16 +920,22 @@ imx_video_convert_propose_allocation(GstBaseTransform *transform,
   guint size = 0;
   GstCaps *caps;
   gboolean need_pool;
-  GstFlowReturn ret;
-
-  if (!GST_BASE_TRANSFORM_CLASS (parent_class)->propose_allocation (transform,
-          decide_query, query))
-    return FALSE;
 
   /* passthrough, we're done */
   if (decide_query == NULL) {
-    GST_DEBUG ("passthrough, don't need propose allocation");
-    return TRUE;
+    GST_DEBUG ("doing passthrough query");
+    return gst_pad_peer_query (transform->srcpad, query);
+  } else {
+    guint i, n_metas;
+    /* non-passthrough, copy all metadata, decide_query does not contain the
+     * metadata anymore that depends on the buffer memory */
+    n_metas = gst_query_get_n_allocation_metas (decide_query);
+    for (i = 0; i < n_metas; i++) {
+      GType api;
+      const GstStructure *params;
+      api = gst_query_parse_nth_allocation_meta (decide_query, i, &params);
+      gst_query_add_allocation_meta (query, api, params);
+    }
   }
 
   gst_query_parse_allocation (query, &caps, &need_pool);
@@ -932,15 +951,19 @@ imx_video_convert_propose_allocation(GstBaseTransform *transform,
   size = GST_VIDEO_INFO_SIZE (&info);
   size = PAGE_ALIGN(size);
 
+  GST_IMX_CONVERT_UNREF_BUFFER (imxvct->in_buf);
   GST_IMX_CONVERT_UNREF_POOL(imxvct->in_pool);
   GST_DEBUG_OBJECT(imxvct, "creating new input pool");
-  pool = gst_imx_video_convert_create_bufferpool(imxvct, caps, size, 1, 0);
+  pool = gst_imx_video_convert_create_bufferpool(imxvct, caps, size, 1,
+                                                 IMX_VCT_IN_POOL_MAX_BUFFERS);
   imxvct->in_pool = pool;
+  imxvct->old_config = FALSE;
 
   if (pool) {
-    GST_IMX_CONVERT_UNREF_BUFFER (imxvct->in_buf);
     GST_DEBUG_OBJECT (imxvct, "propose_allocation, pool(%p).", pool);
-    gst_query_add_allocation_pool (query, pool, size, 1, 0);
+    gst_query_add_allocation_pool (query, pool, size, 1,
+                                   IMX_VCT_IN_POOL_MAX_BUFFERS);
+    gst_query_add_allocation_param (query, imxvct->allocator, NULL);
     gst_query_add_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL);
     gst_query_add_allocation_meta (query, GST_VIDEO_CROP_META_API_TYPE, NULL);
   } else {
@@ -956,7 +979,7 @@ static gboolean imx_video_convert_decide_allocation(GstBaseTransform *transform,
   GstCaps *outcaps;
   GstBufferPool *pool = NULL;
   guint size, num, min = 0, max = 0;
-  GstStructure *config;
+  GstStructure *config = NULL;
   GstVideoInfo vinfo;
   gboolean new_pool = TRUE;
   GstAllocator *allocator = NULL;
@@ -983,6 +1006,11 @@ static gboolean imx_video_convert_decide_allocation(GstBaseTransform *transform,
           break;
         } else {
           GST_LOG_OBJECT (imxvct, "no phy allocator in output pool (%p)", pool);
+        }
+
+        if (config) {
+          gst_structure_free (config);
+          config = NULL;
         }
 
         if (allocator) {
@@ -1066,23 +1094,7 @@ static gboolean imx_video_convert_set_info(GstVideoFilter *filter,
   }
 */
 
-  gint ret = device->config_input(device, GST_VIDEO_INFO_FORMAT(in_info),
-      in_info->interlace_mode, in_info->width, in_info->height,
-      in_info->stride[0]);
-
-  GST_LOG ("Input: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(in_info->finfo),
-      in_info->width, in_info->height);
-
-  ret |= device->config_output(device, GST_VIDEO_INFO_FORMAT(out_info),
-      out_info->width, out_info->height, out_info->stride[0]);
-
-  GST_LOG ("Output: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(out_info->finfo),
-      out_info->width, out_info->height);
-
   GST_DEBUG ("set info from %" GST_PTR_FORMAT " to %" GST_PTR_FORMAT, in, out);
-
-  if (ret != 0)
-    return FALSE;
 
   return TRUE;
 }
@@ -1112,7 +1124,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     if (!imxvct->in_pool) {
       GST_DEBUG_OBJECT(imxvct, "creating new input pool");
       imxvct->in_pool = gst_imx_video_convert_create_bufferpool(imxvct, caps,
-          PAGE_ALIGN(in->info.size), 1, 0);
+          PAGE_ALIGN(in->info.size), 1, IMX_VCT_IN_POOL_MAX_BUFFERS);
     }
 
     gst_caps_unref (caps);
@@ -1137,6 +1149,48 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
       GST_ERROR ("Can't get input buffer");
       return GST_FLOW_ERROR;
     }
+  }
+
+  //alignment check
+  if (!imxvct->old_config) {
+    if (imxvct->in_pool) {
+      GstStructure *config;
+      config = gst_buffer_pool_get_config (imxvct->in_pool);
+      memset (&imxvct->video_align, 0, sizeof(GstVideoAlignment));
+
+      // check if has alignment option setted.
+      if (gst_buffer_pool_config_has_option (config,
+          GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
+        GstVideoInfo info;
+        GstCaps *caps;
+        gst_buffer_pool_config_get_params (config, &caps, NULL, NULL, NULL);
+        gst_video_info_from_caps (&info, caps);
+        gst_buffer_pool_config_get_video_alignment (config, &imxvct->video_align);
+        gst_video_info_align (&info, &imxvct->video_align);
+        GST_DEBUG ("pool has alignment (%d, %d) , (%d, %d)",
+          imxvct->video_align.padding_left, imxvct->video_align.padding_top,
+          imxvct->video_align.padding_right, imxvct->video_align.padding_bottom);
+      }
+
+      gst_structure_free (config);
+    }
+
+    // config input
+    gint ret = device->config_input(device, &(in->info), &imxvct->video_align);
+
+    GST_LOG ("Input: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(in->info.finfo),
+        in->info.width, in->info.height);
+
+    // config output
+    ret |= device->config_output(device, &(out->info));
+
+    GST_LOG ("Output: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(out->info.finfo),
+        out->info.width, out->info.height);
+
+    if (ret != 0)
+      return GST_FLOW_ERROR;
+
+    imxvct->old_config = TRUE;
   }
 
   //convert

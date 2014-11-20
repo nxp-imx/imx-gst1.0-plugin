@@ -41,6 +41,9 @@ typedef struct _GstImxVideoConvert {
   GstBufferPool *in_pool;
   GstBufferPool *out_pool;
   GstBuffer *in_buf;
+  GstAllocator *allocator;
+  GstVideoAlignment video_align;
+  gboolean old_config;
 } GstImxVideoConvert;
 
 typedef struct _GstImxVideoConvertClass {
