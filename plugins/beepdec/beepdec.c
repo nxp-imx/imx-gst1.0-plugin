@@ -699,9 +699,6 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
         goto bail;
     }
 
-    if(beepdec->err_cnt > MAX_PROFILE_ERROR_COUNT )
-        return ret;
-
 
     if(!buffer){
         //audio decoder will send a null frame after 3 codec data buffer
@@ -784,11 +781,6 @@ begin:
             beepdec->err_cnt += 4;
             break;
         }else if(core_ret == ACODEC_NOT_ENOUGH_DATA){
-            break;
-        }else if (core_ret==ACODEC_INIT_ERR){
-            /* ACODEC_INIT_ERR is a fatal error, no need to try decoding again. */
-            beepdec->err_cnt = MAX_PROFILE_ERROR_COUNT+1;
-            GST_WARNING("core ret = ACODEC_INIT_ERR\n");
             break;
         }
         
