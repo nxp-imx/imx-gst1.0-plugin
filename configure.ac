@@ -210,6 +210,8 @@ FIND_PARSER_SONAME(mkv,arm9)
 FIND_PARSER_SONAME(mkv,arm11)
 FIND_PARSER_SONAME(ogg,arm9)
 FIND_PARSER_SONAME(ogg,arm11)
+FIND_PARSER_SONAME(rm,arm9)
+FIND_PARSER_SONAME(rm,arm11)
 
 FIND_ACODEC_SONAME(aacplusd, arm9)
 FIND_ACODEC_SONAME(aacplusd, arm11)
@@ -230,6 +232,8 @@ FIND_ACODEC_SONAME(vorbisd, arm12)
 FIND_ACODEC_SONAME(ddpd, arm12)
 FIND_ACODEC_SONAME(nbamrd, arm11)
 FIND_ACODEC_SONAME(wbamrd, arm12)
+FIND_ACODEC_SONAME(realad, arm9)
+FIND_ACODEC_SONAME(realad, arm11)
 
 dnl set the plugindir where plugins should be installed
 plugindir="\$(libdir)/gstreamer-$GST_MAJORMINOR"
