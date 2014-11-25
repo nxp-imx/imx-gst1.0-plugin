@@ -1702,11 +1702,21 @@ aiurdemux_add_user_tags (GstAiurDemux * demux)
               g_free (longitude_ptr);
               g_string_free (string, TRUE);
               continue;
-            }else if(USER_DATA_TRACKNUMBER == id || USER_DATA_TOTALTRACKNUMBER == id || USER_DATA_DISCNUMBER == id || USER_DATA_RATING ==id){
+            }else if(USER_DATA_TRACKNUMBER == id || USER_DATA_TOTALTRACKNUMBER == id || USER_DATA_DISCNUMBER == id ){
               guint32 value;
               value = atoi(string->str);
               gst_tag_list_add (list, GST_TAG_MERGE_APPEND,
                 g_user_data_entry[i].gst_tag_name, value, NULL);
+              GST_INFO_OBJECT (demux, g_user_data_entry[i].print_string, string->str);
+              g_string_free (string, TRUE);
+              continue;
+            }else if (USER_DATA_RATING ==id) {
+              double value;
+              value = atof(string->str);
+              if (value <= 5.0)
+                  value = value*20;
+              gst_tag_list_add (list, GST_TAG_MERGE_APPEND,
+                g_user_data_entry[i].gst_tag_name, (guint32)value, NULL);
               GST_INFO_OBJECT (demux, g_user_data_entry[i].print_string, string->str);
               g_string_free (string, TRUE);
               continue;
