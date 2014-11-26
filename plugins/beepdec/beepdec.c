@@ -782,6 +782,11 @@ begin:
             break;
         }else if(core_ret == ACODEC_NOT_ENOUGH_DATA){
             break;
+        } else if(core_ret==ACODEC_INIT_ERR){
+            /* ACODEC_INIT_ERR is a fatal error, no need to try decoding again. */
+            ret = GST_FLOW_EOS;
+            GST_ERROR("core ret = ACODEC_INIT_ERR\n", core_ret);
+            goto bail;
         }
         
         status = core_ret & CORE_STATUS_MASK;
