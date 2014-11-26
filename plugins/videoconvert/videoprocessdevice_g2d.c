@@ -29,7 +29,6 @@ typedef struct _ImxVpDeviceG2d {
   gint capabilities;
   struct g2d_surface src;
   struct g2d_surface dst;
-  GstVideoAlignment valign;
 } ImxVpDeviceG2d;
 
 typedef struct {
@@ -189,68 +188,62 @@ static gint imx_g2d_frame_copy(ImxVideoProcessDevice *device,
 }
 
 static gint imx_g2d_config_input(ImxVideoProcessDevice *device,
-                                  GstVideoInfo* in_info,
-                                  GstVideoAlignment *valign)
+                                  ImxVideoInfo* in_info)
 {
   if (!device || !device->priv)
     return -1;
 
   ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
-  const G2dFmtMap *in_map = imx_g2d_get_format(GST_VIDEO_INFO_FORMAT(in_info));
+  const G2dFmtMap *in_map = imx_g2d_get_format(in_info->fmt);
   if (!in_map)
     return -1;
 
-  if (valign)
-    memcpy(&g2d->valign, valign, sizeof(GstVideoAlignment));
-
-  g2d->src.width = GST_ROUND_UP_4(g2d->valign.padding_left + in_info->width +
-                                  g2d->valign.padding_right);
-  g2d->src.height = GST_ROUND_UP_4(g2d->valign.padding_top + in_info->height +
-                                   g2d->valign.padding_bottom);
+  g2d->src.width = GST_ROUND_UP_4(in_info->w);
+  g2d->src.height = GST_ROUND_UP_4(in_info->h);
   g2d->src.stride = g2d->src.width;//stride / (in_map->bpp/8);
   g2d->src.format = in_map->g2d_format;
-  g2d->src.left = g2d->valign.padding_left;
-  g2d->src.top = g2d->valign.padding_top;
-  g2d->src.right = g2d->valign.padding_left + in_info->width;
-  g2d->src.bottom = g2d->valign.padding_top + in_info->height;
-  GST_TRACE("input format = %s",
-      gst_video_format_to_string(GST_VIDEO_INFO_FORMAT(in_info)));
+  g2d->src.left = 0;
+  g2d->src.top = 0;
+  g2d->src.right = in_info->w;
+  g2d->src.bottom = in_info->h;
+  GST_TRACE("input format = %s", gst_video_format_to_string(in_info->fmt));
 
   return 0;
 }
 
 static gint imx_g2d_config_output(ImxVideoProcessDevice *device,
-                                  GstVideoInfo* out_info)
+                                  ImxVideoInfo* out_info)
 {
   if (!device || !device->priv)
     return -1;
 
   ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
-  const G2dFmtMap *out_map = imx_g2d_get_format(GST_VIDEO_INFO_FORMAT(out_info));
+  const G2dFmtMap *out_map = imx_g2d_get_format(out_info->fmt);
   if (!out_map)
     return -1;
 
-  g2d->dst.width = ALIGNTO (out_info->width, ALIGNMENT);
-  g2d->dst.height = out_info->height;
-  g2d->dst.stride = ALIGNTO (out_info->width, ALIGNMENT);//stride / (out_map->bpp / 8);
+  g2d->dst.width = GST_ROUND_UP_4(out_info->w);
+  g2d->dst.height = GST_ROUND_UP_4(out_info->h);
+  g2d->dst.stride = g2d->dst.width;//stride / (out_map->bpp / 8);
   g2d->dst.format = out_map->g2d_format;
   g2d->dst.left = 0;
   g2d->dst.top = 0;
-  g2d->dst.right = out_info->width;
-  g2d->dst.bottom = out_info->height;
-  GST_TRACE("output format = %s",
-      gst_video_format_to_string(GST_VIDEO_INFO_FORMAT(out_info)));
+  g2d->dst.right = out_info->w;
+  g2d->dst.bottom = out_info->h;
+  GST_TRACE("output format = %s", gst_video_format_to_string(out_info->fmt));
 
   return 0;
 }
 
 static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
-                                GstBuffer *input, GstBuffer *output)
+                                PhyMemBlock *from, PhyMemBlock *to,
+                                ImxVideoInterlaceType interlace_type,
+                                ImxVideoCrop incrop, ImxVideoCrop outcrop)
 {
   gint ret = 0;
   void *g2d_handle = NULL;
 
-  if (!device || !device->priv || !input || !output)
+  if (!device || !device->priv || !from || !to)
     return -1;
 
   // Open g2d
@@ -260,53 +253,32 @@ static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
   }
 
   ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
-  GstVideoCropMeta *in_crop = NULL, *out_crop = NULL;
 
   // Set input
-  in_crop = gst_buffer_get_video_crop_meta(input);
-  if (in_crop != NULL) {
-    GST_LOG ("input crop meta: (%d, %d, %d, %d).", in_crop->x, in_crop->y,
-        in_crop->width, in_crop->height);
-    if ((in_crop->x >= g2d->src.width) || (in_crop->y >= g2d->src.height))
-      return -1;
-
-    g2d->src.left = g2d->valign.padding_left + in_crop->x;
-    g2d->src.top = g2d->valign.padding_top + in_crop->y;
-    g2d->src.right = g2d->valign.padding_left +
-        MIN((in_crop->x + in_crop->width), g2d->src.width);
-    g2d->src.bottom = g2d->valign.padding_top +
-        MIN((in_crop->y + in_crop->height), g2d->src.height);
-  }
-
-  PhyMemBlock *from_memblk = gst_buffer_query_phymem_block (input);
-  if (!from_memblk)
-    return -1;
+  g2d->src.left = incrop.x;
+  g2d->src.top = incrop.y;
+  g2d->src.right = incrop.x + MIN(incrop.w, g2d->src.width);
+  g2d->src.bottom = incrop.y + MIN(incrop.h, g2d->src.height);
 
   switch(g2d->src.format) {
     case G2D_I420:
-      g2d->src.planes[0] = (gint)(from_memblk->paddr);
-      g2d->src.planes[1] = (gint)(from_memblk->paddr +
-                                  g2d->src.width * g2d->src.height);
-      g2d->src.planes[2] = g2d->src.planes[1]
-                           + g2d->src.width * g2d->src.height / 4;
+      g2d->src.planes[0] = (gint)(from->paddr);
+      g2d->src.planes[1] = (gint)(from->paddr + g2d->src.width * g2d->src.height);
+      g2d->src.planes[2] = g2d->src.planes[1] + g2d->src.width * g2d->src.height / 4;
       break;
     case G2D_YV12:
-      g2d->src.planes[0] = (gint)(from_memblk->paddr);
-      g2d->src.planes[2] = (gint)(from_memblk->paddr +
-                                  g2d->src.width * g2d->src.height);
-      g2d->src.planes[1] = g2d->src.planes[2]
-                           + g2d->src.width * g2d->src.height / 4;
+      g2d->src.planes[0] = (gint)(from->paddr);
+      g2d->src.planes[2] = (gint)(from->paddr + g2d->src.width * g2d->src.height);
+      g2d->src.planes[1] = g2d->src.planes[2] + g2d->src.width * g2d->src.height / 4;
       break;
     case G2D_NV12:
     case G2D_NV21:
-      g2d->src.planes[0] = (gint)(from_memblk->paddr);
-      g2d->src.planes[1] = (gint)(from_memblk->paddr
-                                  + g2d->src.width * g2d->src.height);
+      g2d->src.planes[0] = (gint)(from->paddr);
+      g2d->src.planes[1] = (gint)(from->paddr + g2d->src.width * g2d->src.height);
       break;
     case G2D_NV16:
-      g2d->src.planes[0] = (gint)(from_memblk->paddr);
-      g2d->src.planes[1] = (gint)(from_memblk->paddr
-                                  + g2d->src.width * g2d->src.height);
+      g2d->src.planes[0] = (gint)(from->paddr);
+      g2d->src.planes[1] = (gint)(from->paddr + g2d->src.width * g2d->src.height);
       break;
 
     case G2D_RGB565:
@@ -322,7 +294,7 @@ static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
     case G2D_UYVY:
     case G2D_YUYV:
     case G2D_YVYU:
-      g2d->src.planes[0] = (gint)(from_memblk->paddr);
+      g2d->src.planes[0] = (gint)(from->paddr);
       break;
     default:
       GST_ERROR ("G2D: not supported format.");
@@ -335,23 +307,11 @@ static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
       g2d->src.format);
 
   // Set output
-  PhyMemBlock *to_memblk = gst_buffer_query_phymem_block (output);
-  if (!to_memblk)
-    return -1;
-
-  g2d->dst.planes[0] = (gint)(to_memblk->paddr);
-  out_crop = gst_buffer_get_video_crop_meta(output);
-  if (out_crop != NULL) {
-    GST_LOG ("input crop meta: (%d, %d, %d, %d).", out_crop->x, out_crop->y,
-        out_crop->width, out_crop->height);
-    if ((out_crop->x >= g2d->dst.width) || (out_crop->y >= g2d->dst.height))
-      return -1;
-
-    g2d->dst.left = in_crop->x;
-    g2d->dst.top = in_crop->y;
-    g2d->dst.right = MIN((in_crop->x + in_crop->width), g2d->dst.width);
-    g2d->dst.bottom = MIN((in_crop->y + in_crop->height), g2d->dst.height);
-  }
+  g2d->dst.planes[0] = (gint)(to->paddr);
+  g2d->dst.left = outcrop.x;
+  g2d->dst.top = outcrop.y;
+  g2d->dst.right = outcrop.x + MIN(outcrop.w, g2d->dst.width);
+  g2d->dst.bottom = outcrop.y + MIN(outcrop.h, g2d->dst.height);
 
   GST_TRACE ("g2d dest : %dx%d,%d(%d,%d-%d,%d), format=%d",
       g2d->dst.width, g2d->dst.height,g2d->dst.stride, g2d->dst.left,

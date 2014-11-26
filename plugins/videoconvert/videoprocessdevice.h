@@ -20,7 +20,6 @@
 #ifndef __IMX_VIDEO_PROCESS_DEVICE_H__
 #define __IMX_VIDEO_PROCESS_DEVICE_H__
 
-#include <gst/gst.h>
 #include <gst/video/video.h>
 #include "gstallocatorphymem.h"
 #include "gstimxcommon.h"
@@ -61,12 +60,32 @@ typedef enum {
   IMX_VIDEO_DEINTERLACE_HIGH_MOTION
 } ImxVideoDeinterlaceMode;
 
+typedef enum {
+  IMX_VIDEO_INTERLACE_PROGRESSIVE,
+  IMX_VIDEO_INTERLACE_INTERLEAVED,
+  IMX_VIDEO_INTERLACE_FIELDS
+} ImxVideoInterlaceType;
+
 typedef struct {
   GstVideoFormat in_fmt;
   GstVideoFormat out_fmt;
   gint  complexity;
   gint  loss;
 } ImxVideoTransformMap;
+
+typedef struct _ImxVideoCrop {
+  guint         x;
+  guint         y;
+  guint         w;
+  guint         h;
+} ImxVideoCrop;
+
+typedef struct _ImxVideoInfo {
+  GstVideoFormat fmt;
+  guint w;
+  guint h;
+  guint stride;
+} ImxVideoInfo;
 
 typedef struct _ImxVideoProcessDevice  ImxVideoProcessDevice;
 struct _ImxVideoProcessDevice {
@@ -89,12 +108,14 @@ struct _ImxVideoProcessDevice {
   gint     (*set_rotate)              (ImxVideoProcessDevice* device,
                                         ImxVideoRotationMode mode);
   gint     (*config_input)            (ImxVideoProcessDevice* device,
-                                        GstVideoInfo* in_info,
-                                        GstVideoAlignment *video_align);
+                                        ImxVideoInfo* in_info);
   gint     (*config_output)           (ImxVideoProcessDevice* device,
-                                        GstVideoInfo* out_info);
+                                        ImxVideoInfo* out_info);
   gint     (*do_convert)              (ImxVideoProcessDevice* device,
-                                       GstBuffer *from, GstBuffer *to);
+                                       PhyMemBlock *from, PhyMemBlock *to,
+                                       ImxVideoInterlaceType interlace_type,
+                                       ImxVideoCrop incrop,
+                                       ImxVideoCrop outcrop);
 
   gint                    (*get_capabilities)        (void);
   GList*                  (*get_supported_in_fmts)   (void);

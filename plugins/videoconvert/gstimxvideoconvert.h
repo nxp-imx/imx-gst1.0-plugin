@@ -43,7 +43,7 @@ typedef struct _GstImxVideoConvert {
   GstBuffer *in_buf;
   GstAllocator *allocator;
   GstVideoAlignment video_align;
-  gboolean old_config;
+  gboolean pool_config_update;
 } GstImxVideoConvert;
 
 typedef struct _GstImxVideoConvertClass {
