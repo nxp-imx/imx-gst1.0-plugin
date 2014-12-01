@@ -993,7 +993,7 @@ gst_vpu_dec_object_handle_input_time_stamp (GstVpuDecObject * vpu_dec_object, \
   gst_buffer_map (buffer, &minfo, GST_MAP_READ);
 
   if (buffer) {
-    GST_LOG ("Chain in with size = %d", minfo.size);
+    GST_DEBUG_OBJECT (vpu_dec_object, "Chain in with size = %d", minfo.size);
 
     if (G_UNLIKELY ((vpu_dec_object->new_segment))) {
       gdouble rate = bdec->input_segment.rate;
@@ -1069,6 +1069,29 @@ gst_vpu_dec_object_set_vpu_input_buf (GstVpuDecObject * vpu_dec_object, \
   return TRUE;
 }
 
+static gboolean
+gst_vpu_dec_object_clear_decoded_frame_ts (GstVpuDecObject * vpu_dec_object)
+{
+  int nBlkCnt;
+  GstClockTime ts = 0;
+
+  if (vpu_dec_object->use_new_tsm) {
+    nBlkCnt = getTSManagerPreBufferCnt(vpu_dec_object->tsm);
+    GST_DEBUG_OBJECT (vpu_dec_object, "nBlkCnt: %d", nBlkCnt);
+    while (nBlkCnt > 0) {
+      nBlkCnt--;
+      ts = TSManagerSend2(vpu_dec_object->tsm, NULL);
+      GST_DEBUG_OBJECT (vpu_dec_object, "drop ts: %" \
+          GST_TIME_FORMAT, GST_TIME_ARGS (ts));
+      if(!GST_CLOCK_TIME_IS_VALID(ts)){
+        break;
+      }
+    }
+  }
+
+  return TRUE;
+}
+
 GstFlowReturn
 gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
     GstVideoDecoder * bdec, GstVideoCodecFrame * frame)
@@ -1117,6 +1140,8 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
       if (buf_ret & VPU_DEC_RESOLUTION_CHANGED)
         vpu_dec_object->vpu_report_resolution_change = TRUE; 
       ret = gst_vpu_dec_object_handle_reconfig(vpu_dec_object, bdec);
+      /* workaround for VPU will discard decoded video frame when resolution change. */
+      gst_vpu_dec_object_clear_decoded_frame_ts (vpu_dec_object);
       vpu_dec_object->vpu_report_resolution_change = FALSE; 
       if (ret != GST_FLOW_OK) {
         GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_handle_reconfig fail: %s\n", \
@@ -1128,7 +1153,7 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
       vpu_dec_object->mosaic_cnt = 0;
       ret = gst_vpu_dec_object_send_output (vpu_dec_object, bdec, FALSE);
       if (ret != GST_FLOW_OK) {
-        GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_send_output fail: %s\n", \
+        GST_WARNING_OBJECT(vpu_dec_object, "gst_vpu_dec_object_send_output fail: %s\n", \
             gst_flow_get_name (ret));
         return ret;
       }
