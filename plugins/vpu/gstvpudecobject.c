@@ -1159,11 +1159,9 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
         return GST_FLOW_ERROR;
       }
     }
-    if (buf_ret & VPU_DEC_OUTPUT_REPEAT) {
-      GST_INFO_OBJECT (vpu_dec_object, "Got repeat information!!");
-      TSManagerSend (vpu_dec_object->tsm);
-    }
-    if (buf_ret & VPU_DEC_OUTPUT_DROPPED) {
+    if (buf_ret & VPU_DEC_OUTPUT_DROPPED \
+        || buf_ret & VPU_DEC_SKIP \
+        || buf_ret & VPU_DEC_OUTPUT_REPEAT) {
       GST_INFO_OBJECT (vpu_dec_object, "Got drop information!!");
       ret = gst_vpu_dec_object_send_output (vpu_dec_object, bdec, TRUE);
       if (ret != GST_FLOW_OK) {
@@ -1171,10 +1169,6 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
             gst_flow_get_name (ret));
         return ret;
       }
-    }
-    if (buf_ret & VPU_DEC_SKIP) {
-      GST_INFO_OBJECT (vpu_dec_object, "Got skip message!!");
-      TSManagerSend (vpu_dec_object->tsm);
     }
     if (buf_ret & VPU_DEC_OUTPUT_EOS) {
       GST_INFO_OBJECT (vpu_dec_object, "Got EOS message!!");
