@@ -534,6 +534,8 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
       demux->n_video_streams = 0;
       demux->n_audio_streams = 0;
       demux->n_sub_streams = 0;
+      demux->sub_read_cnt = 0;
+      demux->sub_read_ready = 0;
 
       break;
     }
@@ -1319,7 +1321,6 @@ static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
   //select a track to read
   track_idx = aiurdemux_choose_next_stream(demux);
 
-
   //check long interleave for file mode
   if(demux->read_mode == PARSER_READ_MODE_FILE_BASED){
       aiurdemux_check_interleave_stream_eos(demux);
@@ -1795,6 +1796,9 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
   demux->n_video_streams = 0;
   demux->n_audio_streams = 0;
   demux->n_sub_streams = 0;
+  demux->sub_read_cnt = 0;
+  demux->sub_read_ready = 0;
+
   memset(demux->streams, 0,GST_AIURDEMUX_MAX_STREAMS*sizeof(AiurDemuxStream *));
 
   for(i = 0; i < demux->track_count; i++){
@@ -2440,29 +2444,61 @@ static void aiurdemux_parse_text (GstAiurDemux * demux, AiurDemuxStream * stream
   if(parser_ret != PARSER_SUCCESS)
       goto bail;
 
-  
-    switch (stream->codec_type) {
-      case TXT_DIVX_FEATURE_SUBTITLE:
-        codec_mime = "subpicture/x-xsub";
-        mime =
-            g_strdup_printf ("%s, width=(int)%ld, height=(int)%ld", codec_mime,
-            stream->info.subtitle.width, stream->info.subtitle.height);
-        break;
+  stream->send_codec_data = TRUE;
 
-      default:
-        goto bail;
+  switch (stream->codec_type) {
+    case TXT_DIVX_FEATURE_SUBTITLE:
+      codec_mime = "subpicture/x-xsub";
+      mime =
+          g_strdup_printf ("%s, width=(int)%ld, height=(int)%ld", codec_mime,
+          stream->info.subtitle.width, stream->info.subtitle.height);
+      break;
+
+    case TXT_QT_TEXT:
+      codec_mime = "application/x-subtitle-qttext";
+      mime = g_strdup_printf ("application/x-subtitle-qttext");
+      break;
+
+    case TXT_3GP_STREAMING_TEXT:
+    case TXT_SUBTITLE_TEXT:
+      codec_mime = "text/x-raw";
+      mime = g_strdup_printf ("text/x-raw, format=(string)pango-markup");
+      break;
+
+    case TXT_SUBTITLE_SSA:
+      codec_mime = "application/x-ssa";
+      mime = g_strdup_printf ("application/x-ssa");
+      break;
+
+    case TXT_SUBTITLE_ASS:
+      codec_mime = "application/x-ass";
+      mime = g_strdup_printf ("application/x-ass");
+      break;
+
+    case TXT_DIVX_MENU_SUBTITLE:
+    case TXT_TYPE_UNKNOWN:
+      GST_WARNING ("Unknown Text code-type=%d, sub-type=%d",
+              stream->codec_type, stream->codec_sub_type);
+      codec_mime = "application/x-subtitle-unknown";
+      mime = g_strdup_printf ("application/x-subtitle-unknown");
+      break;
+
+    default:
+      GST_WARNING ("Unsupported Text code-type=%d, sub-type=%d",
+              stream->codec_type, stream->codec_sub_type);
+      goto bail;
     }
     
     stream->caps = gst_caps_from_string (mime);
     g_free (mime);
-  
+
     if (stream->pid < 0) {
       stream->pid = demux->n_sub_streams;
     }
   
     padname = g_strdup_printf ("subtitle_%u", stream->pid);
   
-    GST_INFO ("Create video pad %s", padname);
+    GST_INFO ("Create text pad %s", padname);
   
     stream->pad =
         gst_pad_new_from_static_template (&gst_aiurdemux_subsrc_template,
@@ -2478,11 +2514,7 @@ static void aiurdemux_parse_text (GstAiurDemux * demux, AiurDemuxStream * stream
     demux->n_sub_streams++;
   
   bail:
-  
-    GST_WARNING ("Unknown Text code-type=%d, sub-type=%d",
-        stream->codec_type, stream->codec_sub_type);
     return;
-
 }
 static void aiurdemux_check_interleave_stream_eos (GstAiurDemux * demux)
 {
@@ -2600,7 +2632,6 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
         parser_ret,*track_idx,buffer_size,usStartTime,usDuration,sampleFlags);
     stream = aiurdemux_trackidx_to_stream (demux, *track_idx);
 
-
     if((parser_ret == PARSER_EOS) || (PARSER_BOS == parser_ret)
         || (PARSER_READ_ERROR == parser_ret)){
         if (demux->read_mode == PARSER_READ_MODE_FILE_BASED) {
@@ -2629,6 +2660,23 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
         ret = GST_FLOW_EOS;
       }
       goto beach;
+    } else if (PARSER_NOT_READY == parser_ret && stream->type == MEDIA_TEXT) {
+      GST_WARNING ("read track not ready, track_idx %d", *track_idx);
+
+      if (stream->new_segment) {
+        // send a fake buffer for prerolling
+        stream->buffer = gst_buffer_new_allocate(NULL, 2, NULL);
+        if (stream->buffer) {
+          GstMapInfo info;
+          gst_buffer_map (stream->buffer, &info, GST_MAP_WRITE);
+          memset (info.data, 0, info.size);
+          gst_buffer_unmap (stream->buffer, &info);
+          GST_WARNING ("send fake text buffer");
+        }
+        stream->sample_stat.start = stream->time_position;
+      }
+
+      goto readend;
     } else if (PARSER_SUCCESS != parser_ret) {
       GST_ERROR ("Movie parser failed, error = %d", parser_ret);
       aiurdemux_send_stream_eos_all (demux);
@@ -2777,11 +2825,34 @@ static gint aiurdemux_choose_next_stream (GstAiurDemux * demux)
   gint track_index = 0;
   gint64 min_time = -1;
   AiurDemuxStream *stream;
+
+  if (demux->sub_read_ready) {
+    if (demux->sub_read_cnt < demux->n_sub_streams) {
+      demux->sub_read_cnt++;
+      guint32 sub_idx = 0;
+      for (n = 0; n < demux->n_streams; n++) {
+        if (demux->streams[n]->type == MEDIA_TEXT) {
+          sub_idx++;
+          if (sub_idx == demux->sub_read_cnt) {
+            return demux->streams[n]->track_idx;
+          }
+        }
+      }
+    } else {
+      demux->sub_read_cnt = 0;
+      demux->sub_read_ready = FALSE;
+    }
+  }
+
   for (n = 0; n < demux->n_streams; n++) {
     stream = demux->streams[n];
     if (!stream->valid) {
       continue;
     }
+
+    if (stream->type == MEDIA_TEXT)
+      continue;
+
     if ((demux->read_mode == PARSER_READ_MODE_TRACK_BASED)
         && (stream->partial_sample)) {
       track_index = stream->track_idx;
@@ -2805,7 +2876,17 @@ static gint aiurdemux_choose_next_stream (GstAiurDemux * demux)
     }
   
   }
-  
+
+  for (n = 0; n < demux->n_streams; n++) {
+    stream = demux->streams[n];
+    if (track_index == stream->track_idx) {
+      if (stream->type == MEDIA_VIDEO) {
+        demux->sub_read_ready = TRUE;
+        demux->sub_read_cnt = 0;
+      }
+    }
+  }
+
   return track_index;
 
 }

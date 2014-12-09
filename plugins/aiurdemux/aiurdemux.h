@@ -289,6 +289,8 @@ struct _GstAiurDemux
     guint32     n_video_streams;
     guint32     n_audio_streams;
     guint32     n_sub_streams;
+    guint32     sub_read_cnt;
+    gboolean    sub_read_ready;
     AiurDemuxStream *streams[GST_AIURDEMUX_MAX_STREAMS];
     guint32 valid_mask;
     uint32     program_num;//temp number for programe count
