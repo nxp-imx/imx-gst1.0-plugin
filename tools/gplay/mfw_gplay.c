@@ -78,6 +78,13 @@ fsl_player_ret_val player_exit(fsl_player_handle handle)
     pplayer = (fsl_player*)handle;
     struct sigaction act;
 
+    fsl_player_bool mute = 0;
+    pplayer->klass->get_property(pplayer, FSL_PLAYER_PROPERTY_MUTE, (void*)(&mute));
+    if (mute) {
+      pplayer->klass->pause(pplayer);
+      pplayer->klass->mute(pplayer);
+    }
+
     pplayer->klass->stop(pplayer);
     pplayer->klass->exit_message_loop(pplayer); // flush all messages left in the message queue.
     //pplayer->klass->send_message_exit(pplayer); // send a exit message.

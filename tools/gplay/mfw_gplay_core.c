@@ -1188,6 +1188,12 @@ fsl_player_ret_val fsl_player_play(fsl_player_handle handle)
 
     fsl_player_get_stream_info (pproperty);
 
+    GValue value  = {0};
+    g_value_init(&value, G_TYPE_DOUBLE);
+    g_object_get_property(G_OBJECT(pproperty->playbin), "volume", &value);
+    pproperty->volume = g_value_get_double(&value);
+    //g_print("current volume=%f\n", g_value_get_double(&value));
+
     if ((pproperty->fade) && (!pproperty->bmute)){
       _player_mute(handle, FALSE);
     }
