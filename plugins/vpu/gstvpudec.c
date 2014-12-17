@@ -351,10 +351,13 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     }
   }
 
+  dec->vpu_dec_object->use_my_pool = FALSE;
+  dec->vpu_dec_object->pool_alignment_checked = FALSE;
   if (pool == NULL) {
     /* no pool, we can make our own */
     GST_DEBUG_OBJECT (dec, "no pool, making new pool");
     pool = gst_video_buffer_pool_new ();
+    dec->vpu_dec_object->use_my_pool = TRUE;
   }
 
   max = min += GST_VPU_DEC_MIN_BUF_CNT (dec->vpu_dec_object) \
@@ -366,11 +369,12 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
 
   /* now configure */
   config = gst_buffer_pool_get_config (pool);
-  if (gst_query_find_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL)) {
+
+  if (!gst_buffer_pool_config_has_option (config, \
+        GST_BUFFER_POOL_OPTION_VIDEO_META)) {
     gst_buffer_pool_config_add_option (config,
         GST_BUFFER_POOL_OPTION_VIDEO_META);
   }
-
   if (!gst_buffer_pool_config_has_option (config, \
         GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
     gst_buffer_pool_config_add_option (config, \

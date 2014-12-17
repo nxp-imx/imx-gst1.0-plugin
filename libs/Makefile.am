@@ -1,6 +1,7 @@
 lib_LTLIBRARIES = libgstfsl-@GST_API_VERSION@.la
 
 libgstfsl_@GST_API_VERSION@_la_SOURCES = allocator/gstallocatorphymem.c \
+	allocator/gstphymemmeta.c \
 	video-tsm/mfw_gst_ts.c \
         gstsutils/gstsutils.c \
 	v4l2_core/gstimxv4l2.c \
@@ -12,6 +13,7 @@ libgstfsl_@GST_API_VERSION@_la_LDFLAGS = -lgstvideo-$(GST_API_VERSION)
 libgstfsl_@GST_API_VERSION@_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 
 noinst_HEADERS = allocator/gstallocatorphymem.h \
+	  allocator/gstphymemmeta.h \
     video-tsm/mfw_gst_ts.h \
     gstsutils/gstsutils.h \
     v4l2_core/gstimxv4l2.h

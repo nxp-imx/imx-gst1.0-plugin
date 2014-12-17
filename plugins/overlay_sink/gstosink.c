@@ -24,6 +24,7 @@
 #include <gst/video/gstvideopool.h>
 #include "gstosink.h"
 #include "gstosinkallocator.h"
+#include "allocator/gstphymemmeta.h"
 #ifdef USE_X11
 #include "gstimxvideooverlay.h"
 #endif
@@ -520,27 +521,6 @@ gst_overlay_sink_input_config (GstOverlaySink *sink)
 {
   gint i;
 
-  if (sink->pool && !sink->pool_alignment_checked) {
-    GstStructure *config;
-    config = gst_buffer_pool_get_config (sink->pool);
-
-    // check if has alignment option setted.
-    memset (&sink->video_align, 0, sizeof(GstVideoAlignment));
-    if (gst_buffer_pool_config_has_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
-      GstVideoInfo info;
-      GstCaps *caps;
-      gst_buffer_pool_config_get_params (config, &caps, NULL, NULL, NULL);
-      gst_video_info_from_caps (&info, caps);
-      gst_buffer_pool_config_get_video_alignment (config, &sink->video_align);
-      gst_video_info_align (&info, &sink->video_align);
-      GST_DEBUG_OBJECT (sink, "pool has alignment (%d, %d) , (%d, %d)", 
-          sink->video_align.padding_left, sink->video_align.padding_top,
-          sink->video_align.padding_right, sink->video_align.padding_bottom);
-    }
-    sink->pool_alignment_checked = TRUE;
-    gst_structure_free (config);
-  }
-
   GST_DEBUG_OBJECT (sink, "cropmeta (%d, %d) --> (%d, %d)", 
       sink->cropmeta.x, sink->cropmeta.y, sink->cropmeta.width, sink->cropmeta.height);
 
@@ -554,6 +534,35 @@ gst_overlay_sink_input_config (GstOverlaySink *sink)
   for (i=0; i<sink->disp_count; i++) {
     sink->config[i] = TRUE;
   }
+
+  return 0;
+}
+
+static gint
+gst_overlay_sink_check_alignment (GstOverlaySink *sink) 
+{
+  if (sink->pool && gst_buffer_pool_is_active (sink->pool)
+      && !sink->pool_alignment_checked) {
+    GstStructure *config;
+    config = gst_buffer_pool_get_config (sink->pool);
+
+    // check if has alignment option setted.
+    memset (&sink->video_align, 0, sizeof(GstVideoAlignment));
+    if (gst_buffer_pool_config_has_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
+      gst_buffer_pool_config_get_video_alignment (config, &sink->video_align);
+      GST_DEBUG_OBJECT (sink, "pool has alignment (%d, %d) , (%d, %d)", 
+          sink->video_align.padding_left, sink->video_align.padding_top,
+          sink->video_align.padding_right, sink->video_align.padding_bottom);
+    }
+    sink->pool_alignment_checked = TRUE;
+    gst_structure_free (config);
+  }
+
+  GST_DEBUG_OBJECT (sink, "pool has alignment (%d, %d) , (%d, %d)", 
+      sink->video_align.padding_left, sink->video_align.padding_top,
+      sink->video_align.padding_right, sink->video_align.padding_bottom);
+
+  gst_overlay_sink_input_config (sink);
 
   return 0;
 }
@@ -608,6 +617,7 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
   GstOverlaySink *sink = GST_OVERLAY_SINK (bsink);
   gboolean not_overlay_buffer = FALSE;
   GstVideoCropMeta *cropmeta = NULL;
+  GstPhyMemMeta *phymemmeta = NULL;
   GstVideoFrameFlags flags = GST_VIDEO_FRAME_FLAG_NONE;
   SurfaceBuffer surface_buffer;
   gint i;
@@ -675,9 +685,25 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
   GST_DEBUG_OBJECT (sink, "show gstbuffer (%p), surface_buffer vaddr (%p) paddr (%p).",
       buffer, surface_buffer.vaddr, surface_buffer.paddr);
 
+  if (!sink->pool_alignment_checked) {
+    if (!sink->self_pool_configed 
+        && !gst_buffer_pool_is_active (sink->pool)) {
+      memset (&sink->video_align, 0, sizeof(GstVideoAlignment));
+
+      phymemmeta = GST_PHY_MEM_META_GET (buffer);
+      if (phymemmeta) {
+        sink->video_align.padding_right = phymemmeta->x_padding;
+        sink->video_align.padding_bottom = phymemmeta->y_padding;
+        GST_DEBUG_OBJECT (sink, "physical memory meta x_padding: %d y_padding: %d",
+            phymemmeta->x_padding, phymemmeta->y_padding);
+      }
+      sink->pool_alignment_checked = TRUE;
+    }
+    gst_overlay_sink_check_alignment (sink);
+  }
+
   cropmeta = gst_buffer_get_video_crop_meta (buffer);
-  if (!sink->pool_alignment_checked
-      || (cropmeta && gst_overlay_sink_incrop_changed_and_set (cropmeta, &sink->cropmeta))) {
+  if ((cropmeta && gst_overlay_sink_incrop_changed_and_set (cropmeta, &sink->cropmeta))) {
     gst_overlay_sink_input_config (sink);
   }
 

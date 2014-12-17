@@ -19,6 +19,7 @@
 
 #include <string.h>
 #include <gst/video/gstvideometa.h>
+#include "allocator/gstphymemmeta.h"
 #include "gstvpuallocator.h"
 #include "gstvpudecobject.h"
 
@@ -799,6 +800,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   GstVideoCodecFrame *out_frame;
   GstVideoMeta *vmeta;
   GstVideoCropMeta *cmeta;
+  GstPhyMemMeta *pmeta;
   GstBuffer *output_buffer = NULL;
   GstClockTime output_pts = 0;
   gint frame_number;
@@ -911,6 +913,35 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   cmeta->y = out_frame_info.pExtInfo->FrmCropRect.nTop;
   cmeta->width = out_frame_info.pExtInfo->FrmCropRect.nRight-out_frame_info.pExtInfo->FrmCropRect.nLeft;
   cmeta->height = out_frame_info.pExtInfo->FrmCropRect.nBottom-out_frame_info.pExtInfo->FrmCropRect.nTop;
+
+  /* set physical memory padding info */
+  if (vpu_dec_object->use_my_pool && !vpu_dec_object->pool_alignment_checked) {
+    GstStructure *config;
+    config = gst_buffer_pool_get_config (gst_video_decoder_get_buffer_pool (bdec));
+
+    // check if has alignment option setted.
+    memset (&vpu_dec_object->video_align, 0, sizeof(GstVideoAlignment));
+    if (gst_buffer_pool_config_has_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
+      GstVideoInfo info;
+      GstCaps *caps;
+      gst_buffer_pool_config_get_params (config, &caps, NULL, NULL, NULL);
+      gst_video_info_from_caps (&info, caps);
+      gst_buffer_pool_config_get_video_alignment (config, &vpu_dec_object->video_align);
+      gst_video_info_align (&info, &vpu_dec_object->video_align);
+
+      GST_DEBUG_OBJECT (vpu_dec_object, "pool has alignment (%d, %d) , (%d, %d)", 
+          vpu_dec_object->video_align.padding_left, vpu_dec_object->video_align.padding_top,
+          vpu_dec_object->video_align.padding_right, vpu_dec_object->video_align.padding_bottom);
+    }
+    vpu_dec_object->pool_alignment_checked = TRUE;
+    gst_structure_free (config);
+  }
+
+  if (vpu_dec_object->use_my_pool) {
+      pmeta = GST_PHY_MEM_META_ADD (out_frame->output_buffer);
+      pmeta->x_padding = vpu_dec_object->video_align.padding_right;
+      pmeta->y_padding = vpu_dec_object->video_align.padding_bottom;
+  }
 
   if (vpu_dec_object->tsm_mode == MODE_FIFO) {
     if (!GST_CLOCK_TIME_IS_VALID(out_frame->pts))

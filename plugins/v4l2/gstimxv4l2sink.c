@@ -381,12 +381,7 @@ gst_imx_v4l2_allocator_cb (gpointer user_data, gint *count)
     // if yes, need to recheck the pool params for reconfigure v4l2 devicec.
     memset (&v4l2sink->video_align, 0, sizeof(GstVideoAlignment));
     if (gst_buffer_pool_config_has_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
-      GstVideoInfo info;
-      GstCaps *caps;
-      gst_buffer_pool_config_get_params (config, &caps, NULL, NULL, NULL);
-      gst_video_info_from_caps (&info, caps);
       gst_buffer_pool_config_get_video_alignment (config, &v4l2sink->video_align);
-      gst_video_info_align (&info, &v4l2sink->video_align);
       GST_DEBUG_OBJECT (v4l2sink, "pool has alignment (%d, %d) , (%d, %d)", 
           v4l2sink->video_align.padding_left, v4l2sink->video_align.padding_top,
           v4l2sink->video_align.padding_right, v4l2sink->video_align.padding_bottom);

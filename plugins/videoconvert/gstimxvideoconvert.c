@@ -1161,12 +1161,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
       // check if has alignment option setted.
       if (gst_buffer_pool_config_has_option (config,
           GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
-        GstVideoInfo info;
-        GstCaps *caps;
-        gst_buffer_pool_config_get_params (config, &caps, NULL, NULL, NULL);
-        gst_video_info_from_caps (&info, caps);
         gst_buffer_pool_config_get_video_alignment (config, &imxvct->video_align);
-        gst_video_info_align (&info, &imxvct->video_align);
         GST_DEBUG ("pool has alignment (%d, %d) , (%d, %d)",
           imxvct->video_align.padding_left, imxvct->video_align.padding_top,
           imxvct->video_align.padding_right, imxvct->video_align.padding_bottom);

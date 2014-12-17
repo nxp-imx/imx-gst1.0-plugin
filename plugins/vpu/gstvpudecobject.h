@@ -88,6 +88,8 @@ struct _GstVpuDecObject {
 	GList * system_frame_number_in_vpu;
 	GList * gstbuffer_in_vpudec;
   gboolean use_new_tsm;
+  gboolean use_my_pool;
+  gboolean pool_alignment_checked;
   gint framerate_n;
   gint framerate_d;
   gint mosaic_cnt;
