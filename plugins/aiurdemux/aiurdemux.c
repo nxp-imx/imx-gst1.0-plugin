@@ -2469,7 +2469,7 @@ static void aiurdemux_parse_text (GstAiurDemux * demux, AiurDemuxStream * stream
         padname);
     g_free (padname);
   
-    stream->pending_tags = gst_tag_list_new (GST_TAG_SUBTITLE_CODEC,mime,NULL);
+    stream->pending_tags = gst_tag_list_new (GST_TAG_SUBTITLE_CODEC,codec_mime,NULL);
     if (stream->lang[0] != '\0') {
       gst_tag_list_add (stream->pending_tags, GST_TAG_MERGE_REPLACE,
           GST_TAG_LANGUAGE_CODE, stream->lang, NULL);
