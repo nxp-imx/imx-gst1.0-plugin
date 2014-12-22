@@ -288,7 +288,8 @@ plugins/vpu/Makefile
 plugins/mp3enc/Makefile
 plugins/videoconvert/Makefile
 tools/Makefile
-tools/gplay/Makefile)
+tools/gplay/Makefile
+tools/grecorder/Makefile)
 
 echo -e "Configure result:"
 echo -e "\tEnabled features:$enabled_feature"

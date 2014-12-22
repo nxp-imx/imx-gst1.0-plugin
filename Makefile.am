@@ -27,7 +27,8 @@ AVBDIRS = plugins/avb
 VIDEO_CONVERT_DIRS = plugins/videoconvert
 
 TOOLDIRS =    tools/                      \
-              tools/gplay
+              tools/gplay                 \
+              tools/grecorder
 
 BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS) $(VIDEO_CONVERT_DIRS)
               

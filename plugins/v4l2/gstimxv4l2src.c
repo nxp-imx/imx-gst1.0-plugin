@@ -192,20 +192,6 @@ gst_imx_v4l2src_get_caps (GstBaseSrc * src, GstCaps * filter)
 static GstCaps *
 gst_imx_v4l2src_fixate (GstBaseSrc * bsrc, GstCaps * caps)
 {
-  GstCaps *caps_dev = NULL;
-
-  caps_dev = gst_imx_v4l2src_get_device_caps (bsrc);
-  if (caps_dev && caps) {
-      GstCaps *intersection;
-
-      intersection =
-          gst_caps_intersect_full (caps_dev, caps, GST_CAPS_INTERSECT_FIRST);
-      gst_caps_unref (caps_dev);
-      caps = intersection;
-  }
-
-  GST_DEBUG_OBJECT (bsrc, "fixated caps %" GST_PTR_FORMAT, caps);
-
   caps = GST_BASE_SRC_CLASS (parent_class)->fixate (bsrc, caps);
 
   return caps;
@@ -437,7 +423,11 @@ gst_imx_v4l2src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
     gst_video_info_init (&vinfo);
     gst_video_info_from_caps (&vinfo, outcaps);
 
+  if (gst_query_get_n_allocation_pools (query) > 0) {
+    gst_query_set_nth_allocation_pool (query, 0, v4l2src->pool, vinfo.size, v4l2src->actual_buf_cnt, v4l2src->actual_buf_cnt);
+  } else {
     gst_query_add_allocation_pool (query, v4l2src->pool, vinfo.size, v4l2src->actual_buf_cnt, v4l2src->actual_buf_cnt);
+  }
     return TRUE;
   }
 
