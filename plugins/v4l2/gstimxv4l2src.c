@@ -452,10 +452,10 @@ gst_imx_v4l2src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
     /* no allocator or isn't physical memory allocator. VPU need continus
      * physical memory. use VPU memory allocator. */
     if (allocator) {
-      GST_ERROR_OBJECT (v4l2src, "unref proposaled allocator.\n");
+      GST_DEBUG_OBJECT (v4l2src, "unref proposaled allocator.\n");
       gst_object_unref (allocator);
     }
-    GST_ERROR_OBJECT (v4l2src, "using v4l2 source allocator.\n");
+    GST_INFO_OBJECT (v4l2src, "using v4l2 source allocator.\n");
 
     context.v4l2_handle = v4l2src->v4l2handle;
     context.user_data = (gpointer) v4l2src;

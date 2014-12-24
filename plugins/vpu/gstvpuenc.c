@@ -899,7 +899,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
         goto bail;
       }
 
-      GST_ERROR_OBJECT(enc, "encoder consume time: %lld\n", \
+      GST_DEBUG_OBJECT(enc, "encoder consume time: %lld\n", \
           g_get_monotonic_time () - start_time);
 
       if (enc_enc_param.eOutRetCode & VPU_ENC_OUTPUT_SEQHEADER) {
