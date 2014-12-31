@@ -2834,7 +2834,10 @@ static gint aiurdemux_choose_next_stream (GstAiurDemux * demux)
         if (demux->streams[n]->type == MEDIA_TEXT) {
           sub_idx++;
           if (sub_idx == demux->sub_read_cnt) {
-            return demux->streams[n]->track_idx;
+            if (demux->streams[n]->valid)
+              return demux->streams[n]->track_idx;
+            else
+              demux->sub_read_cnt++;
           }
         }
       }
@@ -3002,7 +3005,8 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
     gst_segment_init (&segment, GST_FORMAT_TIME);
 
   if (demux->segment.rate >= 0) {
-    if (demux->play_mode == AIUR_PLAY_MODE_TRICK_FORWARD && stream->type == MEDIA_AUDIO) {
+    if (demux->play_mode == AIUR_PLAY_MODE_TRICK_FORWARD &&
+        (stream->type == MEDIA_AUDIO || stream->type == MEDIA_TEXT)) {
       stream->new_segment = FALSE;
       return;
     }
@@ -3035,7 +3039,7 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
     GST_DEBUG ("segment event %" GST_SEGMENT_FORMAT, &segment);
     gst_pad_push_event (stream->pad, gst_event_new_segment (&segment));
   } else {
-    if(stream->type == MEDIA_AUDIO){
+    if(stream->type == MEDIA_AUDIO || stream->type == MEDIA_TEXT){
         stream->new_segment = FALSE;
         return;
     }
@@ -3106,7 +3110,7 @@ aiurdemux_send_stream_eos_all (GstAiurDemux * demux)
     for (n = 0; n < demux->n_streams; n++) {
       stream = demux->streams[n];
 
-      if ((stream->valid) && (stream->type == MEDIA_AUDIO)) {
+      if ((stream->valid) && (stream->type == MEDIA_AUDIO || stream->type == MEDIA_TEXT)) {
         aiurdemux_send_stream_eos (demux, stream);
       }
 
@@ -3329,7 +3333,7 @@ gst_aiurdemux_perform_seek (GstAiurDemux * demux, GstSegment * segment,
 
       stream->time_position = desired_offset;
 
-      if ((rate >= 0) && (stream->type == MEDIA_AUDIO)
+      if ((rate >= 0) && (stream->type == MEDIA_AUDIO || stream->type == MEDIA_TEXT)
           && (demux->n_video_streams))
         stream->block = TRUE;
       else
@@ -3337,7 +3341,7 @@ gst_aiurdemux_perform_seek (GstAiurDemux * demux, GstSegment * segment,
 
       if ((core_ret != PARSER_SUCCESS)
           || ((demux->play_mode != AIUR_PLAY_MODE_NORMAL)
-              && (stream->type == MEDIA_AUDIO))) {
+              && (stream->type == MEDIA_AUDIO || stream->type == MEDIA_TEXT))) {
         MARK_STREAM_EOS (demux, stream);
       }
     }
@@ -3384,7 +3388,7 @@ gst_aiurdemux_perform_seek (GstAiurDemux * demux, GstSegment * segment,
 
           stream->time_position = desired_offset;
 
-          if ((rate >= 0) && (stream->type == MEDIA_AUDIO)
+          if ((rate >= 0) && (stream->type == MEDIA_AUDIO || stream->type == MEDIA_TEXT)
               && (demux->n_video_streams))
             stream->block = TRUE;
           else
@@ -3392,7 +3396,7 @@ gst_aiurdemux_perform_seek (GstAiurDemux * demux, GstSegment * segment,
 
           if ((core_ret != PARSER_SUCCESS)
               || ((demux->play_mode != AIUR_PLAY_MODE_NORMAL)
-                  && (stream->type == MEDIA_AUDIO))) {
+                  && (stream->type == MEDIA_AUDIO || stream->type == MEDIA_TEXT))) {
             MARK_STREAM_EOS (demux, stream);
           }
 
