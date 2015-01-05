@@ -324,6 +324,20 @@ fsl_player_s32 parse_options(fsl_player_config* pconfig, options * opt, fsl_play
                   continue;
                 }
 
+                if ((strncmp(argv[i], "--text-sink", 11)==0)) {
+                  if (argv[i][11]=='=') {
+                    pconfig->text_sink_name = (&(argv[i][12]));
+                  }
+                  continue;
+                }
+
+                if ((strncmp(argv[i], "--suburi", 8)==0)) {
+                  if (argv[i][8]=='=') {
+                    pconfig->suburi = (&(argv[i][9]));
+                  }
+                  continue;
+                }
+
 
                 if ((strncmp(argv[i], "--info-interval", 14)==0)){
                   if (argv[i][14]=='='){
@@ -768,6 +782,7 @@ int main(int argc,char *argv[])
     config.api_version = GPLAYCORE_API_VERSION;
     config.features = (GPLAYCORE_FEATURE_AUTO_BUFFERING|GPLAYCORE_FEATURE_AUTO_REDIRECT_URI);
     config.timeout_second = GPLAYCORE_DEFAULT_TIMEOUT_SECOND;
+    config.text_sink_name = "fakesink";
     
     opt->info_interval_in_sec = 1;
 

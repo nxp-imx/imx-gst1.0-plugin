@@ -53,11 +53,14 @@
 #define VIDEO_ROTATE "rotate"
 #define VIDEO_CONFIG "reconfig"
 
+fsl_player_s8* filename2uri(fsl_player_s8* uri, fsl_player_s8* fn);
+
 // internal structure
 typedef struct
 {
     GstElement *video_sink;
     GstElement *audio_sink;
+    GstElement *text_sink;
     GstElement *visual;
     GstElement* playbin;
     GMainLoop* g_main_loop;
@@ -802,7 +805,18 @@ fsl_player_handle fsl_player_init(fsl_player_config * config)
         pproperty->audio_sink = gst_parse_bin_from_description(config->audio_sink_name, TRUE, NULL);
     }
 
-    
+    if (config->text_sink_name) {
+        g_print("Generate TextSink %s\n", config->text_sink_name);
+        pproperty->text_sink = gst_parse_launch(config->text_sink_name, NULL);
+    }
+
+    if (config->suburi) {
+        fsl_player_s8 uri_buffer[512];
+        filename2uri(uri_buffer,config->suburi);
+        g_object_set(G_OBJECT(pproperty->playbin), "suburi", (gchar*)uri_buffer, NULL);
+        g_print("%s(): suburi=%s\n", __FUNCTION__, uri_buffer);
+    }
+
     if (config->visual_name){
         g_print("Generate visualization %s\n", config->visual_name);
         pproperty->visual = gst_parse_launch(config->visual_name, NULL);
@@ -864,6 +878,10 @@ fsl_player_handle fsl_player_init(fsl_player_config * config)
         g_object_set(pproperty->playbin, "audio-sink", pproperty->audio_sink, NULL);
     }
     
+    if (pproperty->text_sink){
+        g_object_set(pproperty->playbin, "text-sink", pproperty->text_sink, NULL);
+    }
+
     if (pproperty->visual){
         g_object_set(pproperty->playbin, "vis-plugin", pproperty->visual, NULL);
     }

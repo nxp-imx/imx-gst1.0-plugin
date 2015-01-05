@@ -261,8 +261,9 @@ typedef struct{
     
     char * video_sink_name;
     char * audio_sink_name;
-    
+    char * text_sink_name;
     char * visual_name;
+    char * suburi;
     
     /* signal handers and property only take effect when video sink is specifics */
     fsl_player_element_property * ele_properties;
