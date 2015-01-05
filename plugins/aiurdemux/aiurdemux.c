@@ -2660,18 +2660,29 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
       goto beach;
     } else if (PARSER_NOT_READY == parser_ret && stream->type == MEDIA_TEXT) {
       GST_WARNING ("read track not ready, track_idx %d", *track_idx);
-
-      if (stream->new_segment) {
-        // send a fake buffer for prerolling
-        stream->buffer = gst_buffer_new_allocate(NULL, 2, NULL);
-        if (stream->buffer) {
-          GstMapInfo info;
-          gst_buffer_map (stream->buffer, &info, GST_MAP_WRITE);
-          memset (info.data, 0, info.size);
-          gst_buffer_unmap (stream->buffer, &info);
-          GST_WARNING ("send fake text buffer");
+      int n;
+      gint64 min_time = G_MAXINT64;
+      for (n = 0; n < demux->n_streams; n++) {
+        if (!demux->streams[n]->valid || demux->streams[n]->type == MEDIA_TEXT) {
+          continue;
         }
-        stream->sample_stat.start = stream->time_position;
+
+        if (GST_CLOCK_TIME_IS_VALID(demux->streams[n]->last_stop) &&
+            demux->streams[n]->last_stop < min_time) {
+          min_time = demux->streams[n]->last_stop;
+        }
+      }
+
+      if (GST_CLOCK_TIME_IS_VALID(stream->last_stop) &&
+          stream->last_stop + GST_SECOND <= min_time) {
+        GstEvent *gap = gst_event_new_gap (stream->last_stop, GST_SECOND);
+        stream->last_start = stream->last_stop;
+        stream->last_stop += GST_SECOND;
+
+        gst_pad_push_event (stream->pad, gap);
+        GST_INFO ("TEXT GAP event sent %d, time_position=%lld, "
+            "last_start=%lld, last_stop=%lld\n", *track_idx,
+            stream->time_position, stream->last_start, stream->last_stop);
       }
 
       goto readend;
