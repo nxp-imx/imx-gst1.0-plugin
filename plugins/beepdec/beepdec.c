@@ -785,6 +785,7 @@ begin:
         } else if(core_ret==ACODEC_INIT_ERR){
             /* ACODEC_INIT_ERR is a fatal error, no need to try decoding again. */
             ret = GST_FLOW_EOS;
+            gst_pad_push_event (dec->srcpad, gst_event_new_eos ());
             GST_ERROR("core ret = ACODEC_INIT_ERR\n", core_ret);
             goto bail;
         }
@@ -847,8 +848,10 @@ begin:
         GST_LOG_OBJECT (beepdec,"beep_dec_parse_and_decode ret=%x",ret);
     }
 
-    if(beepdec->err_cnt > MAX_PROFILE_ERROR_COUNT)
+    if(beepdec->err_cnt > MAX_PROFILE_ERROR_COUNT) {
+        gst_pad_push_event (dec->srcpad, gst_event_new_eos ());
         ret = GST_FLOW_EOS;
+    }
 
 bail:
     return ret;
