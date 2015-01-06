@@ -20,6 +20,8 @@
 #include <string.h>
 #include "aiurcontent.h"
 
+GST_DEBUG_CATEGORY_EXTERN (aiurdemux_debug);
+#define GST_CAT_DEFAULT aiurdemux_debug
 
 typedef struct{
   const gchar *protocol;
@@ -338,6 +340,8 @@ int32
 aiurcontent_callback_seek_push (FslFileHandle handle, int64 offset,
     int32 whence, void *context)
 {
+
+  GST_DEBUG ("seek to %lld", offset);
 
   if (handle) {
     AiurDemuxContentDesc *content = (AiurDemuxContentDesc *) handle;

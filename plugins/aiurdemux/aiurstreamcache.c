@@ -34,6 +34,8 @@
  *
  */
 
+GST_DEBUG_CATEGORY_EXTERN (aiurdemux_debug);
+#define GST_CAT_DEFAULT aiurdemux_debug
 
 #include "aiurstreamcache.h"
 
