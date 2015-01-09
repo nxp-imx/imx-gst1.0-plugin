@@ -134,8 +134,6 @@ static gint imx_ipu_close(ImxVideoProcessDevice *device)
   if (device) {
     ImxVpDeviceIpu *ipu = (ImxVpDeviceIpu *) (device->priv);
     if (ipu) {
-      close(ipu->ipu_fd);
-      g_slice_free1(sizeof(ImxVpDeviceIpu), ipu);
       if (ipu->vdi.vaddr) {
         dma_addr_t mem = (dma_addr_t)(ipu->vdi.paddr);
         munmap(ipu->vdi.vaddr, ipu->vdi.size);
@@ -147,6 +145,8 @@ static gint imx_ipu_close(ImxVideoProcessDevice *device)
         ipu->vdi.paddr = NULL;
         ipu->vdi.size = 0;
       }
+      close(ipu->ipu_fd);
+      g_slice_free1(sizeof(ImxVpDeviceIpu), ipu);
       device->priv = NULL;
     }
   }
