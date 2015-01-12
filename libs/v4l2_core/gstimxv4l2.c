@@ -115,6 +115,7 @@ typedef struct {
   guint alpha;
   guint color_key;
   IMXV4l2Rect overlay;
+  gboolean pending_close;
 } IMXV4l2Handle;
 
 typedef struct {
@@ -1088,12 +1089,17 @@ gint gst_imx_v4l2_close_device (gpointer v4l2handle)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
 
-  if (handle && handle->v4l2_fd) {
-    close (handle->v4l2_fd);
-    handle->v4l2_fd = 0;
+  if (handle) {
+    if (handle->allocated) {
+      handle->pending_close = TRUE;
+    } else {
+      if (handle->v4l2_fd) {
+        close (handle->v4l2_fd);
+        handle->v4l2_fd = 0;
+      }
+      g_slice_free1 (sizeof(IMXV4l2Handle), handle);
+    }
   }
-
-  g_slice_free1 (sizeof(IMXV4l2Handle), handle);
 
   return 0;
 }
@@ -1518,6 +1524,15 @@ gint gst_imx_v4l2_free_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
     handle->allocated = 0;
   }
 
+  if (handle->allocated == 0 && handle->pending_close) {
+    handle->pending_close = FALSE;
+    if (handle->v4l2_fd) {
+      close (handle->v4l2_fd);
+      handle->v4l2_fd = 0;
+    }
+    g_slice_free1 (sizeof(IMXV4l2Handle), handle);
+  }
+
   return 0;
 }
 
@@ -1692,10 +1707,11 @@ gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk)
   }
 
   *memblk = handle->buffer_pair[v4l2buf.index].v4l2memblk;
+
+  GST_DEBUG ("deque v4l2buffer memblk (%p), index (%d)", handle->buffer_pair[v4l2buf.index].v4l2memblk, v4l2buf.index);
+
   handle->buffer_pair[v4l2buf.index].v4l2memblk = NULL;
   handle->queued_count--;
-
-  GST_DEBUG ("deque v4l2buffer memblk (%p), index (%d)", v4l2buf.index, handle->buffer_pair[v4l2buf.index].v4l2memblk);
 
   return 0;
 }
