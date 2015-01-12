@@ -2645,7 +2645,7 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
             if(PARSER_READ_ERROR == parser_ret)
                 goto beach;
         }
-    } else if (PARSER_ERR_INVALID_MEDIA == parser_ret) {
+    } else if (PARSER_ERR_INVALID_MEDIA == parser_ret || PARSER_SEEK_ERROR == parser_ret) {
       GST_WARNING ("Movie parser interrupt, track_idx %d, error = %d",
           *track_idx, parser_ret);
       if (stream) {
