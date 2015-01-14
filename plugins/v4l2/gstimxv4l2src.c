@@ -26,7 +26,7 @@ GST_DEBUG_CATEGORY (imxv4l2src_debug);
 #define GST_CAT_DEFAULT imxv4l2src_debug
 
 #define DEFAULT_DEVICE "/dev/video0"
-#define DEFAULT_FRAME_PLUS 1
+#define DEFAULT_FRAME_PLUS 3
 #define DEFAULT_USE_V4L2SRC_MEMORY TRUE
 #define DEFAULT_FRAMES_IN_V4L2_CAPTURE 3
 
@@ -131,6 +131,11 @@ gst_imx_v4l2src_stop (GstBaseSrc * src)
     v4l2src->probed_caps = NULL;
   }
 
+  if (v4l2src->old_caps) {
+    gst_caps_unref (v4l2src->old_caps);
+    v4l2src->old_caps = NULL;
+  }
+
   if (v4l2src->gstbuffer_in_v4l2) {
     g_list_free (v4l2src->gstbuffer_in_v4l2);
     v4l2src->gstbuffer_in_v4l2 = NULL;
@@ -226,11 +231,11 @@ gst_imx_v4l2src_reset (GstImxV4l2Src * v4l2src)
     g_list_free (v4l2src->gstbuffer_in_v4l2);
     v4l2src->gstbuffer_in_v4l2 = NULL;
   }
+
   GST_DEBUG_OBJECT (v4l2src, "gstbuffer_in_v4l2 list free\n");
   v4l2src->stream_on = FALSE;
   v4l2src->actual_buf_cnt = 0;
   v4l2src->use_my_allocator = FALSE;
-
 
   return TRUE;
 }
@@ -243,6 +248,11 @@ gst_imx_v4l2src_set_caps (GstBaseSrc * src, GstCaps * caps)
   guint v4l2fmt;
 
   v4l2src = GST_IMX_V4L2SRC (src);
+
+  if (v4l2src->old_caps) {
+    if (gst_caps_is_equal (v4l2src->old_caps, caps))
+      return TRUE;
+  }
 
   if (!gst_video_info_from_caps (&info, caps)) {
     GST_ERROR_OBJECT (v4l2src, "invalid caps.");
@@ -273,6 +283,12 @@ gst_imx_v4l2src_set_caps (GstBaseSrc * src, GstCaps * caps)
     GST_ERROR_OBJECT (v4l2src, "gst_imx_v4l2src_reset failed.");
     return FALSE;
   }
+
+  if (v4l2src->old_caps) {
+    gst_caps_unref (v4l2src->old_caps);
+    v4l2src->old_caps = NULL;
+  }
+  v4l2src->old_caps = gst_caps_copy (caps);
 
   return TRUE;
 }
@@ -416,6 +432,15 @@ gst_imx_v4l2src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
   gboolean update_pool, update_allocator;
   GstVideoInfo vinfo;
 
+  if (v4l2src->pool){
+    gst_query_parse_allocation (query, &outcaps, NULL);
+    gst_video_info_init (&vinfo);
+    gst_video_info_from_caps (&vinfo, outcaps);
+
+    gst_query_add_allocation_pool (query, v4l2src->pool, vinfo.size, v4l2src->actual_buf_cnt, v4l2src->actual_buf_cnt);
+    return TRUE;
+  }
+
   v4l2src->use_my_allocator = FALSE;
 
   gst_query_parse_allocation (query, &outcaps, NULL);
@@ -487,7 +512,9 @@ gst_imx_v4l2src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
 
   /* now configure */
   config = gst_buffer_pool_get_config (pool);
-  if (gst_query_find_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL)) {
+
+  if (!gst_buffer_pool_config_has_option (config, \
+        GST_BUFFER_POOL_OPTION_VIDEO_META)) {
     gst_buffer_pool_config_add_option (config,
         GST_BUFFER_POOL_OPTION_VIDEO_META);
   }
@@ -551,6 +578,7 @@ gst_imx_v4l2src_acquire_buffer (GstImxV4l2Src * v4l2src, GstBuffer ** buf)
 {
   GstFlowReturn ret = GST_FLOW_OK;
   GstVideoFrameFlags flags = GST_VIDEO_FRAME_FLAG_NONE;
+  GstVideoMeta *vmeta;
   gint buffer_count;
 
   if (v4l2src->stream_on == FALSE) {
@@ -585,12 +613,33 @@ gst_imx_v4l2src_acquire_buffer (GstImxV4l2Src * v4l2src, GstBuffer ** buf)
         v4l2src->gstbuffer_in_v4l2, buffer);
   }
  
-  if (gst_imx_v4l2_dequeue_gstbuffer (v4l2src->v4l2handle, buf) < 0) {
+  if (gst_imx_v4l2_dequeue_gstbuffer (v4l2src->v4l2handle, buf, &flags) < 0) {
     GST_ERROR_OBJECT (v4l2src, "Dequeue buffer failed.");
     return GST_FLOW_ERROR;
   }
   v4l2src->gstbuffer_in_v4l2 = g_list_remove ( \
       v4l2src->gstbuffer_in_v4l2, *buf);
+
+  vmeta = gst_buffer_get_video_meta (*buf);
+  /* If the buffer pool didn't add the meta already
+   * we add it ourselves here */
+  if (!vmeta) {
+    GstVideoInfo info;
+
+    if (!gst_video_info_from_caps (&info, v4l2src->old_caps)) {
+      GST_ERROR_OBJECT (v4l2src, "invalid caps.");
+      return GST_FLOW_ERROR;
+    }
+
+    vmeta = gst_buffer_add_video_meta (*buf, \
+        GST_VIDEO_FRAME_FLAG_NONE, \
+        GST_VIDEO_INFO_FORMAT (&info), \
+        v4l2src->w, \
+        v4l2src->h);
+  }
+
+  vmeta->flags = flags;
+  GST_DEBUG_OBJECT(v4l2src, "field type: %d\n", flags);
 
   return ret;
 }
@@ -782,6 +831,7 @@ gst_imx_v4l2src_init (GstImxV4l2Src * v4l2src)
   v4l2src->frame_plus = DEFAULT_FRAME_PLUS;
   v4l2src->v4l2handle = NULL;
   v4l2src->probed_caps = NULL;
+  v4l2src->old_caps = NULL;
   v4l2src->pool = NULL;
   v4l2src->allocator = NULL;
   v4l2src->gstbuffer_in_v4l2 = NULL;

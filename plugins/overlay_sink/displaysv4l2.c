@@ -331,6 +331,7 @@ gint clear_display (gpointer display)
 gint get_next_display_buffer (gpointer display, SurfaceBuffer *buffer)
 {
   DisplayHandle *hdisplay = (DisplayHandle*) display;
+  GstVideoFrameFlags flags = GST_VIDEO_FRAME_FLAG_NONE;
   PhyMemBlock *memblk = NULL;
   gint index;
 
@@ -339,7 +340,7 @@ gint get_next_display_buffer (gpointer display, SurfaceBuffer *buffer)
     hdisplay->first_request ++;
   }
   else {
-    if (gst_imx_v4l2_dequeue_v4l2memblk (hdisplay->v4l2handle, &memblk) < 0) {
+    if (gst_imx_v4l2_dequeue_v4l2memblk (hdisplay->v4l2handle, &memblk, &flags) < 0) {
       GST_ERROR ("get buffer from %s failed.", hdisplay->device);
       return -1;
     } 

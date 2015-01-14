@@ -719,7 +719,7 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
   v4l2sink->frame_showed ++;
 
   buffer = NULL;
-  if (gst_imx_v4l2_dequeue_gstbuffer (v4l2sink->v4l2handle, &buffer) < 0) {
+  if (gst_imx_v4l2_dequeue_gstbuffer (v4l2sink->v4l2handle, &buffer, &flags) < 0) {
     GST_ERROR_OBJECT (v4l2sink, "Dequeue buffer failed.");
     return GST_FLOW_ERROR;
   }

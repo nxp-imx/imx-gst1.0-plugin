@@ -47,7 +47,8 @@ struct _GstImxV4l2Src {
   GstAllocator *allocator;
   gpointer v4l2handle;
   GstCaps *probed_caps;
-	GList * gstbuffer_in_v4l2;
+  GstCaps *old_caps;
+  GList * gstbuffer_in_v4l2;
   guint w, h, fps_n, fps_d;
   guint v4l2fmt;
   guint actual_buf_cnt;

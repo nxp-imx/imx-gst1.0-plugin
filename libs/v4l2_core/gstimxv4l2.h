@@ -52,8 +52,8 @@ gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk);
 gint gst_imx_v4l2_register_buffer (gpointer v4l2handle, PhyMemBlock *memblk);
 gint gst_imx_v4l2_free_buffer (gpointer v4l2handle, PhyMemBlock *memblk);
 gint gst_imx_v4l2_queue_v4l2memblk (gpointer v4l2handle, PhyMemBlock *memblk, GstVideoFrameFlags flags);
-gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk);
+gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk, GstVideoFrameFlags * flags);
 gint gst_imx_v4l2_queue_gstbuffer (gpointer v4l2handle, GstBuffer *buffer, GstVideoFrameFlags flags);
-gint gst_imx_v4l2_dequeue_gstbuffer (gpointer v4l2handle, GstBuffer **buffer);
+gint gst_imx_v4l2_dequeue_gstbuffer (gpointer v4l2handle, GstBuffer **buffer, GstVideoFrameFlags * flags);
 
 #endif

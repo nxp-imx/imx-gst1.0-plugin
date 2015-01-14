@@ -19,7 +19,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
- #include <unistd.h>
+#include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <string.h>
@@ -109,8 +109,10 @@ typedef struct {
   IMXV4l2BufferPair buffer_pair[MAX_BUFFER];
   gint rotate;
   guint *support_format_table;
+  gboolean is_tvin;
   IMXV4l2DeviceItf dev_itf;
   struct v4l2_buffer * v4lbuf_queued_before_streamon[MAX_BUFFER];
+  v4l2_std_id id;
   gboolean prev_need_crop;
   guint alpha;
   guint color_key;
@@ -641,6 +643,8 @@ gst_imx_v4l2_get_caps (gpointer v4l2handle)
                       gst_structure_set (structure, "height", G_TYPE_INT, frmsize.discrete.height, NULL);
                       gst_structure_set (structure, "framerate", GST_TYPE_FRACTION, \
                           frmival.discrete.denominator, frmival.discrete.numerator, NULL);
+                      if (handle->is_tvin)
+                        gst_structure_set (structure, "interlace-mode", G_TYPE_STRING, "interleaved", NULL);
                       gst_caps_append_structure (caps, structure);
                       GST_INFO ("Added one caps\n");
                     }
@@ -856,14 +860,12 @@ gst_imx_v4l2capture_config_camera (IMXV4l2Handle *handle, guint fmt, guint w, gu
 static gint 
 gst_imx_v4l2capture_config_tvin_std (IMXV4l2Handle *handle)
 {
-  v4l2_std_id id;
-
-  if (ioctl (handle->v4l2_fd, VIDIOC_G_STD, &id) < 0) {
+  if (ioctl (handle->v4l2_fd, VIDIOC_G_STD, &handle->id) < 0) {
     GST_ERROR ("VIDIOC_G_STD failed\n");
     return -1;
   }
 
-  if (ioctl (handle->v4l2_fd, VIDIOC_S_STD, &id) < 0) {
+  if (ioctl (handle->v4l2_fd, VIDIOC_S_STD, &handle->id) < 0) {
     GST_ERROR ("VIDIOC_S_STD failed\n");
     return -1;
   }
@@ -886,6 +888,7 @@ gst_imx_v4l2capture_set_function (IMXV4l2Handle *handle)
     return -1;
   }
 
+  handle->is_tvin = FALSE;
   if (!strcmp (cap.driver, MXC_V4L2_CAPTURE_NAME)) {
     struct v4l2_dbg_chip_ident chip;
     if (ioctl(handle->v4l2_fd, VIDIOC_DBG_G_CHIP_IDENT, &chip)) {
@@ -900,6 +903,7 @@ gst_imx_v4l2capture_set_function (IMXV4l2Handle *handle)
     } else if (!strncmp (chip.match.name, MXC_V4L2_CAPTURE_TVIN_NAME, 3)) {
       handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_camera;
       handle->support_format_table = g_camera_format_IPU;
+      handle->is_tvin = TRUE;
       if (gst_imx_v4l2capture_config_tvin_std (handle)) {
         GST_ERROR ("can't set TV-In STD.\n");
         return -1;
@@ -922,6 +926,7 @@ gst_imx_v4l2capture_set_function (IMXV4l2Handle *handle)
     } else if (!strncmp (chip.match.name, MXC_V4L2_CAPTURE_TVIN_VADC_NAME, 3)) {
       handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_camera;
       handle->support_format_table = g_camera_format_PXP;
+      handle->is_tvin = TRUE;
       if (gst_imx_v4l2capture_config_tvin_std (handle)) {
         GST_ERROR ("can't set TV-In STD.\n");
         return -1;
@@ -1687,7 +1692,8 @@ gint gst_imx_v4l2_queue_gstbuffer (gpointer v4l2handle, GstBuffer *buffer, GstVi
 #define TRY_INTERVAL (10000) //10ms
 #define MAX_TRY_CNT (TRY_TIMEOUT/TRY_INTERVAL)
 
-gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk)
+gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk, 
+    GstVideoFrameFlags * flags)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
   struct v4l2_buffer v4l2buf;
@@ -1713,6 +1719,26 @@ gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk)
     usleep (TRY_INTERVAL);
   }
 
+  if (v4l2buf.field == V4L2_FIELD_INTERLACED) {
+    if (handle->id == V4L2_STD_NTSC) {
+      v4l2buf.field = V4L2_FIELD_INTERLACED_BT;
+    } else {
+      v4l2buf.field = V4L2_FIELD_INTERLACED_TB;
+    }
+  }
+
+  /* set field info */
+  switch (v4l2buf.field) {
+    case V4L2_FIELD_NONE: *flags = GST_VIDEO_FRAME_FLAG_NONE; break;
+    case V4L2_FIELD_TOP: *flags = 
+           GST_VIDEO_FRAME_FLAG_ONEFIELD | GST_VIDEO_FRAME_FLAG_TFF; break;
+    case V4L2_FIELD_BOTTOM: *flags = GST_VIDEO_FRAME_FLAG_ONEFIELD; break;
+    case V4L2_FIELD_INTERLACED_TB: *flags = 
+           GST_VIDEO_FRAME_FLAG_INTERLACED | GST_VIDEO_FRAME_FLAG_TFF; break;
+    case V4L2_FIELD_INTERLACED_BT: *flags = GST_VIDEO_FRAME_FLAG_INTERLACED; break;
+    default: GST_WARNING("unknown field type"); break;
+  }
+
   *memblk = handle->buffer_pair[v4l2buf.index].v4l2memblk;
 
   GST_DEBUG ("deque v4l2buffer memblk (%p), paddr(%p), index (%d)",
@@ -1721,10 +1747,14 @@ gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk)
   handle->buffer_pair[v4l2buf.index].v4l2memblk = NULL;
   handle->queued_count--;
 
+  GST_DEBUG ("deque v4l2buffer memblk (%p), index (%d), flags (%d)",
+      v4l2buf.index, handle->buffer_pair[v4l2buf.index].v4l2memblk, *flags);
+
   return 0;
 }
 
-gint gst_imx_v4l2_dequeue_gstbuffer (gpointer v4l2handle, GstBuffer **buffer)
+gint gst_imx_v4l2_dequeue_gstbuffer (gpointer v4l2handle, GstBuffer **buffer, 
+    GstVideoFrameFlags * flags)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
   PhyMemBlock *memblk = NULL;
@@ -1734,7 +1764,7 @@ gint gst_imx_v4l2_dequeue_gstbuffer (gpointer v4l2handle, GstBuffer **buffer)
     return 0;
   }
 
-  if (gst_imx_v4l2_dequeue_v4l2memblk (handle, &memblk) < 0) {
+  if (gst_imx_v4l2_dequeue_v4l2memblk (handle, &memblk, flags) < 0) {
     GST_ERROR ("dequeue memblk failed.");
     return -1;
   }
