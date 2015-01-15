@@ -333,7 +333,7 @@ tryseek:
 
 
   if (addr < cache->start) {    /* left */
-    GST_ERROR ("Unexpect backward seek addr %lld, cachestart %lld, offset %lld",
+    GST_DEBUG ("Flush cache, backward seek addr %lld, cachestart %lld, offset %lld",
         addr, cache->start, cache->offset);
     isfail = 1;
     goto trysendseek;
