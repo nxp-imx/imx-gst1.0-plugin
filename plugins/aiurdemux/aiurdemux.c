@@ -2675,6 +2675,11 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
 
       if (GST_CLOCK_TIME_IS_VALID(stream->last_stop) &&
           stream->last_stop + GST_SECOND <= min_time) {
+        if (stream->new_segment) {
+          aiurdemux_send_stream_newsegment (demux, stream);
+        }
+
+        //gint64 gap_dur = min_time - stream->last_stop;
         GstEvent *gap = gst_event_new_gap (stream->last_stop, GST_SECOND);
         stream->last_start = stream->last_stop;
         stream->last_stop += GST_SECOND;
