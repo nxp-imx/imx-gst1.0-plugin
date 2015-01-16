@@ -90,6 +90,7 @@ struct _GstBeepDec
     gboolean set_codec_data;
     gint frame_cnt;
     gint in_cnt;
+    gboolean eos_sent;
 };
 
 struct _GstBeepDecClass

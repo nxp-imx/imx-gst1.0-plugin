@@ -15,7 +15,7 @@
 */
 
 /*
- * Copyright (c) 2011-2014, Freescale Semiconductor, Inc. All rights reserved. 
+ * Copyright (c) 2011-2014, Freescale Semiconductor, Inc. All rights reserved.
  *
  */
 
@@ -192,12 +192,12 @@ gst_beep_dec_class_init (GstBeepDecClass * klass)
     base_class->handle_frame = GST_DEBUG_FUNCPTR (beep_dec_handle_frame);
     //base_class->parse = GST_DEBUG_FUNCPTR (beep_dec_parse_and_decode);
     base_class->flush = GST_DEBUG_FUNCPTR (beep_dec_flush);
-    
+
     gst_element_class_set_static_metadata (gstelement_class, "Beep universal decoder",
         "Codec/Decoder/Audio",
         "Decode compressed audio to raw data",
         "FreeScale Multimedia Team <shamm@freescale.com>");
-    
+
     GST_DEBUG_CATEGORY_INIT (beep_dec_debug, "beepdec", 0, "beepdec plugin");
     GST_LOG("gst_beep_dec_class_init \n");
 }
@@ -320,12 +320,12 @@ static gboolean beep_dec_set_init_parameter(GstBeepDec * beep_dec,
             parameter.version = intvalue;
             IDecoder->setDecoderPara(handle, UNIA_WMA_VERSION, &parameter);
         }
-        
+
         value = gst_structure_get_value (structure, "codec_data");
         if (value) {
             GstBuffer *codec_data = gst_value_get_buffer (value);
             GstMapInfo map;
-            
+
             if ((codec_data) && gst_buffer_get_size (codec_data)) {
                 gst_buffer_map(codec_data, &map, GST_MAP_READ);
                 GST_INFO ("Set codec_data %" GST_PTR_FORMAT, codec_data);
@@ -342,7 +342,7 @@ static gboolean beep_dec_set_init_parameter(GstBeepDec * beep_dec,
             GST_INFO ("Set stream_type %s", stream_format);
             if(g_strcmp0(stream_format, "adts") == 0) {
                 parameter.stream_type = STREAM_ADTS;
-            } 
+            }
             else if(g_strcmp0(stream_format, "adif") == 0) {
                 parameter.stream_type = STREAM_ADIF;
             }
@@ -418,7 +418,7 @@ static gboolean beep_dec_set_format(GstAudioDecoder *dec, GstCaps *caps)
             break;
 
         ret = beep_dec_set_init_parameter(beepdec,caps);
-        
+
     }while(0);
 
     if (ret == FALSE && beepdec->handle) {
@@ -447,9 +447,10 @@ static gboolean beep_dec_start (GstAudioDecoder * dec)
     beepdec->frame_cnt = 0;
     beepdec->set_codec_data = FALSE;
     beepdec->in_cnt = 0;
-    
+    beepdec->eos_sent = FALSE;
+
     gst_audio_decoder_set_estimate_rate(dec, TRUE);
-    
+
 
     GST_LOG_OBJECT (beepdec,"beep_dec_start called ");
 
@@ -502,7 +503,7 @@ static gboolean beep_dec_map_channel_layout(UniAcodecOutputPCMFormat * outputVal
         pos[0] = GST_AUDIO_CHANNEL_POSITION_MONO;
         return TRUE;
     }
-    
+
     if(nChannels == 2){
         pos[0] = GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT;
         pos[1] = GST_AUDIO_CHANNEL_POSITION_FRONT_RIGHT;
@@ -510,7 +511,7 @@ static gboolean beep_dec_map_channel_layout(UniAcodecOutputPCMFormat * outputVal
     }
 
     for( i = 0; i < nChannels; i++){
-        
+
         switch(outputValue->layout[i]){
             case UA_CHANNEL_FRONT_LEFT:
                 pos[i] = GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT;
@@ -574,7 +575,7 @@ static void beep_dec_handle_output_changed(GstBeepDec *beepdec)
         if(!IDecoder || !handle){
             break;
         }
-        
+
         IDecoder->getDecoderPara(handle,UNIA_OUTPUT_PCM_FORMAT,&parameter);
 
         if (!memcmp (&parameter.outputFormat, &beepdec->outputformat,
@@ -594,7 +595,7 @@ static void beep_dec_handle_output_changed(GstBeepDec *beepdec)
 
         if(beepdec->core_layout != NULL)
             g_free(beepdec->core_layout);
-        
+
         if(beepdec->out_layout != NULL)
             g_free(beepdec->out_layout);
 
@@ -690,10 +691,10 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
     gboolean sent = FALSE;
     if(!beepdec)
         goto bail;
-    
+
     IDecoder = beepdec->beep_interface;
     handle = beepdec->handle;
-    
+
     if(!IDecoder || !handle){
         ret = GST_FLOW_FLUSHING;
         goto bail;
@@ -706,7 +707,7 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
         //return if in this case.
         if(beepdec->in_cnt > 0)
             goto begin;
-        else 
+        else
             goto bail;
     }
 
@@ -719,7 +720,7 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
 
     GST_LOG_OBJECT (beepdec,"handle_frame [%d] BEGIN size=%d",beepdec->in_cnt,inbuf_size);
 
-    
+
     if(!strcmp(IDecoder->name,"mp3"))
         twice = TRUE;
 
@@ -760,7 +761,9 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
 begin:
 
     do{
-
+        if (beepdec->eos_sent == TRUE) {
+          break;
+        }
         outbuf = NULL;
         out_size = 0;
         core_ret = IDecoder->decode(handle,inbuf,inbuf_size,&offset,&outbuf,&out_size);
@@ -785,13 +788,14 @@ begin:
         } else if(core_ret==ACODEC_INIT_ERR){
             /* ACODEC_INIT_ERR is a fatal error, no need to try decoding again. */
             ret = GST_FLOW_EOS;
+            beepdec->eos_sent = TRUE;
             gst_pad_push_event (dec->srcpad, gst_event_new_eos ());
             GST_ERROR("core ret = ACODEC_INIT_ERR\n", core_ret);
             goto bail;
         }
-        
+
         status = core_ret & CORE_STATUS_MASK;
-        
+
         if (status == ACODEC_CAPIBILITY_CHANGE) {
             beep_dec_handle_output_changed(beepdec);
         }
@@ -843,13 +847,14 @@ begin:
         GST_LOG_OBJECT (beepdec,"output frames[%d] size=%d",beepdec->in_cnt,adapter_size);
     }else if (sent == FALSE && (!strcmp(IDecoder->name,"wma") ) ){
         beepdec->in_cnt--;
-        gst_audio_decoder_finish_frame (dec, NULL, 1); 
+        gst_audio_decoder_finish_frame (dec, NULL, 1);
         sent=TRUE;
         GST_LOG_OBJECT (beepdec,"beep_dec_parse_and_decode ret=%x",ret);
     }
 
     if(beepdec->err_cnt > MAX_PROFILE_ERROR_COUNT) {
         gst_pad_push_event (dec->srcpad, gst_event_new_eos ());
+        beepdec->eos_sent = TRUE;
         ret = GST_FLOW_EOS;
     }
 
@@ -869,6 +874,7 @@ static void beep_dec_flush (GstAudioDecoder * dec, gboolean hard)
         }
     }
     beepdec->in_cnt = 0;
+    beepdec->eos_sent = FALSE;
 
     GST_LOG_OBJECT (beepdec,"beep_dec_flush called ");
 }
