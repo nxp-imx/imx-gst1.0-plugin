@@ -288,7 +288,7 @@ imx_ipu_v4l2_config_alpha (IMXV4l2Handle *handle, guint alpha)
   galpha.alpha = alpha;
   galpha.enable = 1;
   if (ioctl(fd, MXCFB_SET_GBL_ALPHA, &galpha) < 0) {
-    GST_ERROR ("Set %s global alpha failed.", alpha);
+    GST_WARNING ("Set %d global alpha failed.", alpha);
   }
 
   close (fd);
@@ -331,7 +331,7 @@ imx_ipu_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint colo
   }
 
   if (ioctl (fd, MXCFB_SET_CLR_KEY, &colorKey) < 0) {
-    GST_ERROR ("Set %s color key failed.", device);
+    GST_WARNING ("Set %s color key failed.", device);
   }
 
   close (fd);
