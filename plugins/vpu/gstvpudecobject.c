@@ -1085,7 +1085,7 @@ gst_vpu_dec_object_set_vpu_input_buf (GstVpuDecObject * vpu_dec_object, \
   vpu_buffer_node->nSize = minfo.size;
   vpu_buffer_node->pPhyAddr = NULL;
   vpu_buffer_node->pVirAddr = minfo.data;
-  if (vpu_dec_object->input_state->codec_data) {
+  if (vpu_dec_object->input_state && vpu_dec_object->input_state->codec_data) {
     GstBuffer *buffer2 = vpu_dec_object->input_state->codec_data;
     GstMapInfo minfo2;
     gst_buffer_map (buffer2, &minfo2, GST_MAP_READ);
