@@ -386,6 +386,25 @@ gst_overlay_sink_setup_buffer_pool (GstOverlaySink *sink, GstCaps *caps)
   }
 
   structure = gst_buffer_pool_get_config (sink->pool);
+
+  // buffer alignment configuration
+  gint w = GST_VIDEO_INFO_WIDTH (&info);
+  gint h = GST_VIDEO_INFO_HEIGHT (&info);
+  if (!ISALIGNED (w, ALIGNMENT) || !ISALIGNED (h, ALIGNMENT)) {
+    GstVideoAlignment alignment;
+
+    memset (&alignment, 0, sizeof (GstVideoAlignment));
+    alignment.padding_right = ALIGNTO (w, ALIGNMENT) - w;
+    alignment.padding_bottom = ALIGNTO (h, ALIGNMENT) - h;
+
+    GST_DEBUG ("align buffer pool, w(%d) h(%d), padding_right (%d), padding_bottom (%d)",
+        w, h, alignment.padding_right, alignment.padding_bottom);
+
+    gst_buffer_pool_config_add_option (structure, GST_BUFFER_POOL_OPTION_VIDEO_META);
+    gst_buffer_pool_config_add_option (structure, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
+    gst_buffer_pool_config_set_video_alignment (structure, &alignment);
+  }
+
   gst_buffer_pool_config_set_params (structure, caps, info.size, sink->min_buffers, sink->max_buffers);
   gst_buffer_pool_config_set_allocator (structure, sink->allocator, NULL);
   if (!gst_buffer_pool_set_config (sink->pool, structure)) {
@@ -433,7 +452,7 @@ gst_overlay_sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
     if (sink->disp_on[i]) {
       gst_overlay_sink_output_config (sink, i);
       if (sink->hoverlay[i] == NULL) {
-        sink->hoverlay[i] = osink_object_create_overlay (sink->osink_obj, i, &sink->surface_info);
+        sink->hoverlay[i] = (gpointer)osink_object_create_overlay (sink->osink_obj, i, &sink->surface_info);
         if (!sink->hoverlay[i]) {
           GST_ERROR_OBJECT (sink, "create overlay for display %s failed.", sink->disp_info[i].name);
         }
@@ -491,7 +510,7 @@ gst_overlay_sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
   gst_structure_free (config);
 
   sink->pool_alignment_checked = FALSE;
-  sink->self_pool_configed = FALSE;
+  sink->no_phy_buffer = FALSE;
 
   GST_DEBUG_OBJECT (sink, "propose_allocation, pool(%p).", sink->pool);
 
@@ -541,30 +560,38 @@ gst_overlay_sink_input_config (GstOverlaySink *sink)
 }
 
 static gint
-gst_overlay_sink_check_alignment (GstOverlaySink *sink) 
+gst_overlay_sink_check_alignment (GstOverlaySink *sink, GstBuffer *buffer)
 {
-  if (sink->pool && gst_buffer_pool_is_active (sink->pool)
-      && !sink->pool_alignment_checked) {
-    GstStructure *config;
-    config = gst_buffer_pool_get_config (sink->pool);
+  if (!sink->pool_alignment_checked) {
+    if (!sink->no_phy_buffer && !gst_buffer_pool_is_active (sink->pool)) {
+      GstPhyMemMeta *phymemmeta = NULL;
+      memset (&sink->video_align, 0, sizeof(GstVideoAlignment));
 
-    // check if has alignment option setted.
-    memset (&sink->video_align, 0, sizeof(GstVideoAlignment));
-    if (gst_buffer_pool_config_has_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
-      gst_buffer_pool_config_get_video_alignment (config, &sink->video_align);
-      GST_DEBUG_OBJECT (sink, "pool has alignment (%d, %d) , (%d, %d)", 
-          sink->video_align.padding_left, sink->video_align.padding_top,
-          sink->video_align.padding_right, sink->video_align.padding_bottom);
+      phymemmeta = GST_PHY_MEM_META_GET (buffer);
+      if (phymemmeta) {
+        sink->video_align.padding_right = phymemmeta->x_padding;
+        sink->video_align.padding_bottom = phymemmeta->y_padding;
+        GST_DEBUG_OBJECT (sink, "physical memory meta x_padding: %d y_padding: %d",
+            phymemmeta->x_padding, phymemmeta->y_padding);
+      }
+    } else {
+      GstStructure *config;
+      config = gst_buffer_pool_get_config (sink->pool);
+
+      // check if has alignment option setted.
+      memset (&sink->video_align, 0, sizeof(GstVideoAlignment));
+      if (gst_buffer_pool_config_has_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
+        gst_buffer_pool_config_get_video_alignment (config, &sink->video_align);
+        GST_DEBUG_OBJECT (sink, "pool has alignment (%d, %d) , (%d, %d)",
+            sink->video_align.padding_left, sink->video_align.padding_top,
+            sink->video_align.padding_right, sink->video_align.padding_bottom);
+      }
+      gst_structure_free (config);
     }
+
     sink->pool_alignment_checked = TRUE;
-    gst_structure_free (config);
+    gst_overlay_sink_input_config (sink);
   }
-
-  GST_DEBUG_OBJECT (sink, "pool has alignment (%d, %d) , (%d, %d)", 
-      sink->video_align.padding_left, sink->video_align.padding_top,
-      sink->video_align.padding_right, sink->video_align.padding_bottom);
-
-  gst_overlay_sink_input_config (sink);
 
   return 0;
 }
@@ -590,36 +617,12 @@ gst_overlay_sink_get_surface_buffer (GstBuffer *gstbuffer, SurfaceBuffer *surfac
   return 0;
 }
 
-static void
-gst_overlay_sink_config_buffer_pool_alignment (GstBufferPool *pool, gint w, gint h)
-{
-  GstStructure *config;
-  GstVideoAlignment alignment;
-
-  GST_DEBUG ("align buffer pool, w(%d) h(%d)", w, h);
-
-  memset (&alignment, 0, sizeof (GstVideoAlignment));
-  alignment.padding_right = ALIGNTO (w, ALIGNMENT) - w;
-  alignment.padding_bottom = ALIGNTO (h, ALIGNMENT) - h;
-
-  GST_DEBUG ("padding_right (%d), padding_bottom (%d)", alignment.padding_right, alignment.padding_bottom);
-
-  config = gst_buffer_pool_get_config (pool);
-  gst_buffer_pool_config_add_option (config, GST_BUFFER_POOL_OPTION_VIDEO_META);
-  gst_buffer_pool_config_add_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
-  gst_buffer_pool_config_set_video_alignment (config, &alignment);
-  gst_buffer_pool_set_config (pool, config);
-
-  return;
-}
-
 static GstFlowReturn
 gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 {
   GstOverlaySink *sink = GST_OVERLAY_SINK (bsink);
   gboolean not_overlay_buffer = FALSE;
   GstVideoCropMeta *cropmeta = NULL;
-  GstPhyMemMeta *phymemmeta = NULL;
   GstVideoFrameFlags flags = GST_VIDEO_FRAME_FLAG_NONE;
   SurfaceBuffer surface_buffer;
   gint i;
@@ -633,35 +636,25 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
     GST_DEBUG_OBJECT (sink, "not physical buffer.");
 
-    if (!sink->pool && gst_overlay_sink_setup_buffer_pool (sink, caps) < 0)
+    if (!sink->pool && gst_overlay_sink_setup_buffer_pool (sink, caps) < 0) {
+      gst_caps_unref (caps);
       return GST_FLOW_ERROR;
-
-    gst_video_info_from_caps (&info, caps);
-    if (!sink->self_pool_configed) {
-      gint w, h;
-
-      w = GST_VIDEO_INFO_WIDTH (&info);
-      h = GST_VIDEO_INFO_HEIGHT (&info);
-      if (!ISALIGNED (w, ALIGNMENT) || !ISALIGNED (h, ALIGNMENT)) {
-        if (gst_buffer_pool_set_active (sink->pool, FALSE) != TRUE) {
-          GST_ERROR_OBJECT (sink, "de-active pool(%p) failed.", sink->pool);
-          return GST_FLOW_ERROR;
-        }
-        gst_overlay_sink_config_buffer_pool_alignment (sink->pool, w, h);
-      }
-
-      if (gst_buffer_pool_set_active (sink->pool, TRUE) != TRUE) {
-        GST_ERROR_OBJECT (sink, "active pool(%p) failed.", sink->pool);
-        return GST_FLOW_ERROR;
-      }
-      sink->self_pool_configed = TRUE;
     }
+
+    if (gst_buffer_pool_set_active (sink->pool, TRUE) != TRUE) {
+      GST_ERROR_OBJECT (sink, "active pool(%p) failed.", sink->pool);
+      gst_caps_unref (caps);
+      return GST_FLOW_ERROR;
+    }
+
     gst_buffer_pool_acquire_buffer (sink->pool, &buffer2, NULL);
     if (!buffer2) {
       GST_ERROR_OBJECT (sink, "acquire buffer from pool(%p) failed.", sink->pool);
+      gst_caps_unref (caps);
       return GST_FLOW_ERROR;
     }
 
+    gst_video_info_from_caps (&info, caps);
     gst_video_frame_map (&frame1, &info, buffer, GST_MAP_READ);
     gst_video_frame_map (&frame2, &info, buffer2, GST_MAP_WRITE);
 
@@ -672,6 +665,7 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     gst_caps_unref (caps);
 
     buffer = buffer2;
+    sink->no_phy_buffer = TRUE;
   }
   else
     gst_buffer_ref (buffer);
@@ -687,22 +681,8 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
   GST_DEBUG_OBJECT (sink, "show gstbuffer (%p), surface_buffer vaddr (%p) paddr (%p).",
       buffer, surface_buffer.vaddr, surface_buffer.paddr);
 
-  if (!sink->pool_alignment_checked) {
-    if (!sink->self_pool_configed 
-        && !gst_buffer_pool_is_active (sink->pool)) {
-      memset (&sink->video_align, 0, sizeof(GstVideoAlignment));
 
-      phymemmeta = GST_PHY_MEM_META_GET (buffer);
-      if (phymemmeta) {
-        sink->video_align.padding_right = phymemmeta->x_padding;
-        sink->video_align.padding_bottom = phymemmeta->y_padding;
-        GST_DEBUG_OBJECT (sink, "physical memory meta x_padding: %d y_padding: %d",
-            phymemmeta->x_padding, phymemmeta->y_padding);
-      }
-      sink->pool_alignment_checked = TRUE;
-    }
-    gst_overlay_sink_check_alignment (sink);
-  }
+  gst_overlay_sink_check_alignment (sink, buffer);
 
   cropmeta = gst_buffer_get_video_crop_meta (buffer);
   if ((cropmeta && gst_overlay_sink_incrop_changed_and_set (cropmeta, &sink->cropmeta))) {
@@ -749,7 +729,7 @@ gst_overlay_sink_finalize (GstOverlaySink * overlay_sink)
 static void
 gst_overlay_sink_install_properties (GObjectClass *gobject_class)
 {
-  gpointer osink_obj = osink_object_new ();
+  gpointer osink_obj = (gpointer)osink_object_new ();
   gint display_count = 0;
   gint prop, i;
   gchar *prop_name;

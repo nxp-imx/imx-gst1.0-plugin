@@ -23,6 +23,7 @@
 #include "gstimxv4l2allocator.h"
 
 #define ALIGNMENT_8 (8)
+#define ALIGNMENT_2 (2)
 #define ISALIGNED(a, b) (!(a & (b-1)))
 #define ALIGNTO(a, b) ((a + (b-1)) & (~(b-1)))
 
@@ -413,11 +414,17 @@ gst_imx_v4l2sink_setup_buffer_pool (GstImxV4l2Sink *v4l2sink, GstCaps *caps)
 {
   GstStructure *structure;
   gint size;
+  GstVideoInfo info;
   IMXV4l2AllocatorContext context;
 
   v4l2sink->pool = gst_video_buffer_pool_new ();
   if (!v4l2sink->pool) {
     GST_ERROR_OBJECT (v4l2sink, "New video buffer pool failed.\n");
+    return -1;
+  }
+
+  if (!gst_video_info_from_caps (&info, caps)) {
+    GST_ERROR_OBJECT (v4l2sink, "invalid caps.");
     return -1;
   }
 
@@ -433,6 +440,25 @@ gst_imx_v4l2sink_setup_buffer_pool (GstImxV4l2Sink *v4l2sink, GstCaps *caps)
   }
 
   structure = gst_buffer_pool_get_config (v4l2sink->pool);
+
+  // buffer alignment configuration
+  gint w = GST_VIDEO_INFO_WIDTH (&info);
+  gint h = GST_VIDEO_INFO_HEIGHT (&info);
+  if (!ISALIGNED (w, ALIGNMENT_8) || !ISALIGNED (h, ALIGNMENT_2)) {
+    GstVideoAlignment alignment;
+
+    memset (&alignment, 0, sizeof (GstVideoAlignment));
+    alignment.padding_right = ALIGNTO (w, ALIGNMENT_8) - w;
+    alignment.padding_bottom = ALIGNTO (h, ALIGNMENT_2) - h;
+
+    GST_DEBUG ("align buffer pool, w(%d) h(%d), padding_right (%d), padding_bottom (%d)",
+        w, h, alignment.padding_right, alignment.padding_bottom);
+
+    gst_buffer_pool_config_add_option (structure, GST_BUFFER_POOL_OPTION_VIDEO_META);
+    gst_buffer_pool_config_add_option (structure, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
+    gst_buffer_pool_config_set_video_alignment (structure, &alignment);
+  }
+
   size = v4l2sink->w * v4l2sink->h * gst_imx_v4l2_get_bits_per_pixel (v4l2sink->v4l2fmt) / 8;
   gst_buffer_pool_config_set_params (structure, caps, size, v4l2sink->min_buffers, v4l2sink->min_buffers);
   gst_buffer_pool_config_set_allocator (structure, v4l2sink->allocator, NULL);
@@ -607,33 +633,6 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
       return GST_FLOW_ERROR;
     }
 
-    gst_video_info_from_caps (&info, caps);
-    if (!v4l2sink->self_pool_configed) {
-      gint w = GST_VIDEO_INFO_WIDTH (&info);
-      GstVideoAlignment alignment;
-
-      if (!ISALIGNED (w, ALIGNMENT_8)) {
-        if (gst_buffer_pool_set_active (v4l2sink->pool, FALSE) != TRUE) {
-          GST_ERROR_OBJECT (v4l2sink, "de-active pool(%p) failed.", v4l2sink->pool);
-          gst_caps_unref (caps);
-          return GST_FLOW_ERROR;
-        }
-
-        memset (&alignment, 0, sizeof (GstVideoAlignment));
-        alignment.padding_right = ALIGNTO (w, ALIGNMENT_8) - w;
-
-        GST_DEBUG ("align buffer, w(%d) padding(%d)", w, alignment.padding_right);
-
-        GstStructure *config = gst_buffer_pool_get_config (v4l2sink->pool);
-        gst_buffer_pool_config_add_option (config, GST_BUFFER_POOL_OPTION_VIDEO_META);
-        gst_buffer_pool_config_add_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
-        gst_buffer_pool_config_set_video_alignment (config, &alignment);
-        gst_buffer_pool_set_config (v4l2sink->pool, config);
-      }
-
-      v4l2sink->self_pool_configed = TRUE;
-    }
-
     if (gst_buffer_pool_set_active (v4l2sink->pool, TRUE) != TRUE) {
       GST_ERROR_OBJECT (v4l2sink, "active pool(%p) failed.", v4l2sink->pool);
       gst_caps_unref (caps);
@@ -647,6 +646,7 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
       return GST_FLOW_ERROR;
     }
 
+    gst_video_info_from_caps (&info, caps);
     gst_video_frame_map (&frame1, &info, v4l2_buffer, GST_MAP_WRITE);
     gst_video_frame_map (&frame2, &info, buffer, GST_MAP_READ);
 
@@ -709,6 +709,7 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
   if (vmeta)
     flags = vmeta->flags;
+
   if (gst_imx_v4l2_queue_gstbuffer (v4l2sink->v4l2handle, buffer, flags) < 0) {
     GST_ERROR_OBJECT (v4l2sink, "Queue buffer %p failed.", buffer);
     gst_buffer_unref (buffer);

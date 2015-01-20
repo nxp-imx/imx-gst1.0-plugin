@@ -958,19 +958,19 @@ void gst_imx_v4l2_get_display_resolution (gchar *device, gint *w, gint *h)
 
   fd = open (g_device_maps[device_map_id].bg_fb_name, O_RDWR, 0);
   if (fd < 0) {
-    GST_ERROR ("Can't open %s.\n", g_device_maps[device_map_id].bg_fb_name);
+    g_print ("ERROR: Can't open %s.\n", g_device_maps[device_map_id].bg_fb_name);
     return;
   }
 
   if (ioctl (fd, FBIOGET_VSCREENINFO, &fb_var) < 0) {
-    GST_ERROR ("Can't get display resolution, use default (%dx%d).\n", DEFAULTW, DEFAULTH);
+    g_print ("ERROR: Can't get display resolution, use default (%dx%d).\n", DEFAULTW, DEFAULTH);
     close (fd);
     return;
   }
 
   *w = fb_var.xres;
   *h = fb_var.yres;
-  GST_DEBUG ("display(%s) resolution is (%dx%d).", g_device_maps[device_map_id].bg_fb_name, fb_var.xres, fb_var.yres);
+  g_print ("display(%s) resolution is (%dx%d).\n", g_device_maps[device_map_id].bg_fb_name, fb_var.xres, fb_var.yres);
 
   close (fd);
 
@@ -1157,7 +1157,7 @@ gint gst_imx_v4l2out_config_input (gpointer v4l2handle, guint fmt, guint w, guin
   memcpy (&handle->in_crop, crop, sizeof(IMXV4l2Rect));
   ret = (*handle->dev_itf.v4l2out_config_input) (handle, fmt, w, h, crop);
   if (ret == 1) {
-    GST_DEBUG ("Video is invisible as all input are cropped.");
+    GST_WARNING ("Video is invisible as all input are cropped.");
     handle->invisible |= INVISIBLE_IN;
     return 0;
   }
@@ -1467,8 +1467,8 @@ gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   }
   memblk->paddr = (guint8*) v4l2buf->m.offset;
 
-  GST_DEBUG ("Allocated v4l2buffer(%p), index(%d), vaddr(%p), paddr(%p), size(%d).",
-      v4l2buf, handle->allocated - 1, memblk->vaddr, memblk->paddr, memblk->size);
+  GST_DEBUG ("Allocated v4l2buffer(%p), index(%d), memblk(%p), vaddr(%p), paddr(%p), size(%d).",
+      v4l2buf, handle->allocated - 1, memblk, memblk->vaddr, memblk->paddr, memblk->size);
 
   return 0;
 }
@@ -1498,7 +1498,8 @@ gint gst_imx_v4l2_register_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
 
   handle->allocated ++;
 
-  GST_DEBUG ("Allocated v4l2buffer(%p), index(%d).", v4l2buf, handle->allocated - 1);
+  GST_DEBUG ("Allocated v4l2buffer(%p), memblk(%p), paddr(%p), index(%d).",
+      v4l2buf, memblk, memblk->paddr, handle->allocated - 1);
 
   return 0;
 }
@@ -1514,7 +1515,8 @@ gint gst_imx_v4l2_free_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
     munmap(memblk->vaddr, memblk->size);
 
   if (v4l2buf) {
-    GST_DEBUG ("Free v4l2buffer(%p), index(%d).", v4l2buf, v4l2buf->index);
+    GST_DEBUG ("Free v4l2buffer(%p), memblk(%p), paddr(%p), index(%d).",
+        v4l2buf, memblk, memblk->paddr, v4l2buf->index);
     memset (v4l2buf, 0, sizeof(struct v4l2_buffer));
   }
 
@@ -1550,7 +1552,7 @@ static gint imx_v4l2_do_queue_buffer (IMXV4l2Handle *handle, struct v4l2_buffer 
   v4l2buf->timestamp = queuetime;
 
   if (ioctl (handle->v4l2_fd, VIDIOC_QBUF, v4l2buf) < 0) {
-    GST_ERROR ("queue v4l2 buffer failed.\n");
+    GST_ERROR ("queue v4l2 buffer failed.");
     return -1;
   }
 
@@ -1569,8 +1571,8 @@ gint gst_imx_v4l2_queue_v4l2memblk (gpointer v4l2handle, PhyMemBlock *memblk, Gs
 
   index = v4l2buf->index;
 
-  GST_DEBUG ("queue v4lbuffer memblk (%p), index(%d), flags(%x).",
-      memblk, index, flags);
+  GST_DEBUG ("queue v4lbuffer memblk (%p), paddr(%p), index(%d), flags(%x).",
+      memblk, memblk->paddr, index, flags);
 
   v4l2buf->field = V4L2_FIELD_NONE;
   if ((flags & GST_VIDEO_FRAME_FLAG_INTERLACED) && handle->do_deinterlace) {
@@ -1591,7 +1593,7 @@ gint gst_imx_v4l2_queue_v4l2memblk (gpointer v4l2handle, PhyMemBlock *memblk, Gs
 
   if (!handle->streamon) {
     int i;
-    GST_DEBUG ("streamon count (%d), queue count (%d)\n", handle->streamon_count, handle->queued_count);
+    GST_DEBUG ("streamon count (%d), queue count (%d)", handle->streamon_count, handle->queued_count);
 
     handle->v4lbuf_queued_before_streamon[handle->queued_count] = v4l2buf;
     handle->queued_count ++;
@@ -1617,7 +1619,6 @@ gint gst_imx_v4l2_queue_v4l2memblk (gpointer v4l2handle, PhyMemBlock *memblk, Gs
 
   if (imx_v4l2_do_queue_buffer (handle, v4l2buf) < 0) {
     handle->buffer_pair[v4l2buf->index].v4l2memblk = NULL;
-    GST_ERROR ("queue buffer failed.");
     return -1;
   }
 
@@ -1633,7 +1634,6 @@ gint gst_imx_v4l2_queue_gstbuffer (gpointer v4l2handle, GstBuffer *buffer, GstVi
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
   struct v4l2_buffer *v4l2buf;
   PhyMemBlock *memblk;
-  gint ret;
 
   if (handle->invisible) {
     gst_buffer_unref (buffer);
@@ -1664,12 +1664,18 @@ gint gst_imx_v4l2_queue_gstbuffer (gpointer v4l2handle, GstBuffer *buffer, GstVi
   if (!v4l2buf)
     return -1;
 
-  if (handle->buffer_pair[v4l2buf->index].gstbuffer)
-    GST_ERROR ("gstbuffer(%p) not dequeued yet but queued again, index(%d).", buffer, index);
+  if (handle->buffer_pair[v4l2buf->index].gstbuffer) {
+    if (handle->buffer_pair[v4l2buf->index].gstbuffer != buffer) {
+      GST_WARNING ("new buffer (%p) use the same memblk(%p) with queued buffer(%p)",
+          buffer, memblk, handle->buffer_pair[v4l2buf->index].gstbuffer);
+    }
+    GST_WARNING ("gstbuffer(%p) for (%p) not dequeued yet but queued again, index(%d).",
+        handle->buffer_pair[v4l2buf->index].gstbuffer, index);
+  }
 
   if (gst_imx_v4l2_queue_v4l2memblk (v4l2handle, memblk, flags) < 0) {
     GST_ERROR ("queue gstbuffer (%p) failed.", buffer);
-    return ret;
+    return 0;
   }
 
   handle->buffer_pair[v4l2buf->index].gstbuffer = buffer;
@@ -1688,6 +1694,7 @@ gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk)
   gint trycnt = 0;
 
   if (handle->queued_count <= MAX(V4L2_HOLDED_BUFFERS, handle->streamon_count)) {
+    GST_DEBUG ("current queued %d", handle->queued_count);
     *memblk = NULL;
     return 0;
   }
@@ -1708,7 +1715,8 @@ gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk)
 
   *memblk = handle->buffer_pair[v4l2buf.index].v4l2memblk;
 
-  GST_DEBUG ("deque v4l2buffer memblk (%p), index (%d)", handle->buffer_pair[v4l2buf.index].v4l2memblk, v4l2buf.index);
+  GST_DEBUG ("deque v4l2buffer memblk (%p), paddr(%p), index (%d)",
+      *memblk, (*memblk)->paddr, v4l2buf.index);
 
   handle->buffer_pair[v4l2buf.index].v4l2memblk = NULL;
   handle->queued_count--;
