@@ -163,7 +163,7 @@ static void gst_imx_video_convert_finalize (GObject * object)
 
   GST_IMX_CONVERT_UNREF_BUFFER (imxvct->in_buf);
   GST_IMX_CONVERT_UNREF_POOL (imxvct->in_pool);
-  GST_IMX_CONVERT_UNREF_POOL (imxvct->out_pool);
+  GST_IMX_CONVERT_UNREF_POOL (imxvct->self_out_pool);
   if (imxvct->allocator) {
     gst_object_unref (imxvct->allocator);
     imxvct->allocator = NULL;
@@ -856,6 +856,36 @@ gst_imx_video_convert_filter_meta (GstBaseTransform * trans, GstQuery * query,
   return TRUE;
 }
 
+static void
+imx_video_convert_set_pool_alignment(GstCaps *caps, GstBufferPool *pool)
+{
+  GstVideoInfo info;
+  GstVideoAlignment alignment;
+  GstStructure *config = gst_buffer_pool_get_config(pool);
+  gst_video_info_from_caps (&info, caps);
+
+  memset (&alignment, 0, sizeof (GstVideoAlignment));
+
+  gint w = GST_VIDEO_INFO_WIDTH (&info);
+  gint h = GST_VIDEO_INFO_HEIGHT (&info);
+  if (!ISALIGNED (w, ALIGNMENT) || !ISALIGNED (h, ALIGNMENT)) {
+    alignment.padding_right = ALIGNTO (w, ALIGNMENT) - w;
+    alignment.padding_bottom = ALIGNTO (h, ALIGNMENT) - h;
+  }
+
+  GST_DEBUG ("pool(%p), [%d, %d]:padding_right (%d), padding_bottom (%d)",
+      pool, w, h, alignment.padding_right, alignment.padding_bottom);
+
+  if (!gst_buffer_pool_config_has_option (config,
+            GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
+    gst_buffer_pool_config_add_option (config,
+        GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
+  }
+
+  gst_buffer_pool_config_set_video_alignment (config, &alignment);
+  gst_buffer_pool_set_config(pool, config);
+}
+
 static GstBufferPool*
 gst_imx_video_convert_create_bufferpool(GstImxVideoConvert *imxvct,
                     GstCaps *caps, guint size, guint min, guint max)
@@ -875,29 +905,13 @@ gst_imx_video_convert_create_bufferpool(GstImxVideoConvert *imxvct,
       return NULL;
     }
 
+    imx_video_convert_set_pool_alignment(caps, pool);
+
     config = gst_buffer_pool_get_config(pool);
     gst_buffer_pool_config_set_params(config, caps, size, min, max);
     gst_buffer_pool_config_set_allocator(config, imxvct->allocator, NULL);
     gst_buffer_pool_config_add_option(config,
                                       GST_BUFFER_POOL_OPTION_VIDEO_META);
-    gst_buffer_pool_config_add_option (config,
-                                      GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
-
-    GstVideoInfo info;
-    GstVideoAlignment alignment;
-    memset (&alignment, 0, sizeof (GstVideoAlignment));
-    gst_video_info_from_caps (&info, caps);
-    gint w = GST_VIDEO_INFO_WIDTH (&info);
-    gint h = GST_VIDEO_INFO_HEIGHT (&info);
-    if (!ISALIGNED (w, ALIGNMENT) || !ISALIGNED (h, ALIGNMENT)) {
-      alignment.padding_right = ALIGNTO (w, ALIGNMENT) - w;
-      alignment.padding_bottom = ALIGNTO (h, ALIGNMENT) - h;
-    }
-
-    GST_DEBUG ("[%d, %d]:padding_right (%d), padding_bottom (%d)", w, h,
-        alignment.padding_right, alignment.padding_bottom);
-    gst_buffer_pool_config_set_video_alignment (config, &alignment);
-
     if (!gst_buffer_pool_set_config(pool, config)) {
       GST_ERROR ("set buffer pool config failed.");
       gst_buffer_pool_set_active (pool, FALSE);
@@ -1032,15 +1046,19 @@ static gboolean imx_video_convert_decide_allocation(GstBaseTransform *transform,
   /* downstream doesn't provide a pool or the pool has no ability to allocate
    * physical memory buffers, we need create new pool */
   if (new_pool) {
-    GST_IMX_CONVERT_UNREF_POOL(imxvct->out_pool);
+    GST_IMX_CONVERT_UNREF_POOL(imxvct->self_out_pool);
     GST_DEBUG_OBJECT(imxvct, "creating new output pool");
     pool = gst_imx_video_convert_create_bufferpool(imxvct, outcaps, size,
                                                    min, max);
-    imxvct->out_pool = pool;
+    imxvct->self_out_pool = pool;
+    config = gst_buffer_pool_get_config (pool);
     gst_buffer_pool_set_active(pool, TRUE);
+  } else {
+    // check the requirement of output alignment
+    imx_video_convert_set_pool_alignment(outcaps, pool);
   }
 
-  config = gst_buffer_pool_get_config (pool);
+  imxvct->out_pool = pool;
   gst_buffer_pool_config_get_params (config, &outcaps, &size, &min, &max);
   gst_structure_free (config);
 
@@ -1163,14 +1181,35 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     //alignment check
     if (imxvct->in_pool) {
       GstStructure *config = gst_buffer_pool_get_config (imxvct->in_pool);
-      memset (&imxvct->video_align, 0, sizeof(GstVideoAlignment));
+      memset (&imxvct->in_video_align, 0, sizeof(GstVideoAlignment));
 
       if (gst_buffer_pool_config_has_option (config,
           GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
-        gst_buffer_pool_config_get_video_alignment (config, &imxvct->video_align);
-        GST_DEBUG ("pool has alignment (%d, %d) , (%d, %d)",
-          imxvct->video_align.padding_left, imxvct->video_align.padding_top,
-          imxvct->video_align.padding_right, imxvct->video_align.padding_bottom);
+        gst_buffer_pool_config_get_video_alignment (config,
+            &imxvct->in_video_align);
+        GST_DEBUG ("input pool has alignment (%d, %d) , (%d, %d)",
+          imxvct->in_video_align.padding_left,
+          imxvct->in_video_align.padding_top,
+          imxvct->in_video_align.padding_right,
+          imxvct->in_video_align.padding_bottom);
+      }
+
+      gst_structure_free (config);
+    }
+
+    if (imxvct->out_pool) {
+      GstStructure *config = gst_buffer_pool_get_config (imxvct->out_pool);
+      memset (&imxvct->out_video_align, 0, sizeof(GstVideoAlignment));
+
+      if (gst_buffer_pool_config_has_option (config,
+          GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
+        gst_buffer_pool_config_get_video_alignment (config,
+            &imxvct->out_video_align);
+        GST_DEBUG ("output pool has alignment (%d, %d) , (%d, %d)",
+          imxvct->out_video_align.padding_left,
+          imxvct->out_video_align.padding_top,
+          imxvct->out_video_align.padding_right,
+          imxvct->out_video_align.padding_bottom);
       }
 
       gst_structure_free (config);
@@ -1179,10 +1218,10 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     ImxVideoInfo in_info, out_info;
 
     in_info.fmt = GST_VIDEO_INFO_FORMAT(&(in->info));
-    in_info.w = in->info.width + imxvct->video_align.padding_left +
-                imxvct->video_align.padding_right;
-    in_info.h = in->info.height + imxvct->video_align.padding_top +
-                imxvct->video_align.padding_bottom;
+    in_info.w = in->info.width + imxvct->in_video_align.padding_left +
+                imxvct->in_video_align.padding_right;
+    in_info.h = in->info.height + imxvct->in_video_align.padding_top +
+                imxvct->in_video_align.padding_bottom;
     in_info.stride = in->info.stride[0];
 
     gint ret = device->config_input(device, &in_info);
@@ -1191,8 +1230,10 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
         in->info.width, in->info.height);
 
     out_info.fmt = GST_VIDEO_INFO_FORMAT(&(out->info));
-    out_info.w = out->info.width;
-    out_info.h = out->info.height;
+    out_info.w = out->info.width + imxvct->out_video_align.padding_left +
+                  imxvct->out_video_align.padding_right;
+    out_info.h = out->info.height + imxvct->out_video_align.padding_top +
+                  imxvct->out_video_align.padding_bottom;
     out_info.stride = out->info.stride[0];
 
     ret |= device->config_output(device, &out_info);
@@ -1209,8 +1250,8 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   ImxVideoCrop incrop, outcrop;
   GstVideoCropMeta *in_crop = NULL, *out_crop = NULL;
 
-  incrop.x = imxvct->video_align.padding_left;
-  incrop.y = imxvct->video_align.padding_right;
+  incrop.x = 0;
+  incrop.y = 0;
   incrop.w = in->info.width;
   incrop.h = in->info.height;
 
@@ -1400,6 +1441,7 @@ gst_imx_video_convert_init (GstImxVideoConvert * imxvct)
       imxvct->in_buf = NULL;
       imxvct->in_pool = NULL;
       imxvct->out_pool = NULL;
+      imxvct->self_out_pool = NULL;
       imxvct->pool_config_update = TRUE;
     }
   } else {

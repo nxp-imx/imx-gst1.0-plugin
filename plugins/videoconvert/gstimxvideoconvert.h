@@ -40,9 +40,11 @@ typedef struct _GstImxVideoConvert {
   ImxVideoProcessDevice *device;
   GstBufferPool *in_pool;
   GstBufferPool *out_pool;
+  GstBufferPool *self_out_pool;
   GstBuffer *in_buf;
   GstAllocator *allocator;
-  GstVideoAlignment video_align;
+  GstVideoAlignment in_video_align;
+  GstVideoAlignment out_video_align;
   gboolean pool_config_update;
 } GstImxVideoConvert;
 

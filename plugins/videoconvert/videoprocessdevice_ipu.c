@@ -225,7 +225,7 @@ static gint imx_ipu_config_input(ImxVideoProcessDevice *device,
   if (!from_map)
     return -1;
 
-  ipu->task.input.width = ALIGNTO (in_info->w, ALIGNMENT);
+  ipu->task.input.width = in_info->w;
   ipu->task.input.height = in_info->h;
   ipu->task.input.format = from_map->ipu_format;
   ipu->task.input.crop.pos.x = 0;
@@ -251,7 +251,7 @@ static gint imx_ipu_config_output(ImxVideoProcessDevice *device,
   if (!to_map)
     return -1;
 
-  ipu->task.output.width = ALIGNTO (out_info->w, ALIGNMENT);
+  ipu->task.output.width = out_info->w;
   ipu->task.output.height = out_info->h;
   ipu->task.output.format = to_map->ipu_format;
   ipu->task.output.crop.pos.x = 0;
@@ -277,10 +277,10 @@ static gint imx_ipu_do_convert(ImxVideoProcessDevice *device,
   ipu->task.input.paddr = (dma_addr_t)(from->paddr);
   ipu->task.input.crop.pos.x = GST_ROUND_UP_8(incrop.x);
   ipu->task.input.crop.pos.y = GST_ROUND_UP_8(incrop.y);
-  ipu->task.input.crop.w = MIN(incrop.w,
-      (ipu->task.input.width - ipu->task.input.crop.pos.x));
-  ipu->task.input.crop.h = MIN(incrop.h,
-      (ipu->task.input.height - ipu->task.input.crop.pos.y));
+  ipu->task.input.crop.w = GST_ROUND_DOWN_8((MIN(incrop.w,
+      (ipu->task.input.width - ipu->task.input.crop.pos.x))));
+  ipu->task.input.crop.h = GST_ROUND_DOWN_8(MIN(incrop.h,
+      (ipu->task.input.height - ipu->task.input.crop.pos.y)));
 
   if (ipu->deinterlace_enable) {
     switch (interlace_type) {
@@ -307,12 +307,12 @@ static gint imx_ipu_do_convert(ImxVideoProcessDevice *device,
 
   // Set output
   ipu->task.output.paddr = (dma_addr_t)(to->paddr);
-  ipu->task.output.crop.pos.x = GST_ROUND_UP_8(outcrop.x);
-  ipu->task.output.crop.pos.y = GST_ROUND_UP_8(outcrop.y);
-  ipu->task.output.crop.w = MIN(outcrop.w,
-      (ipu->task.output.width - ipu->task.output.crop.pos.x));
-  ipu->task.output.crop.h = MIN(outcrop.h,
-      (ipu->task.output.height - ipu->task.output.crop.pos.y));
+  ipu->task.output.crop.pos.x = GST_ROUND_DOWN_8(outcrop.x);
+  ipu->task.output.crop.pos.y = GST_ROUND_DOWN_8(outcrop.y);
+  ipu->task.output.crop.w = GST_ROUND_UP_8(MIN(outcrop.w,
+      (ipu->task.output.width - ipu->task.output.crop.pos.x)));
+  ipu->task.output.crop.h = GST_ROUND_UP_8(MIN(outcrop.h,
+      (ipu->task.output.height - ipu->task.output.crop.pos.y)));
 
   GST_TRACE ("ipu output : %dx%d(%d,%d->%d,%d), format=%d",
       ipu->task.output.width, ipu->task.output.height,

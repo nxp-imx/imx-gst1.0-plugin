@@ -198,8 +198,8 @@ static gint imx_g2d_config_input(ImxVideoProcessDevice *device,
   if (!in_map)
     return -1;
 
-  g2d->src.width = GST_ROUND_UP_4(in_info->w);
-  g2d->src.height = GST_ROUND_UP_4(in_info->h);
+  g2d->src.width = in_info->w;
+  g2d->src.height = in_info->h;
   g2d->src.stride = g2d->src.width;//stride / (in_map->bpp/8);
   g2d->src.format = in_map->g2d_format;
   g2d->src.left = 0;
@@ -222,8 +222,8 @@ static gint imx_g2d_config_output(ImxVideoProcessDevice *device,
   if (!out_map)
     return -1;
 
-  g2d->dst.width = GST_ROUND_UP_4(out_info->w);
-  g2d->dst.height = GST_ROUND_UP_4(out_info->h);
+  g2d->dst.width = out_info->w;
+  g2d->dst.height = out_info->h;
   g2d->dst.stride = g2d->dst.width;//stride / (out_map->bpp / 8);
   g2d->dst.format = out_map->g2d_format;
   g2d->dst.left = 0;
