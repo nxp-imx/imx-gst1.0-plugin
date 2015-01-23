@@ -33,7 +33,7 @@ VIDEO_CONVERT_DIRS = plugins/videoconvert
 TOOLDIRS =    tools/                      \
               tools/gplay
 
-BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS) $(OVERLAYSINKDIRS) $(AVBDIRS) $(VIDEO_CONVERT_DIRS)
+BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS) $(OVERLAYSINKDIRS) $(VIDEO_CONVERT_DIRS)
               
 if PLATFORM_IS_MX6
 
