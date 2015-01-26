@@ -618,7 +618,9 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
         demux->streams[i]->last_ret = GST_FLOW_OK;
       }
 
+      gst_event_unref (event);
       res = TRUE;
+      goto drop;
       break;
     }
     case GST_EVENT_EOS:
@@ -656,7 +658,7 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
       break;
   }
 
-  res = gst_pad_event_default (sinkpad, parent, event);
+  res = gst_pad_event_default (demux->sinkpad, parent, event);
 
 drop:
   return res;
@@ -3469,9 +3471,12 @@ aiurdemux_do_push_seek (GstAiurDemux * demux, GstPad * pad,
     flags = 0;
   }
 
-  /* in push mode, don't need to send flush event, src will send flush event,
-   * demux should pass this event to donwstream. 
-   */
+  flush = flags & GST_SEEK_FLAG_FLUSH;
+
+  /* stop streaming, either by flushing or by pausing the task */
+  if (flush) {
+    gst_aiurdemux_push_event (demux, gst_event_new_flush_start ());
+  }
 
   demux->loop_push = FALSE;
   gst_aiur_stream_cache_close (demux->stream_cache);
@@ -3486,6 +3491,11 @@ aiurdemux_do_push_seek (GstAiurDemux * demux, GstPad * pad,
   if (event) {
     gst_segment_do_seek(&seeksegment, rate,
         format, flags, cur_type, cur, stop_type, stop, &update);
+  }
+
+  /* prepare for streaming again */
+  if (flush) {
+    gst_aiurdemux_push_event (demux, gst_event_new_flush_stop (TRUE));
   }
 
   /* now do the seek, this actually never returns FALSE */
