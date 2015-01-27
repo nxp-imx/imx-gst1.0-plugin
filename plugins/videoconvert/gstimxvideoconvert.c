@@ -876,6 +876,11 @@ imx_video_convert_set_pool_alignment(GstCaps *caps, GstBufferPool *pool)
   GST_DEBUG ("pool(%p), [%d, %d]:padding_right (%d), padding_bottom (%d)",
       pool, w, h, alignment.padding_right, alignment.padding_bottom);
 
+  if (!gst_buffer_pool_config_has_option (config, \
+        GST_BUFFER_POOL_OPTION_VIDEO_META)) {
+    gst_buffer_pool_config_add_option (config,
+        GST_BUFFER_POOL_OPTION_VIDEO_META);
+  }
   if (!gst_buffer_pool_config_has_option (config,
             GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
     gst_buffer_pool_config_add_option (config,
