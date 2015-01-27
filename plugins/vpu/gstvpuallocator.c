@@ -26,8 +26,8 @@ GST_DEBUG_CATEGORY_STATIC(vpu_allocator_debug);
 
 static void gst_vpu_allocator_finalize(GObject *object);
 
-static gboolean gst_vpu_alloc_phys_mem(GstAllocatorPhyMem *allocator, PhyMemBlock *memory);
-static gboolean gst_vpu_free_phys_mem(GstAllocatorPhyMem *allocator, PhyMemBlock *memory);
+static int gst_vpu_alloc_phys_mem(GstAllocatorPhyMem *allocator, PhyMemBlock *memory);
+static int gst_vpu_free_phys_mem(GstAllocatorPhyMem *allocator, PhyMemBlock *memory);
 
 G_DEFINE_TYPE(GstVpuAllocator, gst_vpu_allocator, GST_TYPE_ALLOCATOR_PHYMEM)
 
@@ -53,7 +53,7 @@ gst_vpu_allocator_obtain(void)
 	return allocator;
 }
 
-static gboolean 
+static int
 gst_vpu_alloc_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock *memory)
 {
 	VpuDecRetCode ret;
@@ -72,12 +72,13 @@ gst_vpu_alloc_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock 
 		memory->vaddr         = (guint8 *)(mem_desc.nVirtAddr);
     GST_DEBUG_OBJECT(allocator, "vpu allocator malloc paddr: %x vaddr: %x\n", \
         memory->paddr, memory->vaddr);
-    return TRUE;
-	} else
-		return FALSE;
+    return 0;
+	} else {
+		return -1;
+        }
 }
 
-static gboolean 
+static int
 gst_vpu_free_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock *memory)
 {
   VpuDecRetCode ret;
@@ -91,7 +92,7 @@ gst_vpu_free_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock *
 
 	ret = VPU_DecFreeMem(&mem_desc);
 
-	return (ret == VPU_DEC_RET_SUCCESS);
+	return (ret == VPU_DEC_RET_SUCCESS) ? 0 : -1;
 }
 
 static void 
