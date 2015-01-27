@@ -922,12 +922,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
     // check if has alignment option setted.
     memset (&vpu_dec_object->video_align, 0, sizeof(GstVideoAlignment));
     if (gst_buffer_pool_config_has_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
-      GstVideoInfo info;
-      GstCaps *caps;
-      gst_buffer_pool_config_get_params (config, &caps, NULL, NULL, NULL);
-      gst_video_info_from_caps (&info, caps);
       gst_buffer_pool_config_get_video_alignment (config, &vpu_dec_object->video_align);
-      gst_video_info_align (&info, &vpu_dec_object->video_align);
 
       GST_DEBUG_OBJECT (vpu_dec_object, "pool has alignment (%d, %d) , (%d, %d)", 
           vpu_dec_object->video_align.padding_left, vpu_dec_object->video_align.padding_top,

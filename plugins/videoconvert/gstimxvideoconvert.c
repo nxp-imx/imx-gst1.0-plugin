@@ -23,6 +23,7 @@
 
 #include <gst/video/video.h>
 #include "gstallocatorphymem.h"
+#include "allocator/gstphymemmeta.h"
 #include "gstimxvideoconvert.h"
 
 #define IMX_VCT_IN_POOL_MAX_BUFFERS   30
@@ -1136,6 +1137,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   GstImxVideoConvert *imxvct = (GstImxVideoConvert *)(filter);
   ImxVideoProcessDevice *device = imxvct->device;
   GstVideoFrame *input_frame = in;
+  GstPhyMemMeta *phymemmeta = NULL;
   GstCaps *caps;
   GstVideoFrame temp_in_frame;
 
@@ -1184,7 +1186,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
 
   if (imxvct->pool_config_update) {
     //alignment check
-    if (imxvct->in_pool) {
+    if (imxvct->in_pool && gst_buffer_pool_is_active (imxvct->in_pool)) {
       GstStructure *config = gst_buffer_pool_get_config (imxvct->in_pool);
       memset (&imxvct->in_video_align, 0, sizeof(GstVideoAlignment));
 
@@ -1200,6 +1202,16 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
       }
 
       gst_structure_free (config);
+    } else {
+      memset (&imxvct->in_video_align, 0, sizeof(GstVideoAlignment));
+
+      phymemmeta = GST_PHY_MEM_META_GET (input_frame->buffer);
+      if (phymemmeta) {
+        imxvct->in_video_align.padding_right = phymemmeta->x_padding;
+        imxvct->in_video_align.padding_bottom = phymemmeta->y_padding;
+        GST_DEBUG_OBJECT (imxvct, "physical memory meta x_padding: %d y_padding: %d",
+            phymemmeta->x_padding, phymemmeta->y_padding);
+      }
     }
 
     if (imxvct->out_pool) {
@@ -1218,6 +1230,15 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
       }
 
       gst_structure_free (config);
+    }
+
+    /* set physical memory padding info */
+    if (imxvct->self_out_pool && gst_buffer_is_writable (out->buffer)) {
+      phymemmeta = GST_PHY_MEM_META_ADD (out->buffer);
+      phymemmeta->x_padding = imxvct->out_video_align.padding_right;
+      phymemmeta->y_padding = imxvct->out_video_align.padding_bottom;
+      GST_DEBUG_OBJECT (imxvct, "out physical memory meta x_padding: %d y_padding: %d",
+          phymemmeta->x_padding, phymemmeta->y_padding);
     }
 
     ImxVideoInfo in_info, out_info;
