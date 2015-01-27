@@ -132,8 +132,8 @@ imx_g2d_alloc_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
     return -1;
   }
 
-  memblk->vaddr = (guint8*) pbuf->buf_vaddr;
-  memblk->paddr = (guint8*) pbuf->buf_paddr;
+  memblk->vaddr = (guchar*) pbuf->buf_vaddr;
+  memblk->paddr = (guchar*) pbuf->buf_paddr;
   memblk->user_data = (gpointer) pbuf;
 
   return 0;
@@ -380,7 +380,7 @@ static ImxVideoDeinterlaceMode imx_g2d_get_deinterlace (
   return IMX_VIDEO_DEINTERLACE_NONE;
 }
 
-static gint imx_g2d_get_capabilities (void)
+static gint imx_g2d_get_capabilities (ImxVideoProcessDevice* device)
 {
   void *g2d_handle = NULL;
   gint capabilities = 0;
@@ -402,7 +402,7 @@ static gint imx_g2d_get_capabilities (void)
   return capabilities;
 }
 
-static GList* imx_g2d_get_supported_in_fmts(void)
+static GList* imx_g2d_get_supported_in_fmts(ImxVideoProcessDevice* device)
 {
   GList* list = NULL;
   const G2dFmtMap *map = g2d_fmts_map;
@@ -415,7 +415,7 @@ static GList* imx_g2d_get_supported_in_fmts(void)
   return list;
 }
 
-static GList* imx_g2d_get_supported_out_fmts(void)
+static GList* imx_g2d_get_supported_out_fmts(ImxVideoProcessDevice* device)
 {
   GList* list = NULL;
   const G2dFmtMap *map = g2d_fmts_map;
@@ -428,7 +428,7 @@ static GList* imx_g2d_get_supported_out_fmts(void)
   return list;
 }
 
-ImxVideoProcessDevice * imx_g2d_create(void)
+ImxVideoProcessDevice * imx_g2d_create(ImxVpDeviceType  device_type)
 {
   ImxVideoProcessDevice * device = g_slice_alloc(sizeof(ImxVideoProcessDevice));
   if (!device) {
@@ -436,7 +436,7 @@ ImxVideoProcessDevice * imx_g2d_create(void)
     return NULL;
   }
 
-  device->device_type = IMX_VP_DEVICE_G2D;
+  device->device_type = device_type;
   device->priv = NULL;
 
   device->open                = imx_g2d_open;

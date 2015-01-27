@@ -27,6 +27,12 @@ libgstimxvideoconvert_la_CFLAGS += -DUSE_G2D
 libgstimxvideoconvert_la_LIBADD += -lg2d
 endif
 
+if USE_PXP
+libgstimxvideoconvert_la_SOURCES += videoprocessdevice_pxp.c
+libgstimxvideoconvert_la_CFLAGS += -DUSE_PXP
+libgstimxvideoconvert_la_LIBADD += -lpxp
+endif
+
 libgstimxvideoconvert_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstimxvideoconvert_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 

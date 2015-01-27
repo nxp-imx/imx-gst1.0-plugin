@@ -117,9 +117,9 @@ struct _ImxVideoProcessDevice {
                                        ImxVideoCrop incrop,
                                        ImxVideoCrop outcrop);
 
-  gint                    (*get_capabilities)        (void);
-  GList*                  (*get_supported_in_fmts)   (void);
-  GList*                  (*get_supported_out_fmts)  (void);
+  gint               (*get_capabilities)        (ImxVideoProcessDevice* device);
+  GList*             (*get_supported_in_fmts)   (ImxVideoProcessDevice* device);
+  GList*             (*get_supported_out_fmts)  (ImxVideoProcessDevice* device);
   ImxVideoRotationMode    (*get_rotate)     (ImxVideoProcessDevice* device);
   ImxVideoDeinterlaceMode (*get_deinterlace)(ImxVideoProcessDevice* device);
 };
@@ -128,7 +128,8 @@ typedef struct _ImxVideoProcessDeviceInfo {
   gchar *name;
   gchar *description;
   gchar *detail;
-  ImxVideoProcessDevice*  (*create)   (void);
+  ImxVpDeviceType  device_type;
+  ImxVideoProcessDevice*  (*create)   (ImxVpDeviceType  device_type);
   gint                    (*destroy)  (ImxVideoProcessDevice* dev);
 } ImxVideoProcessDeviceInfo;
 

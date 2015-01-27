@@ -171,7 +171,7 @@ imx_ipu_alloc_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
     return -1;
   }
 
-  memblk->paddr = (guint8 *)mem;
+  memblk->paddr = (guchar *)mem;
   memblk->vaddr = mmap(0, memblk->size, PROT_READ|PROT_WRITE, MAP_SHARED,
                        ipu->ipu_fd, (dma_addr_t)(memblk->paddr));
 
@@ -397,7 +397,7 @@ static gint imx_ipu_do_convert(ImxVideoProcessDevice *device,
       GST_ERROR ("mmap vdibuf failed");
       return -1;
     }
-    ipu->vdi.paddr = (guint8 *)(ipu->task.input.paddr_n);
+    ipu->vdi.paddr = (guchar *)(ipu->task.input.paddr_n);
 
     memcpy(ipu->vdi.vaddr, from->vaddr, ipu->vdi.size);
   }
@@ -510,12 +510,12 @@ static ImxVideoDeinterlaceMode imx_ipu_get_deinterlace (
   return deint_mode;
 }
 
-static gint imx_ipu_get_capabilities(void)
+static gint imx_ipu_get_capabilities(ImxVideoProcessDevice* device)
 {
   return IMX_VP_DEVICE_CAP_ALL;
 }
 
-static GList* imx_ipu_get_supported_in_fmts(void)
+static GList* imx_ipu_get_supported_in_fmts(ImxVideoProcessDevice* device)
 {
   GList* list = NULL;
   const IpuFmtMap *map = ipu_fmts_map;
@@ -527,12 +527,12 @@ static GList* imx_ipu_get_supported_in_fmts(void)
   return list;
 }
 
-static GList* imx_ipu_get_supported_out_fmts(void)
+static GList* imx_ipu_get_supported_out_fmts(ImxVideoProcessDevice* device)
 {
-  return imx_ipu_get_supported_in_fmts();
+  return imx_ipu_get_supported_in_fmts(device);
 }
 
-ImxVideoProcessDevice * imx_ipu_create(void)
+ImxVideoProcessDevice * imx_ipu_create(ImxVpDeviceType  device_type)
 {
   ImxVideoProcessDevice * device = g_slice_alloc(sizeof(ImxVideoProcessDevice));
   if (!device) {
@@ -540,7 +540,7 @@ ImxVideoProcessDevice * imx_ipu_create(void)
     return NULL;
   }
 
-  device->device_type = IMX_VP_DEVICE_IPU;
+  device->device_type = device_type;
   device->priv = NULL;
 
   device->open                = imx_ipu_open;

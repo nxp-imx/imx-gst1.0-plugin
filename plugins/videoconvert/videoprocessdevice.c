@@ -19,16 +19,24 @@
 
 #include "videoprocessdevice.h"
 #ifdef USE_IPU
-extern ImxVideoProcessDevice * imx_ipu_create(void);
+extern ImxVideoProcessDevice * imx_ipu_create(ImxVpDeviceType  device_type);
 extern gint imx_ipu_destroy(ImxVideoProcessDevice *device);
 #endif
+
 #ifdef USE_G2D
-extern ImxVideoProcessDevice * imx_g2d_create(void);
+extern ImxVideoProcessDevice * imx_g2d_create(ImxVpDeviceType  device_type);
 extern gint imx_g2d_destroy(ImxVideoProcessDevice *device);
 #endif
+
+#ifdef USE_PXP
+extern ImxVideoProcessDevice * imx_pxp_create(ImxVpDeviceType  device_type);
+extern gint imx_pxp_destroy(ImxVideoProcessDevice *device);
+#endif
+
 static const ImxVideoProcessDeviceInfo VPDevices[] = {
 #ifdef USE_IPU
     { .name                     ="ipu",
+      .device_type              =IMX_VP_DEVICE_IPU,
       .description              ="IMX IPU Video Converter",
       .detail                   ="Video CSC/resize/rotate/deinterlace",
       .create                   =imx_ipu_create,
@@ -38,10 +46,21 @@ static const ImxVideoProcessDeviceInfo VPDevices[] = {
 
 #ifdef USE_G2D
     { .name                     ="g2d",
+      .device_type              =IMX_VP_DEVICE_G2D,
       .description              ="IMX G2D Video Converter",
       .detail                   ="Video CSC/resize/rotate",
       .create                   =imx_g2d_create,
       .destroy                  =imx_g2d_destroy
+    },
+#endif
+
+#ifdef USE_PXP
+    { .name                     ="pxp",
+      .device_type              =IMX_VP_DEVICE_PXP,
+      .description              ="IMX PXP Video Converter",
+      .detail                   ="Video CSC/resize/rotate",
+      .create                   =imx_pxp_create,
+      .destroy                  =imx_pxp_destroy
     },
 #endif
     {

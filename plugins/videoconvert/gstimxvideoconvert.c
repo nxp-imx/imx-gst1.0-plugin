@@ -245,15 +245,15 @@ static GstCaps* imx_video_convert_transform_caps(GstBaseTransform *transform,
 
     st = gst_structure_copy(st);
 
-    gst_structure_set(st, "width", GST_TYPE_INT_RANGE, 64, G_MAXINT,
-                          "height", GST_TYPE_INT_RANGE, 64, G_MAXINT, NULL);
+    gst_structure_set(st, "width", GST_TYPE_INT_RANGE, 64, G_MAXINT32,
+                          "height", GST_TYPE_INT_RANGE, 64, G_MAXINT32, NULL);
 
     gst_structure_remove_fields(st, "format", NULL);
 
     /* if pixel aspect ratio, make a range of it*/
     if (gst_structure_has_field(st, "pixel-aspect-ratio")) {
       gst_structure_set(st, "pixel-aspect-ratio",
-          GST_TYPE_FRACTION_RANGE, 1, G_MAXINT, G_MAXINT, 1, NULL);
+          GST_TYPE_FRACTION_RANGE, 1, G_MAXINT32, G_MAXINT32, 1, NULL);
     }
 
     gst_caps_append_structure(tmp, st);
@@ -301,13 +301,13 @@ static gint get_format_conversion_loss(GstBaseTransform * base,
 #define ALPHA_MASK      (GST_VIDEO_FORMAT_FLAG_ALPHA)
 #define PALETTE_MASK    (GST_VIDEO_FORMAT_FLAG_PALETTE)
 
-  gint loss = G_MAXINT;
+  gint loss = G_MAXINT32;
   GstVideoFormatFlags in_flags, out_flags;
   const GstVideoFormatInfo *in_info = gst_video_format_get_info(in_name);
   const GstVideoFormatInfo *out_info = gst_video_format_get_info(out_name);
 
   if (!in_info || !out_info)
-    return G_MAXINT;
+    return G_MAXINT32;
 
   /* accept input format immediately without loss */
   if (in_info == out_info) {
@@ -421,7 +421,7 @@ static guint imx_video_convert_fixate_format_caps(GstBaseTransform *transform,
   if (device->get_rotate(device) != IMX_VIDEO_ROTATION_0 ||
       (device->get_deinterlace(device) != IMX_VIDEO_DEINTERLACE_NONE &&
           interlace)) {
-    GList* list = device->get_supported_out_fmts();
+    GList* list = device->get_supported_out_fmts(device);
     GstCaps *out_caps = imx_video_convert_caps_from_fmt_list(list);
     g_list_free(list);
 
@@ -434,7 +434,7 @@ static guint imx_video_convert_fixate_format_caps(GstBaseTransform *transform,
 
 #ifdef COMPARE_CONVERT_LOSS
   GstVideoFormat in_fmt;
-  gint min_loss = G_MAXINT;
+  gint min_loss = G_MAXINT32;
   gint loss;
   guint i, j;
 
@@ -517,7 +517,7 @@ static GstCaps* imx_video_convert_fixate_caps(GstBaseTransform *transform,
   GValue fpar = { 0, }, tpar = { 0, };
   const gchar *in_format;
   const GstVideoFormatInfo *in_info, *out_info = NULL;
-  gint min_loss = G_MAXINT;
+  gint min_loss = G_MAXINT32;
   guint i, capslen;
 
   g_return_val_if_fail(gst_caps_is_fixed (caps), othercaps);
@@ -544,7 +544,7 @@ static GstCaps* imx_video_convert_fixate_caps(GstBaseTransform *transform,
       }
       if (!to_par) {
         g_value_init(&tpar, GST_TYPE_FRACTION_RANGE);
-        gst_value_set_fraction_range_full(&tpar, 1, G_MAXINT, G_MAXINT, 1);
+        gst_value_set_fraction_range_full(&tpar, 1, G_MAXINT32, G_MAXINT32, 1);
         to_par = &tpar;
       }
     } else {
@@ -1366,7 +1366,7 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
       g_type_get_qdata (G_OBJECT_CLASS_TYPE (klass), GST_IMX_VCT_PARAMS_QDATA);
   g_assert (in_plugin != NULL);
 
-  ImxVideoProcessDevice* dev = in_plugin->create();
+  ImxVideoProcessDevice* dev = in_plugin->create(in_plugin->device_type);
   if (!dev)
     return;
 
@@ -1374,7 +1374,7 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
         in_plugin->description, "Filter/Converter/Video",
         in_plugin->detail, IMX_GST_PLUGIN_AUTHOR);
 
-  GList *list = dev->get_supported_in_fmts();
+  GList *list = dev->get_supported_in_fmts(dev);
   caps = imx_video_convert_caps_from_fmt_list(list);
   g_list_free(list);
 
@@ -1390,7 +1390,7 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
       gst_pad_template_new ("src", GST_PAD_SRC, GST_PAD_ALWAYS,
                             gst_caps_copy(caps)));
 #else
-  list = dev->get_supported_out_fmts();
+  list = dev->get_supported_out_fmts(dev);
   caps = imx_video_convert_caps_from_fmt_list(list);
   g_list_free(list);
 
@@ -1409,7 +1409,7 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
   gobject_class->set_property = gst_imx_video_convert_set_property;
   gobject_class->get_property = gst_imx_video_convert_get_property;
 
-  gint capabilities = dev->get_capabilities();
+  gint capabilities = dev->get_capabilities(dev);
   if (capabilities & IMX_VP_DEVICE_CAP_ROTATE) {
     g_object_class_install_property (gobject_class, PROP_OUTPUT_ROTATE,
         g_param_spec_enum("rotation", "Output rotation",
@@ -1458,7 +1458,7 @@ gst_imx_video_convert_init (GstImxVideoConvert * imxvct)
       (GstImxVideoConvertClass *) G_OBJECT_GET_CLASS (imxvct);
 
   if (klass->in_plugin)
-    imxvct->device = klass->in_plugin->create();
+    imxvct->device = klass->in_plugin->create(klass->in_plugin->device_type);
 
   if (imxvct->device) {
     if (imxvct->device->open(imxvct->device) < 0) {
