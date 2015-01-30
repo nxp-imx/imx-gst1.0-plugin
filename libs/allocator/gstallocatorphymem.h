@@ -34,9 +34,12 @@
 typedef struct _GstAllocatorPhyMem GstAllocatorPhyMem;
 typedef struct _GstAllocatorPhyMemClass GstAllocatorPhyMemClass;
 
+/* also change gst-libs/gst/gl/gstglvivdirecttexture.c in gst-plugins-bad git
+ * if changed below structure */
 typedef struct {
   guint8 *vaddr;
   guint8 *paddr;
+  guint8 *caddr;
   gsize size;
   gpointer *user_data;
 } PhyMemBlock;

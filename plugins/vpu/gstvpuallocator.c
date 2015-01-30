@@ -70,6 +70,7 @@ gst_vpu_alloc_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock 
 		memory->size         = mem_desc.nSize;
 		memory->paddr        = (guint8 *)(mem_desc.nPhyAddr);
 		memory->vaddr         = (guint8 *)(mem_desc.nVirtAddr);
+		memory->caddr         = (guint8 *)(mem_desc.nCpuAddr);
     GST_DEBUG_OBJECT(allocator, "vpu allocator malloc paddr: %x vaddr: %x\n", \
         memory->paddr, memory->vaddr);
     return 0;
@@ -89,6 +90,7 @@ gst_vpu_free_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock *
 	mem_desc.nSize     = memory->size;
 	mem_desc.nPhyAddr  = (unsigned long)(memory->paddr);
 	mem_desc.nVirtAddr  = (unsigned long)(memory->vaddr);
+	mem_desc.nCpuAddr  = (unsigned long)(memory->caddr);
 
 	ret = VPU_DecFreeMem(&mem_desc);
 

@@ -917,7 +917,8 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   /* set physical memory padding info */
   if (vpu_dec_object->use_my_pool && !vpu_dec_object->pool_alignment_checked) {
     GstStructure *config;
-    config = gst_buffer_pool_get_config (gst_video_decoder_get_buffer_pool (bdec));
+    GstBufferPool *pool = gst_video_decoder_get_buffer_pool (bdec);
+    config = gst_buffer_pool_get_config (pool);
 
     // check if has alignment option setted.
     memset (&vpu_dec_object->video_align, 0, sizeof(GstVideoAlignment));
@@ -930,6 +931,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
     }
     vpu_dec_object->pool_alignment_checked = TRUE;
     gst_structure_free (config);
+    gst_object_unref (pool);
   }
 
   if (vpu_dec_object->use_my_pool) {
