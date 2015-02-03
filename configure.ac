@@ -284,7 +284,6 @@ plugins/v4l2/Makefile
 plugins/overlay_sink/Makefile
 plugins/vpu/Makefile
 plugins/mp3enc/Makefile
-plugins/avb/Makefile
 plugins/videoconvert/Makefile
 tools/Makefile
 tools/gplay/Makefile)
