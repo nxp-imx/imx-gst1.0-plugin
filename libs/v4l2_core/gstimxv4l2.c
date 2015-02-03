@@ -67,6 +67,7 @@ typedef struct {
   struct v4l2_buffer v4l2buffer;
   PhyMemBlock *v4l2memblk;
   GstBuffer *gstbuffer;
+  guint8 *paddr;
 } IMXV4l2BufferPair;
 
 typedef gint (*V4l2outConfigInput) (void *handle, guint fmt, guint w, guint h, \
@@ -1400,15 +1401,11 @@ void gst_imx_v4l2out_config_color_key (gpointer v4l2handle, gboolean enable, gui
 static void * gst_imx_v4l2_find_buffer(gpointer v4l2handle, PhyMemBlock *memblk)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
-  struct v4l2_buffer *v4l2buf;
   gint i;
 
   for(i=0; i<MAX_BUFFER; i++) {
-    v4l2buf = &handle->buffer_pair[i].v4l2buffer;
-    if ((v4l2buf->memory == V4L2_MEMORY_MMAP && v4l2buf->m.offset == memblk->paddr)
-        || (v4l2buf->memory == V4L2_MEMORY_USERPTR && v4l2buf->m.userptr == memblk->paddr)) {
-      return v4l2buf;
-    }
+    if (handle->buffer_pair[i].paddr == memblk->paddr)
+      return &handle->buffer_pair[i].v4l2buffer;
   }
 
   GST_ERROR ("Can't find the buffer 0x%08X.", memblk->paddr);
@@ -1457,7 +1454,6 @@ gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
     return -1;
   }
 
-  handle->allocated ++;
   memblk->size = v4l2buf->length;
   memblk->vaddr = mmap (NULL, v4l2buf->length, PROT_READ | PROT_WRITE, MAP_SHARED, handle->v4l2_fd, v4l2buf->m.offset);
   if (!memblk->vaddr) {
@@ -1471,6 +1467,9 @@ gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
     return -1;
   }
   memblk->paddr = (guint8*) v4l2buf->m.offset;
+  handle->buffer_pair[handle->allocated].paddr = memblk->paddr;
+
+  handle->allocated ++;
 
   GST_DEBUG ("Allocated v4l2buffer(%p), index(%d), memblk(%p), vaddr(%p), paddr(%p), size(%d).",
       v4l2buf, handle->allocated - 1, memblk, memblk->vaddr, memblk->paddr, memblk->size);
@@ -1495,6 +1494,7 @@ gint gst_imx_v4l2_register_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   v4l2buf->index = handle->allocated;
   v4l2buf->m.userptr = memblk->paddr;
   v4l2buf->length = memblk->size;
+  handle->buffer_pair[handle->allocated].paddr = memblk->paddr;
 
   if (ioctl(handle->v4l2_fd, VIDIOC_QUERYBUF, v4l2buf) < 0) {
     GST_ERROR ("VIDIOC_QUERYBUF error.");
@@ -1522,6 +1522,7 @@ gint gst_imx_v4l2_free_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   if (v4l2buf) {
     GST_DEBUG ("Free v4l2buffer(%p), memblk(%p), paddr(%p), index(%d).",
         v4l2buf, memblk, memblk->paddr, v4l2buf->index);
+    handle->buffer_pair[v4l2buf->index].paddr = 0;
     memset (v4l2buf, 0, sizeof(struct v4l2_buffer));
   }
 
