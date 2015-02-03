@@ -1361,7 +1361,7 @@ gint gst_imx_v4l2_config_deinterlace (gpointer v4l2handle, gboolean do_deinterla
     ctrl.id = V4L2_CID_MXC_MOTION;
     ctrl.value = motion;
     if (ioctl(handle->v4l2_fd, VIDIOC_S_CTRL, &ctrl) < 0) {
-      GST_ERROR("Set ctrl motion failed\n");
+      GST_WARNING ("Set ctrl motion failed\n");
       return -1;
     }
   }
