@@ -1361,9 +1361,10 @@ static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
       GST_BUFFER_FLAG_UNSET (stream->buffer, GST_BUFFER_FLAG_DELTA_UNIT);
       GST_BUFFER_FLAG_SET (stream->buffer, GST_BUFFER_FLAG_DISCONT);
       aiurdemux_send_stream_newsegment (demux, stream);
-      gst_aiurdemux_push_tags (demux, stream);
     }
      
+    gst_aiurdemux_push_tags (demux, stream);
+
     //for vorbis codec data
     if(demux->option.disable_vorbis_codec_data &&
       (stream->type == MEDIA_AUDIO)
@@ -2447,6 +2448,7 @@ static void aiurdemux_parse_text (GstAiurDemux * demux, AiurDemuxStream * stream
   stream->send_codec_data = TRUE;
 
   switch (stream->codec_type) {
+#if 0
     case TXT_DIVX_FEATURE_SUBTITLE:
       codec_mime = "subpicture/x-xsub";
       mime =
@@ -2458,7 +2460,7 @@ static void aiurdemux_parse_text (GstAiurDemux * demux, AiurDemuxStream * stream
       codec_mime = "application/x-subtitle-qttext";
       mime = g_strdup_printf ("application/x-subtitle-qttext");
       break;
-
+#endif
     case TXT_3GP_STREAMING_TEXT:
     case TXT_SUBTITLE_TEXT:
       codec_mime = "text/x-raw";
@@ -2474,7 +2476,7 @@ static void aiurdemux_parse_text (GstAiurDemux * demux, AiurDemuxStream * stream
       codec_mime = "application/x-ass";
       mime = g_strdup_printf ("application/x-ass");
       break;
-
+#if 0
     case TXT_DIVX_MENU_SUBTITLE:
     case TXT_TYPE_UNKNOWN:
       GST_WARNING ("Unknown Text code-type=%d, sub-type=%d",
@@ -2482,7 +2484,7 @@ static void aiurdemux_parse_text (GstAiurDemux * demux, AiurDemuxStream * stream
       codec_mime = "application/x-subtitle-unknown";
       mime = g_strdup_printf ("application/x-subtitle-unknown");
       break;
-
+#endif
     default:
       GST_WARNING ("Unsupported Text code-type=%d, sub-type=%d",
               stream->codec_type, stream->codec_sub_type);
@@ -2499,16 +2501,21 @@ static void aiurdemux_parse_text (GstAiurDemux * demux, AiurDemuxStream * stream
     padname = g_strdup_printf ("subtitle_%u", stream->pid);
   
     GST_INFO ("Create text pad %s", padname);
-  
+
     stream->pad =
         gst_pad_new_from_static_template (&gst_aiurdemux_subsrc_template,
         padname);
     g_free (padname);
   
-    stream->pending_tags = gst_tag_list_new (GST_TAG_SUBTITLE_CODEC,codec_mime,NULL);
+    stream->pending_tags = gst_tag_list_new (GST_TAG_CODEC, codec_mime, NULL);
     if (stream->lang[0] != '\0') {
       gst_tag_list_add (stream->pending_tags, GST_TAG_MERGE_REPLACE,
           GST_TAG_LANGUAGE_CODE, stream->lang, NULL);
+    }
+
+    if (demux->tag_list) {
+        gst_tag_list_add (demux->tag_list,
+            GST_TAG_MERGE_REPLACE, GST_TAG_SUBTITLE_CODEC, codec_mime, NULL);
     }
   
     demux->n_sub_streams++;
@@ -2670,26 +2677,31 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
         }
 
         if (GST_CLOCK_TIME_IS_VALID(demux->streams[n]->last_stop) &&
+            GST_CLOCK_TIME_IS_VALID(demux->streams[n]->last_start) &&
             demux->streams[n]->last_stop < min_time) {
           min_time = demux->streams[n]->last_stop;
         }
       }
 
-      if (GST_CLOCK_TIME_IS_VALID(stream->last_stop) &&
-          stream->last_stop + GST_SECOND <= min_time) {
+      GST_INFO ("min_time=%lld\n", min_time);
+
+      if (GST_CLOCK_TIME_IS_VALID(stream->time_position) &&
+          min_time != G_MAXINT64 &&
+          stream->time_position + GST_SECOND <= min_time) {
         if (stream->new_segment) {
           aiurdemux_send_stream_newsegment (demux, stream);
         }
 
-        //gint64 gap_dur = min_time - stream->last_stop;
-        GstEvent *gap = gst_event_new_gap (stream->last_stop, GST_SECOND);
-        stream->last_start = stream->last_stop;
-        stream->last_stop += GST_SECOND;
+        GstEvent *gap = gst_event_new_gap (stream->time_position, GST_SECOND);
+        stream->last_start = stream->time_position;
+        stream->last_stop = stream->time_position + GST_SECOND;
 
         gst_pad_push_event (stream->pad, gap);
         GST_INFO ("TEXT GAP event sent %d, time_position=%lld, "
             "last_start=%lld, last_stop=%lld\n", *track_idx,
             stream->time_position, stream->last_start, stream->last_stop);
+
+        stream->time_position = stream->last_stop;
       }
 
       goto readend;
@@ -3229,6 +3241,7 @@ static void aiurdemux_reset_stream (GstAiurDemux * demux, AiurDemuxStream * stre
     stream->last_ret = GST_FLOW_OK;
     stream->last_stop = 0;
     stream->last_start = GST_CLOCK_TIME_NONE;
+    stream->time_position = 0;
     stream->pending_eos = FALSE;
     stream->block = FALSE;
 
@@ -3253,10 +3266,10 @@ static void aiurdemux_reset_stream (GstAiurDemux * demux, AiurDemuxStream * stre
     
     AIUR_RESET_SAMPLE_STAT(stream->sample_stat);
 
-    
-
     demux->valid_mask |= stream->mask;
 
+    demux->sub_read_ready = TRUE;
+    demux->sub_read_cnt = 0;
 }
 
 static gboolean
