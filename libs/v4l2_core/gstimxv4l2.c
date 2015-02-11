@@ -1368,16 +1368,20 @@ gint gst_imx_v4l2_config_deinterlace (gpointer v4l2handle, gboolean do_deinterla
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
   struct v4l2_control ctrl;
 
-  if (do_deinterlace) {
-    ctrl.id = V4L2_CID_MXC_MOTION;
-    ctrl.value = motion;
-    if (ioctl(handle->v4l2_fd, VIDIOC_S_CTRL, &ctrl) < 0) {
-      GST_WARNING ("Set ctrl motion failed\n");
-      return -1;
+  if (gst_imx_v4l2_support_deinterlace(V4L2_BUF_TYPE_VIDEO_OUTPUT)) {
+    if (do_deinterlace) {
+      ctrl.id = V4L2_CID_MXC_MOTION;
+      ctrl.value = motion;
+      if (ioctl(handle->v4l2_fd, VIDIOC_S_CTRL, &ctrl) < 0) {
+        GST_WARNING ("Set ctrl motion failed\n");
+        return -1;
+      }
     }
-  }
 
-  handle->do_deinterlace = do_deinterlace;
+    handle->do_deinterlace = do_deinterlace;
+  } else {
+    handle->do_deinterlace = FALSE;
+  }
 
   return 0;
 }
@@ -1464,6 +1468,9 @@ gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
     return -1;
   }
 
+  GST_DEBUG ("Allocated v4l2buffer(%p), type(%d), memblk(%p), paddr(%p), size(%d).",
+      v4l2buf, v4l2buf->type, memblk, v4l2buf->m.offset, v4l2buf->length);
+
   memblk->size = v4l2buf->length;
   memblk->vaddr = mmap (NULL, v4l2buf->length, PROT_READ | PROT_WRITE, MAP_SHARED, handle->v4l2_fd, v4l2buf->m.offset);
   if (!memblk->vaddr) {
@@ -1476,13 +1483,13 @@ gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
     GST_ERROR ("VIDIOC_QUERYBUF for physical address failed.");
     return -1;
   }
-  memblk->paddr = (guint8*) v4l2buf->m.offset;
+  memblk->paddr = (guchar*) v4l2buf->m.offset;
   handle->buffer_pair[handle->allocated].paddr = memblk->paddr;
 
   handle->allocated ++;
 
-  GST_DEBUG ("Allocated v4l2buffer(%p), index(%d), memblk(%p), vaddr(%p), paddr(%p), size(%d).",
-      v4l2buf, handle->allocated - 1, memblk, memblk->vaddr, memblk->paddr, memblk->size);
+  GST_DEBUG ("Allocated v4l2buffer(%p), type(%d), index(%d), memblk(%p), vaddr(%p), paddr(%p), size(%d).",
+      v4l2buf, v4l2buf->type, handle->allocated - 1, memblk, memblk->vaddr, memblk->paddr, memblk->size);
 
   return 0;
 }
