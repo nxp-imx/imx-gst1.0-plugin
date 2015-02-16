@@ -374,6 +374,16 @@ imx_pxp_v4l2out_config_input (IMXV4l2Handle *handle, guint fmt, guint w, guint h
     return -1;
   }
 
+  if (ioctl(handle->v4l2_fd, VIDIOC_G_FMT, &v4l2fmt) < 0) {
+    GST_ERROR ("Get format failed.");
+    return -1;
+  }
+
+  if (v4l2fmt.fmt.pix.width < w || v4l2fmt.fmt.pix.height < h) {
+    GST_ERROR ("Resolution out of range %dx%d\n", w, h);
+    return -1;
+  }
+
   /* Set overlay source window */
   memset(&v4l2fmt, 0, sizeof(struct v4l2_format));
   v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY;
