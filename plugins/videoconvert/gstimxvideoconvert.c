@@ -960,39 +960,43 @@ imx_video_convert_propose_allocation(GstBaseTransform *transform,
 
   gst_query_parse_allocation (query, &caps, &need_pool);
 
-  if (caps == NULL) {
-    GST_ERROR_OBJECT (imxvct, "no caps specified.");
-    return FALSE;
+  if (need_pool) {
+    if (caps == NULL) {
+      GST_ERROR_OBJECT (imxvct, "no caps specified.");
+      return FALSE;
+    }
+
+    if (!gst_video_info_from_caps (&info, caps))
+      return FALSE;
+
+    size = GST_VIDEO_INFO_SIZE (&info);
+    size = PAGE_ALIGN(size);
+
+    GST_IMX_CONVERT_UNREF_BUFFER (imxvct->in_buf);
+    GST_IMX_CONVERT_UNREF_POOL(imxvct->in_pool);
+    GST_DEBUG_OBJECT(imxvct, "creating new input pool");
+    pool = gst_imx_video_convert_create_bufferpool(imxvct, caps, size, 1,
+                                                   IMX_VCT_IN_POOL_MAX_BUFFERS);
+    imxvct->in_pool = pool;
+    imxvct->pool_config_update = TRUE;
+
+    if (pool) {
+      GST_DEBUG_OBJECT (imxvct, "propose_allocation, pool(%p).", pool);
+      GstStructure *config = gst_buffer_pool_get_config (pool);
+      gst_buffer_pool_config_get_params (config, &caps, &size, NULL, NULL);
+      gst_structure_free (config);
+
+      gst_query_add_allocation_pool (query, pool, size, 1,
+                                     IMX_VCT_IN_POOL_MAX_BUFFERS);
+      gst_query_add_allocation_param (query, imxvct->allocator, NULL);
+    } else {
+      return FALSE;
+    }
   }
 
-  if (!gst_video_info_from_caps (&info, caps))
-    return FALSE;
+  gst_query_add_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL);
+  gst_query_add_allocation_meta (query, GST_VIDEO_CROP_META_API_TYPE, NULL);
 
-  size = GST_VIDEO_INFO_SIZE (&info);
-  size = PAGE_ALIGN(size);
-
-  GST_IMX_CONVERT_UNREF_BUFFER (imxvct->in_buf);
-  GST_IMX_CONVERT_UNREF_POOL(imxvct->in_pool);
-  GST_DEBUG_OBJECT(imxvct, "creating new input pool");
-  pool = gst_imx_video_convert_create_bufferpool(imxvct, caps, size, 1,
-                                                 IMX_VCT_IN_POOL_MAX_BUFFERS);
-  imxvct->in_pool = pool;
-  imxvct->pool_config_update = TRUE;
-
-  if (pool) {
-    GST_DEBUG_OBJECT (imxvct, "propose_allocation, pool(%p).", pool);
-    GstStructure *config = gst_buffer_pool_get_config (pool);
-    gst_buffer_pool_config_get_params (config, &caps, &size, NULL, NULL);
-    gst_structure_free (config);
-
-    gst_query_add_allocation_pool (query, pool, size, 1,
-                                   IMX_VCT_IN_POOL_MAX_BUFFERS);
-    gst_query_add_allocation_param (query, imxvct->allocator, NULL);
-    gst_query_add_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL);
-    gst_query_add_allocation_meta (query, GST_VIDEO_CROP_META_API_TYPE, NULL);
-  } else {
-    return FALSE;
-  }
   return TRUE;
 }
 
