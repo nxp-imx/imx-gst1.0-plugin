@@ -98,11 +98,11 @@ if test "x$HAVE_PKGCONFIG" = "xno"; then
 fi
 
 dnl check target type
-if  test "$PLATFORM" = "MX6" || test "$PLATFORM" = "MX6SL" || test "$PLATFORM" = "MX6SX" ;
+if  test "$PLATFORM" = "MX6" || test "$PLATFORM" = "MX6SL" || test "$PLATFORM" = "MX6SX" || test "$PLATFORM" = "MX7D" ;
 then
   AC_MSG_NOTICE(build for $PLATFORM)
 else
-  AC_MSG_ERROR(No target platform specified! Use ./configure PLATFORM=(MX6/MX6SL/MX6SX) to retry)
+  AC_MSG_ERROR(No target platform specified! Use ./configure PLATFORM=(MX6/MX6SL/MX6SX/MX7D) to retry)
 fi
 
 AC_SUBST(PLATFORM)
@@ -247,6 +247,7 @@ AM_CONDITIONAL(PLATFORM_IS_MX6X, test "x$PLATFORM" = "xMX6" || test "x$PLATFORM"
 AM_CONDITIONAL(PLATFORM_IS_MX6, test "x$PLATFORM" = "xMX6")
 AM_CONDITIONAL(PLATFORM_IS_MX6SL, test "x$PLATFORM" = "xMX6SL")
 AM_CONDITIONAL(PLATFORM_IS_MX6SX, test "x$PLATFORM" = "xMX6SX")
+AM_CONDITIONAL(PLATFORM_IS_MX7D, test "x$PLATFORM" = "xMX7D")
 
 
 CHECK_DISABLE_FEATURE(mp3enc, [Disable mp3 encoder plugin], [MP3_ENC], [mp3_enc_interface.h], [plugin: imxmp3enc])

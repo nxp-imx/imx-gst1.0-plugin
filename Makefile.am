@@ -22,10 +22,6 @@ if USE_WMA8_ENC
 WMA8ENC_DIR =
 endif
 
-if USE_OVERLAY_SINK
-OVERLAYSINKDIRS = plugins/overlay_sink
-endif
-
 AVBDIRS = plugins/avb
 
 VIDEO_CONVERT_DIRS = plugins/videoconvert
@@ -33,9 +29,13 @@ VIDEO_CONVERT_DIRS = plugins/videoconvert
 TOOLDIRS =    tools/                      \
               tools/gplay
 
-BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS) $(OVERLAYSINKDIRS) $(VIDEO_CONVERT_DIRS)
+BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS) $(VIDEO_CONVERT_DIRS)
               
 if PLATFORM_IS_MX6
+
+if USE_OVERLAY_SINK
+OVERLAYSINKDIRS = plugins/overlay_sink
+endif
 
 if USE_VPU_WRAP
 VPUWRAPDIRS = plugins/vpu
@@ -45,17 +45,33 @@ endif
 
 if PLATFORM_IS_MX6SL
 
+if USE_OVERLAY_SINK
+OVERLAYSINKDIRS = plugins/overlay_sink
+endif
+
 VPUWRAPDIRS =
 
 endif
 
 if PLATFORM_IS_MX6SX
 
+if USE_OVERLAY_SINK
+OVERLAYSINKDIRS = plugins/overlay_sink
+endif
+
 VPUWRAPDIRS =
 
 endif
 
-SUBDIRS =  $(LIBSDIRS) $(BASEDIRS) $(VPUWRAPDIRS) $(WMA8ENC_DIR) $(MP3ENC_DIR) $(TOOLDIRS)
+if PLATFORM_IS_MX7D
+
+OVERLAYSINKDIRS =
+
+VPUWRAPDIRS =
+
+endif
+
+SUBDIRS =  $(LIBSDIRS) $(BASEDIRS) $(OVERLAYSINKDIRS) $(VPUWRAPDIRS) $(WMA8ENC_DIR) $(MP3ENC_DIR) $(TOOLDIRS)
 
 
 
