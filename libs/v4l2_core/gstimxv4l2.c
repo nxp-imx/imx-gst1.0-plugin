@@ -713,7 +713,11 @@ gst_imx_v4l2_get_caps (gpointer v4l2handle)
     }
   }
 
-  return gst_caps_simplify(caps);
+  if (caps) {
+    return gst_caps_simplify(caps);
+  } else {
+    return NULL;
+  }
 }
 
 guint
@@ -1137,7 +1141,9 @@ gst_imx_v4l2capture_get_device_caps ()
       if (!caps)
         caps = gst_caps_new_empty ();
       if (caps) {
-        gst_caps_append (caps, gst_imx_v4l2_get_caps(v4l2handle));
+        GstCaps *dev_caps = gst_imx_v4l2_get_caps(v4l2handle);
+        if (dev_caps)
+          gst_caps_append (caps, dev_caps);
       }
       gst_imx_v4l2_close_device (v4l2handle);
       v4l2handle = NULL;
