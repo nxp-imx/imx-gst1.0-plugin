@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -27,6 +27,14 @@ typedef struct {
   PhyMemBlock block;
 } GstMemoryPhy;
 
+static int
+default_copy (GstAllocatorPhyMem *allocator, PhyMemBlock *dst_mem,
+              PhyMemBlock *src_mem, guint offset, guint size)
+{
+  GST_WARNING ("No default copy implementation for physical memory allocator.\n");
+  return -1;
+}
+
 static gpointer
 gst_phymem_map (GstMemory * mem, gsize maxsize, GstMapFlags flags)
 {
@@ -44,8 +52,38 @@ gst_phymem_unmap (GstMemory * mem)
 static GstMemory *
 gst_phymem_copy (GstMemory * mem, gssize offset, gssize size)
 {
-  GST_ERROR("Not implemented mem_copy in gstallocatorphymem.\n");
-  return NULL;
+  GstAllocatorPhyMemClass *klass;
+  GstMemoryPhy *src_mem = (GstMemoryPhy *)mem;
+
+  GstMemoryPhy *dst_mem = g_slice_alloc(sizeof(GstMemoryPhy));
+  if(dst_mem == NULL) {
+    GST_ERROR("Can't allocate for GstMemoryPhy structure.\n");
+    return NULL;
+  }
+
+  klass = GST_ALLOCATOR_PHYMEM_CLASS(G_OBJECT_GET_CLASS(mem->allocator));
+  if(klass == NULL) {
+    GST_ERROR("Can't get class from allocator object.\n");
+    return NULL;
+  }
+
+  if(klass->copy_phymem((GstAllocatorPhyMem*)mem->allocator,
+                         &dst_mem->block, &src_mem->block, offset, size) < 0) {
+    GST_ERROR("Copy phymem %d failed.\n", size);
+    return NULL;
+  }
+
+  GST_DEBUG ("copied phymem, vaddr(%p), paddr(%p), size(%d).\n",
+      dst_mem->block.vaddr, dst_mem->block.paddr, dst_mem->block.size);
+
+  dst_mem->vaddr = dst_mem->block.vaddr;
+  dst_mem->paddr = dst_mem->block.paddr;
+
+  gst_memory_init (GST_MEMORY_CAST (dst_mem), mem->mini_object.flags,
+                   mem->allocator, NULL, mem->maxsize, mem->align,
+                   mem->offset, mem->size);
+
+  return (GstMemory*)dst_mem;
 }
 
 static GstMemory *
@@ -144,7 +182,7 @@ base_free (GstAllocator * allocator, GstMemory * mem)
 
   phymem = (GstMemoryPhy*)mem;
 
-  GST_DEBUG ("free phymem, vaddr(%p), paddr(%p), size(%d).\n", 
+  GST_DEBUG ("free phymem, vaddr(%p), paddr(%p), size(%d).\n",
       phymem->block.vaddr, phymem->block.paddr, phymem->block.size);
 
   klass->free_phymem((GstAllocatorPhyMem*)allocator, &phymem->block);
@@ -180,6 +218,7 @@ gst_allocator_phymem_class_init (GstAllocatorPhyMemClass * klass)
   allocator_class->free = base_free;
   klass->alloc_phymem = default_alloc;
   klass->free_phymem = default_free;
+  klass->copy_phymem = default_copy;
 }
 
 static void

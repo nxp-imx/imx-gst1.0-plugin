@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -364,6 +364,7 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
         + GST_VPU_DEC_FRAMES_PLUS (dec->vpu_dec_object);
   GST_VPU_DEC_ACTUAL_BUF_CNT (dec->vpu_dec_object) = min;
   params.align = GST_VPU_DEC_BUF_ALIGNMENT (dec->vpu_dec_object);
+  params.flags |= GST_MEMORY_FLAG_READONLY;
   GST_INFO_OBJECT (dec, "vpudec frame buffer count: %d.\n", \
       GST_VPU_DEC_ACTUAL_BUF_CNT (dec->vpu_dec_object));
 

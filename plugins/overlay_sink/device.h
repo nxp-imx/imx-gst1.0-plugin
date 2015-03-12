@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -38,6 +38,8 @@ gint compositor_device_update_surface_info (gpointer device, SurfaceInfo *surfac
 gint compositor_device_blit_surface (gpointer device, gpointer surface, SurfaceBuffer *buffer, SurfaceBuffer *dest);
 gint compositor_device_allocate_memory (gpointer device, PhyMemBlock *memblk);
 gint compositor_device_free_memory (gpointer device, PhyMemBlock *memblk);
+gint compositor_device_copy_memory (gpointer device, PhyMemBlock *dst_mem,
+    PhyMemBlock *src_mem, guint offset, guint size);
 gint compositor_device_copy (gpointer device, PhyMemBlock *dstblk, PhyMemBlock *srcblk);
 
 #endif

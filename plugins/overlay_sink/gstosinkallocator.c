@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -49,6 +49,21 @@ osink_free_memory (GstAllocatorPhyMem *allocator, PhyMemBlock *memblk)
   return 0;
 }
 
+static int
+osink_copy_memory (GstAllocatorPhyMem *allocator, PhyMemBlock *dst_mem,
+    PhyMemBlock *src_mem, guint offset, guint size)
+{
+  GstAllocatorOsink *osink_allocator = GST_ALLOCATOR_OSINK(allocator);
+
+  if (osink_object_copy_memory (osink_allocator->hosink_obj,
+      dst_mem, src_mem, offset, size) < 0) {
+    GST_ERROR ("osink copy memory failed.");
+    return -1;
+  }
+
+  return 0;
+}
+
 G_DEFINE_TYPE (GstAllocatorOsink, gst_allocator_osink, GST_TYPE_ALLOCATOR_PHYMEM);
 
   static void
@@ -60,6 +75,7 @@ gst_allocator_osink_class_init (GstAllocatorOsinkClass * klass)
 
   parent_class->alloc_phymem = osink_allocate_memory;
   parent_class->free_phymem = osink_free_memory;
+  parent_class->copy_phymem = osink_copy_memory;
 }
 
 static void

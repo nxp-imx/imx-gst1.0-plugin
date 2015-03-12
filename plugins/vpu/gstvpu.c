@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -116,7 +116,7 @@ gst_vpu_register_frame_buffer (GList * gstbuffer_in_vpudec, \
         i, buffer);
     vpu_frame = &(vpuframebuffers[i]);
 
-    if (!gst_video_frame_map (&frame, info, buffer, GST_MAP_WRITE)) {
+    if (!gst_video_frame_map (&frame, info, buffer, GST_MAP_READ)) {
       GST_ERROR ("Could not map video buffer");
       return FALSE;
     }

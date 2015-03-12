@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -52,6 +52,8 @@ struct _GstAllocatorPhyMemClass {
   GstAllocatorClass parent_class;
   int (*alloc_phymem) (GstAllocatorPhyMem *allocator, PhyMemBlock *phy_mem);
   int (*free_phymem) (GstAllocatorPhyMem *allocator, PhyMemBlock *phy_mem);
+  int (*copy_phymem) (GstAllocatorPhyMem *allocator, PhyMemBlock *det_mem,
+                      PhyMemBlock *src_mem, guint offset, guint size);
 };
 
 GType gst_allocator_phymem_get_type (void);

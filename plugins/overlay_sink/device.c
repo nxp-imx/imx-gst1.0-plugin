@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -268,7 +268,8 @@ g2d_device_free_memory (gpointer device, PhyMemBlock *memblk)
 }
 
 static gint
-g2d_device_copy (gpointer device, PhyMemBlock *dstblk, PhyMemBlock *srcblk)
+g2d_device_copy (gpointer device, PhyMemBlock *dstblk, PhyMemBlock *srcblk,
+    guint offset, guint size)
 {
   void *g2d_handle = NULL;
   struct g2d_buf src, dst;
@@ -279,16 +280,47 @@ g2d_device_copy (gpointer device, PhyMemBlock *dstblk, PhyMemBlock *srcblk)
   }
 
   src.buf_handle = NULL;
-  src.buf_vaddr = srcblk->vaddr;
-  src.buf_paddr = srcblk->paddr;
-  src.buf_size = srcblk->size;
+  src.buf_vaddr = srcblk->vaddr + offset;
+  src.buf_paddr = srcblk->paddr + offset;
+  src.buf_size = srcblk->size - offset;
   dst.buf_handle = NULL;
   dst.buf_vaddr = dstblk->vaddr;
   dst.buf_paddr = dstblk->paddr;
   dst.buf_size = dstblk->size;
-  g2d_copy (g2d_handle, &dst, &src, dstblk->size);
 
+  if (size < 0)
+    size = dst.buf_size;
+
+  g2d_copy (g2d_handle, &dst, &src, size);
+  g2d_finish(g2d_handle);
   g2d_close (g2d_handle);
+}
+
+static gint
+g2d_device_copy_memory (gpointer device, PhyMemBlock *dst_mem,
+    PhyMemBlock *src_mem, guint offset, guint size)
+{
+  struct g2d_buf *pbuf = NULL;
+
+  dst_mem->size = src_mem->size;
+
+  pbuf = g2d_alloc (dst_mem->size, 0);
+  if (!pbuf) {
+    GST_ERROR ("g2d_alloc failed.");
+    return -1;
+  }
+  dst_mem->vaddr = (gchar*) pbuf->buf_vaddr;
+  dst_mem->paddr = (gchar*) pbuf->buf_paddr;
+  dst_mem->user_data = (gpointer) pbuf;
+
+  g2d_device_copy (device, dst_mem, src_mem, offset, size);
+
+  GST_LOG ("g2d copy from vaddr (%p), paddr (%p), size (%d) to "
+      "vaddr (%p), paddr (%p), size (%d)",
+      src_mem->vaddr, src_mem->paddr, src_mem->size,
+      dst_mem->vaddr, dst_mem->paddr, dst_mem->size);
+
+  return 0;
 }
 
 // global functions
@@ -339,7 +371,13 @@ gint compositor_device_free_memory (gpointer device, PhyMemBlock *memblk)
   return g2d_device_free_memory (device, memblk);
 }
 
+gint compositor_device_copy_memory (gpointer device, PhyMemBlock *dst_mem,
+    PhyMemBlock *src_mem, guint offset, guint size)
+{
+  return g2d_device_copy_memory (device, dst_mem, src_mem, offset, size);
+}
+
 gint compositor_device_copy (gpointer device, PhyMemBlock *dstblk, PhyMemBlock *srcblk)
 {
-  return g2d_device_copy (device, dstblk, srcblk);
+  return g2d_device_copy (device, dstblk, srcblk, 0, dstblk->size);
 }

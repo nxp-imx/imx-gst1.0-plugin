@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -36,6 +36,8 @@ int osink_object_update_overlay (gpointer ohandle, gpointer overlay, SurfaceBuff
 gint64 osink_object_get_overlay_showed_frames (gpointer ohandle, gpointer overlay);
 int osink_object_allocate_memory (gpointer handle, PhyMemBlock *memblk);
 int osink_object_free_memory (gpointer handle, PhyMemBlock *memblk);
+int osink_object_copy_memory (gpointer osink_handle, PhyMemBlock *dst_mem,
+    PhyMemBlock *src_mem, guint offset, guint size);
 void osink_object_set_global_alpha(gpointer ohandle, gint display_idx, gint alpha);
 void osink_object_set_color_key(gpointer ohandle, gint display_idx, gboolean enable, guint colorkey);
 

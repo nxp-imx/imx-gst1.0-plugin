@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -630,6 +630,30 @@ int osink_object_free_memory (gpointer osink_handle, PhyMemBlock *memblk)
   UNLOCK (glock);
 
   osink_object_unref (osink_handle);
+
+  return ret ;
+}
+
+int osink_object_copy_memory (gpointer osink_handle, PhyMemBlock *dst_mem,
+    PhyMemBlock *src_mem, guint offset, guint size)
+{
+  gint ret;
+  OSinkHandle *handle;
+  OSINK_MAKE_HANDLE (-1);
+  GET_LOCK (-1);
+
+  LOCK (glock);
+  ret = compositor_device_copy_memory (handle->hdevice[0], dst_mem, src_mem,
+      offset, size);
+  UNLOCK (glock);
+
+  if (ret >= 0)
+    osink_object_ref (osink_handle);
+
+  GST_DEBUG ("copy memory, vaddr (%p), paddr (%p), size (%d) "
+      "to memory vaddr (%p), paddr (%p), size (%d)",
+      src_mem->vaddr, src_mem->paddr, src_mem->size,
+      dst_mem->vaddr, dst_mem->paddr, dst_mem->size);
 
   return ret ;
 }
