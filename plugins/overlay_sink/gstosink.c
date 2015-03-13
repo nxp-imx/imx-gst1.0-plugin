@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2014-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -328,7 +328,12 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
         }
 
         if (sink->pool) {
-          gst_buffer_pool_set_active (sink->pool, FALSE);
+          // only deactivate pool if pool activated by own, up stream element
+          // may still using it
+          if (sink->pool_activated) {
+            gst_buffer_pool_set_active (sink->pool, FALSE);
+            sink->pool_activated = FALSE;
+          }
           gst_object_unref (sink->pool);
           sink->pool = NULL;
         }
@@ -658,6 +663,7 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
       return GST_FLOW_ERROR;
     }
 
+    sink->pool_activated = TRUE;
     gst_buffer_pool_acquire_buffer (sink->pool, &buffer2, NULL);
     if (!buffer2) {
       GST_ERROR_OBJECT (sink, "acquire buffer from pool(%p) failed.", sink->pool);
@@ -677,9 +683,10 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
     buffer = buffer2;
     sink->no_phy_buffer = TRUE;
-  }
-  else
+  } else {
     gst_buffer_ref (buffer);
+    sink->no_phy_buffer = FALSE;
+  }
 
   if (gst_overlay_sink_get_surface_buffer (buffer, &surface_buffer) < 0) {
     GST_ERROR_OBJECT (sink, "Can't get surface buffer from gst buffer (%p).", buffer);
@@ -956,6 +963,10 @@ gst_overlay_sink_init (GstOverlaySink * overlay_sink)
   }
 
   overlay_sink->disp_on[0] = TRUE;
+  overlay_sink->no_phy_buffer = FALSE;
+  overlay_sink->pool_activated = FALSE;
+  overlay_sink->pool_alignment_checked = FALSE;
+
 #ifdef USE_X11
   overlay_sink->imxoverlay = gst_imx_video_overlay_init ((GstElement *)overlay_sink,
                                               overlay_sink_update_video_geo,

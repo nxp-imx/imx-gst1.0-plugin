@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2014-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -67,6 +67,7 @@ struct _GstOverlaySink {
   GstVideoAlignment video_align;
   gboolean pool_alignment_checked;
   gboolean no_phy_buffer;
+  gboolean pool_activated;
   guint64 frame_showed;
   gint min_buffers;
   gint max_buffers;

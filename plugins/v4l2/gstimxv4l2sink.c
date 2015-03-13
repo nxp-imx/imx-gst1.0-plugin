@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -293,7 +293,12 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
           return GST_STATE_CHANGE_FAILURE;
         }
         if (v4l2sink->pool) {
-          gst_buffer_pool_set_active (v4l2sink->pool, FALSE);
+          // only deactivate pool if pool activated by own, up stream element
+          // may still using it
+          if (v4l2sink->pool_activated) {
+            gst_buffer_pool_set_active (v4l2sink->pool, FALSE);
+            v4l2sink->pool_activated = FALSE;
+          }
           gst_object_unref (v4l2sink->pool);
           v4l2sink->pool = NULL;
         }
@@ -639,6 +644,7 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
       return GST_FLOW_ERROR;
     }
 
+    v4l2sink->pool_activated = TRUE;
     gst_buffer_pool_acquire_buffer (v4l2sink->pool, &v4l2_buffer, NULL);
     if (!v4l2_buffer) {
       GST_ERROR_OBJECT (v4l2sink, "acquire buffer from pool(%p) failed.", v4l2sink->pool);
@@ -914,6 +920,8 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   v4l2sink->keep_video_ratio = FALSE;
   v4l2sink->frame_showed = 0;
   v4l2sink->min_buffers = gst_imx_v4l2_get_min_buffer_num (V4L2_BUF_TYPE_VIDEO_OUTPUT);
+  v4l2sink->pool_activated = FALSE;
+
 #ifdef USE_X11
   v4l2sink->imxoverlay = gst_imx_video_overlay_init ((GstElement *)v4l2sink,
                                               v4l2sink_update_video_geo,

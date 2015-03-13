@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -61,6 +61,7 @@ struct _GstImxV4l2Sink {
   guint64 frame_showed;
   guint min_buffers;
   gboolean self_pool_configed;
+  gboolean pool_activated;
 #ifdef USE_X11
   void *imxoverlay;
 #endif
