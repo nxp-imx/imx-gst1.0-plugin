@@ -528,7 +528,7 @@ gst_imx_v4l2_get_default_device_name (gint type)
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
     if (imx_chip_code () == CC_MX6Q)
       devname = (char*)"/dev/video17";
-    else if (imx_chip_code () == CC_MX60)
+    else if (imx_chip_code () == CC_MX60 || imx_chip_code () == CC_MX7D)
       devname = (char*)"/dev/video0";
     else {
       GST_ERROR ("UNKNOWN imx SoC.");
@@ -551,7 +551,7 @@ gst_imx_v4l2_get_min_buffer_num (gint type)
 {
   gint num;
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-    if (imx_chip_code () == CC_MX60)
+    if (imx_chip_code () == CC_MX60 || imx_chip_code () == CC_MX7D)
       num = MAX (V4L2_HOLDED_BUFFERS, MX60_STREAMON_COUNT);
     else if (imx_chip_code () == CC_MX6Q)
       num = MAX (V4L2_HOLDED_BUFFERS, MX6Q_STREAMON_COUNT);
@@ -757,7 +757,7 @@ gst_imx_v4l2_support_deinterlace (gint type)
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
     if (imx_chip_code () == CC_MX6Q)
       return TRUE;
-    else if (imx_chip_code () == CC_MX60)
+    else if (imx_chip_code () == CC_MX60 || imx_chip_code () == CC_MX7D)
       return FALSE;
     else {
       GST_ERROR ("UNKNOWN imx SoC.");
@@ -1050,7 +1050,7 @@ gpointer gst_imx_v4l2_open_device (gchar *device, int type)
       handle->dev_itf.v4l2out_config_colorkey = (V4l2outConfigColorkey) imx_ipu_v4l2_config_colorkey;
       handle->streamon_count = MX6Q_STREAMON_COUNT;
     }
-    else if (imx_chip_code () == CC_MX60) {
+    else if (imx_chip_code () == CC_MX60 || imx_chip_code () == CC_MX7D) {
       handle->dev_itf.v4l2out_config_input = (V4l2outConfigInput)imx_pxp_v4l2out_config_input;
       handle->dev_itf.v4l2out_config_output = (V4l2outConfigOutput)imx_pxp_v4l2out_config_output;
       handle->dev_itf.v4l2out_config_rotate = (V4l2outConfigRotate)imx_pxp_v4l2out_config_rotate;

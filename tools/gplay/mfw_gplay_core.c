@@ -32,6 +32,7 @@
 
 #include "mfw_gplay_core.h"
 #include "gst_snapshot.h"
+#include "../../libs/gstimxcommon.h"
 
 #define DEFAULT_PLAYBACK_RATE 1.0
 #define DEFAULT_VOLUME 1.0
@@ -795,7 +796,11 @@ fsl_player_handle fsl_player_init(fsl_player_config * config)
     }
 
     if (!config->video_sink_name)
-      config->video_sink_name = "overlaysink";
+      if(imx_chip_code () == CC_MX7D) {
+        config->video_sink_name= "imxv4l2sink";
+      }else {
+        config->video_sink_name = "overlaysink";
+      }
 
     g_print("Generate VideoSink %s\n", config->video_sink_name);
     pproperty->video_sink = gst_parse_bin_from_description (config->video_sink_name, TRUE, NULL);

@@ -70,6 +70,7 @@ typedef enum
   CC_MX53 = CHIPCODE ('M', 'X', '5', '3'),
   CC_MX6Q = CHIPCODE ('M', 'X', '6', 'Q'),
   CC_MX60 = CHIPCODE ('M', 'X', '6', '0'),
+  CC_MX7D = CHIPCODE ('M', 'X', '7', 'D'),
   CC_UNKN = CHIPCODE ('U', 'N', 'K', 'N'),
 
 } CHIP_CODE;
@@ -154,7 +155,8 @@ static SOC_INFO soc_info[] = {
   {CC_MX6Q, "i.MX6DL"},
   {CC_MX6Q, "i.MX6Q"},
   {CC_MX60, "i.MX6SL"},
-  {CC_MX60, "i.MX6SX"}
+  {CC_MX60, "i.MX6SX"},
+  {CC_MX7D, "i.MX7D"},
 };
 
 static CHIP_CODE
