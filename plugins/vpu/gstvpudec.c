@@ -162,6 +162,8 @@ gst_vpu_dec_init (GstVpuDec * dec)
   GST_VPU_DEC_FRAME_DROP (dec->vpu_dec_object) = DEFAULT_ADAPTIVE_FRAME_DROP;
   GST_VPU_DEC_FRAMES_PLUS (dec->vpu_dec_object) = DEFAULT_FRAMES_PLUS;
   GST_VPU_DEC_MIN_BUF_CNT (dec->vpu_dec_object) = 0;
+  dec->vpu_dec_object->use_my_pool = FALSE;
+  dec->vpu_dec_object->use_my_allocator = FALSE;
 
   /* As VPU can support stream mode. need call parser before decode */
   gst_video_decoder_set_packetized (GST_VIDEO_DECODER (dec), TRUE);
@@ -331,6 +333,37 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     update_pool = FALSE;
   }
 
+  if (dec->vpu_dec_object->use_my_allocator) {
+    /* video track selection case. don't change pool for smoothly video track
+     * selection */
+    GstStructure *config;
+    GstCaps *caps;
+    GstBufferPool *pool_pre = gst_video_decoder_get_buffer_pool (bdec);
+    config = gst_buffer_pool_get_config (pool_pre);
+    gst_buffer_pool_config_get_params (config, &caps, NULL, NULL, NULL);
+
+    GST_DEBUG_OBJECT (dec, "outcaps caps %" GST_PTR_FORMAT, outcaps);
+    GST_DEBUG_OBJECT (dec, "VPU output caps %" GST_PTR_FORMAT, caps);
+    if (gst_caps_is_equal (outcaps, caps)) {
+      GST_DEBUG_OBJECT (dec, "using previous buffer pool.\n");
+      max = min += GST_VPU_DEC_MIN_BUF_CNT (dec->vpu_dec_object) \
+            + GST_VPU_DEC_FRAMES_PLUS (dec->vpu_dec_object);
+
+      if (update_pool)
+        gst_query_set_nth_allocation_pool (query, 0, pool_pre, size, min, max);
+      else
+        gst_query_add_allocation_pool (query, pool_pre, size, min, max);
+
+      gst_structure_free (config);
+      gst_object_unref (pool_pre);
+
+      return TRUE;
+    }
+
+    gst_structure_free (config);
+    gst_object_unref (pool_pre);
+  }
+
   if (allocator == NULL || !GST_IS_ALLOCATOR_PHYMEM (allocator)) {
     /* no allocator or isn't physical memory allocator. VPU need continus
      * physical memory. use VPU memory allocator. */
@@ -339,6 +372,9 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     }
     GST_DEBUG_OBJECT (dec, "using vpu allocator.\n");
     allocator = gst_vpu_allocator_obtain();
+    dec->vpu_dec_object->use_my_allocator = TRUE;
+  } else {
+    dec->vpu_dec_object->use_my_allocator = FALSE;
   }
 
   if (pool) {
@@ -351,13 +387,14 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     }
   }
 
-  dec->vpu_dec_object->use_my_pool = FALSE;
   dec->vpu_dec_object->pool_alignment_checked = FALSE;
   if (pool == NULL) {
     /* no pool, we can make our own */
     GST_DEBUG_OBJECT (dec, "no pool, making new pool");
     pool = gst_video_buffer_pool_new ();
     dec->vpu_dec_object->use_my_pool = TRUE;
+  } else {
+    dec->vpu_dec_object->use_my_pool = FALSE;
   }
 
   max = min += GST_VPU_DEC_MIN_BUF_CNT (dec->vpu_dec_object) \
