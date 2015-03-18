@@ -466,6 +466,9 @@ gst_overlay_sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
   sink->surface_info.src.bottom = h;
   sink->surface_info.src.width = w;
   sink->surface_info.src.height = h;
+  /* one video frame which allocate by VPU may arrived before propose_allocation.
+   * need check alignment for the video frame. */
+  sink->pool_alignment_checked = FALSE;
 
   for (i=0; i<sink->disp_count; i++) {
     if (sink->disp_on[i]) {
@@ -510,6 +513,8 @@ gst_overlay_sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
       GST_ERROR_OBJECT (sink, "no caps specified.");
       return FALSE;
     }
+
+    GST_DEBUG_OBJECT (sink, "prosal set caps %" GST_PTR_FORMAT, caps);
 
     if (sink->pool) {
       /* must re-allocate buffer pool as up-stream need set config, video buffer
@@ -593,30 +598,31 @@ static gint
 gst_overlay_sink_check_alignment (GstOverlaySink *sink, GstBuffer *buffer)
 {
   if (!sink->pool_alignment_checked) {
-    if (!sink->no_phy_buffer && !gst_buffer_pool_is_active (sink->pool)) {
-      GstPhyMemMeta *phymemmeta = NULL;
-      memset (&sink->video_align, 0, sizeof(GstVideoAlignment));
+    /* one video frame which allocate by VPU will arrived video sink when video 
+     * track selection. But pool still active and the pool is used for previous
+     * video track. So check video physical meta first, if no, check pool. */
+    GstPhyMemMeta *phymemmeta = NULL;
+    memset (&sink->video_align, 0, sizeof(GstVideoAlignment));
 
-      phymemmeta = GST_PHY_MEM_META_GET (buffer);
-      if (phymemmeta) {
-        sink->video_align.padding_right = phymemmeta->x_padding;
-        sink->video_align.padding_bottom = phymemmeta->y_padding;
-        GST_DEBUG_OBJECT (sink, "physical memory meta x_padding: %d y_padding: %d",
-            phymemmeta->x_padding, phymemmeta->y_padding);
-      }
+    phymemmeta = GST_PHY_MEM_META_GET (buffer);
+    if (phymemmeta) {
+      sink->video_align.padding_right = phymemmeta->x_padding;
+      sink->video_align.padding_bottom = phymemmeta->y_padding;
+      GST_DEBUG_OBJECT (sink, "physical memory meta x_padding: %d y_padding: %d",
+          phymemmeta->x_padding, phymemmeta->y_padding);
     } else {
-      GstStructure *config;
-      config = gst_buffer_pool_get_config (sink->pool);
+      if (sink->pool && gst_buffer_pool_is_active (sink->pool)) {
+        GstStructure *config;
+        config = gst_buffer_pool_get_config (sink->pool);
 
-      // check if has alignment option setted.
-      memset (&sink->video_align, 0, sizeof(GstVideoAlignment));
-      if (gst_buffer_pool_config_has_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
-        gst_buffer_pool_config_get_video_alignment (config, &sink->video_align);
-        GST_DEBUG_OBJECT (sink, "pool has alignment (%d, %d) , (%d, %d)",
-            sink->video_align.padding_left, sink->video_align.padding_top,
-            sink->video_align.padding_right, sink->video_align.padding_bottom);
+        if (gst_buffer_pool_config_has_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
+          gst_buffer_pool_config_get_video_alignment (config, &sink->video_align);
+          GST_DEBUG_OBJECT (sink, "pool has alignment (%d, %d) , (%d, %d)",
+              sink->video_align.padding_left, sink->video_align.padding_top,
+              sink->video_align.padding_right, sink->video_align.padding_bottom);
+        }
+        gst_structure_free (config);
       }
-      gst_structure_free (config);
     }
 
     sink->pool_alignment_checked = TRUE;
