@@ -1353,7 +1353,6 @@ static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
       && !aiurcontent_is_random_access(demux->content_info))
         aiurdemux_check_start_offset(demux, stream);
 
-    
     aiurdemux_adjust_timestamp (demux, stream, stream->buffer);
 
     //send new segment
@@ -2916,7 +2915,16 @@ static gint aiurdemux_choose_next_stream (GstAiurDemux * demux)
       track_index = stream->track_idx;
       break;
     }
-  
+
+    if (stream->last_stop == GST_CLOCK_TIME_NONE) {
+      if (stream->buf_queue && !g_queue_is_empty(stream->buf_queue)) {
+        track_index = stream->track_idx;
+        break;
+      } else {
+        continue;
+      }
+    }
+
     if (min_time >= 0) {
       if (stream->last_stop < min_time) {
         min_time = stream->last_stop;
@@ -3043,6 +3051,8 @@ aiurdemux_update_stream_position (GstAiurDemux * demux,
         demux->movie_duration = GST_BUFFER_TIMESTAMP (buffer);
       }
     }
+  } else {
+    stream->last_stop = GST_CLOCK_TIME_NONE;
   }
 }
 
