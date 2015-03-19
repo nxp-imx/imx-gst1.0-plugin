@@ -1,4 +1,4 @@
-SUBDIRS = gplay
+SUBDIRS = gplay grecorder
 
-DIST_SUBDIRS = gplay
+DIST_SUBDIRS = gplay grecorder
 

@@ -895,6 +895,14 @@ setup_pipeline (gRecorderEngine *recorder)
         recorder->mode == MODE_VIDEO ? MODE_IMAGE : MODE_VIDEO, NULL);
   }
 
+  //FIXME: shouldn't need those code. will check later.
+  if (GST_IS_VIDEO_OVERLAY (recorder->viewfinder_sink)) {
+    gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(recorder->viewfinder_sink),
+        recorder->window);
+  } else {
+    g_warning ("view finder sink isn't video overlay.\n");
+  }
+
   if (GST_STATE_CHANGE_FAILURE ==
       gst_element_set_state (recorder->camerabin, GST_STATE_READY)) {
     g_warning ("can't set camerabin to ready\n");
@@ -1446,6 +1454,10 @@ static REresult set_preview_region(RecorderEngineHandle handle, REVideoRect *rec
 static REresult set_preview_win_id(RecorderEngineHandle handle, void *wid)
 {
   RecorderEngine *h = (RecorderEngine *)(handle);
+  gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
+
+  recorder->window = (guintptr)wid;
+
   return RE_RESULT_SUCCESS;
 }
 
@@ -1973,6 +1985,7 @@ RecorderEngine * recorder_engine_create()
   h->prepare = prepare;
   h->start = start;
   h->pause = pause;
+  h->resume = resume;
   h->stop = stop;
   h->close = close;
   h->reset = reset;
