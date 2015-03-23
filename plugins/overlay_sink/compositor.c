@@ -36,8 +36,19 @@ GST_DEBUG_CATEGORY_EXTERN (overlay_sink_debug);
   (((a)->right <= (b)->left) || ((a)->left >= (b)->right) \
    || ((a)->bottom <= (b)->top) || ((a)->top >= (b)->bottom))
 
-#define COMPOSITOR_WAIT_SURFACE(h) (g_cond_wait (&((h)->cond), &((h)->lock)))
-#define COMPOSITOR_POST_SURFACE(h) (g_cond_signal (&((h)->cond)))
+#define COMPOSITOR_WAIT_SURFACE(h) \
+  do { \
+    g_mutex_lock(&((h)->lock));  \
+    g_cond_wait (&((h)->cond), &((h)->lock)); \
+    g_mutex_unlock(&((h)->lock)); \
+  } while (0);
+
+#define COMPOSITOR_POST_SURFACE(h)  \
+  do { \
+    g_mutex_lock(&((h)->lock));  \
+    g_cond_signal (&((h)->cond)); \
+    g_mutex_unlock(&((h)->lock)); \
+  } while (0);
 
 typedef struct _Surface Surface;
 struct _Surface{
