@@ -782,7 +782,7 @@ int main(int argc,char *argv[])
     config.api_version = GPLAYCORE_API_VERSION;
     config.features = (GPLAYCORE_FEATURE_AUTO_BUFFERING|GPLAYCORE_FEATURE_AUTO_REDIRECT_URI);
     config.timeout_second = GPLAYCORE_DEFAULT_TIMEOUT_SECOND;
-    config.text_sink_name = "fakesink";
+    //config.text_sink_name = "fakesink";
     
     opt->info_interval_in_sec = 1;
 
