@@ -807,6 +807,8 @@ setup_pipeline (gRecorderEngine *recorder)
     if (camerasrc && recorder->videodevice_name &&
         g_object_class_find_property (G_OBJECT_GET_CLASS (camerasrc),
             "device")) {
+      GST_INFO_OBJECT (recorder->camerabin, "video device string: %s",
+          recorder->videodevice_name);
       g_object_set (camerasrc, "device", recorder->videodevice_name, NULL);
     }
   }
@@ -1398,11 +1400,13 @@ static REresult get_camera_capabilities(RecorderEngineHandle handle, REuint32 in
     gst_structure_get_int (str, "height", (gint *)(&videoProperty->height));
     gst_structure_get_fraction (str, "framerate", 
         &framerate_numerator, &framerate_denominator);
+    GST_DEBUG ("framerate_numerator: %d framerate_denominator: %d",
+        framerate_numerator, framerate_denominator);
+    //FIXME: should be 15 and 30.
+    videoProperty->framesPerSecond = 30;
     if (framerate_denominator) {
-      videoProperty->framesPerSecond = framerate_numerator / framerate_denominator;
-      if (!videoProperty->framesPerSecond) {
-        //FIXME: should be 15 and 30.
-        videoProperty->framesPerSecond = 30;
+      if (framerate_numerator / framerate_denominator == 15) {
+        videoProperty->framesPerSecond = 15;
       }
     } 
   } else {
@@ -1878,6 +1882,11 @@ static REresult reset(RecorderEngineHandle handle)
   if (ret != RE_RESULT_SUCCESS) {
     GST_ERROR ("close fail.");
     return ret;
+  }
+
+  if (recorder->camera_caps) {
+    gst_caps_unref (recorder->camera_caps);
+    recorder->camera_caps = NULL;
   }
 
   return prepare (handle);
