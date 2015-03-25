@@ -83,7 +83,11 @@ typedef REuint32    REresult;
 #define RE_VIDEO_EFFECT_CUBE                ((REuint32) 0x00000001)
 #define RE_VIDEO_EFFECT_MIRROR              ((REuint32) 0x00000002)
 #define RE_VIDEO_EFFECT_SQUEEZE             ((REuint32) 0x00000003)
-#define RE_VIDEO_EFFECT_LIST_END            ((REuint32) 0x00000004)
+#define RE_VIDEO_EFFECT_FISHEYE             ((REuint32) 0x00000004)
+#define RE_VIDEO_EFFECT_GRAY                ((REuint32) 0x00000005)
+#define RE_VIDEO_EFFECT_TUNNEL              ((REuint32) 0x00000006)
+#define RE_VIDEO_EFFECT_TWIRL               ((REuint32) 0x00000007)
+#define RE_VIDEO_EFFECT_LIST_END            ((REuint32) 0x00000008)
 
 #define RE_OUTPUT_FORMAT_DEFAULT            ((REuint32) 0x00000000)
 #define RE_OUTPUT_FORMAT_MOV                ((REuint32) 0x00000001)

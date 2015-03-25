@@ -592,7 +592,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"camera output video width"},
       {"camera output video height"},
       {"camera output video FPS"},
-      {"video effect: 0->default(no effect), 1->cube, 2->mirror, 3->squeeze"},
+      {"video effect: 0->default(no effect),1:cube,2:mirror,3:squeeze,4:fisheye,5:gray,6:tunnel,7:twirl"},
       {"preview video left"},
       {"preview video top"},
       {"preview video width"},

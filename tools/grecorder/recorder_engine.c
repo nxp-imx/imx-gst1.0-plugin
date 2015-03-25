@@ -1504,6 +1504,10 @@ static REresult add_video_effect(RecorderEngineHandle handle, REuint32 videoEffe
     { RE_VIDEO_EFFECT_CUBE, (REchar *)"glfiltercube" },
     { RE_VIDEO_EFFECT_MIRROR, (REchar *)"gleffects effect=1" },
     { RE_VIDEO_EFFECT_SQUEEZE, (REchar *)"gleffects effect=2" },
+    { RE_VIDEO_EFFECT_FISHEYE, (REchar *)"glshader location=/usr/share/fisheye_shader.fs" },
+    { RE_VIDEO_EFFECT_GRAY, (REchar *)"glshader location=/usr/share/gray_shader.fs" },
+    { RE_VIDEO_EFFECT_TUNNEL, (REchar *)"glshader location=/usr/share/tunnel_shader.fs" },
+    { RE_VIDEO_EFFECT_TWIRL, (REchar *)"glshader location=/usr/share/twirl_shader.fs" },
   };
 
   recorder->video_effect_name = key_value_pair (videoEffect, kKeyMap, sizeof(kKeyMap));
