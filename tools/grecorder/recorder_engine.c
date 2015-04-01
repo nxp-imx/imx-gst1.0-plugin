@@ -773,6 +773,9 @@ setup_pipeline (gRecorderEngine *recorder)
       wrapper = gst_element_factory_make ("wrappercamerabinsrc", NULL);
 
     camerasrc = gst_element_factory_make (recorder->videosrc_name, NULL);
+    if (g_strcmp0(recorder->videosrc_name, "videotestsrc") == 0) {
+      g_object_set (camerasrc, "is-live", TRUE, NULL);
+    }
     g_object_set (wrapper, "video-source", camerasrc, NULL);
     g_object_unref (camerasrc);
 

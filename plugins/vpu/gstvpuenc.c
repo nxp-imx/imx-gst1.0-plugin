@@ -554,7 +554,7 @@ gst_vpu_enc_set_format (GstVideoEncoder * benc, GstVideoCodecState * state)
 		return FALSE;
   }
 
-	memset(&(enc->open_param), 0, sizeof(VpuEncOpenParam));
+	memset(&(enc->open_param), 0, sizeof(VpuEncOpenParamSimp));
   if (!gst_vpu_enc_decide_output_video_format (benc)) {
 		GST_ERROR_OBJECT (enc, "gst_vpu_enc_decide_output_video_format fail.");
 		return FALSE;

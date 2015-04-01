@@ -700,6 +700,10 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
         if (optarg)
           pOpt->camera_id = atoi (optarg);
         break;
+      case 'v':
+        if (optarg)
+          pOpt->video_source = atoi (optarg);
+        break;
       case 'h':
         printf ("Usage: grecorder-1.0 [OPTION]\n");
         for (c = 0; long_options[c].name; ++c) {
