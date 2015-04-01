@@ -1845,6 +1845,27 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
 
     ret = PARSER_SUCCESS;
     
+
+    int m, n;
+    gboolean track_enable = TRUE;
+    for (m = 0; m < demux->program_num; m++) {
+      if (demux->programs[m]) {
+        for (n = 0; n < demux->programs[m]->track_num; n++) {
+          if (demux->programs[m]->tracks[n].id == stream->track_idx
+              && demux->programs[m]->enabled == FALSE) {
+            track_enable = FALSE;
+            break;
+          }
+        }
+      }
+      if (track_enable == FALSE)
+        break;
+    }
+
+    if (track_enable == FALSE)
+      continue;
+
+
     switch (stream->type) {
         case MEDIA_VIDEO:
             aiurdemux_parse_video (demux, stream, i);
