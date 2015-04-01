@@ -153,6 +153,7 @@ typedef struct _gRecorderEngine
   gchar *imagepp_name;
   gchar *vfsink_name;
   gchar *video_effect_name;
+  gchar *date_time;
   gint image_width;
   gint image_height;
   gint view_framerate_num;
@@ -782,6 +783,14 @@ setup_pipeline (gRecorderEngine *recorder)
     if (recorder->camera_output_caps) {
       video_filter_str = g_strdup_printf ("%s\"%s\"", "capsfilter caps=",
           gst_caps_to_string (recorder->camera_output_caps));
+    }
+    if (recorder->date_time) {
+      if (video_filter_str) {
+        video_filter_str = g_strdup_printf ("%s ! %s", video_filter_str,
+            recorder->date_time);
+      } else {
+        video_filter_str = g_strdup_printf ("%s", recorder->date_time);
+      }
     }
     if (recorder->video_effect_name) {
       if (video_filter_str) {
@@ -1493,6 +1502,14 @@ static REresult get_preview_buffer_format(RecorderEngineHandle handle, RERawVide
 static REresult add_time_stamp(RecorderEngineHandle handle, REboolean bAddTimeStamp)
 {
   RecorderEngine *h = (RecorderEngine *)(handle);
+  gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
+
+  if (bAddTimeStamp) {
+    recorder->date_time = "clockoverlay halignment=right valignment=bottom time-format=%Y/%m/%d::%H:%M:%S ! queue";
+  } else {
+    recorder->date_time = NULL;
+  }
+
   return RE_RESULT_SUCCESS;
 }
 
@@ -1660,6 +1677,7 @@ static REresult init(RecorderEngineHandle handle)
   recorder->imagepp_name = NULL;
   recorder->vfsink_name = NULL;
   recorder->video_effect_name = NULL;
+  recorder->date_time = NULL;
   recorder->image_width = 0;
   recorder->image_height = 0;
   recorder->view_framerate_num = 0;

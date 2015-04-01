@@ -576,6 +576,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
   static int verbose;
   static int list;
   static int preview_buffer;
+  static int add_time_stamp;
   int option_index = 0;
   int c;
 
@@ -592,6 +593,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"camera output video width"},
       {"camera output video height"},
       {"camera output video FPS"},
+      {"add date/time onto video"},
       {"video effect: 0->default(no effect),1:cube,2:mirror,3:squeeze,4:fisheye,5:gray,6:tunnel,7:twirl"},
       {"preview video left"},
       {"preview video top"},
@@ -625,6 +627,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"width",    required_argument, 0, 'w'},
       {"height",    required_argument, 0, 'e'},
       {"fps",    required_argument, 0, 'f'},
+      {"date_time", no_argument,       &add_time_stamp, 1},
       {"video_effect",    required_argument, 0, 'q'},
       {"preview_left",    required_argument, 0, 'l'},
       {"preview_top",    required_argument, 0, 't'},
@@ -729,6 +732,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
   pOpt->verbose = verbose;
   pOpt->list = list;
   pOpt->preview_buffer = preview_buffer;
+  pOpt->add_time_stamp = add_time_stamp;
   pOpt->use_default_filename = RE_BOOLEAN_FALSE;
   if (pOpt->path[0] == 0) {
     pOpt->use_default_filename = RE_BOOLEAN_TRUE;
