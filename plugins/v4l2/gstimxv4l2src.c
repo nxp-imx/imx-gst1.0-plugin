@@ -671,6 +671,13 @@ gst_imx_v4l2src_create (GstPushSrc * src, GstBuffer ** buf)
     abs_time = GST_CLOCK_TIME_NONE;
   }
 
+  if (!GST_CLOCK_TIME_IS_VALID (v4l2src->base_time_org)) {
+    v4l2src->base_time_org = base_time;
+  }
+
+  GST_DEBUG_OBJECT (v4l2src, "base_time: %" GST_TIME_FORMAT " abs_time: %" 
+      GST_TIME_FORMAT, GST_TIME_ARGS (base_time), GST_TIME_ARGS (abs_time));
+
   if (timestamp != GST_CLOCK_TIME_NONE) {
     struct timespec now;
     GstClockTime gstnow;
@@ -702,7 +709,8 @@ gst_imx_v4l2src_create (GstPushSrc * src, GstBuffer ** buf)
   }
 
   if (G_LIKELY (abs_time != GST_CLOCK_TIME_NONE)) {
-    timestamp = abs_time - base_time;
+    /* workaround for base time will change when image capture. */
+    timestamp = abs_time - v4l2src->base_time_org;
     if (timestamp > delay)
       timestamp -= delay;
     else
@@ -830,6 +838,7 @@ gst_imx_v4l2src_init (GstImxV4l2Src * v4l2src)
   v4l2src->stream_on = FALSE;
   v4l2src->use_my_allocator = FALSE;
   v4l2src->use_v4l2_memory = DEFAULT_USE_V4L2SRC_MEMORY;
+  v4l2src->base_time_org = GST_CLOCK_TIME_NONE;
 
   gst_base_src_set_format (GST_BASE_SRC (v4l2src), GST_FORMAT_TIME);
   gst_base_src_set_live (GST_BASE_SRC (v4l2src), TRUE);

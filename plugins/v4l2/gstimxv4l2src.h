@@ -54,6 +54,7 @@ struct _GstImxV4l2Src {
   guint actual_buf_cnt;
   GstVideoAlignment video_align;
   GstClockTime duration;
+  GstClockTime base_time_org;
   gboolean stream_on;
   gboolean use_my_allocator;
   gboolean use_v4l2_memory;
