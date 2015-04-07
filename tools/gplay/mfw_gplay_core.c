@@ -1342,6 +1342,7 @@ fsl_player_ret_val fsl_player_set_playback_rate(fsl_player_handle handle, double
     fsl_player_property* pproperty = (fsl_player_property*)pplayer->property_handle;
     GstEvent *set_playback_rate_event = NULL;
     GstFormat fmt = GST_FORMAT_TIME;
+    fsl_player_u32 try_cnt = 20;
 
     if( playback_rate > 8.0 || playback_rate < -8.0 /*|| (playback_rate>-2.0 && playback_rate<0.0)*/ )
     {
@@ -1350,7 +1351,7 @@ fsl_player_ret_val fsl_player_set_playback_rate(fsl_player_handle handle, double
     }
 
     do {
-        gint64 current_position;
+        gint64 current_position = 0;
         GstQuery* query;
         gboolean res;
         query = gst_query_new_position(GST_FORMAT_TIME);
@@ -1364,6 +1365,7 @@ fsl_player_ret_val fsl_player_set_playback_rate(fsl_player_handle handle, double
         else
         {
             g_print ("current_postion query failed...\n");
+            continue;
         }
 
         if( 0 == pproperty->duration )
@@ -1388,7 +1390,13 @@ fsl_player_ret_val fsl_player_set_playback_rate(fsl_player_handle handle, double
                     GST_SEEK_TYPE_SET, 0,
                     GST_SEEK_TYPE_SET, current_position);
         }
-    } while(0);
+        break;
+    } while(try_cnt--);
+
+    if (try_cnt <= 0) {
+      g_print("can't get current position, set rate failed\n");
+      return FSL_PLAYER_FAILURE;
+    }
 
     if(gst_element_send_event(pproperty->playbin, set_playback_rate_event) == FSL_PLAYER_FALSE)
     {
