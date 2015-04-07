@@ -185,6 +185,7 @@ typedef struct RecorderEngine_
   REresult (*set_camera_output_settings)(RecorderEngineHandle handle, RERawVideoSettings *videoProperty);
 
   /* View finder interface */
+  REresult (*disable_viewfinder)(RecorderEngineHandle handle, REboolean bDisableViewfinder);
   REresult (*set_preview_region)(RecorderEngineHandle handle, REVideoRect *rect);
   REresult (*set_preview_win_id)(RecorderEngineHandle handle, void *wid);
 

@@ -141,6 +141,7 @@ typedef struct _gRecorderEngine
 {
   GstElement *camerabin;
   GstElement *viewfinder_sink;
+  GstElement *video_sink;
   gulong camera_probe_id;
   gulong viewfinder_probe_id;
   GMainLoop *loop;
@@ -193,8 +194,11 @@ typedef struct _gRecorderEngine
   int x_width;
   int x_height;
 
-  /* test configuration for common callbacks */
   GString *filename;
+  GString *host;
+  gint port;
+  gint max_files;
+  gint64 max_file_size;
 
   gchar *preview_caps_name;
 
@@ -220,6 +224,7 @@ typedef struct _gRecorderEngine
   REuint32 video_encoder_format;
   RecorderState state;
   gboolean stop_done;
+  gboolean disable_viewfinder;
   REtime base_media_timeUs;
   GstCaps * camera_caps;
   GstCaps * camera_output_caps;
@@ -735,7 +740,6 @@ setup_pipeline (gRecorderEngine *recorder)
   gboolean res = TRUE;
   GstBus *bus;
   GstElement *sink = NULL, *ipp = NULL;
-  GstElement *video_sink;
   GstEncodingProfile *prof = NULL;
 
   recorder->initial_time = gst_util_get_timestamp ();
@@ -825,22 +829,46 @@ setup_pipeline (gRecorderEngine *recorder)
     }
   }
 
-  recorder->vfsink_name = "glimagesink";
+  if (recorder->disable_viewfinder)
+    recorder->vfsink_name = "fakesink";
+  else
+    recorder->vfsink_name = "imxv4l2sink";
+
   /* configure used elements */
   res &=
       setup_pipeline_element (recorder->camerabin, "audio-source", recorder->audiosrc_name, NULL);
   res &=
       setup_pipeline_element (recorder->camerabin, "viewfinder-sink", recorder->vfsink_name, &sink);
   res &=
-      setup_pipeline_element_bin (recorder->camerabin, "viewfinder-filter", recorder->viewfinder_filter,
-      NULL);
-  /*
-  res &=
+      setup_pipeline_element_bin (recorder->camerabin, "viewfinder-filter", 
+          recorder->viewfinder_filter, NULL);
+
+  if (recorder->max_files && recorder->max_file_size) {
+    if (recorder->container_format != RE_OUTPUT_FORMAT_TS) {
+      g_print ("set_file_count() only supported for TS container.");
+      return RE_RESULT_PARAMETER_INVALID;
+    }
+
+    res &=
       setup_pipeline_element (recorder->camerabin, "video-sink", "multifilesink",
-      NULL);
-  g_object_get (recorder->camerabin, "video-sink", &video_sink, NULL);
-  g_object_set (video_sink, "next-file", 4, NULL);
-  */
+          NULL);
+    g_object_get (recorder->camerabin, "video-sink", &recorder->video_sink, NULL);
+    g_object_set (recorder->video_sink, "next-file", 4, NULL);
+    g_object_set (recorder->video_sink, "max-file-size", recorder->max_file_size, NULL);
+    g_object_set (recorder->video_sink, "max-files", recorder->max_files, NULL);
+    g_object_set (recorder->video_sink, "async", FALSE, NULL);
+  } else if (recorder->host) {
+    if (recorder->container_format != RE_OUTPUT_FORMAT_TS) {
+      g_print ("web camera only supported for TS container.");
+      return RE_RESULT_PARAMETER_INVALID;
+    }
+
+    gchar *video_sink_str = g_strdup_printf ("%s%s", "rtpmp2tpay ! udpsink async=false sync=false host=", recorder->host);
+    res &=
+      setup_pipeline_element_bin (recorder->camerabin, "video-sink", 
+          video_sink_str, NULL);
+    g_free (video_sink_str);
+  }
 
   if (recorder->imagepp_name) {
     ipp = create_ipp_bin (recorder);
@@ -1036,7 +1064,23 @@ run_pipeline (gRecorderEngine *recorder)
   set_metadata (recorder->camerabin);
 
   GST_DEBUG ("Setting filename: %s", recorder->filename);
-  g_object_set (recorder->camerabin, "location", recorder->filename, NULL);
+
+  if (recorder->mode == MODE_VIDEO) {
+    if (recorder->video_sink) {
+      const gchar *filename_suffix;
+      const gchar *filename_str;
+      filename_suffix = strrchr(recorder->filename, '.');
+      filename_str =
+        g_strdup_printf ("%s%s%s", recorder->filename, "%05d", filename_suffix);
+      GST_DEBUG ("Setting filename: %s", filename_str);
+      g_object_set (recorder->video_sink, "location", filename_str, NULL);
+      g_free (filename_str);     
+    } else if (recorder->host) {
+      GST_DEBUG ("web camera host: %s", recorder->host);
+    } else
+      g_object_set (recorder->camerabin, "location", recorder->filename, NULL);
+  } else
+    g_object_set (recorder->camerabin, "location", recorder->filename, NULL);
 
   g_object_get (recorder->camerabin, "camera-source", &video_source, NULL);
   if (video_source) {
@@ -1471,6 +1515,16 @@ static REresult set_camera_output_settings(RecorderEngineHandle handle, RERawVid
   return RE_RESULT_SUCCESS;
 }
 
+static REresult disable_viewfinder (RecorderEngineHandle handle, REboolean bDisableViewfinder)
+{
+  RecorderEngine *h = (RecorderEngine *)(handle);
+  gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
+
+  recorder->disable_viewfinder = bDisableViewfinder;
+
+  return RE_RESULT_SUCCESS;
+}
+
 static REresult set_preview_region(RecorderEngineHandle handle, REVideoRect *rect)
 {
   RecorderEngine *h = (RecorderEngine *)(handle);
@@ -1583,12 +1637,26 @@ static REresult set_output_file_path (RecorderEngineHandle handle, const REchar 
 static REresult set_rtp_host (RecorderEngineHandle handle, const REchar *host, REuint32 port)
 {
   RecorderEngine *h = (RecorderEngine *)(handle);
+  gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
+
+  if (recorder->host) {
+    g_free (recorder->host);
+    recorder->host = NULL;
+  }
+
+  recorder->host = g_strdup (host);
+  recorder->port = port;
+
   return RE_RESULT_SUCCESS;
 }
 
 static REresult set_file_count(RecorderEngineHandle handle, REuint32 fileCount)
 {
   RecorderEngine *h = (RecorderEngine *)(handle);
+  gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
+
+  recorder->max_files = fileCount;
+
   return RE_RESULT_SUCCESS;
 }
 
@@ -1601,6 +1669,10 @@ static REresult set_max_file_duration(RecorderEngineHandle handle, REtime timeUs
 static REresult set_max_file_size_bytes (RecorderEngineHandle handle, REuint64 bytes)
 {
   RecorderEngine *h = (RecorderEngine *)(handle);
+  gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
+
+  recorder->max_file_size = bytes;
+
   return RE_RESULT_SUCCESS;
 }
 
@@ -1666,6 +1738,7 @@ static REresult init(RecorderEngineHandle handle)
 
   recorder->camerabin = NULL;
   recorder->viewfinder_sink = NULL;
+  recorder->video_sink = NULL;
   recorder->camera_probe_id = 0;
   recorder->viewfinder_probe_id = 0;
   recorder->loop = NULL;
@@ -1683,6 +1756,7 @@ static REresult init(RecorderEngineHandle handle)
   recorder->view_framerate_num = 0;
   recorder->view_framerate_den = 0;
   recorder->no_xwindow = FALSE;
+  recorder->disable_viewfinder = FALSE;
   recorder->gep_targetname = NULL;
   recorder->gep_profilename = NULL;
   recorder->gep_filename = NULL;
@@ -1717,6 +1791,10 @@ static REresult init(RecorderEngineHandle handle)
   recorder->x_height = 240;
 
   recorder->filename = NULL;
+  recorder->host = NULL;
+  recorder->port = 0;
+  recorder->max_files = 0;
+  recorder->max_file_size = 0;
 
   recorder->preview_caps_name = NULL;
 
@@ -1967,6 +2045,10 @@ static REresult delete_it(RecorderEngineHandle handle)
     g_free (recorder->filename);
     recorder->filename = NULL;
   }
+  if (recorder->host) {
+    g_free (recorder->host);
+    recorder->host = NULL;
+  }
 
   g_mutex_clear (&recorder->lock);
   g_slice_free (gRecorderEngine, recorder);
@@ -2006,6 +2088,7 @@ RecorderEngine * recorder_engine_create()
   h->set_camera_id = set_camera_id;
   h->get_camera_capabilities = get_camera_capabilities;
   h->set_camera_output_settings = set_camera_output_settings;
+  h->disable_viewfinder = disable_viewfinder;
   h->set_preview_region = set_preview_region;
   h->set_preview_win_id = set_preview_win_id;
   h->need_preview_buffer = need_preview_buffer;

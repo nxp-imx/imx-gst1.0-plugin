@@ -138,6 +138,7 @@ typedef struct {
   REuint32 preview_top;
   REuint32 preview_width;
   REuint32 preview_height;
+  REuint32 disable_viewfinder;
   REuint32 preview_buffer;
   REuint32 audio_encoder;
   REuint32 audio_bitrate;
@@ -231,6 +232,7 @@ static void display_media_time (void* param)
 
 static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
 {
+  REuint64 free_size;
 
   /* Audio source interface */
   if (RE_RESULT_SUCCESS != recorder->set_audio_source (
@@ -275,6 +277,7 @@ static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
   }
 
   /* View finder interface */
+  recorder->disable_viewfinder ((RecorderEngineHandle)recorder, pOpt->disable_viewfinder);
   {
     REVideoRect rect;
     rect.left = pOpt->preview_left;
@@ -336,6 +339,38 @@ static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
     return -1;
   }
 
+  if (pOpt->host[0])
+    recorder->set_rtp_host ((RecorderEngineHandle)recorder, pOpt->host, pOpt->port);
+
+  /* fileCount is 0 means unlimited */
+  if (RE_RESULT_SUCCESS != recorder->set_file_count (
+        (RecorderEngineHandle)recorder, pOpt->file_count)) {
+    PRINTF_ERROR ("set video source fail.\n");
+    return -1;
+  }
+  if (pOpt->duration) {
+    if (RE_RESULT_SUCCESS != recorder->set_max_file_duration (
+          (RecorderEngineHandle)recorder, pOpt->duration)) {
+    PRINTF_ERROR ("set video source fail.\n");
+    return -1;
+    }
+  }
+  free_size = get_storage_free_size(path);
+  if (pOpt->file_size) {
+    if (RE_RESULT_SUCCESS != recorder->set_max_file_size_bytes (
+          (RecorderEngineHandle)recorder,
+          pOpt->file_size <= free_size ? pOpt->file_size:free_size)) {
+      PRINTF_ERROR ("set video source fail.\n");
+      return -1;
+    }
+  } else {
+    if (RE_RESULT_SUCCESS != recorder->set_max_file_size_bytes (
+          (RecorderEngineHandle)recorder, free_size)) {
+      PRINTF_ERROR ("set video source fail.\n");
+      return -1;
+    }
+  }
+
   return 0;
 }
 
@@ -358,12 +393,6 @@ static int set_recoder_setting_snap_shot (RecorderEngine *recorder, REOptions * 
     return -1;
   }
 
-  /* fileCount is 0 means unlimited */
-  if (RE_RESULT_SUCCESS != recorder->set_file_count (
-        (RecorderEngineHandle)recorder, pOpt->file_count)) {
-    PRINTF_ERROR ("set video source fail.\n");
-    return -1;
-  }
   {
     REOutputFileSettings file_setting;
     file_setting.interleaveMs = 0;
@@ -423,34 +452,6 @@ static int set_recoder_setting_video (RecorderEngine *recorder, REOptions * pOpt
     return -1;
   }
 
-  //recorder->set_rtp_host ((RecorderEngineHandle)recorder, pOpt->host, pOpt->port);
-  /* fileCount is 0 means unlimited */
-  if (RE_RESULT_SUCCESS != recorder->set_file_count (
-        (RecorderEngineHandle)recorder, pOpt->file_count)) {
-    PRINTF_ERROR ("set video source fail.\n");
-    return -1;
-  }
-  if (pOpt->duration) {
-    if (RE_RESULT_SUCCESS != recorder->set_max_file_duration (
-          (RecorderEngineHandle)recorder, pOpt->duration)) {
-    PRINTF_ERROR ("set video source fail.\n");
-    return -1;
-    }
-  }
-  if (pOpt->file_size) {
-    if (RE_RESULT_SUCCESS != recorder->set_max_file_size_bytes (
-          (RecorderEngineHandle)recorder,
-          pOpt->file_size <= free_size ? pOpt->file_size:free_size)) {
-      PRINTF_ERROR ("set video source fail.\n");
-      return -1;
-    }
-  } else {
-    if (RE_RESULT_SUCCESS != recorder->set_max_file_size_bytes (
-          (RecorderEngineHandle)recorder, free_size)) {
-      PRINTF_ERROR ("set video source fail.\n");
-      return -1;
-    }
-  }
   {
     REOutputFileSettings file_setting;
     file_setting.interleaveMs = 0;
@@ -576,6 +577,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
   static int verbose;
   static int list;
   static int preview_buffer;
+  static int disable_viewfinder;
   static int add_time_stamp;
   int option_index = 0;
   int c;
@@ -599,6 +601,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"preview video top"},
       {"preview video width"},
       {"preview video height"},
+      {"disable view finder"},
       {"need preview buffer"},
       {"audio encoder type: 0->default(MP3), 1->MP3"},
       {"audio encoder bitrate(kbps)"},
@@ -633,6 +636,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"preview_top",    required_argument, 0, 't'},
       {"preview_width",    required_argument, 0, 'b'},
       {"preview_height",    required_argument, 0, 'n'},
+      {"disable_viewfinder", no_argument,       &disable_viewfinder, 1},
       {"preview_buffer", no_argument,       &preview_buffer, 1},
       {"audio_encoder",    required_argument, 0, 'g'},
       {"audio_bitrate",    required_argument, 0, 'j'},
@@ -707,6 +711,22 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
         if (optarg)
           pOpt->video_source = atoi (optarg);
         break;
+      case 'n':
+        if (optarg)
+          pOpt->file_count = atoi (optarg);
+        break;
+      case 'z':
+        if (optarg)
+          pOpt->file_size = atoll (optarg);
+        break;
+      case 'o':
+        if (optarg)
+          strcpy (pOpt->host, optarg);
+        break;
+      case 'r':
+        if (optarg)
+          pOpt->port = atoi (optarg);
+        break;
       case 'h':
         printf ("Usage: grecorder-1.0 [OPTION]\n");
         for (c = 0; long_options[c].name; ++c) {
@@ -732,6 +752,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
   pOpt->verbose = verbose;
   pOpt->list = list;
   pOpt->preview_buffer = preview_buffer;
+  pOpt->disable_viewfinder = disable_viewfinder;
   pOpt->add_time_stamp = add_time_stamp;
   pOpt->use_default_filename = RE_BOOLEAN_FALSE;
   if (pOpt->path[0] == 0) {
