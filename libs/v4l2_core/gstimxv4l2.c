@@ -67,7 +67,7 @@ typedef struct {
   struct v4l2_buffer v4l2buffer;
   PhyMemBlock *v4l2memblk;
   GstBuffer *gstbuffer;
-  guint8 *paddr;
+  guint8 *vaddr;
 } IMXV4l2BufferPair;
 
 typedef gint (*V4l2outConfigInput) (void *handle, guint fmt, guint w, guint h, \
@@ -119,6 +119,7 @@ typedef struct {
   guint color_key;
   IMXV4l2Rect overlay;
   gboolean pending_close;
+  gboolean invalid_paddr;
 } IMXV4l2Handle;
 
 typedef struct {
@@ -1424,7 +1425,7 @@ static void * gst_imx_v4l2_find_buffer(gpointer v4l2handle, PhyMemBlock *memblk)
   gint i;
 
   for(i=0; i<MAX_BUFFER; i++) {
-    if (handle->buffer_pair[i].paddr == memblk->paddr)
+    if (handle->buffer_pair[i].vaddr == memblk->vaddr)
       return &handle->buffer_pair[i].v4l2buffer;
   }
 
@@ -1490,7 +1491,19 @@ gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
     return -1;
   }
   memblk->paddr = (guchar*) v4l2buf->m.offset;
-  handle->buffer_pair[handle->allocated].paddr = memblk->paddr;
+
+  // if the queried physical address is 0, that means the m.offset is not
+  // a absolute physical address.
+  if (NULL == memblk->paddr)
+    handle->invalid_paddr = TRUE;
+
+  // clear all the following paddr since m.offset is not a valid address
+  // so that the caller can check if a memblk contain a valid physical address
+  // by checking the paddr.
+  if (handle->invalid_paddr)
+    memblk->paddr = NULL;
+
+  handle->buffer_pair[handle->allocated].vaddr = memblk->vaddr;
 
   handle->allocated ++;
 
@@ -1517,7 +1530,7 @@ gint gst_imx_v4l2_register_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   v4l2buf->index = handle->allocated;
   v4l2buf->m.userptr = memblk->paddr;
   v4l2buf->length = memblk->size;
-  handle->buffer_pair[handle->allocated].paddr = memblk->paddr;
+  handle->buffer_pair[handle->allocated].vaddr = memblk->vaddr;
 
   if (ioctl(handle->v4l2_fd, VIDIOC_QUERYBUF, v4l2buf) < 0) {
     GST_ERROR ("VIDIOC_QUERYBUF error.");
@@ -1545,7 +1558,7 @@ gint gst_imx_v4l2_free_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   if (v4l2buf) {
     GST_DEBUG ("Free v4l2buffer(%p), memblk(%p), paddr(%p), index(%d).",
         v4l2buf, memblk, memblk->paddr, v4l2buf->index);
-    handle->buffer_pair[v4l2buf->index].paddr = 0;
+    handle->buffer_pair[v4l2buf->index].vaddr = 0;
     memset (v4l2buf, 0, sizeof(struct v4l2_buffer));
   }
 

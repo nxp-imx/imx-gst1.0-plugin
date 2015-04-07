@@ -240,9 +240,16 @@ gboolean
 gst_buffer_is_phymem (GstBuffer *buffer)
 {
   gboolean ret = FALSE;
+  PhyMemBlock * memblk;
   GstMemory *mem = gst_buffer_get_memory (buffer, 0);
   if(mem == NULL) {
     GST_ERROR ("Not get memory from buffer.\n");
+    return FALSE;
+  }
+
+  if (NULL == ((GstMemoryPhy*)mem)->block.paddr) {
+    GST_WARNING("physical address in memory block is invalid");
+    gst_memory_unref (mem);
     return FALSE;
   }
 
@@ -261,12 +268,14 @@ gst_buffer_query_phymem_block (GstBuffer *buffer)
   GstMemoryPhy *memphy;
   PhyMemBlock *memblk;
 
-  if (!gst_buffer_is_phymem (buffer))
-    return NULL;
-
   mem = gst_buffer_get_memory (buffer, 0);
   if(mem == NULL) {
     GST_ERROR ("Not get memory from buffer.\n");
+    return NULL;
+  }
+
+  if(!GST_IS_ALLOCATOR_PHYMEM(mem->allocator)) {
+    gst_memory_unref (mem);
     return NULL;
   }
 
