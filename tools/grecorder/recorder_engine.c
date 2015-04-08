@@ -832,7 +832,7 @@ setup_pipeline (gRecorderEngine *recorder)
   if (recorder->disable_viewfinder)
     recorder->vfsink_name = "fakesink";
   else
-    recorder->vfsink_name = "imxv4l2sink";
+    recorder->vfsink_name = "glimagesink";
 
   /* configure used elements */
   res &=
