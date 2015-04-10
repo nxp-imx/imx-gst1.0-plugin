@@ -699,7 +699,7 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
     if (v4l2sink->config_flag & CONFIG_OVERLAY) {
       if (gst_imx_v4l2out_config_output (v4l2sink->v4l2handle, &v4l2sink->overlay, v4l2sink->keep_video_ratio) < 0) {
-        GST_ERROR_OBJECT (v4l2sink, "configure output failed.");
+        GST_WARNING_OBJECT (v4l2sink, "configure output failed.");
         memcpy(&v4l2sink->overlay, &v4l2sink->prev_overlay, sizeof(IMXV4l2Rect));
       } else {
         memcpy(&v4l2sink->prev_overlay, &v4l2sink->overlay, sizeof(IMXV4l2Rect));
