@@ -3471,8 +3471,8 @@ gst_aiurdemux_perform_seek (GstAiurDemux * demux, GstSegment * segment,
     }
   }
 //bail:
-  segment->stop = desired_offset;
-  segment->time = desired_offset;
+  //segment->stop = desired_offset;
+  //segment->time = desired_offset;
 
   return TRUE;
 }
