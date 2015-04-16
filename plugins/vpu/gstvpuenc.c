@@ -570,6 +570,7 @@ gst_vpu_enc_set_format (GstVideoEncoder * benc, GstVideoCodecState * state)
   enc->open_param.nChromaInterleave = 0;
   enc->open_param.nMapType = 0;
   enc->open_param.nLinear2TiledEnable = 0;
+  enc->gop_count = 0;
 
   GST_DEBUG_OBJECT (enc, "input caps: %" GST_PTR_FORMAT, state->caps);
   s = gst_caps_get_structure(state->caps, 0);
@@ -740,15 +741,16 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 {
   GstVpuEnc *enc = (GstVpuEnc *) benc;
   GstFlowReturn ret = GST_FLOW_OK;
-	VpuEncRetCode enc_ret;
-	VpuEncEncParam enc_enc_param;
-	VpuFrameBuffer input_framebuf;
+  VpuEncRetCode enc_ret;
+  VpuEncEncParam enc_enc_param;
+  VpuFrameBuffer input_framebuf;
   GstVideoCropMeta *cropmeta = NULL;
-	GstBuffer *input_buffer;
-	GstBuffer *output_buffer = NULL;
+  GstBuffer *input_buffer;
+  GstBuffer *output_buffer = NULL;
   GstMapInfo minfo;
-	GstBuffer *pool_buffer = NULL;
-	gint src_stride;
+  GstBuffer *pool_buffer = NULL;
+  gboolean is_sync_point = FALSE;
+  gint src_stride;
 
 	memset(&enc_enc_param, 0, sizeof(enc_enc_param));
 	memset(&input_framebuf, 0, sizeof(input_framebuf));
@@ -872,12 +874,14 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
   GST_DEBUG_OBJECT(enc, "VPU enc width: %d, height: %d", \
     enc_enc_param.nPicWidth, enc_enc_param.nPicHeight);
 
-	if (GST_VIDEO_CODEC_FRAME_IS_FORCE_KEYFRAME(frame) \
+  if (GST_VIDEO_CODEC_FRAME_IS_FORCE_KEYFRAME(frame) \
       || GST_VIDEO_CODEC_FRAME_IS_FORCE_KEYFRAME_HEADERS(frame) \
-      || !(enc->gop_count % enc->gop_size)) {
-		enc_enc_param.nForceIPicture = 1;
-		GST_LOG_OBJECT(enc, "got request to make this a keyframe - forcing I frame");
-	}
+      || (enc->gop_size && !(enc->gop_count % enc->gop_size)) \
+      || enc->gop_count == 1) {
+    enc_enc_param.nForceIPicture = 1;
+    is_sync_point = TRUE;
+    GST_LOG_OBJECT(enc, "got request to make this a keyframe - forcing I frame");
+  }
 
 	{
 		gsize output_buffer_offset = 0;
@@ -918,7 +922,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 
         gst_buffer_unmap (output_buffer, &minfo);
 
-        if (!(enc->gop_count % enc->gop_size)) { //frame_type == IDR) {
+        if (is_sync_point) {
           GST_LOG_OBJECT(enc, "setting sync point");
           GST_VIDEO_CODEC_FRAME_SET_SYNC_POINT(frame);
         }
