@@ -1053,6 +1053,12 @@ static gboolean imx_video_convert_decide_allocation(GstBaseTransform *transform,
   size = MAX(size, vinfo.size);
   size = PAGE_ALIGN(size);
 
+  if (max == 0)
+    if (min < 3)
+      max = min = 3;
+    else
+      max = min;
+
   /* downstream doesn't provide a pool or the pool has no ability to allocate
    * physical memory buffers, we need create new pool */
   if (new_pool) {

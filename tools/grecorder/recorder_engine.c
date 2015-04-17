@@ -782,6 +782,7 @@ setup_pipeline (gRecorderEngine *recorder)
       g_object_set (camerasrc, "is-live", TRUE, NULL);
     }
     g_object_set (wrapper, "video-source", camerasrc, NULL);
+    g_object_set (wrapper, "post-previews", FALSE, NULL);
     g_object_unref (camerasrc);
 
     if (recorder->camera_output_caps) {
@@ -805,7 +806,7 @@ setup_pipeline (gRecorderEngine *recorder)
       }
       video_filter_str = g_strdup_printf ("%s ! capsfilter caps=\"%s\" ! %s ! capsfilter caps=\"%s\"",
           video_filter_str, "video/x-raw, format=(string)RGBA",
-          "imxvideoconvert_ipu", "video/x-raw, format=(string)NV12");
+          "queue ! imxvideoconvert_ipu", "video/x-raw, format=(string)NV12");
     }
     if (video_filter_str) {
       GST_INFO_OBJECT (recorder->camerabin, "video filter string: %s", video_filter_str);
@@ -1559,7 +1560,7 @@ static REresult add_time_stamp(RecorderEngineHandle handle, REboolean bAddTimeSt
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
 
   if (bAddTimeStamp) {
-    recorder->date_time = "clockoverlay halignment=right valignment=bottom time-format=%Y/%m/%d::%H:%M:%S ! queue";
+    recorder->date_time = "clockoverlay halignment=left valignment=top time-format=%Y/%m/%d::%H:%M:%S ! queue ! timeoverlay halignment=right valignment=top text=\"Stream time:\" ! queue";
   } else {
     recorder->date_time = NULL;
   }
