@@ -2966,24 +2966,22 @@ static AiurDemuxStream* aiurdemux_trackidx_to_stream (GstAiurDemux * demux, guin
 static void
 aiurdemux_check_start_offset (GstAiurDemux * demux, AiurDemuxStream * stream)
 {
-
-    //clock of pipeline has started when first buffer arrives, so adjust the buffer timestamp
-    if(demux->clock_offset == GST_CLOCK_TIME_NONE){
-        GstClockTime base_time,now;
-        GstClock *clock = NULL;
-        GstClockTimeDiff offset = 0;
-        base_time = GST_ELEMENT_CAST (demux)->base_time;
-        clock = GST_ELEMENT_CLOCK (demux);
-        if(clock != NULL){
-            now = gst_clock_get_time (clock);
-            offset = now - base_time;
-            if(offset > 0)
-                demux->clock_offset = offset;
+    GstClockTime base_time,now;
+    GstClock *clock = NULL;
+    GstClockTimeDiff offset = 0;
+    base_time = GST_ELEMENT_CAST (demux)->base_time;
+    clock = GST_ELEMENT_CLOCK (demux);
+    if(clock != NULL){
+        now = gst_clock_get_time (clock);
+        offset = now - base_time;
+        GST_LOG_OBJECT (demux,"media time =%"GST_TIME_FORMAT,GST_TIME_ARGS (offset));
+        //clock of pipeline has started when first buffer arrives, so adjust the buffer timestamp
+        if(demux->clock_offset == GST_CLOCK_TIME_NONE && offset > 0){
+            demux->clock_offset = offset;
+            GST_LOG_OBJECT (demux,"first clock offset =%"GST_TIME_FORMAT,GST_TIME_ARGS (offset));
         }
-        GST_LOG_OBJECT (demux,"basetime=%"GST_TIME_FORMAT,GST_TIME_ARGS (base_time));
-        GST_LOG_OBJECT (demux,"now=%"GST_TIME_FORMAT,GST_TIME_ARGS (now));
-        GST_LOG_OBJECT (demux,"clock_offset=%"GST_TIME_FORMAT,GST_TIME_ARGS (demux->clock_offset));
     }
+
     if(stream->last_stop == 0 && (GST_CLOCK_TIME_IS_VALID (demux->clock_offset))){
         stream->last_stop = demux->clock_offset;
         GST_LOG_OBJECT (demux,"last_stop =%"GST_TIME_FORMAT,GST_TIME_ARGS (stream->last_stop));
@@ -2998,6 +2996,12 @@ aiurdemux_check_start_offset (GstAiurDemux * demux, AiurDemuxStream * stream)
         stream->sample_stat.start = stream->sample_stat.start - demux->start_time + demux->clock_offset + (GST_MSECOND * demux->option.streaming_latency);
         GST_LOG_OBJECT (demux,"***start=%"GST_TIME_FORMAT,GST_TIME_ARGS (stream->sample_stat.start));
     }
+    if(demux->option.streaming_latency > 0
+        && stream->sample_stat.start > offset + (GST_MSECOND * (demux->option.streaming_latency*3/2))){
+        demux->clock_offset -= stream->sample_stat.start - offset - (GST_MSECOND * demux->option.streaming_latency);
+        GST_LOG_OBJECT (demux,"***clock_offset=%"GST_TIME_FORMAT,GST_TIME_ARGS (demux->clock_offset));
+    }
+
 }
 static void
 aiurdemux_adjust_timestamp (GstAiurDemux * demux, AiurDemuxStream * stream,
