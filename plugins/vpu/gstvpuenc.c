@@ -877,7 +877,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
   if (GST_VIDEO_CODEC_FRAME_IS_FORCE_KEYFRAME(frame) \
       || GST_VIDEO_CODEC_FRAME_IS_FORCE_KEYFRAME_HEADERS(frame) \
       || (enc->gop_size && !(enc->gop_count % enc->gop_size)) \
-      || enc->gop_count == 1) {
+      || enc->gop_count == 0) {
     enc_enc_param.nForceIPicture = 1;
     is_sync_point = TRUE;
     GST_LOG_OBJECT(enc, "got request to make this a keyframe - forcing I frame");
@@ -913,6 +913,13 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
           ret = GST_FLOW_ERROR;
           goto bail;
         }
+
+        if (!(enc->open_param.eFormat == VPU_V_AVC && enc->open_param.nIsAvcc == 1)) {
+          output_buffer_offset += enc_enc_param.nOutOutputSize;
+          enc_enc_param.nInVirtOutput = (unsigned int)(minfo.data) + enc_enc_param.nOutOutputSize;
+          enc_enc_param.nInOutputBufLen = enc->state->info.size - enc_enc_param.nOutOutputSize;
+        }
+
         continue;
       }
 
