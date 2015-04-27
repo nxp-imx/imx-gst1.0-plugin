@@ -1455,14 +1455,14 @@ static gboolean aiurdemux_set_readmode (GstAiurDemux * demux)
   FslParserHandle handle = demux->core_handle;
 
   gchar *format = NULL;
-  gboolean isMPEG = FALSE;
+  demux->isMPEG = FALSE;
 
   int32 parser_result;
   uint32 readmode;
 
   gboolean ret = gst_tag_list_get_string (demux->tag_list, GST_TAG_CONTAINER_FORMAT, &format);
   if(ret && format && strncmp(format,"MPEG",4) == 0){
-      isMPEG = TRUE;
+    demux->isMPEG = TRUE;
   }
   if(format ){
     g_free(format);
@@ -1470,7 +1470,7 @@ static gboolean aiurdemux_set_readmode (GstAiurDemux * demux)
   }
   
   //use track mode for local file and file mode for streaming file.
-  if(aiurcontent_is_random_access(demux->content_info) && !isMPEG){
+  if(aiurcontent_is_random_access(demux->content_info) && !demux->isMPEG){
       readmode = PARSER_READ_MODE_TRACK_BASED;
   }else{
       readmode = PARSER_READ_MODE_FILE_BASED;
@@ -1497,7 +1497,8 @@ static gboolean aiurdemux_set_readmode (GstAiurDemux * demux)
   
       demux->read_mode = readmode;
 
-      if (readmode == PARSER_READ_MODE_FILE_BASED){
+      if (readmode == PARSER_READ_MODE_FILE_BASED &&
+          !(demux->isMPEG && aiurcontent_is_live(demux->content_info))){
           demux->interleave_queue_size = demux->option.interleave_queue_size;
           GST_DEBUG_OBJECT(demux,"read mode = file mode");
       } else {
@@ -2981,6 +2982,7 @@ aiurdemux_check_start_offset (GstAiurDemux * demux, AiurDemuxStream * stream)
     GstClock *clock = NULL;
     GstClockTimeDiff offset = 0;
     GstClockTimeDiff in_diff;
+
     base_time = GST_ELEMENT_CAST (demux)->base_time;
     clock = GST_ELEMENT_CLOCK (demux);
     if(clock != NULL){
@@ -2998,10 +3000,55 @@ aiurdemux_check_start_offset (GstAiurDemux * demux, AiurDemuxStream * stream)
         stream->last_stop = demux->clock_offset;
         GST_LOG_OBJECT (demux,"last_stop =%"GST_TIME_FORMAT,GST_TIME_ARGS (stream->last_stop));
     }
+
     if(demux->start_time == GST_CLOCK_TIME_NONE){
         demux->start_time = stream->sample_stat.start;
         GST_LOG_OBJECT (demux,"start_time=%"GST_TIME_FORMAT,GST_TIME_ARGS (demux->start_time));
     }
+
+    if (demux->isMPEG && aiurcontent_is_live(demux->content_info) &&
+        GST_CLOCK_TIME_IS_VALID(stream->sample_stat.start)) {
+      /* check stream time stamp discontinuity */
+      if ((GST_CLOCK_TIME_IS_VALID(stream->last_timestamp)) &&
+          ((stream->sample_stat.start < stream->last_timestamp - AIURDEMUX_TIMESTAMP_DISCONT_MAX_GAP) ||
+           (stream->sample_stat.start > stream->last_timestamp + AIURDEMUX_TIMESTAMP_DISCONT_MAX_GAP))) {
+        GST_INFO_OBJECT(demux,"timestamp discontinuity, stream %d start_time: %lld --> %lld",
+              stream->track_idx, demux->start_time, stream->sample_stat.start);
+        GST_INFO_OBJECT(demux,"timestamp discontinuity, stream %d clock offset: %lld --> %lld",
+              stream->track_idx, demux->clock_offset, offset);
+        demux->start_time = stream->sample_stat.start;
+        demux->clock_offset = offset;
+      }
+      stream->last_timestamp = stream->sample_stat.start;
+
+      /* monitoring the gap between media time and current time stamp */
+      gint64 new_ts = stream->sample_stat.start - demux->start_time + demux->clock_offset;
+      if((new_ts + (GST_MSECOND*demux->option.streaming_latency/2)) < offset) {
+        //new ts lag last for AIURDEMUX_TIMESTAMP_LAG_MAX_TIME, then change to new start time
+        if (stream->lag_time != GST_CLOCK_TIME_NONE) {
+          if ((offset - stream->lag_time) > AIURDEMUX_TIMESTAMP_LAG_MAX_TIME) {
+            GST_INFO_OBJECT(demux,"clock lag, stream %d start_time: %lld --> %lld",
+              stream->track_idx, demux->start_time, stream->sample_stat.start);
+            GST_INFO_OBJECT(demux,"clock lag, stream %d clock offset: %lld --> %lld",
+              stream->track_idx, demux->clock_offset, offset);
+            demux->start_time = stream->sample_stat.start;
+            demux->clock_offset = offset;
+            stream->lag_time = GST_CLOCK_TIME_NONE;
+          }
+        } else {
+          stream->lag_time = offset;
+        }
+      } else {
+        stream->lag_time = GST_CLOCK_TIME_NONE;
+
+        //new ts is larger than meida time by far, align it to media time
+        if (new_ts - offset > AIURDEMUX_TIMESTAMP_LAG_MAX_TIME) {
+          stream->sample_stat.start = offset - demux->clock_offset + demux->start_time;
+          GST_INFO_OBJECT(demux, "timestamp gap, align to mediatime %lld", offset);
+        }
+      }
+    }
+
     if((GST_CLOCK_TIME_IS_VALID (demux->clock_offset))
         && (GST_CLOCK_TIME_IS_VALID (demux->start_time))
         && (GST_CLOCK_TIME_IS_VALID (stream->sample_stat.start))){
@@ -3032,8 +3079,8 @@ aiurdemux_check_start_offset (GstAiurDemux * demux, AiurDemuxStream * stream)
         GST_LOG_OBJECT (demux,"***media_offset 2=%lld",demux->media_offset);
       }
     }
-
 }
+
 static void
 aiurdemux_adjust_timestamp (GstAiurDemux * demux, AiurDemuxStream * stream,
     GstBuffer * buffer)
@@ -3310,6 +3357,8 @@ static void aiurdemux_reset_stream (GstAiurDemux * demux, AiurDemuxStream * stre
     stream->time_position = 0;
     stream->pending_eos = FALSE;
     stream->block = FALSE;
+    stream->last_timestamp = GST_CLOCK_TIME_NONE;
+    stream->lag_time = GST_CLOCK_TIME_NONE;
 
     if (stream->buffer) {
       gst_buffer_unref (stream->buffer);

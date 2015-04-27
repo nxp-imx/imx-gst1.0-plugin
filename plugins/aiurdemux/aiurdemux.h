@@ -78,6 +78,8 @@ GST_DEBUG_CATEGORY_EXTERN (aiurdemux_debug);
 #define AIURDEMUX_AUDIO_SAMPLERATE_DEFAULT 44100
 #define AIURDEMUX_AUDIO_SAMPLEWIDTH_DEFAULT 16
 #define AIURDEMUX_MIN_OUTPUT_BUFFER_SIZE 8
+#define AIURDEMUX_TIMESTAMP_DISCONT_MAX_GAP   (10*GST_SECOND)
+#define AIURDEMUX_TIMESTAMP_LAG_MAX_TIME      (10*GST_SECOND)
 
 #define GST_BUFFER_TIMESTAMP GST_BUFFER_PTS
 
@@ -266,6 +268,8 @@ struct _AiurDemuxStream
     guint64 time_position;
     gint64 last_stop;
     gint64 last_start;
+    gint64 last_timestamp;
+    gint64 lag_time;
     GstFlowReturn last_ret;
 
     
@@ -284,6 +288,7 @@ struct _GstAiurDemux
     gboolean pullbased;
     gboolean pending_event;
     gboolean seekable;
+    gboolean isMPEG;
     uint64 movie_duration;
     uint32     track_count; //temp number for track count
     guint32     n_streams;
