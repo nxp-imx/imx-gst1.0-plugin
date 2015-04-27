@@ -2917,8 +2917,8 @@ static gint aiurdemux_choose_next_stream (GstAiurDemux * demux)
     }
 
     if (stream->last_stop == GST_CLOCK_TIME_NONE) {
+      track_index = stream->track_idx;
       if (stream->buf_queue && !g_queue_is_empty(stream->buf_queue)) {
-        track_index = stream->track_idx;
         break;
       } else {
         continue;
