@@ -154,6 +154,7 @@ typedef struct _gRecorderEngine
   gchar *imagepp_name;
   gchar *vfsink_name;
   gchar *video_effect_name;
+  gchar *video_detect_name;
   gchar *date_time;
   gint image_width;
   gint image_height;
@@ -383,6 +384,8 @@ sync_bus_callback (GstBus * bus, GstMessage * message, gpointer data)
   FILE *f = NULL;
   size_t written;
 
+  GST_LOG ("Got %s sync message\n", GST_MESSAGE_TYPE_NAME (message));
+
   switch (GST_MESSAGE_TYPE (message)) {
     case GST_MESSAGE_ELEMENT:{
       st = gst_message_get_structure (message);
@@ -435,6 +438,31 @@ sync_bus_callback (GstBus * bus, GstMessage * message, gpointer data)
             }
             g_free (preview_filename);
           }
+        } else if (gst_structure_has_name (st, "facedetect")) {
+          const GValue *value_list = gst_structure_get_value (st, "faces");
+          REVideoRect object_pos;
+          GstStructure *str;
+          gchar *sstr;
+          guint i, n;
+
+          sstr = gst_structure_to_string (st);
+          GST_INFO ("Got sync message: %s\n", sstr);
+          g_free (sstr);
+
+          n = gst_value_list_get_size (value_list);
+          for (i = 0; i < n; i++) {
+            const GValue *value = gst_value_list_get_value (value_list, i);
+            str = gst_value_get_structure (value);
+
+            gst_structure_get_uint (str, "x", (guint *)(&object_pos.left));
+            gst_structure_get_uint (str, "y", (guint *)(&object_pos.top));
+            gst_structure_get_uint (str, "width", (guint *)(&object_pos.width));
+            gst_structure_get_uint (str, "height", (guint *)(&object_pos.height));
+
+            if(recorder->app_callback != NULL) {
+              (*(recorder->app_callback))(recorder->pAppData, RE_EVENT_OBJECT_POSITION, &object_pos);
+            }
+          }
         }
       }
       break;
@@ -460,6 +488,8 @@ static gboolean
 bus_callback (GstBus * bus, GstMessage * message, gpointer data)
 {
   gRecorderEngine *recorder = (gRecorderEngine *)data;
+
+  GST_LOG ("Got %s message\n", GST_MESSAGE_TYPE_NAME (message));
 
   switch (GST_MESSAGE_TYPE (message)) {
     case GST_MESSAGE_ERROR:{
@@ -830,10 +860,19 @@ setup_pipeline (gRecorderEngine *recorder)
     }
   }
 
+  if (recorder->video_detect_name) {
+    recorder->viewfinder_filter = recorder->video_detect_name;
+  }
+  GST_INFO_OBJECT (recorder->camerabin, "view finder filter string: %s",
+      recorder->viewfinder_filter);
+
   if (recorder->disable_viewfinder)
     recorder->vfsink_name = "fakesink";
   else
-    recorder->vfsink_name = "glimagesink";
+    if (recorder->video_detect_name)
+      recorder->vfsink_name = "imxv4l2sink";
+    else
+      recorder->vfsink_name = "glimagesink";
 
   /* configure used elements */
   res &=
@@ -1590,6 +1629,23 @@ static REresult add_video_effect(RecorderEngineHandle handle, REuint32 videoEffe
   return RE_RESULT_SUCCESS;
 }
 
+static REresult add_video_detect(RecorderEngineHandle handle, REuint32 videoDetect)
+{
+  RecorderEngine *h = (RecorderEngine *)(handle);
+  gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
+  CHECK_PARAM (videoDetect, RE_VIDEO_DETECT_LIST_END);
+
+  static KeyMap kKeyMap[] = {
+    { RE_VIDEO_DETECT_DEFAULT, NULL },
+    { RE_VIDEO_DETECT_FACEDETECT, (REchar *)"imxvideoconvert_ipu ! queue ! video/x-raw,width=176,height=144 ! queue ! facedetect profile=/usr/share/gst1.0-fsl-plugins/1.0/opencv_haarcascades/haarcascade_frontalface_old_format.xml display=true scale-factor=2 min-size-width=32 min-size-height=32 updates=2 min-neighbors=3 ! queue" },
+    { RE_VIDEO_DETECT_FACEBLUR, (REchar *)"imxvideoconvert_ipu ! queue ! video/x-raw,width=176,height=144 ! queue ! faceblur profile=/usr/share/gst1.0-fsl-plugins/1.0/opencv_haarcascades/haarcascade_frontalface_old_format.xml ! queue" },
+  };
+
+  recorder->video_detect_name = key_value_pair (videoDetect, kKeyMap, sizeof(kKeyMap));
+
+  return RE_RESULT_SUCCESS;
+}
+
 static REresult set_audio_encoder_settings(RecorderEngineHandle handle, REAudioEncoderSettings *audioEncoderSettings)
 {
   RecorderEngine *h = (RecorderEngine *)(handle);
@@ -1751,6 +1807,7 @@ static REresult init(RecorderEngineHandle handle)
   recorder->imagepp_name = NULL;
   recorder->vfsink_name = NULL;
   recorder->video_effect_name = NULL;
+  recorder->video_detect_name = NULL;
   recorder->date_time = NULL;
   recorder->image_width = 0;
   recorder->image_height = 0;
@@ -2096,6 +2153,7 @@ RecorderEngine * recorder_engine_create()
   h->get_preview_buffer_format = get_preview_buffer_format;
   h->add_time_stamp = add_time_stamp;
   h->add_video_effect = add_video_effect;
+  h->add_video_detect = add_video_detect;
   h->set_audio_encoder_settings = set_audio_encoder_settings;
   h->set_video_encoder_settings = set_video_encoder_settings;
   h->set_container_format = set_container_format;

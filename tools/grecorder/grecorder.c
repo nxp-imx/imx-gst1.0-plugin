@@ -134,6 +134,7 @@ typedef struct {
   REuint32 fps;
   REboolean add_time_stamp;
   REuint32 video_effect;
+  REuint32 video_detect;
   REuint32 preview_left;
   REuint32 preview_top;
   REuint32 preview_width;
@@ -302,6 +303,7 @@ static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
   /* Video time stamp and video effect */
   recorder->add_time_stamp ((RecorderEngineHandle)recorder, pOpt->add_time_stamp);
   recorder->add_video_effect ((RecorderEngineHandle)recorder, pOpt->video_effect);
+  recorder->add_video_detect ((RecorderEngineHandle)recorder, pOpt->video_detect);
 
   /* Audio encoder interface */
   {
@@ -554,6 +556,12 @@ static int event_handler(void* context, REuint32 eventID, void* Eventpayload)
       STOP_SHOW_MEDIATIME_INFO;
       RECORDER_STOP;
       break;
+    case RE_EVENT_OBJECT_POSITION: {
+      REVideoRect *object_pos = (REVideoRect *) Eventpayload;
+      PRINT_INFO ("Object Detected. Position: [x:%d y:%d width: %d height: %d]\n",
+          object_pos->left, object_pos->top,object_pos->width,object_pos->height);
+      }
+      break;
     default:
       break;
   }
@@ -597,6 +605,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"camera output video FPS"},
       {"add date/time onto video"},
       {"video effect: 0->default(no effect),1:cube,2:mirror,3:squeeze,4:fisheye,5:gray,6:tunnel,7:twirl"},
+      {"video detect: 0->default(no detect),1:face detect,2:faceblur"},
       {"preview video left"},
       {"preview video top"},
       {"preview video width"},
@@ -632,6 +641,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"fps",    required_argument, 0, 'f'},
       {"date_time", no_argument,       &add_time_stamp, 1},
       {"video_effect",    required_argument, 0, 'q'},
+      {"video_detect",    required_argument, 0, 'x'},
       {"preview_left",    required_argument, 0, 'l'},
       {"preview_top",    required_argument, 0, 't'},
       {"preview_width",    required_argument, 0, 'b'},
@@ -726,6 +736,10 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       case 'r':
         if (optarg)
           pOpt->port = atoi (optarg);
+        break;
+      case 'x':
+        if (optarg)
+          pOpt->video_detect = atoi (optarg);
         break;
       case 'h':
         printf ("Usage: grecorder-1.0 [OPTION]\n");

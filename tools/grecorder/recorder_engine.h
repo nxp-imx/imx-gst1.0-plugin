@@ -89,6 +89,11 @@ typedef REuint32    REresult;
 #define RE_VIDEO_EFFECT_TWIRL               ((REuint32) 0x00000007)
 #define RE_VIDEO_EFFECT_LIST_END            ((REuint32) 0x00000008)
 
+#define RE_VIDEO_DETECT_DEFAULT             ((REuint32) 0x00000000)
+#define RE_VIDEO_DETECT_FACEDETECT          ((REuint32) 0x00000001)
+#define RE_VIDEO_DETECT_FACEBLUR            ((REuint32) 0x00000002)
+#define RE_VIDEO_DETECT_LIST_END            ((REuint32) 0x00000003)
+
 #define RE_OUTPUT_FORMAT_DEFAULT            ((REuint32) 0x00000000)
 #define RE_OUTPUT_FORMAT_MOV                ((REuint32) 0x00000001)
 #define RE_OUTPUT_FORMAT_MKV                ((REuint32) 0x00000002)
@@ -123,7 +128,8 @@ typedef REuint32    REresult;
 #define RE_EVENT_PROGRESS_FRAME_STATUS      ((REuint32) 0x00000007)
 #define RE_EVENT_PROGRESS_TIME_STATUS       ((REuint32) 0x00000008)
 #define RE_EVENT_EOS                        ((REuint32) 0x00000009)
-#define RE_EVENT_LIST_END                   ((REuint32) 0x0000000A)
+#define RE_EVENT_OBJECT_POSITION            ((REuint32) 0x0000000A)
+#define RE_EVENT_LIST_END                   ((REuint32) 0x0000000B)
 
 typedef struct RERawVideoSettings_ {
   REuint32 videoFormat;
@@ -196,6 +202,7 @@ typedef struct RecorderEngine_
   /* Video time stamp and video effect */
   REresult (*add_time_stamp)(RecorderEngineHandle handle, REboolean bAddTimeStamp);
   REresult (*add_video_effect)(RecorderEngineHandle handle, REuint32 videoEffect);
+  REresult (*add_video_detect)(RecorderEngineHandle handle, REuint32 videoDetect);
 
   /* Audio encoder interface */
   REresult (*set_audio_encoder_settings)(RecorderEngineHandle handle, REAudioEncoderSettings *audioEncoderSettings);
