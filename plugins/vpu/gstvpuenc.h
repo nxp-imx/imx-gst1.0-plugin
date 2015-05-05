@@ -26,17 +26,6 @@
 
 G_BEGIN_DECLS
 
-#define GST_TYPE_VPU_ENC \
-  (gst_vpu_enc_get_type())
-#define GST_VPU_ENC(obj) \
-  (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_VPU_ENC,GstVpuEnc))
-#define GST_VPU_ENC_CLASS(klass) \
-  (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_VPU_ENC,GstVpuEncClass))
-#define GST_IS_VPU_ENC(obj) \
-  (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_VPU_ENC))
-#define GST_IS_VPU_ENC_CLASS(klass) \
-  (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_VPU_ENC))
-
 typedef struct _GstVpuEnc           GstVpuEnc;
 typedef struct _GstVpuEncClass      GstVpuEncClass;
 
@@ -63,7 +52,7 @@ struct _GstVpuEncClass {
   GstVideoEncoderClass encoder_class;
 };
 
-GType gst_vpu_enc_get_type(void);
+gboolean gst_vpu_enc_register (GstPlugin * plugin);
 
 G_END_DECLS
 

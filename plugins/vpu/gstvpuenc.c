@@ -49,6 +49,41 @@
 #define DEFAULT_H264_QUANT 35
 #define DEFAULT_MPEG4_QUANT 15
 
+#define GST_VPU_ENC_PARAMS_QDATA   g_quark_from_static_string("vpuenc-params")
+
+typedef struct _VpuEncInfo {
+  gchar *name;
+  VpuCodStd std;
+  gchar *description;
+  gchar *detail;
+} VpuEncInfo;
+
+static const VpuEncInfo VpuEncInfos[] = {
+  { .name                     = "h264",
+    .std                      = VPU_V_AVC,
+    .description              = "VPU-based AVC/H264 video encoder",
+    .detail                   = "Encode raw data to compressed video",
+  },
+  { .name                     = "mpeg4",
+    .std                      = VPU_V_MPEG4,
+    .description              = "VPU-based MPEG4 video encoder",
+    .detail                   = "Encode raw data to compressed video",
+  },
+  { .name                     = "h263",
+    .std                      = VPU_V_H263,
+    .description              = "VPU-based H263 video encoder",
+    .detail                   = "Encode raw data to compressed video",
+  },
+  { .name                     = "jpeg",
+    .std                      = VPU_V_MJPG,
+    .description              = "VPU-based JPEG video encoder",
+    .detail                   = "Encode raw data to compressed video",
+  },
+  {
+    NULL
+  }
+};
+
 enum
 {
   PROP_0,
@@ -70,7 +105,20 @@ static GstStaticPadTemplate static_sink_template = GST_STATIC_PAD_TEMPLATE(
 	)
 );
 
-static GstStaticPadTemplate static_src_template = GST_STATIC_PAD_TEMPLATE(
+static GstStaticPadTemplate static_sink_template_jpeg = GST_STATIC_PAD_TEMPLATE(
+	"sink",
+	GST_PAD_SINK,
+	GST_PAD_ALWAYS,
+	GST_STATIC_CAPS(
+		"video/x-raw,"
+		"format = (string) { NV12, I420, YV12 }, "
+		"width = (int) [ 64, 8192, 8 ], "
+		"height = (int) [ 64, 8192, 8 ], "
+		"framerate = (fraction) [ 0, MAX ]"
+	)
+);
+
+static GstStaticPadTemplate static_src_template_h264 = GST_STATIC_PAD_TEMPLATE(
 	"src",
 	GST_PAD_SRC,
 	GST_PAD_ALWAYS,
@@ -78,20 +126,41 @@ static GstStaticPadTemplate static_src_template = GST_STATIC_PAD_TEMPLATE(
 		"video/x-h264, "
 		"stream-format = (string) { avc, byte-stream }, "
 		"alignment = (string) { au, nal }; "
+	)
+);
 
+static GstStaticPadTemplate static_src_template_mpeg4 = GST_STATIC_PAD_TEMPLATE(
+	"src",
+	GST_PAD_SRC,
+	GST_PAD_ALWAYS,
+	GST_STATIC_CAPS(
 		"video/mpeg, "
 		"mpegversion = (int) 4," 
 		"systemstream = (boolean) false, "
 		"width = (int) [ 64, 1920, 8 ], "
 		"height = (int) [ 64, 1088, 8 ], "
 		"framerate = (fraction) [ 0, MAX ]; "
+	)
+);
 
+static GstStaticPadTemplate static_src_template_h263 = GST_STATIC_PAD_TEMPLATE(
+	"src",
+	GST_PAD_SRC,
+	GST_PAD_ALWAYS,
+	GST_STATIC_CAPS(
 		"video/x-h263, "
 		"variant = (string) itu, "
 		"width = (int) [ 64, 1920, 8 ], "
 		"height = (int) [ 64, 1088, 8 ], "
 		"framerate = (fraction) [ 0, MAX ]; "
+	)
+);
 
+static GstStaticPadTemplate static_src_template_jpeg = GST_STATIC_PAD_TEMPLATE(
+	"src",
+	GST_PAD_SRC,
+	GST_PAD_ALWAYS,
+	GST_STATIC_CAPS(
 		"image/jpeg; "
 	)
 );
@@ -115,9 +184,6 @@ static GstFlowReturn gst_vpu_enc_handle_frame (GstVideoEncoder * benc,
 static gboolean gst_vpu_enc_propose_allocation (GstVideoEncoder * benc,
     GstQuery * query);
 
-#define gst_vpu_enc_parent_class parent_class
-G_DEFINE_TYPE (GstVpuEnc, gst_vpu_enc, GST_TYPE_VIDEO_ENCODER);
-
 static void
 gst_vpu_enc_class_init (GstVpuEncClass * klass)
 {
@@ -125,11 +191,13 @@ gst_vpu_enc_class_init (GstVpuEncClass * klass)
   GstElementClass *element_class;
   GstVideoEncoderClass *venc_class;
 
+  VpuEncInfo *in_plugin = (VpuEncInfo *)
+    g_type_get_qdata (G_OBJECT_CLASS_TYPE (klass), GST_VPU_ENC_PARAMS_QDATA);
+  g_assert (in_plugin != NULL);
+
   gobject_class = (GObjectClass *) klass;
   element_class = (GstElementClass *) klass;
   venc_class = (GstVideoEncoderClass *) klass;
-
-  parent_class = g_type_class_peek_parent (klass);
 
   gobject_class->set_property = GST_DEBUG_FUNCPTR (gst_vpu_enc_set_property);
   gobject_class->get_property = GST_DEBUG_FUNCPTR (gst_vpu_enc_get_property);
@@ -138,23 +206,55 @@ gst_vpu_enc_class_init (GstVpuEncClass * klass)
       g_param_spec_uint ("bitrate", "bit rate",
         "set bit rate in bps (0 for automatic)",
         0, G_MAXINT, DEFAULT_BITRATE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-  g_object_class_install_property (gobject_class, PROP_GOP_SIZE,
-      g_param_spec_uint ("gop-size", "Group-of-picture size",
-        "How many frames a group-of-picture shall contain",
-        0, 32767, DEFAULT_GOP_SIZE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-  g_object_class_install_property (gobject_class, PROP_QUANT,
-      g_param_spec_int ("quant", "quant",
-        "set quant value: H.264(0-51), Mpeg4/H.263(1-31) (-1 for automatic)", 
-        -1, 51, DEFAULT_QUANT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  if (in_plugin->std != VPU_V_MJPG) {
+    g_object_class_install_property (gobject_class, PROP_GOP_SIZE,
+        g_param_spec_uint ("gop-size", "Group-of-picture size",
+          "How many frames a group-of-picture shall contain",
+          0, 32767, DEFAULT_GOP_SIZE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  }
+  if (in_plugin->std == VPU_V_AVC) {
+    g_object_class_install_property (gobject_class, PROP_QUANT,
+        g_param_spec_int ("quant", "quant",
+          "set quant value: H.264(0-51) (-1 for automatic)", 
+          -1, 51, DEFAULT_QUANT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  } else if (in_plugin->std == VPU_V_MPEG4) {
+    g_object_class_install_property (gobject_class, PROP_QUANT,
+        g_param_spec_int ("quant", "quant",
+          "set quant value: Mpeg4(1-31) (-1 for automatic)", 
+          -1, 31, DEFAULT_QUANT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  } else if (in_plugin->std == VPU_V_H263) {
+    g_object_class_install_property (gobject_class, PROP_QUANT,
+        g_param_spec_int ("quant", "quant",
+          "set quant value: H.263(1-31) (-1 for automatic)", 
+          -1, 31, DEFAULT_QUANT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  }
 
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&static_sink_template));
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&static_src_template));
+  if (in_plugin->std == VPU_V_AVC) {
+    gst_element_class_add_pad_template (element_class,
+        gst_static_pad_template_get (&static_sink_template));
+    gst_element_class_add_pad_template (element_class,
+        gst_static_pad_template_get (&static_src_template_h264));
+  } else if (in_plugin->std == VPU_V_MPEG4) {
+    gst_element_class_add_pad_template (element_class,
+        gst_static_pad_template_get (&static_sink_template));
+    gst_element_class_add_pad_template (element_class,
+        gst_static_pad_template_get (&static_src_template_mpeg4));
+  } else if (in_plugin->std == VPU_V_H263) {
+    gst_element_class_add_pad_template (element_class,
+        gst_static_pad_template_get (&static_sink_template));
+    gst_element_class_add_pad_template (element_class,
+        gst_static_pad_template_get (&static_src_template_h263));
+  } else if (in_plugin->std == VPU_V_MJPG) {
+    gst_element_class_add_pad_template (element_class,
+        gst_static_pad_template_get (&static_sink_template_jpeg));
+    gst_element_class_add_pad_template (element_class,
+        gst_static_pad_template_get (&static_src_template_jpeg));
+  }
+
   gst_element_class_set_static_metadata (element_class,
-      "VPU-based video encoder", "Codec/Encoder/Video",
-      "Encode raw data to compressed video",
-      IMX_GST_PLUGIN_AUTHOR);
+      in_plugin->description, "Codec/Encoder/Video",
+      in_plugin->detail, IMX_GST_PLUGIN_AUTHOR);
+
 
   venc_class->open = GST_DEBUG_FUNCPTR (gst_vpu_enc_open);
   venc_class->close = GST_DEBUG_FUNCPTR (gst_vpu_enc_close);
@@ -186,10 +286,7 @@ static void
 gst_vpu_enc_get_property (GObject * object, guint prop_id, GValue * value,
     GParamSpec * pspec)
 {
-  GstVpuEnc *enc;
-
-  g_return_if_fail (GST_IS_VPU_ENC (object));
-  enc = GST_VPU_ENC (object);
+  GstVpuEnc *enc = (GstVpuEnc *) object;
 
   switch (prop_id) {
     case PROP_BITRATE:
@@ -211,10 +308,7 @@ static void
 gst_vpu_enc_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec)
 {
-  GstVpuEnc *enc;
-
-  g_return_if_fail (GST_IS_VPU_ENC (object));
-  enc = GST_VPU_ENC (object);
+  GstVpuEnc *enc = (GstVpuEnc *) object;
 
   switch (prop_id) {
     case PROP_BITRATE:
@@ -467,7 +561,7 @@ gst_vpu_enc_decide_output_video_format (GstVideoEncoder * benc)
 
   if (enc->open_param.eFormat == VPU_V_AVC && enc->quant == -1) {
     enc->quant = DEFAULT_H264_QUANT;
-  } else {
+  } else if (enc->quant == -1) {
     enc->quant = DEFAULT_MPEG4_QUANT;
   }
 
@@ -871,8 +965,8 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 	enc_enc_param.nQuantParam = enc->quant;
 	enc_enc_param.nForceIPicture = 0;
 
-  GST_DEBUG_OBJECT(enc, "VPU enc width: %d, height: %d", \
-    enc_enc_param.nPicWidth, enc_enc_param.nPicHeight);
+  GST_DEBUG_OBJECT(enc, "VPU enc width: %d, height: %d, fps: %d", \
+    enc_enc_param.nPicWidth, enc_enc_param.nPicHeight, enc_enc_param.nFrameRate);
 
   if (GST_VIDEO_CODEC_FRAME_IS_FORCE_KEYFRAME(frame) \
       || GST_VIDEO_CODEC_FRAME_IS_FORCE_KEYFRAME_HEADERS(frame) \
@@ -1010,6 +1104,51 @@ gst_vpu_enc_propose_allocation (GstVideoEncoder * benc, GstQuery * query)
     gst_object_unref (allocator);
     gst_object_unref (pool);
     gst_query_add_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL);
+  }
+
+  return TRUE;
+}
+
+const VpuEncInfo * gst_vpu_enc_get_info(void)
+{
+  return &VpuEncInfos[0];
+}
+
+gboolean gst_vpu_enc_register (GstPlugin * plugin)
+{
+  GTypeInfo tinfo = {
+    sizeof (GstVpuEncClass),
+    NULL,
+    NULL,
+    (GClassInitFunc) gst_vpu_enc_class_init,
+    NULL,
+    NULL,
+    sizeof (GstVpuEnc),
+    0,
+    (GInstanceInitFunc) gst_vpu_enc_init,
+  };
+
+  GType type;
+  gchar *t_name;
+
+  const VpuEncInfo *in_plugin = gst_vpu_enc_get_info();
+
+  while (in_plugin->name) {
+    t_name = g_strdup_printf ("vpuenc_%s", in_plugin->name);
+    type = g_type_from_name (t_name);
+
+    if (!type) {
+      type = g_type_register_static (GST_TYPE_VIDEO_ENCODER, t_name, &tinfo, 0);
+      g_type_set_qdata (type, GST_VPU_ENC_PARAMS_QDATA, (gpointer) in_plugin);
+    }
+
+    if (!gst_element_register (plugin, t_name, IMX_GST_PLUGIN_RANK, type)) {
+      g_free (t_name);
+      return FALSE;
+    }
+    g_free (t_name);
+
+    in_plugin++;
   }
 
   return TRUE;

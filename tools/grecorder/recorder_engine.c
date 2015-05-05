@@ -1938,6 +1938,12 @@ static REresult start(RecorderEngineHandle handle)
     return RE_RESULT_WRONG_STATE;
   }
 
+  if (recorder->image_width > 1920 || recorder->image_height > 1080) {
+    GST_ERROR ("invalid parameter for video recording.");
+    g_mutex_unlock (&recorder->lock);
+    return RE_RESULT_PARAMETER_INVALID;
+  }
+
   recorder->mode = MODE_VIDEO;
   ret = run_pipeline (recorder);
   if (ret != RE_RESULT_SUCCESS) {

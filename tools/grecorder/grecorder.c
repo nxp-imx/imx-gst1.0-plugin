@@ -29,9 +29,9 @@
 
 #include "recorder_engine.h"
 
-#define PRINTF_ERROR printf
-#define PRINT_INFO printf
-#define PRINT_DEBUG printf
+#define LOG_ERROR printf
+#define LOG_INFO printf
+#define LOG_DEBUG printf
 
 #define LATEST_REMAIN_SPACE_SIZE (50*1024*1024)
 
@@ -179,7 +179,7 @@ static REuint64 get_storage_free_size (char *dirname)
   REuint64 free_size;
 
   if (statvfs64(dirname, &fsdata) < 0) {
-    PRINTF_ERROR ("get storage free size fail.\n");
+    LOG_ERROR ("get storage free size fail.\n");
     return 0;
   }
 
@@ -190,7 +190,7 @@ static REuint64 get_storage_free_size (char *dirname)
 static void monitor_storage_free_size (RecorderEngine* recorder)
 {
   if (get_storage_free_size (path) < LATEST_REMAIN_SPACE_SIZE) {
-    PRINT_INFO ("storage free space is less then %d. stop recording", \
+    LOG_INFO ("storage free space is less then %d. stop recording", \
         LATEST_REMAIN_SPACE_SIZE);
     STOP_SHOW_MEDIATIME_INFO;
     RECORDER_STOP;
@@ -238,29 +238,29 @@ static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
   /* Audio source interface */
   if (RE_RESULT_SUCCESS != recorder->set_audio_source (
         (RecorderEngineHandle)recorder, pOpt->audio_source)) {
-    PRINTF_ERROR ("set audio source fail.\n");
+    LOG_ERROR ("set audio source fail.\n");
     return -1;
   }
   if (RE_RESULT_SUCCESS != recorder->set_audio_sample_rate (
         (RecorderEngineHandle)recorder, pOpt->sample_rate)) {
-    PRINTF_ERROR ("set audio sample rate fail.\n");
+    LOG_ERROR ("set audio sample rate fail.\n");
     return -1;
   }
   if (RE_RESULT_SUCCESS != recorder->set_audio_channel (
         (RecorderEngineHandle)recorder, pOpt->channel)) {
-    PRINTF_ERROR ("set audio channel fail.\n");
+    LOG_ERROR ("set audio channel fail.\n");
     return -1;
   }
 
   /* Camera interface */
   if (RE_RESULT_SUCCESS != recorder->set_video_source (
         (RecorderEngineHandle)recorder, pOpt->video_source)) {
-    PRINTF_ERROR ("set video source fail.\n");
+    LOG_ERROR ("set video source fail.\n");
     return -1;
   }
   if (RE_RESULT_SUCCESS != recorder->set_camera_id (
         (RecorderEngineHandle)recorder, pOpt->camera_id)) {
-    PRINTF_ERROR ("set video source fail.\n");
+    LOG_ERROR ("set video source fail.\n");
     return -1;
   }
   {
@@ -272,7 +272,7 @@ static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
 
     if (RE_RESULT_SUCCESS != recorder->set_camera_output_settings (
           (RecorderEngineHandle)recorder, &video_property)) {
-      PRINTF_ERROR ("set video source fail.\n");
+      LOG_ERROR ("set video source fail.\n");
       return -1;
     }
   }
@@ -288,7 +288,7 @@ static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
 
     if (RE_RESULT_SUCCESS != recorder->set_preview_region (
           (RecorderEngineHandle)recorder, &rect)) {
-      PRINTF_ERROR ("set video source fail.\n");
+      LOG_ERROR ("set video source fail.\n");
       return -1;
     }
   }
@@ -296,7 +296,7 @@ static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
   /* Preview buffer after capture */
   if (RE_RESULT_SUCCESS != recorder->need_preview_buffer (
         (RecorderEngineHandle)recorder, pOpt->preview_buffer)) {
-    PRINTF_ERROR ("set video source fail.\n");
+    LOG_ERROR ("set video source fail.\n");
     return -1;
   }
 
@@ -313,7 +313,7 @@ static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
 
     if (RE_RESULT_SUCCESS != recorder->set_audio_encoder_settings (
           (RecorderEngineHandle)recorder, &audio_encoder)) {
-      PRINTF_ERROR ("set video source fail.\n");
+      LOG_ERROR ("set video source fail.\n");
       return -1;
     }
   }
@@ -329,7 +329,7 @@ static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
 
     if (RE_RESULT_SUCCESS != recorder->set_video_encoder_settings (
           (RecorderEngineHandle)recorder, &video_encoder)) {
-      PRINTF_ERROR ("set video source fail.\n");
+      LOG_ERROR ("set video source fail.\n");
       return -1;
     }
   }
@@ -337,7 +337,7 @@ static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
   /* Recorded output interface */
   if (RE_RESULT_SUCCESS != recorder->set_container_format (
         (RecorderEngineHandle)recorder, pOpt->container_format)) {
-    PRINTF_ERROR ("set video source fail.\n");
+    LOG_ERROR ("set video source fail.\n");
     return -1;
   }
 
@@ -347,13 +347,13 @@ static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
   /* fileCount is 0 means unlimited */
   if (RE_RESULT_SUCCESS != recorder->set_file_count (
         (RecorderEngineHandle)recorder, pOpt->file_count)) {
-    PRINTF_ERROR ("set video source fail.\n");
+    LOG_ERROR ("set video source fail.\n");
     return -1;
   }
   if (pOpt->duration) {
     if (RE_RESULT_SUCCESS != recorder->set_max_file_duration (
           (RecorderEngineHandle)recorder, pOpt->duration)) {
-    PRINTF_ERROR ("set video source fail.\n");
+    LOG_ERROR ("set video source fail.\n");
     return -1;
     }
   }
@@ -362,13 +362,13 @@ static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
     if (RE_RESULT_SUCCESS != recorder->set_max_file_size_bytes (
           (RecorderEngineHandle)recorder,
           pOpt->file_size <= free_size ? pOpt->file_size:free_size)) {
-      PRINTF_ERROR ("set video source fail.\n");
+      LOG_ERROR ("set video source fail.\n");
       return -1;
     }
   } else {
     if (RE_RESULT_SUCCESS != recorder->set_max_file_size_bytes (
           (RecorderEngineHandle)recorder, free_size)) {
-      PRINTF_ERROR ("set video source fail.\n");
+      LOG_ERROR ("set video source fail.\n");
       return -1;
     }
   }
@@ -385,13 +385,13 @@ static int set_recoder_setting_snap_shot (RecorderEngine *recorder, REOptions * 
   }
   free_size = get_storage_free_size(path);
   if (free_size < LATEST_REMAIN_SPACE_SIZE) {
-    PRINTF_ERROR ("storage free size is less than: %d is: %lld\n", 
+    LOG_ERROR ("storage free size is less than: %d is: %lld\n", 
         LATEST_REMAIN_SPACE_SIZE, free_size);
     return -1;
   }
   if (RE_RESULT_SUCCESS != recorder->set_output_file_path (
         (RecorderEngineHandle)recorder, pOpt->path)) {
-    PRINTF_ERROR ("set video source fail.\n");
+    LOG_ERROR ("set video source fail.\n");
     return -1;
   }
 
@@ -407,7 +407,7 @@ static int set_recoder_setting_snap_shot (RecorderEngine *recorder, REOptions * 
 
     if (RE_RESULT_SUCCESS != recorder->set_output_file_settings (
           (RecorderEngineHandle)recorder, &file_setting)) {
-      PRINTF_ERROR ("set video source fail.\n");
+      LOG_ERROR ("set video source fail.\n");
       return -1;
     }
   }
@@ -444,13 +444,13 @@ static int set_recoder_setting_video (RecorderEngine *recorder, REOptions * pOpt
   }
   free_size = get_storage_free_size(path);
   if (free_size < LATEST_REMAIN_SPACE_SIZE) {
-    PRINTF_ERROR ("storage free size is less than: %d is: %lld\n", 
+    LOG_ERROR ("storage free size is less than: %d is: %lld\n", 
         LATEST_REMAIN_SPACE_SIZE, free_size);
     return -1;
   }
   if (RE_RESULT_SUCCESS != recorder->set_output_file_path (
         (RecorderEngineHandle)recorder, pOpt->path)) {
-    PRINTF_ERROR ("set video source fail.\n");
+    LOG_ERROR ("set video source fail.\n");
     return -1;
   }
 
@@ -466,7 +466,7 @@ static int set_recoder_setting_video (RecorderEngine *recorder, REOptions * pOpt
 
     if (RE_RESULT_SUCCESS != recorder->set_output_file_settings (
           (RecorderEngineHandle)recorder, &file_setting)) {
-      PRINTF_ERROR ("set video source fail.\n");
+      LOG_ERROR ("set video source fail.\n");
       return -1;
     }
   }
@@ -489,10 +489,14 @@ static void process_message (void* param)
     latest_message = MESSAGE_NULL;
     sem_wait(&grecordersem);
 
-    PRINT_INFO ("process_message: %d\n", latest_message);
+    LOG_INFO ("process_message: %d\n", latest_message);
     switch (latest_message) {
       case MESSAGE_START:
-        recorder->start((RecorderEngineHandle)recorder);
+        if (RE_RESULT_SUCCESS == recorder->start((RecorderEngineHandle)recorder)) {
+          START_SHOW_MEDIATIME_INFO;
+          LOG_INFO ("start recording\n");
+        } else 
+          LOG_ERROR ("start recording failed\n");
         break;
       case MESSAGE_STOP:
         recorder->stop((RecorderEngineHandle)recorder);
@@ -523,7 +527,7 @@ static void list_camera_capabilities (RecorderEngine* recorder)
   RERawVideoSettings videoProperty;
   REuint32 index; 
 
-  PRINT_INFO ("\nCamera Capebilities:\n\n"); 
+  LOG_INFO ("\nCamera Capebilities:\n\n"); 
 
   for (index = 0; ; index ++) {
     ret = recorder->get_camera_capabilities((RecorderEngineHandle)recorder, 
@@ -532,7 +536,7 @@ static void list_camera_capabilities (RecorderEngine* recorder)
       break;
     }
 
-    PRINT_INFO ("width: %d height: %d frame rate: %d\n", \
+    LOG_INFO ("width: %d height: %d frame rate: %d\n", \
         videoProperty.width, videoProperty.height, \
         videoProperty.framesPerSecond);
   }
@@ -543,22 +547,22 @@ static int event_handler(void* context, REuint32 eventID, void* Eventpayload)
   RecorderEngine* recorder = (RecorderEngine*) context;
   switch(eventID) {
     case RE_EVENT_ERROR_UNKNOWN:
-      PRINTF_ERROR ("error, post stop message.\n");
+      LOG_ERROR ("error, post stop message.\n");
       STOP_SHOW_MEDIATIME_INFO;
       RECORDER_STOP;
       break;
     case RE_EVENT_PREVIEW_BUFFER:
-      PRINT_INFO ("received preview buffer.\n");
+      LOG_INFO ("received preview buffer.\n");
       break;
     case RE_EVENT_MAX_DURATION_REACHED:
     case RE_EVENT_MAX_FILESIZE_REACHED:
-      PRINTF_ERROR ("reach max duration, post stop message.\n");
+      LOG_ERROR ("reach max duration, post stop message.\n");
       STOP_SHOW_MEDIATIME_INFO;
       RECORDER_STOP;
       break;
     case RE_EVENT_OBJECT_POSITION: {
       REVideoRect *object_pos = (REVideoRect *) Eventpayload;
-      PRINT_INFO ("Object Detected. Position: [x:%d y:%d width: %d height: %d]\n",
+      LOG_INFO ("Object Detected. Position: [x:%d y:%d width: %d height: %d]\n",
           object_pos->left, object_pos->top,object_pos->width,object_pos->height);
       }
       break;
@@ -772,7 +776,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
   if (pOpt->path[0] == 0) {
     pOpt->use_default_filename = RE_BOOLEAN_TRUE;
     if (getcwd(path, sizeof(path)) == NULL) {
-      PRINTF_ERROR ("get current path fail\n");
+      LOG_ERROR ("get current path fail\n");
       return -1;
     }
   } else {
@@ -800,29 +804,29 @@ int main(int argc, char* argv[])
 
   memset(&options, 0, sizeof(REOptions));
   if (recorder_parse_options(argc,argv,&options)){
-    PRINTF_ERROR ("recorder_parse_options fail.\n");
+    LOG_ERROR ("recorder_parse_options fail.\n");
     exit (1);
   }
   
   recorder = recorder_engine_create();
   if (recorder == NULL) {
-    PRINTF_ERROR ("RecorderEngineCreate fail.\n");
+    LOG_ERROR ("RecorderEngineCreate fail.\n");
     exit (1);
   }
 
-  PRINT_INFO ("create recorder successfully\n");
+  LOG_INFO ("create recorder successfully\n");
 
   recorder->init((RecorderEngineHandle)recorder);
   recorder->register_event_handler((RecorderEngineHandle)recorder, recorder,
       event_handler);
 
   if (set_recoder_setting (recorder, &options)) {
-    PRINTF_ERROR ("set_recoder_setting fail.\n");
+    LOG_ERROR ("set_recoder_setting fail.\n");
     goto bail;
   }
 
   if (recorder->prepare((RecorderEngineHandle)recorder)) {
-    PRINTF_ERROR ("prepare fail.\n");
+    LOG_ERROR ("prepare fail.\n");
     goto bail;
   }
 
@@ -843,19 +847,17 @@ int main(int argc, char* argv[])
       }
       read_input=RE_BOOLEAN_TRUE;
       if (quit_flag) {
-        PRINT_INFO ("receive Ctrl+c user input.\n");
+        LOG_INFO ("receive Ctrl+c user input.\n");
         STOP_SHOW_MEDIATIME_INFO;
         RECORDER_STOP;
         bexit = RE_BOOLEAN_TRUE;
       }
       if(rep[0] == 'r') {
         if (set_recoder_setting_video (recorder, &options)) {
-          PRINTF_ERROR ("set_recoder_setting_video fail.\n");
+          LOG_ERROR ("set_recoder_setting_video fail.\n");
           continue;
         }
         RECORDER_START;
-        START_SHOW_MEDIATIME_INFO;
-        PRINT_INFO ("start recording\n");
       }
       else if(rep[0] == 'a') {
         if(bPause != RE_BOOLEAN_TRUE) {
@@ -873,7 +875,7 @@ int main(int argc, char* argv[])
       }
       else if(rep[0] == 'n') {
         if (set_recoder_setting_snap_shot (recorder, &options)) {
-          PRINTF_ERROR ("set_recoder_setting_snap_shot fail\n");
+          LOG_ERROR ("set_recoder_setting_snap_shot fail\n");
           continue;
         }
         RECORDER_TAKE_SNAPSHOT;
