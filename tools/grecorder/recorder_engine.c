@@ -1487,23 +1487,39 @@ static REresult get_camera_capabilities(RecorderEngineHandle handle, REuint32 in
 
   if (recorder->camera_caps) {
     GstStructure *str;
+    const GValue *value_list;
+    const GValue *value;
+
     GST_DEBUG ("index: %d caps size: %d\n", index, gst_caps_get_size (recorder->camera_caps));
     if (index >= gst_caps_get_size (recorder->camera_caps)) {
       return RE_RESULT_NO_MORE;
     }
     str = gst_caps_get_structure (recorder->camera_caps, index);
-    gst_structure_get_int (str, "width", (gint *)(&videoProperty->width));
-    gst_structure_get_int (str, "height", (gint *)(&videoProperty->height));
-    gst_structure_get_fraction (str, "framerate", 
-        &framerate_numerator, &framerate_denominator);
+    if (!gst_structure_get_int (str, "width", (gint *)(&videoProperty->width))) {
+      value_list = gst_structure_get_value (str, "width");
+      value = gst_value_list_get_value (value_list, 0);
+
+      videoProperty->width = g_value_get_int (value);
+    }
+    if (!gst_structure_get_int (str, "height", (gint *)(&videoProperty->height))) {
+      value_list = gst_structure_get_value (str, "height");
+      value = gst_value_list_get_value (value_list, 0);
+
+      videoProperty->height = g_value_get_int (value);
+    }
+    if (!gst_structure_get_fraction (str, "framerate",
+          &framerate_numerator, &framerate_denominator)) {
+      value_list = gst_structure_get_value (str, "framerate");
+      value = gst_value_list_get_value (value_list, 0);
+
+      framerate_numerator = gst_value_get_fraction_numerator (value);
+      framerate_denominator = gst_value_get_fraction_denominator (value);
+    }
+
     GST_DEBUG ("framerate_numerator: %d framerate_denominator: %d",
         framerate_numerator, framerate_denominator);
-    //FIXME: should be 15 and 30.
-    videoProperty->framesPerSecond = 30;
     if (framerate_denominator) {
-      if (framerate_numerator / framerate_denominator == 15) {
-        videoProperty->framesPerSecond = 15;
-      }
+      videoProperty->framesPerSecond = framerate_numerator / framerate_denominator;
     } 
   } else {
     return RE_RESULT_NO_MORE;
@@ -1522,8 +1538,14 @@ static REresult set_camera_output_settings(RecorderEngineHandle handle, RERawVid
   //recorder->image_format = videoProperty->videoFormat;
   recorder->image_width = videoProperty->width;
   recorder->image_height = videoProperty->height;
-  recorder->view_framerate_num = videoProperty->framesPerSecond;
-  recorder->view_framerate_den = 1;
+  //FIXME: work around for USB camera 15/2 fps.
+  if (videoProperty->framesPerSecond == 7) {
+    recorder->view_framerate_num = 15;
+    recorder->view_framerate_den = 2;
+  } else {
+    recorder->view_framerate_num = videoProperty->framesPerSecond;
+    recorder->view_framerate_den = 1;
+  }
 
   if (recorder->image_width > 0 && recorder->image_height > 0) {
     if (recorder->camera_output_caps) {
