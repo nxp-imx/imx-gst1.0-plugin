@@ -356,6 +356,10 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
 
       gst_structure_free (config);
       gst_object_unref (pool_pre);
+      if (allocator)
+        gst_object_unref (allocator);
+      if (pool)
+        gst_object_unref (pool);
 
       return TRUE;
     }
