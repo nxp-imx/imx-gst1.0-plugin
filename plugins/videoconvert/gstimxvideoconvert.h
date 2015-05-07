@@ -21,7 +21,8 @@
 #define __GST_IMX_VIDEO_CONVERT_H__
 
 #include <gst/gst.h>
-#include "videoprocessdevice.h"
+#include "gstimxcommon.h"
+#include "imx_2d_device.h"
 
 G_BEGIN_DECLS
 
@@ -37,7 +38,7 @@ G_BEGIN_DECLS
 typedef struct _GstImxVideoConvert {
   GstVideoFilter element;
 
-  ImxVideoProcessDevice *device;
+  Imx2DDevice *device;
   GstBufferPool *in_pool;
   GstBufferPool *out_pool;
   GstBufferPool *self_out_pool;
@@ -51,7 +52,7 @@ typedef struct _GstImxVideoConvert {
 typedef struct _GstImxVideoConvertClass {
   GstVideoFilterClass parent_class;
 
-  const ImxVideoProcessDeviceInfo *in_plugin;
+  const Imx2DDeviceInfo *in_plugin;
 } GstImxVideoConvertClass;
 
 G_END_DECLS

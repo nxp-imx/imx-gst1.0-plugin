@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2014-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -17,28 +17,28 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifndef __GST_IMX_VIDEO_CONVERT_ALLOCATOR_H__
-#define __GST_IMX_VIDEO_CONVERT_ALLOCATOR_H__
+#ifndef __GST_IMX_2D_DEVICE_ALLOCATOR_H__
+#define __GST_IMX_2D_DEVICE_ALLOCATOR_H__
 
 #include <gst/gst.h>
-#include "gstallocatorphymem.h"
+#include "../allocator/gstallocatorphymem.h"
 
-#define GST_TYPE_IMX_VIDEO_CONVERT_ALLOCATOR             \
-                                  (gst_imx_video_convert_allocator_get_type())
-#define GST_IMX_VIDEO_CONVERT_ALLOCATOR(obj)             \
-      (G_TYPE_CHECK_INSTANCE_CAST((obj), GST_TYPE_IMX_VIDEO_CONVERT_ALLOCATOR,\
-          GstImxVideoConvertAllocator))
+#define GST_TYPE_IMX_2D_DEVICE_ALLOCATOR             \
+                                  (gst_imx_2d_device_allocator_get_type())
+#define GST_IMX_2D_DEVICE_ALLOCATOR(obj)             \
+      (G_TYPE_CHECK_INSTANCE_CAST((obj), GST_TYPE_IMX_2D_DEVICE_ALLOCATOR,\
+          GstImx2DDeviceAllocator))
 
-typedef struct _GstImxVideoConvertAllocator {
+typedef struct _GstImx2DDeviceAllocator {
   GstAllocatorPhyMem parent;
   gpointer device;
-} GstImxVideoConvertAllocator;
+} GstImx2DDeviceAllocator;
 
-typedef struct _GstImxVideoConvertAllocatorClass {
+typedef struct _GstImx2DDeviceAllocatorClass {
   GstAllocatorPhyMemClass parent_class;
-} GstImxVideoConvertAllocatorClass;
+} GstImx2DDeviceAllocatorClass;
 
-GType gst_imx_video_convert_allocator_get_type (void);
-GstAllocator *gst_imx_video_convert_allocator_new (gpointer device);
+GType gst_imx_2d_device_allocator_get_type (void);
+GstAllocator *gst_imx_2d_device_allocator_new (gpointer device);
 
-#endif /* __GST_IMX_VIDEO_CONVERT_ALLOCATOR_H__ */
+#endif /* __GST_IMX_2D_DEVICE_ALLOCATOR_H__ */

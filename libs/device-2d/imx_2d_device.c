@@ -1,5 +1,5 @@
-/* GStreamer IMX Video Processing device
- * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
+/* GStreamer IMX Video 2D device
+ * Copyright (c) 2014-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -17,28 +17,30 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "videoprocessdevice.h"
+#include "imx_2d_device.h"
+
+GST_DEBUG_CATEGORY (imx2ddevice_debug);
+#define GST_CAT_DEFAULT imx2ddevice_debug
+
 #ifdef USE_IPU
-extern ImxVideoProcessDevice * imx_ipu_create(ImxVpDeviceType  device_type);
-extern gint imx_ipu_destroy(ImxVideoProcessDevice *device);
+extern Imx2DDevice * imx_ipu_create(Imx2DDeviceType  device_type);
+extern gint imx_ipu_destroy(Imx2DDevice *device);
 #endif
 
 #ifdef USE_G2D
-extern ImxVideoProcessDevice * imx_g2d_create(ImxVpDeviceType  device_type);
-extern gint imx_g2d_destroy(ImxVideoProcessDevice *device);
+extern Imx2DDevice * imx_g2d_create(Imx2DDeviceType  device_type);
+extern gint imx_g2d_destroy(Imx2DDevice *device);
 #endif
 
 #ifdef USE_PXP
-extern ImxVideoProcessDevice * imx_pxp_create(ImxVpDeviceType  device_type);
-extern gint imx_pxp_destroy(ImxVideoProcessDevice *device);
+extern Imx2DDevice * imx_pxp_create(Imx2DDeviceType  device_type);
+extern gint imx_pxp_destroy(Imx2DDevice *device);
 #endif
 
-static const ImxVideoProcessDeviceInfo VPDevices[] = {
+static const Imx2DDeviceInfo Imx2DDevices[] = {
 #ifdef USE_IPU
     { .name                     ="ipu",
-      .device_type              =IMX_VP_DEVICE_IPU,
-      .description              ="IMX IPU Video Converter",
-      .detail                   ="Video CSC/resize/rotate/deinterlace",
+      .device_type              =IMX_2D_DEVICE_IPU,
       .create                   =imx_ipu_create,
       .destroy                  =imx_ipu_destroy
     },
@@ -46,9 +48,7 @@ static const ImxVideoProcessDeviceInfo VPDevices[] = {
 
 #ifdef USE_G2D
     { .name                     ="g2d",
-      .device_type              =IMX_VP_DEVICE_G2D,
-      .description              ="IMX G2D Video Converter",
-      .detail                   ="Video CSC/resize/rotate",
+      .device_type              =IMX_2D_DEVICE_G2D,
       .create                   =imx_g2d_create,
       .destroy                  =imx_g2d_destroy
     },
@@ -56,9 +56,7 @@ static const ImxVideoProcessDeviceInfo VPDevices[] = {
 
 #ifdef USE_PXP
     { .name                     ="pxp",
-      .device_type              =IMX_VP_DEVICE_PXP,
-      .description              ="IMX PXP Video Converter",
-      .detail                   ="Video CSC/resize/rotate",
+      .device_type              =IMX_2D_DEVICE_PXP,
       .create                   =imx_pxp_create,
       .destroy                  =imx_pxp_destroy
     },
@@ -68,7 +66,9 @@ static const ImxVideoProcessDeviceInfo VPDevices[] = {
     }
 };
 
-const ImxVideoProcessDeviceInfo * imx_get_video_process_devices(void)
+const Imx2DDeviceInfo * imx_get_2d_devices(void)
 {
-  return &VPDevices[0];
+  GST_DEBUG_CATEGORY_INIT (imx2ddevice_debug, "imx2ddevice", 0,
+                           "Freescale IMX 2D Devices");
+  return &Imx2DDevices[0];
 }

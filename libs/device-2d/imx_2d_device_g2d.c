@@ -1,5 +1,5 @@
-/* GStreamer IMX G2D Video Processing
- * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
+/* GStreamer IMX G2D Device
+ * Copyright (c) 2014-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -20,16 +20,16 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include "g2d.h"
-#include "videoprocessdevice.h"
+#include "imx_2d_device.h"
 
-GST_DEBUG_CATEGORY_EXTERN (imxvideoconvert_debug);
-#define GST_CAT_DEFAULT imxvideoconvert_debug
+GST_DEBUG_CATEGORY_EXTERN (imx2ddevice_debug);
+#define GST_CAT_DEFAULT imx2ddevice_debug
 
-typedef struct _ImxVpDeviceG2d {
+typedef struct _Imx2DDeviceG2d {
   gint capabilities;
   struct g2d_surface src;
   struct g2d_surface dst;
-} ImxVpDeviceG2d;
+} Imx2DDeviceG2d;
 
 typedef struct {
   GstVideoFormat gst_video_format;
@@ -83,32 +83,32 @@ static const G2dFmtMap * imx_g2d_get_format(GstVideoFormat format)
   return NULL;
 }
 
-static gint imx_g2d_open(ImxVideoProcessDevice *device)
+static gint imx_g2d_open(Imx2DDevice *device)
 {
   if (!device)
     return -1;
 
-  ImxVpDeviceG2d *g2d = g_slice_alloc(sizeof(ImxVpDeviceG2d));
+  Imx2DDeviceG2d *g2d = g_slice_alloc(sizeof(Imx2DDeviceG2d));
   if (!g2d) {
     GST_ERROR("allocate g2d structure failed\n");
     return -1;
   }
 
-  memset(g2d, 0, sizeof (ImxVpDeviceG2d));
+  memset(g2d, 0, sizeof (Imx2DDeviceG2d));
   device->priv = (gpointer)g2d;
 
   return 0;
 }
 
-static gint imx_g2d_close(ImxVideoProcessDevice *device)
+static gint imx_g2d_close(Imx2DDevice *device)
 {
   if (!device)
     return -1;
 
   if (device) {
-    ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
+    Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
     if (g2d)
-      g_slice_free1(sizeof(ImxVpDeviceG2d), g2d);
+      g_slice_free1(sizeof(Imx2DDeviceG2d), g2d);
     device->priv = NULL;
   }
   return 0;
@@ -116,7 +116,7 @@ static gint imx_g2d_close(ImxVideoProcessDevice *device)
 
 
 static gint
-imx_g2d_alloc_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
+imx_g2d_alloc_mem(Imx2DDevice *device, PhyMemBlock *memblk)
 {
   struct g2d_buf *pbuf = NULL;
 
@@ -139,7 +139,7 @@ imx_g2d_alloc_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
   return 0;
 }
 
-static gint imx_g2d_free_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
+static gint imx_g2d_free_mem(Imx2DDevice *device, PhyMemBlock *memblk)
 {
   if (!device || !device->priv || !memblk)
     return -1;
@@ -153,7 +153,7 @@ static gint imx_g2d_free_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
   return ret;
 }
 
-static gint imx_g2d_frame_copy(ImxVideoProcessDevice *device,
+static gint imx_g2d_frame_copy(Imx2DDevice *device,
                                PhyMemBlock *from, PhyMemBlock *to)
 {
   struct g2d_buf src, dst;
@@ -162,7 +162,7 @@ static gint imx_g2d_frame_copy(ImxVideoProcessDevice *device,
   if (!device || !device->priv || !from || !to)
     return -1;
 
-  ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
+  Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
 
   void *g2d_handle = NULL;
 
@@ -187,13 +187,12 @@ static gint imx_g2d_frame_copy(ImxVideoProcessDevice *device,
   return ret;
 }
 
-static gint imx_g2d_config_input(ImxVideoProcessDevice *device,
-                                  ImxVideoInfo* in_info)
+static gint imx_g2d_config_input(Imx2DDevice *device, Imx2DVideoInfo* in_info)
 {
   if (!device || !device->priv)
     return -1;
 
-  ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
+  Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
   const G2dFmtMap *in_map = imx_g2d_get_format(in_info->fmt);
   if (!in_map)
     return -1;
@@ -211,13 +210,12 @@ static gint imx_g2d_config_input(ImxVideoProcessDevice *device,
   return 0;
 }
 
-static gint imx_g2d_config_output(ImxVideoProcessDevice *device,
-                                  ImxVideoInfo* out_info)
+static gint imx_g2d_config_output(Imx2DDevice *device, Imx2DVideoInfo* out_info)
 {
   if (!device || !device->priv)
     return -1;
 
-  ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
+  Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
   const G2dFmtMap *out_map = imx_g2d_get_format(out_info->fmt);
   if (!out_map)
     return -1;
@@ -235,10 +233,10 @@ static gint imx_g2d_config_output(ImxVideoProcessDevice *device,
   return 0;
 }
 
-static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
+static gint imx_g2d_do_convert(Imx2DDevice *device,
                                 PhyMemBlock *from, PhyMemBlock *to,
-                                ImxVideoInterlaceType interlace_type,
-                                ImxVideoCrop incrop, ImxVideoCrop outcrop)
+                                Imx2DInterlaceType interlace_type,
+                                Imx2DCrop incrop, Imx2DCrop outcrop)
 {
   gint ret = 0;
   void *g2d_handle = NULL;
@@ -252,7 +250,7 @@ static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
     return -1;
   }
 
-  ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
+  Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
 
   // Set input
   g2d->src.left = incrop.x;
@@ -326,61 +324,59 @@ static gint imx_g2d_do_convert(ImxVideoProcessDevice *device,
   return ret;
 }
 
-static gint imx_g2d_set_rotate(ImxVideoProcessDevice *device,
-                               ImxVideoRotationMode rot)
+static gint imx_g2d_set_rotate(Imx2DDevice *device, Imx2DRotationMode rot)
 {
   if (!device || !device->priv)
     return -1;
 
-  ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
+  Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
   gint g2d_rotate = G2D_ROTATION_0;
   switch (rot) {
-  case IMX_VIDEO_ROTATION_0:      g2d_rotate = G2D_ROTATION_0;    break;
-  case IMX_VIDEO_ROTATION_90:     g2d_rotate = G2D_ROTATION_90;   break;
-  case IMX_VIDEO_ROTATION_180:    g2d_rotate = G2D_ROTATION_180;  break;
-  case IMX_VIDEO_ROTATION_270:    g2d_rotate = G2D_ROTATION_270;  break;
-  case IMX_VIDEO_ROTATION_HFLIP:  g2d_rotate = G2D_FLIP_H;        break;
-  case IMX_VIDEO_ROTATION_VFLIP:  g2d_rotate = G2D_FLIP_V;        break;
-  default:                        g2d_rotate = G2D_ROTATION_0;    break;
+  case IMX_2D_ROTATION_0:      g2d_rotate = G2D_ROTATION_0;    break;
+  case IMX_2D_ROTATION_90:     g2d_rotate = G2D_ROTATION_90;   break;
+  case IMX_2D_ROTATION_180:    g2d_rotate = G2D_ROTATION_180;  break;
+  case IMX_2D_ROTATION_270:    g2d_rotate = G2D_ROTATION_270;  break;
+  case IMX_2D_ROTATION_HFLIP:  g2d_rotate = G2D_FLIP_H;        break;
+  case IMX_2D_ROTATION_VFLIP:  g2d_rotate = G2D_FLIP_V;        break;
+  default:                     g2d_rotate = G2D_ROTATION_0;    break;
   }
 
   g2d->dst.rot = g2d_rotate;
   return 0;
 }
 
-static gint imx_g2d_set_deinterlace(ImxVideoProcessDevice *device,
-                                    ImxVideoDeinterlaceMode mode)
+static gint imx_g2d_set_deinterlace(Imx2DDevice *device,
+                                    Imx2DDeinterlaceMode mode)
 {
   return 0;
 }
 
-static ImxVideoRotationMode imx_g2d_get_rotate (ImxVideoProcessDevice* device)
+static Imx2DRotationMode imx_g2d_get_rotate (Imx2DDevice* device)
 {
   if (!device || !device->priv)
     return 0;
 
-  ImxVpDeviceG2d *g2d = (ImxVpDeviceG2d *) (device->priv);
-  ImxVideoRotationMode rot = IMX_VIDEO_ROTATION_0;
+  Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
+  Imx2DRotationMode rot = IMX_2D_ROTATION_0;
   switch (g2d->dst.rot) {
-  case G2D_ROTATION_0:    rot = IMX_VIDEO_ROTATION_0;     break;
-  case G2D_ROTATION_90:   rot = IMX_VIDEO_ROTATION_90;    break;
-  case G2D_ROTATION_180:  rot = IMX_VIDEO_ROTATION_180;   break;
-  case G2D_ROTATION_270:  rot = IMX_VIDEO_ROTATION_270;   break;
-  case G2D_FLIP_H:        rot = IMX_VIDEO_ROTATION_HFLIP; break;
-  case G2D_FLIP_V:        rot = IMX_VIDEO_ROTATION_VFLIP; break;
-  default:                rot = IMX_VIDEO_ROTATION_0;     break;
+  case G2D_ROTATION_0:    rot = IMX_2D_ROTATION_0;     break;
+  case G2D_ROTATION_90:   rot = IMX_2D_ROTATION_90;    break;
+  case G2D_ROTATION_180:  rot = IMX_2D_ROTATION_180;   break;
+  case G2D_ROTATION_270:  rot = IMX_2D_ROTATION_270;   break;
+  case G2D_FLIP_H:        rot = IMX_2D_ROTATION_HFLIP; break;
+  case G2D_FLIP_V:        rot = IMX_2D_ROTATION_VFLIP; break;
+  default:                rot = IMX_2D_ROTATION_0;     break;
   }
 
   return rot;
 }
 
-static ImxVideoDeinterlaceMode imx_g2d_get_deinterlace (
-                                                ImxVideoProcessDevice* device)
+static Imx2DDeinterlaceMode imx_g2d_get_deinterlace (Imx2DDevice* device)
 {
-  return IMX_VIDEO_DEINTERLACE_NONE;
+  return IMX_2D_DEINTERLACE_NONE;
 }
 
-static gint imx_g2d_get_capabilities (ImxVideoProcessDevice* device)
+static gint imx_g2d_get_capabilities (Imx2DDevice* device)
 {
   void *g2d_handle = NULL;
   gint capabilities = 0;
@@ -388,13 +384,18 @@ static gint imx_g2d_get_capabilities (ImxVideoProcessDevice* device)
   if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
     GST_ERROR ("Failed to open g2d device.");
   } else {
-    capabilities = IMX_VP_DEVICE_CAP_SCALE|IMX_VP_DEVICE_CAP_CSC \
-                      |IMX_VP_DEVICE_CAP_ROTATE;
+    capabilities = IMX_2D_DEVICE_CAP_SCALE|IMX_2D_DEVICE_CAP_CSC \
+                      |IMX_2D_DEVICE_CAP_ROTATE;
 
     gboolean enable = FALSE;
     g2d_query_cap(g2d_handle, G2D_GLOBAL_ALPHA, &enable);
     if (enable)
-      capabilities |= IMX_VP_DEVICE_CAP_ALPHA;
+      capabilities |= IMX_2D_DEVICE_CAP_ALPHA;
+
+    enable = FALSE;
+    g2d_query_cap(g2d_handle, G2D_BLEND, &enable);
+    if (enable)
+      capabilities |= IMX_2D_DEVICE_CAP_BLEND;
 
     g2d_close(g2d_handle);
   }
@@ -402,7 +403,7 @@ static gint imx_g2d_get_capabilities (ImxVideoProcessDevice* device)
   return capabilities;
 }
 
-static GList* imx_g2d_get_supported_in_fmts(ImxVideoProcessDevice* device)
+static GList* imx_g2d_get_supported_in_fmts(Imx2DDevice* device)
 {
   GList* list = NULL;
   const G2dFmtMap *map = g2d_fmts_map;
@@ -415,7 +416,7 @@ static GList* imx_g2d_get_supported_in_fmts(ImxVideoProcessDevice* device)
   return list;
 }
 
-static GList* imx_g2d_get_supported_out_fmts(ImxVideoProcessDevice* device)
+static GList* imx_g2d_get_supported_out_fmts(Imx2DDevice* device)
 {
   GList* list = NULL;
   const G2dFmtMap *map = g2d_fmts_map;
@@ -428,9 +429,9 @@ static GList* imx_g2d_get_supported_out_fmts(ImxVideoProcessDevice* device)
   return list;
 }
 
-ImxVideoProcessDevice * imx_g2d_create(ImxVpDeviceType  device_type)
+Imx2DDevice * imx_g2d_create(Imx2DDeviceType  device_type)
 {
-  ImxVideoProcessDevice * device = g_slice_alloc(sizeof(ImxVideoProcessDevice));
+  Imx2DDevice * device = g_slice_alloc(sizeof(Imx2DDevice));
   if (!device) {
     GST_ERROR("allocate device structure failed\n");
     return NULL;
@@ -458,12 +459,12 @@ ImxVideoProcessDevice * imx_g2d_create(ImxVpDeviceType  device_type)
   return device;
 }
 
-gint imx_g2d_destroy(ImxVideoProcessDevice *device)
+gint imx_g2d_destroy(Imx2DDevice *device)
 {
   if (!device)
     return -1;
 
-  g_slice_free1(sizeof(ImxVideoProcessDevice), device);
+  g_slice_free1(sizeof(Imx2DDevice), device);
 
   return 0;
 }

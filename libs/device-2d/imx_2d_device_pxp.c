@@ -1,4 +1,4 @@
-/* GStreamer IMX PXP Video Processing
+/* GStreamer IMX PXP Device
  * Copyright (c) 2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -20,18 +20,18 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include "pxp_lib.h"
-#include "videoprocessdevice.h"
+#include "imx_2d_device.h"
 
-GST_DEBUG_CATEGORY_EXTERN (imxvideoconvert_debug);
-#define GST_CAT_DEFAULT imxvideoconvert_debug
+GST_DEBUG_CATEGORY_EXTERN (imx2ddevice_debug);
+#define GST_CAT_DEFAULT imx2ddevice_debug
 
 #define PXP_WAIT_COMPLETE_TIME    3
 
-typedef struct _ImxVpDevicePxp {
+typedef struct _Imx2DDevicePxp {
   gint capabilities;
   struct pxp_config_data config;
   pxp_chan_handle_t pxp_chan;
-} ImxVpDevicePxp;
+} Imx2DDevicePxp;
 
 typedef struct {
   GstVideoFormat gst_video_format;
@@ -103,7 +103,7 @@ static const PxpFmtMap * imx_pxp_get_format(GstVideoFormat format,
   return NULL;
 }
 
-static gint imx_pxp_open(ImxVideoProcessDevice *device)
+static gint imx_pxp_open(Imx2DDevice *device)
 {
   if (!device)
     return -1;
@@ -122,7 +122,7 @@ static gint imx_pxp_open(ImxVideoProcessDevice *device)
     return -1;
   }
 
-  ImxVpDevicePxp *pxp = g_slice_alloc(sizeof(ImxVpDevicePxp));
+  Imx2DDevicePxp *pxp = g_slice_alloc(sizeof(Imx2DDevicePxp));
   if (!pxp) {
     pxp_release_channel(&pxp_chan);
     pxp_uninit();
@@ -130,7 +130,7 @@ static gint imx_pxp_open(ImxVideoProcessDevice *device)
     return -1;
   }
 
-  memset(pxp, 0, sizeof (ImxVpDevicePxp));
+  memset(pxp, 0, sizeof (Imx2DDevicePxp));
   memcpy(&pxp->pxp_chan, &pxp_chan, sizeof(pxp_chan_handle_t));
 
 /* not necessary, pxp already memset to 0
@@ -160,17 +160,17 @@ static gint imx_pxp_open(ImxVideoProcessDevice *device)
   return 0;
 }
 
-static gint imx_pxp_close(ImxVideoProcessDevice *device)
+static gint imx_pxp_close(Imx2DDevice *device)
 {
   if (!device)
     return -1;
 
   if (device) {
-    ImxVpDevicePxp *pxp = (ImxVpDevicePxp *) (device->priv);
+    Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
     if (pxp) {
       pxp_release_channel(&pxp->pxp_chan);
       pxp_uninit();
-      g_slice_free1(sizeof(ImxVpDevicePxp), pxp);
+      g_slice_free1(sizeof(Imx2DDevicePxp), pxp);
     }
     device->priv = NULL;
   }
@@ -179,7 +179,7 @@ static gint imx_pxp_close(ImxVideoProcessDevice *device)
 
 
 static gint
-imx_pxp_alloc_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
+imx_pxp_alloc_mem(Imx2DDevice *device, PhyMemBlock *memblk)
 {
   if (!device || !device->priv || !memblk)
     return -1;
@@ -205,7 +205,7 @@ imx_pxp_alloc_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
   return 0;
 }
 
-static gint imx_pxp_free_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
+static gint imx_pxp_free_mem(Imx2DDevice *device, PhyMemBlock *memblk)
 {
   if (!device || !device->priv || !memblk)
     return -1;
@@ -219,7 +219,7 @@ static gint imx_pxp_free_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
   return ret;
 }
 
-static gint imx_pxp_frame_copy(ImxVideoProcessDevice *device,
+static gint imx_pxp_frame_copy(Imx2DDevice *device,
                                PhyMemBlock *from, PhyMemBlock *to)
 {
   if (!device || !device->priv || !from || !to)
@@ -230,13 +230,12 @@ static gint imx_pxp_frame_copy(ImxVideoProcessDevice *device,
   return 0;
 }
 
-static gint imx_pxp_config_input(ImxVideoProcessDevice *device,
-                                  ImxVideoInfo* in_info)
+static gint imx_pxp_config_input(Imx2DDevice *device, Imx2DVideoInfo* in_info)
 {
   if (!device || !device->priv)
     return -1;
 
-  ImxVpDevicePxp *pxp = (ImxVpDevicePxp *) (device->priv);
+  Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
   const PxpFmtMap *in_map = imx_pxp_get_format(in_info->fmt, pxp_in_fmts_map);
   if (!in_map)
     return -1;
@@ -257,13 +256,12 @@ static gint imx_pxp_config_input(ImxVideoProcessDevice *device,
   return 0;
 }
 
-static gint imx_pxp_config_output(ImxVideoProcessDevice *device,
-                                  ImxVideoInfo* out_info)
+static gint imx_pxp_config_output(Imx2DDevice *device, Imx2DVideoInfo* out_info)
 {
   if (!device || !device->priv)
     return -1;
 
-  ImxVpDevicePxp *pxp = (ImxVpDevicePxp *) (device->priv);
+  Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
   const PxpFmtMap *out_map = imx_pxp_get_format(out_info->fmt,pxp_out_fmts_map);
   if (!out_map)
     return -1;
@@ -286,17 +284,17 @@ static gint imx_pxp_config_output(ImxVideoProcessDevice *device,
   return 0;
 }
 
-static gint imx_pxp_do_convert(ImxVideoProcessDevice *device,
+static gint imx_pxp_do_convert(Imx2DDevice *device,
                                 PhyMemBlock *from, PhyMemBlock *to,
-                                ImxVideoInterlaceType interlace_type,
-                                ImxVideoCrop incrop, ImxVideoCrop outcrop)
+                                Imx2DInterlaceType interlace_type,
+                                Imx2DCrop incrop, Imx2DCrop outcrop)
 {
   gint ret = 0;
 
   if (!device || !device->priv || !from || !to)
     return -1;
 
-  ImxVpDevicePxp *pxp = (ImxVpDevicePxp *) (device->priv);
+  Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
 
   // Set input crop
   pxp->config.proc_data.srect.left = incrop.x;
@@ -354,72 +352,71 @@ static gint imx_pxp_do_convert(ImxVideoProcessDevice *device,
   return ret;
 }
 
-static gint imx_pxp_set_rotate(ImxVideoProcessDevice *device,
-                               ImxVideoRotationMode rot)
+static gint imx_pxp_set_rotate(Imx2DDevice *device, Imx2DRotationMode rot)
 {
   if (!device || !device->priv)
     return -1;
 
-  ImxVpDevicePxp *pxp = (ImxVpDevicePxp *) (device->priv);
+  Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
   switch (rot) {
-  case IMX_VIDEO_ROTATION_0:      pxp->config.proc_data.rotate = 0;    break;
-  case IMX_VIDEO_ROTATION_90:     pxp->config.proc_data.rotate = 90;   break;
-  case IMX_VIDEO_ROTATION_180:    pxp->config.proc_data.rotate = 180;  break;
-  case IMX_VIDEO_ROTATION_270:    pxp->config.proc_data.rotate = 270;  break;
-  case IMX_VIDEO_ROTATION_HFLIP:  pxp->config.proc_data.hflip = 1;     break;
-  case IMX_VIDEO_ROTATION_VFLIP:  pxp->config.proc_data.vflip = 1;     break;
-  default:                        pxp->config.proc_data.rotate = 0;    break;
+  case IMX_2D_ROTATION_0:      pxp->config.proc_data.rotate = 0;    break;
+  case IMX_2D_ROTATION_90:     pxp->config.proc_data.rotate = 90;   break;
+  case IMX_2D_ROTATION_180:    pxp->config.proc_data.rotate = 180;  break;
+  case IMX_2D_ROTATION_270:    pxp->config.proc_data.rotate = 270;  break;
+  case IMX_2D_ROTATION_HFLIP:  pxp->config.proc_data.hflip = 1;     break;
+  case IMX_2D_ROTATION_VFLIP:  pxp->config.proc_data.vflip = 1;     break;
+  default:                     pxp->config.proc_data.rotate = 0;    break;
   }
 
   return 0;
 }
 
-static gint imx_pxp_set_deinterlace(ImxVideoProcessDevice *device,
-                                    ImxVideoDeinterlaceMode mode)
+static gint imx_pxp_set_deinterlace(Imx2DDevice *device,
+                                    Imx2DDeinterlaceMode mode)
 {
   return 0;
 }
 
-static ImxVideoRotationMode imx_pxp_get_rotate (ImxVideoProcessDevice* device)
+static Imx2DRotationMode imx_pxp_get_rotate (Imx2DDevice* device)
 {
   if (!device || !device->priv)
     return 0;
 
-  ImxVpDevicePxp *pxp = (ImxVpDevicePxp *) (device->priv);
-  ImxVideoRotationMode rot = IMX_VIDEO_ROTATION_0;
+  Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
+  Imx2DRotationMode rot = IMX_2D_ROTATION_0;
   switch (pxp->config.proc_data.rotate) {
-  case 0:    rot = IMX_VIDEO_ROTATION_0;     break;
-  case 90:   rot = IMX_VIDEO_ROTATION_90;    break;
-  case 180:  rot = IMX_VIDEO_ROTATION_180;   break;
-  case 270:  rot = IMX_VIDEO_ROTATION_270;   break;
-  default:   rot = IMX_VIDEO_ROTATION_0;     break;
+  case 0:    rot = IMX_2D_ROTATION_0;     break;
+  case 90:   rot = IMX_2D_ROTATION_90;    break;
+  case 180:  rot = IMX_2D_ROTATION_180;   break;
+  case 270:  rot = IMX_2D_ROTATION_270;   break;
+  default:   rot = IMX_2D_ROTATION_0;     break;
   }
 
   if (pxp->config.proc_data.hflip)
-    rot = IMX_VIDEO_ROTATION_HFLIP;
+    rot = IMX_2D_ROTATION_HFLIP;
   else if (pxp->config.proc_data.vflip)
-    rot = IMX_VIDEO_ROTATION_VFLIP;
+    rot = IMX_2D_ROTATION_VFLIP;
 
   return rot;
 }
 
-static ImxVideoDeinterlaceMode imx_pxp_get_deinterlace (
-                                                ImxVideoProcessDevice* device)
+static Imx2DDeinterlaceMode imx_pxp_get_deinterlace (Imx2DDevice* device)
 {
-  return IMX_VIDEO_DEINTERLACE_NONE;
+  return IMX_2D_DEINTERLACE_NONE;
 }
 
-static gint imx_pxp_get_capabilities (ImxVideoProcessDevice* device)
+static gint imx_pxp_get_capabilities (Imx2DDevice* device)
 {
   void *pxp_handle = NULL;
   gint capabilities = 0;
 
-  capabilities = IMX_VP_DEVICE_CAP_SCALE|IMX_VP_DEVICE_CAP_CSC \
-                      |IMX_VP_DEVICE_CAP_ROTATE | IMX_VP_DEVICE_CAP_ALPHA;
+  capabilities = IMX_2D_DEVICE_CAP_SCALE|IMX_2D_DEVICE_CAP_CSC \
+                      |IMX_2D_DEVICE_CAP_ROTATE | IMX_2D_DEVICE_CAP_ALPHA
+                      |IMX_2D_DEVICE_CAP_OVERLAY;
   return capabilities;
 }
 
-static GList* imx_pxp_get_supported_in_fmts(ImxVideoProcessDevice* device)
+static GList* imx_pxp_get_supported_in_fmts(Imx2DDevice* device)
 {
   GList* list = NULL;
   const PxpFmtMap *map = pxp_in_fmts_map;
@@ -432,7 +429,7 @@ static GList* imx_pxp_get_supported_in_fmts(ImxVideoProcessDevice* device)
   return list;
 }
 
-static GList* imx_pxp_get_supported_out_fmts(ImxVideoProcessDevice* device)
+static GList* imx_pxp_get_supported_out_fmts(Imx2DDevice* device)
 {
   GList* list = NULL;
   const PxpFmtMap *map = pxp_out_fmts_map;
@@ -445,9 +442,9 @@ static GList* imx_pxp_get_supported_out_fmts(ImxVideoProcessDevice* device)
   return list;
 }
 
-ImxVideoProcessDevice * imx_pxp_create(ImxVpDeviceType  device_type)
+Imx2DDevice * imx_pxp_create(Imx2DDeviceType  device_type)
 {
-  ImxVideoProcessDevice * device = g_slice_alloc(sizeof(ImxVideoProcessDevice));
+  Imx2DDevice * device = g_slice_alloc(sizeof(Imx2DDevice));
   if (!device) {
     GST_ERROR("allocate device structure failed\n");
     return NULL;
@@ -475,12 +472,12 @@ ImxVideoProcessDevice * imx_pxp_create(ImxVpDeviceType  device_type)
   return device;
 }
 
-gint imx_pxp_destroy(ImxVideoProcessDevice *device)
+gint imx_pxp_destroy(Imx2DDevice *device)
 {
   if (!device)
     return -1;
 
-  g_slice_free1(sizeof(ImxVideoProcessDevice), device);
+  g_slice_free1(sizeof(Imx2DDevice), device);
 
   return 0;
 }

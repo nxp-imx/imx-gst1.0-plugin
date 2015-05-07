@@ -1,5 +1,5 @@
-/* GStreamer IMX IPU Video Processing
- * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
+/* GStreamer IMX IPU Device
+ * Copyright (c) 2014-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -21,21 +21,20 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <linux/ipu.h>
-#include "gstallocatorphymem.h"
-#include "videoprocessdevice.h"
+#include "imx_2d_device.h"
 
 #define IPU_DEVICE_NAME "/dev/mxc_ipu"
 
-GST_DEBUG_CATEGORY_EXTERN (imxvideoconvert_debug);
-#define GST_CAT_DEFAULT imxvideoconvert_debug
+GST_DEBUG_CATEGORY_EXTERN (imx2ddevice_debug);
+#define GST_CAT_DEFAULT imx2ddevice_debug
 
-typedef struct _ImxVpDeviceIpu {
+typedef struct _Imx2DDeviceIpu {
   gint ipu_fd;
   struct ipu_task task;
   gboolean deinterlace_enable;
   PhyMemBlock vdi;
   gboolean  new_input;
-} ImxVpDeviceIpu;
+} Imx2DDeviceIpu;
 
 typedef struct {
   GstVideoFormat gst_video_format;
@@ -98,7 +97,7 @@ static const guint imx_ipu_get_bpp(guint ipu_format)
   return 8;
 }
 
-static gint imx_ipu_open(ImxVideoProcessDevice *device)
+static gint imx_ipu_open(Imx2DDevice *device)
 {
   if (!device)
     return -1;
@@ -109,14 +108,14 @@ static gint imx_ipu_open(ImxVideoProcessDevice *device)
     return -1;
   }
 
-  ImxVpDeviceIpu *ipu = g_slice_alloc(sizeof(ImxVpDeviceIpu));
+  Imx2DDeviceIpu *ipu = g_slice_alloc(sizeof(Imx2DDeviceIpu));
   if (!ipu) {
     GST_ERROR("allocate ipu structure failed\n");
     close(fd);
     return -1;
   }
 
-  memset(ipu, 0, sizeof(ImxVpDeviceIpu));
+  memset(ipu, 0, sizeof(Imx2DDeviceIpu));
   ipu->ipu_fd = fd;
   ipu->task.priority = 0;
   ipu->task.timeout = 1000;
@@ -126,13 +125,13 @@ static gint imx_ipu_open(ImxVideoProcessDevice *device)
   return 0;
 }
 
-static gint imx_ipu_close(ImxVideoProcessDevice *device)
+static gint imx_ipu_close(Imx2DDevice *device)
 {
   if (!device)
     return -1;
 
   if (device) {
-    ImxVpDeviceIpu *ipu = (ImxVpDeviceIpu *) (device->priv);
+    Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
     if (ipu) {
       if (ipu->vdi.vaddr) {
         dma_addr_t mem = (dma_addr_t)(ipu->vdi.paddr);
@@ -146,7 +145,7 @@ static gint imx_ipu_close(ImxVideoProcessDevice *device)
         ipu->vdi.size = 0;
       }
       close(ipu->ipu_fd);
-      g_slice_free1(sizeof(ImxVpDeviceIpu), ipu);
+      g_slice_free1(sizeof(Imx2DDeviceIpu), ipu);
       device->priv = NULL;
     }
   }
@@ -155,7 +154,7 @@ static gint imx_ipu_close(ImxVideoProcessDevice *device)
 }
 
 static gint
-imx_ipu_alloc_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
+imx_ipu_alloc_mem(Imx2DDevice *device, PhyMemBlock *memblk)
 {
   dma_addr_t mem;
 
@@ -163,7 +162,7 @@ imx_ipu_alloc_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
     return -1;
 
   memblk->size = PAGE_ALIGN(memblk->size);
-  ImxVpDeviceIpu *ipu = (ImxVpDeviceIpu *) (device->priv);
+  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
   mem = (dma_addr_t)(memblk->size);
   if (ioctl(ipu->ipu_fd, IPU_ALLOC, &mem) < 0) {
     GST_ERROR("IPU allocate %u bytes memory failed: %s",
@@ -178,14 +177,14 @@ imx_ipu_alloc_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
   return 0;
 }
 
-static gint imx_ipu_free_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
+static gint imx_ipu_free_mem(Imx2DDevice *device, PhyMemBlock *memblk)
 {
   dma_addr_t mem;
 
   if (!device || !device->priv || !memblk)
     return -1;
 
-  ImxVpDeviceIpu *ipu = (ImxVpDeviceIpu *) (device->priv);
+  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
 
   mem = (dma_addr_t)(memblk->paddr);
   munmap(memblk->vaddr, memblk->size);
@@ -202,7 +201,7 @@ static gint imx_ipu_free_mem(ImxVideoProcessDevice *device, PhyMemBlock *memblk)
   return 0;
 }
 
-static gint imx_ipu_frame_copy(ImxVideoProcessDevice *device,
+static gint imx_ipu_frame_copy(Imx2DDevice *device,
                                PhyMemBlock *from, PhyMemBlock *to)
 {
   if (!device || !device->priv || !from || !to)
@@ -213,13 +212,12 @@ static gint imx_ipu_frame_copy(ImxVideoProcessDevice *device,
   return 0;
 }
 
-static gint imx_ipu_config_input(ImxVideoProcessDevice *device,
-                                  ImxVideoInfo* in_info)
+static gint imx_ipu_config_input(Imx2DDevice *device, Imx2DVideoInfo* in_info)
 {
   if (!device || !device->priv)
     return -1;
 
-  ImxVpDeviceIpu *ipu = (ImxVpDeviceIpu *) (device->priv);
+  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
 
   const IpuFmtMap *from_map = imx_ipu_get_format(in_info->fmt);
   if (!from_map)
@@ -239,13 +237,12 @@ static gint imx_ipu_config_input(ImxVideoProcessDevice *device,
   return 0;
 }
 
-static gint imx_ipu_config_output(ImxVideoProcessDevice *device,
-                                  ImxVideoInfo* out_info)
+static gint imx_ipu_config_output(Imx2DDevice *device, Imx2DVideoInfo* out_info)
 {
   if (!device || !device->priv)
     return -1;
 
-  ImxVpDeviceIpu *ipu = (ImxVpDeviceIpu *) (device->priv);
+  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
 
   const IpuFmtMap *to_map = imx_ipu_get_format(out_info->fmt);
   if (!to_map)
@@ -263,15 +260,15 @@ static gint imx_ipu_config_output(ImxVideoProcessDevice *device,
   return 0;
 }
 
-static gint imx_ipu_do_convert(ImxVideoProcessDevice *device,
+static gint imx_ipu_do_convert(Imx2DDevice *device,
                                 PhyMemBlock *from, PhyMemBlock *to,
-                                ImxVideoInterlaceType interlace_type,
-                                ImxVideoCrop incrop, ImxVideoCrop outcrop)
+                                Imx2DInterlaceType interlace_type,
+                                Imx2DCrop incrop, Imx2DCrop outcrop)
 {
   if (!device || !device->priv || !from || !to)
     return -1;
 
-  ImxVpDeviceIpu *ipu = (ImxVpDeviceIpu *) (device->priv);
+  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
 
   // Set input
   ipu->task.input.paddr = (dma_addr_t)(from->paddr);
@@ -284,10 +281,10 @@ static gint imx_ipu_do_convert(ImxVideoProcessDevice *device,
 
   if (ipu->deinterlace_enable) {
     switch (interlace_type) {
-    case IMX_VIDEO_INTERLACE_INTERLEAVED:
+    case IMX_2D_INTERLACE_INTERLEAVED:
       ipu->task.input.deinterlace.enable = TRUE;
       break;
-    case IMX_VIDEO_INTERLACE_FIELDS:
+    case IMX_2D_INTERLACE_FIELDS:
       GST_FIXME("2-fields deinterlacing not supported yet");
       ipu->task.input.deinterlace.enable = FALSE;
       break;
@@ -417,48 +414,47 @@ static gint imx_ipu_do_convert(ImxVideoProcessDevice *device,
   return 0;
 }
 
-static gint imx_ipu_set_rotate(ImxVideoProcessDevice *device,
-                               ImxVideoRotationMode rot)
+static gint imx_ipu_set_rotate(Imx2DDevice *device, Imx2DRotationMode rot)
 {
   if (!device || !device->priv)
     return -1;
 
-  ImxVpDeviceIpu *ipu = (ImxVpDeviceIpu *) (device->priv);
+  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
   gint ipu_rotate = IPU_ROTATE_NONE;
   switch (rot) {
-  case IMX_VIDEO_ROTATION_0:      ipu_rotate = IPU_ROTATE_NONE;       break;
-  case IMX_VIDEO_ROTATION_90:     ipu_rotate = IPU_ROTATE_90_RIGHT;   break;
-  case IMX_VIDEO_ROTATION_180:    ipu_rotate = IPU_ROTATE_180;        break;
-  case IMX_VIDEO_ROTATION_270:    ipu_rotate = IPU_ROTATE_90_LEFT;    break;
-  case IMX_VIDEO_ROTATION_HFLIP:  ipu_rotate = IPU_ROTATE_HORIZ_FLIP; break;
-  case IMX_VIDEO_ROTATION_VFLIP:  ipu_rotate = IPU_ROTATE_VERT_FLIP;  break;
-  default:                        ipu_rotate = IPU_ROTATE_NONE;       break;
+  case IMX_2D_ROTATION_0:      ipu_rotate = IPU_ROTATE_NONE;       break;
+  case IMX_2D_ROTATION_90:     ipu_rotate = IPU_ROTATE_90_RIGHT;   break;
+  case IMX_2D_ROTATION_180:    ipu_rotate = IPU_ROTATE_180;        break;
+  case IMX_2D_ROTATION_270:    ipu_rotate = IPU_ROTATE_90_LEFT;    break;
+  case IMX_2D_ROTATION_HFLIP:  ipu_rotate = IPU_ROTATE_HORIZ_FLIP; break;
+  case IMX_2D_ROTATION_VFLIP:  ipu_rotate = IPU_ROTATE_VERT_FLIP;  break;
+  default:                     ipu_rotate = IPU_ROTATE_NONE;       break;
   }
   ipu->task.output.rotate = ipu_rotate;
 
   return 0;
 }
 
-static gint imx_ipu_set_deinterlace (ImxVideoProcessDevice *device,
-                                     ImxVideoDeinterlaceMode deint_mode)
+static gint imx_ipu_set_deinterlace (Imx2DDevice *device,
+                                     Imx2DDeinterlaceMode deint_mode)
 {
   if (!device || !device->priv)
     return -1;
 
-  ImxVpDeviceIpu *ipu = (ImxVpDeviceIpu *) (device->priv);
+  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
   switch (deint_mode) {
-  case IMX_VIDEO_DEINTERLACE_NONE:
+  case IMX_2D_DEINTERLACE_NONE:
     ipu->deinterlace_enable = FALSE;
     break;
-  case IMX_VIDEO_DEINTERLACE_LOW_MOTION:
+  case IMX_2D_DEINTERLACE_LOW_MOTION:
     ipu->deinterlace_enable = TRUE;
     ipu->task.input.deinterlace.motion = LOW_MOTION;
     break;
-  case IMX_VIDEO_DEINTERLACE_MID_MOTION:
+  case IMX_2D_DEINTERLACE_MID_MOTION:
     ipu->deinterlace_enable = TRUE;
     ipu->task.input.deinterlace.motion = MED_MOTION;
     break;
-  case IMX_VIDEO_DEINTERLACE_HIGH_MOTION:
+  case IMX_2D_DEINTERLACE_HIGH_MOTION:
     ipu->deinterlace_enable = TRUE;
     ipu->task.input.deinterlace.motion = HIGH_MOTION;
     break;
@@ -470,52 +466,53 @@ static gint imx_ipu_set_deinterlace (ImxVideoProcessDevice *device,
   return 0;
 }
 
-static ImxVideoRotationMode imx_ipu_get_rotate (ImxVideoProcessDevice* device)
+static Imx2DRotationMode imx_ipu_get_rotate (Imx2DDevice* device)
 {
   if (!device || !device->priv)
     return 0;
 
-  ImxVpDeviceIpu *ipu = (ImxVpDeviceIpu *) (device->priv);
-  ImxVideoRotationMode rot = IMX_VIDEO_ROTATION_0;
+  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
+  Imx2DRotationMode rot = IMX_2D_ROTATION_0;
   switch (ipu->task.output.rotate) {
-  case IPU_ROTATE_NONE:       rot = IMX_VIDEO_ROTATION_0;     break;
-  case IPU_ROTATE_90_RIGHT:   rot = IMX_VIDEO_ROTATION_90;    break;
-  case IPU_ROTATE_180:        rot = IMX_VIDEO_ROTATION_180;   break;
-  case IPU_ROTATE_90_LEFT:    rot = IMX_VIDEO_ROTATION_270;   break;
-  case IPU_ROTATE_HORIZ_FLIP: rot = IMX_VIDEO_ROTATION_HFLIP; break;
-  case IPU_ROTATE_VERT_FLIP:  rot = IMX_VIDEO_ROTATION_VFLIP; break;
-  default:                    rot = IMX_VIDEO_ROTATION_0;     break;
+  case IPU_ROTATE_NONE:       rot = IMX_2D_ROTATION_0;     break;
+  case IPU_ROTATE_90_RIGHT:   rot = IMX_2D_ROTATION_90;    break;
+  case IPU_ROTATE_180:        rot = IMX_2D_ROTATION_180;   break;
+  case IPU_ROTATE_90_LEFT:    rot = IMX_2D_ROTATION_270;   break;
+  case IPU_ROTATE_HORIZ_FLIP: rot = IMX_2D_ROTATION_HFLIP; break;
+  case IPU_ROTATE_VERT_FLIP:  rot = IMX_2D_ROTATION_VFLIP; break;
+  default:                    rot = IMX_2D_ROTATION_0;     break;
   }
 
   return rot;
 }
 
-static ImxVideoDeinterlaceMode imx_ipu_get_deinterlace (
-                                              ImxVideoProcessDevice* device)
+static Imx2DDeinterlaceMode imx_ipu_get_deinterlace (Imx2DDevice* device)
 {
   if (!device || !device->priv)
     return 0;
 
-  ImxVpDeviceIpu *ipu = (ImxVpDeviceIpu *) (device->priv);
-  ImxVideoDeinterlaceMode deint_mode = IMX_VIDEO_DEINTERLACE_NONE;
+  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
+  Imx2DDeinterlaceMode deint_mode = IMX_2D_DEINTERLACE_NONE;
   if (ipu->deinterlace_enable) {
     switch (ipu->task.input.deinterlace.motion) {
-    case LOW_MOTION:  deint_mode = IMX_VIDEO_DEINTERLACE_LOW_MOTION;  break;
-    case MED_MOTION:  deint_mode = IMX_VIDEO_DEINTERLACE_MID_MOTION;  break;
-    case HIGH_MOTION: deint_mode = IMX_VIDEO_DEINTERLACE_HIGH_MOTION; break;
-    default:          deint_mode = IMX_VIDEO_DEINTERLACE_NONE;        break;
+    case LOW_MOTION:  deint_mode = IMX_2D_DEINTERLACE_LOW_MOTION;  break;
+    case MED_MOTION:  deint_mode = IMX_2D_DEINTERLACE_MID_MOTION;  break;
+    case HIGH_MOTION: deint_mode = IMX_2D_DEINTERLACE_HIGH_MOTION; break;
+    default:          deint_mode = IMX_2D_DEINTERLACE_NONE;        break;
     }
   }
 
   return deint_mode;
 }
 
-static gint imx_ipu_get_capabilities(ImxVideoProcessDevice* device)
+static gint imx_ipu_get_capabilities(Imx2DDevice* device)
 {
-  return IMX_VP_DEVICE_CAP_ALL;
+  return IMX_2D_DEVICE_CAP_CSC | IMX_2D_DEVICE_CAP_DEINTERLACE
+          | IMX_2D_DEVICE_CAP_ROTATE | IMX_2D_DEVICE_CAP_SCALE
+          | IMX_2D_DEVICE_CAP_ALPHA | IMX_2D_DEVICE_CAP_OVERLAY;
 }
 
-static GList* imx_ipu_get_supported_in_fmts(ImxVideoProcessDevice* device)
+static GList* imx_ipu_get_supported_in_fmts(Imx2DDevice* device)
 {
   GList* list = NULL;
   const IpuFmtMap *map = ipu_fmts_map;
@@ -527,14 +524,14 @@ static GList* imx_ipu_get_supported_in_fmts(ImxVideoProcessDevice* device)
   return list;
 }
 
-static GList* imx_ipu_get_supported_out_fmts(ImxVideoProcessDevice* device)
+static GList* imx_ipu_get_supported_out_fmts(Imx2DDevice* device)
 {
   return imx_ipu_get_supported_in_fmts(device);
 }
 
-ImxVideoProcessDevice * imx_ipu_create(ImxVpDeviceType  device_type)
+Imx2DDevice * imx_ipu_create(Imx2DDeviceType  device_type)
 {
-  ImxVideoProcessDevice * device = g_slice_alloc(sizeof(ImxVideoProcessDevice));
+  Imx2DDevice * device = g_slice_alloc(sizeof(Imx2DDevice));
   if (!device) {
     GST_ERROR("allocate device structure failed\n");
     return NULL;
@@ -562,12 +559,12 @@ ImxVideoProcessDevice * imx_ipu_create(ImxVpDeviceType  device_type)
   return device;
 }
 
-gint imx_ipu_destroy(ImxVideoProcessDevice *device)
+gint imx_ipu_destroy(Imx2DDevice *device)
 {
   if (!device)
     return -1;
 
-  g_slice_free1(sizeof(ImxVideoProcessDevice), device);
+  g_slice_free1(sizeof(Imx2DDevice), device);
 
   return 0;
 }

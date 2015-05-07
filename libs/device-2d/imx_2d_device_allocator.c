@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2014-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -17,28 +17,26 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "gstimxvideoconvertallocator.h"
-#include "videoprocessdevice.h"
+#include "imx_2d_device_allocator.h"
+#include "imx_2d_device.h"
 
-GST_DEBUG_CATEGORY_EXTERN (imxvideoconvert_debug);
-#define GST_CAT_DEFAULT imxvideoconvert_debug
+GST_DEBUG_CATEGORY_EXTERN (imx2ddevice_debug);
+#define GST_CAT_DEFAULT imx2ddevice_debug
 
 static void
-gst_imx_video_convert_allocator_class_init (
-                                GstImxVideoConvertAllocatorClass * klass);
+gst_imx_2d_device_allocator_class_init (GstImx2DDeviceAllocatorClass * klass);
 static void
-gst_imx_video_convert_allocator_init (GstImxVideoConvertAllocator * allocator);
+gst_imx_2d_device_allocator_init (GstImx2DDeviceAllocator * allocator);
 
-G_DEFINE_TYPE (GstImxVideoConvertAllocator, gst_imx_video_convert_allocator, \
+G_DEFINE_TYPE (GstImx2DDeviceAllocator, gst_imx_2d_device_allocator, \
                GST_TYPE_ALLOCATOR_PHYMEM);
 
 static gint
-imx_video_convert_allocate (GstAllocatorPhyMem *allocator, PhyMemBlock *memblk)
+imx_2d_device_allocate (GstAllocatorPhyMem *allocator, PhyMemBlock *memblk)
 {
-  GstImxVideoConvertAllocator *vct_allocator =
-                            GST_IMX_VIDEO_CONVERT_ALLOCATOR(allocator);
+  GstImx2DDeviceAllocator *_allocator = GST_IMX_2D_DEVICE_ALLOCATOR(allocator);
 
-  ImxVideoProcessDevice *dev = (ImxVideoProcessDevice*)(vct_allocator->device);
+  Imx2DDevice *dev = (Imx2DDevice*)(_allocator->device);
   if (dev) {
     if (dev->alloc_mem(dev, memblk) < 0)  {
       GST_ERROR ("imx video convert allocate memory failed.");
@@ -53,12 +51,11 @@ imx_video_convert_allocate (GstAllocatorPhyMem *allocator, PhyMemBlock *memblk)
 }
 
 static gint
-imx_video_convert_free (GstAllocatorPhyMem *allocator, PhyMemBlock *memblk)
+imx_2d_device_free (GstAllocatorPhyMem *allocator, PhyMemBlock *memblk)
 {
-  GstImxVideoConvertAllocator *vct_allocator =
-                              GST_IMX_VIDEO_CONVERT_ALLOCATOR(allocator);
+  GstImx2DDeviceAllocator *_allocator = GST_IMX_2D_DEVICE_ALLOCATOR(allocator);
 
-  ImxVideoProcessDevice *dev = (ImxVideoProcessDevice*)(vct_allocator->device);
+  Imx2DDevice *dev = (Imx2DDevice*)(_allocator->device);
   if (dev) {
     GST_LOG ("imx video convert free memory (%p) of (%p)",
               memblk->paddr, allocator);
@@ -72,28 +69,27 @@ imx_video_convert_free (GstAllocatorPhyMem *allocator, PhyMemBlock *memblk)
 }
 
 static void
-gst_imx_video_convert_allocator_class_init (
-                                GstImxVideoConvertAllocatorClass * klass)
+gst_imx_2d_device_allocator_class_init (GstImx2DDeviceAllocatorClass * klass)
 {
   GstAllocatorPhyMemClass *parent_class;
 
   parent_class = (GstAllocatorPhyMemClass *) klass;
 
-  parent_class->alloc_phymem = imx_video_convert_allocate;
-  parent_class->free_phymem = imx_video_convert_free;
+  parent_class->alloc_phymem = imx_2d_device_allocate;
+  parent_class->free_phymem = imx_2d_device_free;
 }
 
 static void
-gst_imx_video_convert_allocator_init (GstImxVideoConvertAllocator * allocator)
+gst_imx_2d_device_allocator_init (GstImx2DDeviceAllocator * allocator)
 {
   return;
 }
 
-GstAllocator *gst_imx_video_convert_allocator_new (gpointer device)
+GstAllocator *gst_imx_2d_device_allocator_new (gpointer device)
 {
-  GstImxVideoConvertAllocator *allocator = NULL;
+  GstImx2DDeviceAllocator *allocator = NULL;
 
-  allocator = g_object_new(gst_imx_video_convert_allocator_get_type(), NULL);
+  allocator = g_object_new(gst_imx_2d_device_allocator_get_type(), NULL);
   if (!allocator) {
     GST_ERROR ("new imx video convert allocator failed.\n");
   } else {

@@ -23,15 +23,15 @@
 
 #include <gst/video/video.h>
 #include "gstallocatorphymem.h"
-#include "allocator/gstphymemmeta.h"
+#include "gstphymemmeta.h"
 #include "gstimxvideoconvert.h"
 
 #define IMX_VCT_IN_POOL_MAX_BUFFERS   30
 
 #define GST_IMX_VCT_PARAMS_QDATA   g_quark_from_static_string("imxvct-params")
 
-#define GST_IMX_VIDEO_ROTATION_DEFAULT      IMX_VIDEO_ROTATION_0
-#define GST_IMX_VIDEO_DEINTERLACE_DEFAULT   IMX_VIDEO_DEINTERLACE_NONE
+#define GST_IMX_VIDEO_ROTATION_DEFAULT      IMX_2D_ROTATION_0
+#define GST_IMX_VIDEO_DEINTERLACE_DEFAULT   IMX_2D_DEINTERLACE_NONE
 
 #define GST_IMX_CONVERT_UNREF_BUFFER(buffer) {\
     if (buffer) {                             \
@@ -67,12 +67,12 @@ GType gst_imx_video_convert_rotation_get_type(void) {
 
   if (!gst_imx_video_convert_rotation_type) {
     static GEnumValue rotation_values[] = {
-      {IMX_VIDEO_ROTATION_0, "No rotation", "none"},
-      {IMX_VIDEO_ROTATION_90, "Rotate 90 degrees", "rotate-90"},
-      {IMX_VIDEO_ROTATION_180, "Rotate 180 degrees", "rotate-180"},
-      {IMX_VIDEO_ROTATION_270, "Rotate 270 degrees", "rotate-270"},
-      {IMX_VIDEO_ROTATION_HFLIP, "Flip horizontally", "horizontal-flip"},
-      {IMX_VIDEO_ROTATION_VFLIP, "Flip vertically", "vertical-flip"},
+      {IMX_2D_ROTATION_0, "No rotation", "none"},
+      {IMX_2D_ROTATION_90, "Rotate 90 degrees", "rotate-90"},
+      {IMX_2D_ROTATION_180, "Rotate 180 degrees", "rotate-180"},
+      {IMX_2D_ROTATION_270, "Rotate 270 degrees", "rotate-270"},
+      {IMX_2D_ROTATION_HFLIP, "Flip horizontally", "horizontal-flip"},
+      {IMX_2D_ROTATION_VFLIP, "Flip vertically", "vertical-flip"},
       {0, NULL, NULL },
     };
 
@@ -88,12 +88,12 @@ GType gst_imx_video_convert_deinterlace_get_type(void) {
 
   if (!gst_imx_video_convert_deinterlace_type) {
     static GEnumValue deinterlace_values[] = {
-      { IMX_VIDEO_DEINTERLACE_NONE, "No deinterlace", "none" },
-      { IMX_VIDEO_DEINTERLACE_LOW_MOTION,
+      { IMX_2D_DEINTERLACE_NONE, "No deinterlace", "none" },
+      { IMX_2D_DEINTERLACE_LOW_MOTION,
           "low-motion deinterlace", "low-motion" },
-      { IMX_VIDEO_DEINTERLACE_MID_MOTION,
+      { IMX_2D_DEINTERLACE_MID_MOTION,
           "midium-motion deinterlace", "mid-motion" },
-      { IMX_VIDEO_DEINTERLACE_HIGH_MOTION,
+      { IMX_2D_DEINTERLACE_HIGH_MOTION,
           "high-motion deinterlace", "high-motion" },
       { 0, NULL, NULL },
     };
@@ -110,7 +110,7 @@ static void gst_imx_video_convert_set_property (GObject * object,
     guint prop_id, const GValue * value, GParamSpec * pspec)
 {
   GstImxVideoConvert *imxvct = (GstImxVideoConvert *) (object);
-  ImxVideoProcessDevice *device = imxvct->device;
+  Imx2DDevice *device = imxvct->device;
 
   GST_DEBUG_OBJECT (imxvct, "set_property (%d).", prop_id);
 
@@ -137,7 +137,7 @@ static void gst_imx_video_convert_get_property (GObject * object,
     guint prop_id, GValue * value, GParamSpec * pspec)
 {
   GstImxVideoConvert *imxvct = (GstImxVideoConvert *) (object);
-  ImxVideoProcessDevice *device = imxvct->device;
+  Imx2DDevice *device = imxvct->device;
 
   if (!device)
     return;
@@ -402,7 +402,7 @@ static guint imx_video_convert_fixate_format_caps(GstBaseTransform *transform,
   GstCaps *new_caps;
 
   GstImxVideoConvert *imxvct = (GstImxVideoConvert *)(transform);
-  ImxVideoProcessDevice *device = imxvct->device;
+  Imx2DDevice *device = imxvct->device;
 
   //the input caps should fixed alreay, and only have caps0
   ins = gst_caps_get_structure(caps, 0);
@@ -418,8 +418,8 @@ static guint imx_video_convert_fixate_format_caps(GstBaseTransform *transform,
    * then passthrough is not possible, we need limit the othercaps
    * with device conversion limitation
    */
-  if (device->get_rotate(device) != IMX_VIDEO_ROTATION_0 ||
-      (device->get_deinterlace(device) != IMX_VIDEO_DEINTERLACE_NONE &&
+  if (device->get_rotate(device) != IMX_2D_ROTATION_0 ||
+      (device->get_deinterlace(device) != IMX_2D_DEINTERLACE_NONE &&
           interlace)) {
     GList* list = device->get_supported_out_fmts(device);
     GstCaps *out_caps = imx_video_convert_caps_from_fmt_list(list);
@@ -902,7 +902,7 @@ gst_imx_video_convert_create_bufferpool(GstImxVideoConvert *imxvct,
   if (pool) {
     if (!imxvct->allocator)
       imxvct->allocator =
-          gst_imx_video_convert_allocator_new((gpointer)(imxvct->device));
+          gst_imx_2d_device_allocator_new((gpointer)(imxvct->device));
 
     if (!imxvct->allocator) {
       GST_ERROR ("new imx video convert allocator failed.");
@@ -1099,7 +1099,7 @@ static gboolean imx_video_convert_set_info(GstVideoFilter *filter,
                                     GstCaps *out, GstVideoInfo *out_info)
 {
   GstImxVideoConvert *imxvct = (GstImxVideoConvert *)(filter);
-  ImxVideoProcessDevice *device = imxvct->device;
+  Imx2DDevice *device = imxvct->device;
   GstStructure *ins, *outs;
   const gchar *from_interlace;
 
@@ -1114,14 +1114,14 @@ static gboolean imx_video_convert_set_info(GstVideoFilter *filter,
   if (from_interlace &&
       (g_strcmp0(from_interlace, "interleaved") == 0
           || g_strcmp0(from_interlace, "mixed") == 0)) {
-    if (IMX_VIDEO_DEINTERLACE_NONE != device->get_deinterlace(device)) {
+    if (IMX_2D_DEINTERLACE_NONE != device->get_deinterlace(device)) {
       gst_structure_set(outs,
           "interlace-mode", G_TYPE_STRING, "progressive", NULL);
       gst_base_transform_set_passthrough((GstBaseTransform*)filter, FALSE);
     }
   }
 
-  if (IMX_VIDEO_ROTATION_0 != device->get_rotate(device))
+  if (IMX_2D_ROTATION_0 != device->get_rotate(device))
     gst_base_transform_set_passthrough((GstBaseTransform*)filter, FALSE);
 
 /* can't remove since caps fixed
@@ -1145,7 +1145,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     GstVideoFrame *in, GstVideoFrame *out)
 {
   GstImxVideoConvert *imxvct = (GstImxVideoConvert *)(filter);
-  ImxVideoProcessDevice *device = imxvct->device;
+  Imx2DDevice *device = imxvct->device;
   GstVideoFrame *input_frame = in;
   GstPhyMemMeta *phymemmeta = NULL;
   GstCaps *caps;
@@ -1251,7 +1251,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
           phymemmeta->x_padding, phymemmeta->y_padding);
     }
 
-    ImxVideoInfo in_info, out_info;
+    Imx2DVideoInfo in_info, out_info;
 
     in_info.fmt = GST_VIDEO_INFO_FORMAT(&(in->info));
     in_info.w = in->info.width + imxvct->in_video_align.padding_left +
@@ -1283,7 +1283,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     imxvct->pool_config_update = FALSE;
   }
 
-  ImxVideoCrop incrop, outcrop;
+  Imx2DCrop incrop, outcrop;
   GstVideoCropMeta *in_crop = NULL, *out_crop = NULL;
 
   incrop.x = 0;
@@ -1325,12 +1325,12 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   //convert
   PhyMemBlock *from = gst_buffer_query_phymem_block (input_frame->buffer);
   PhyMemBlock *to = gst_buffer_query_phymem_block (out->buffer);
-  ImxVideoInterlaceType interlace_t = IMX_VIDEO_INTERLACE_PROGRESSIVE;
+  Imx2DInterlaceType interlace_t = IMX_2D_INTERLACE_PROGRESSIVE;
 
   switch (in->info.interlace_mode) {
     case GST_VIDEO_INTERLACE_MODE_INTERLEAVED:
       GST_TRACE("input stream is interleaved");
-      interlace_t = IMX_VIDEO_INTERLACE_INTERLEAVED;
+      interlace_t = IMX_2D_INTERLACE_INTERLEAVED;
       break;
     case GST_VIDEO_INTERLACE_MODE_MIXED:
     {
@@ -1339,7 +1339,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
       if (video_meta != NULL) {
         if (video_meta->flags & GST_VIDEO_FRAME_FLAG_INTERLACED) {
           GST_TRACE("frame has video metadata and INTERLACED flag");
-          interlace_t = IMX_VIDEO_INTERLACE_INTERLEAVED;
+          interlace_t = IMX_2D_INTERLACE_INTERLEAVED;
         }
       }
       break;
@@ -1349,7 +1349,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
       break;
     case GST_VIDEO_INTERLACE_MODE_FIELDS:
       GST_TRACE("input stream is 2-fields");
-      interlace_t = IMX_VIDEO_INTERLACE_FIELDS;
+      interlace_t = IMX_2D_INTERLACE_FIELDS;
       break;
     default:
       break;
@@ -1372,17 +1372,23 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
   GstVideoFilterClass *video_filter_class = GST_VIDEO_FILTER_CLASS(klass);
   GstCaps *caps;
 
-  ImxVideoProcessDeviceInfo *in_plugin = (ImxVideoProcessDeviceInfo *)
+  Imx2DDeviceInfo *in_plugin = (Imx2DDeviceInfo *)
       g_type_get_qdata (G_OBJECT_CLASS_TYPE (klass), GST_IMX_VCT_PARAMS_QDATA);
   g_assert (in_plugin != NULL);
 
-  ImxVideoProcessDevice* dev = in_plugin->create(in_plugin->device_type);
+  Imx2DDevice* dev = in_plugin->create(in_plugin->device_type);
   if (!dev)
     return;
 
-  gst_element_class_set_static_metadata (element_class,
-        in_plugin->description, "Filter/Converter/Video",
-        in_plugin->detail, IMX_GST_PLUGIN_AUTHOR);
+  gchar longname[64] = {0};
+  gchar desc[64] = {0};
+  gint capabilities = dev->get_capabilities(dev);
+
+  snprintf(longname, 32, "IMX %s Video Converter", in_plugin->name);
+  snprintf(desc, 64, "Video CSC/Resize/Rotate%s",
+      (capabilities&IMX_2D_DEVICE_CAP_DEINTERLACE) ? "/Deinterlace." : ".");
+  gst_element_class_set_static_metadata (element_class, longname,
+        "Filter/Converter/Video", desc, IMX_GST_PLUGIN_AUTHOR);
 
   GList *list = dev->get_supported_in_fmts(dev);
   caps = imx_video_convert_caps_from_fmt_list(list);
@@ -1419,8 +1425,7 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
   gobject_class->set_property = gst_imx_video_convert_set_property;
   gobject_class->get_property = gst_imx_video_convert_get_property;
 
-  gint capabilities = dev->get_capabilities(dev);
-  if (capabilities & IMX_VP_DEVICE_CAP_ROTATE) {
+  if (capabilities & IMX_2D_DEVICE_CAP_ROTATE) {
     g_object_class_install_property (gobject_class, PROP_OUTPUT_ROTATE,
         g_param_spec_enum("rotation", "Output rotation",
           "Rotation that shall be applied to output frames",
@@ -1429,7 +1434,7 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   }
 
-  if (capabilities & IMX_VP_DEVICE_CAP_DEINTERLACE) {
+  if (capabilities & IMX_2D_DEVICE_CAP_DEINTERLACE) {
     g_object_class_install_property (gobject_class, PROP_DEINTERLACE_MODE,
         g_param_spec_enum("deinterlace", "Deinterlace mode",
           "Deinterlacing mode to be used for incoming frames "
@@ -1502,10 +1507,10 @@ static gboolean gst_imx_video_convert_register (GstPlugin * plugin)
   GType type;
   gchar *t_name;
 
-  const ImxVideoProcessDeviceInfo *in_plugin = imx_get_video_process_devices();
+  const Imx2DDeviceInfo *in_plugin = imx_get_2d_devices();
 
   while (in_plugin->name) {
-    GST_LOG ("Registering %s [%s]", in_plugin->name, in_plugin->description);
+    GST_LOG ("Registering %s video converter", in_plugin->name);
 
     t_name = g_strdup_printf ("imxvideoconvert_%s", in_plugin->name);
     type = g_type_from_name (t_name);
