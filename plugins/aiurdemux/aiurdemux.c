@@ -135,6 +135,11 @@ static GstsutilsOptionEntry g_aiurdemux_option_table[] = {
             G_TYPE_BOOLEAN,
             G_STRUCT_OFFSET (AiurDemuxOption, disable_vorbis_codec_data),
           "true"},
+    {PROP_LOW_LATENCY_TOLERANCE, "low_latency_tolerance", "low latency tolarance",
+            "-1: disable low latency function, 0-streaming_latency: tolarance in ms seconds for time diff",
+            G_TYPE_INT,
+            G_STRUCT_OFFSET (AiurDemuxOption, low_latency_tolerance),
+         "-1", "-1", G_MAXINT_STR},
   {-1, NULL, NULL, NULL, 0, 0, NULL}    /* terminator */
 };
 
@@ -499,6 +504,8 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
 
 
       demux->clock_offset = GST_CLOCK_TIME_NONE;
+      demux->media_offset = 0;
+      demux->avg_diff = 0;
       demux->start_time = GST_CLOCK_TIME_NONE;
       demux->tag_list = gst_tag_list_new_empty ();
       aiurcontent_new(&demux->content_info);
@@ -2962,6 +2969,10 @@ static AiurDemuxStream* aiurdemux_trackidx_to_stream (GstAiurDemux * demux, guin
   }
   return stream;
 }
+#define DO_RUNNING_AVG(avg,val,size) (((val) + ((size)-1) * (avg)) / (size))
+
+/* generic running average, this has a neutral window size */
+#define UPDATE_RUNNING_AVG(avg,val)   DO_RUNNING_AVG(avg,val,10)
 
 static void
 aiurdemux_check_start_offset (GstAiurDemux * demux, AiurDemuxStream * stream)
@@ -2969,6 +2980,7 @@ aiurdemux_check_start_offset (GstAiurDemux * demux, AiurDemuxStream * stream)
     GstClockTime base_time,now;
     GstClock *clock = NULL;
     GstClockTimeDiff offset = 0;
+    GstClockTimeDiff in_diff;
     base_time = GST_ELEMENT_CAST (demux)->base_time;
     clock = GST_ELEMENT_CLOCK (demux);
     if(clock != NULL){
@@ -2993,13 +3005,37 @@ aiurdemux_check_start_offset (GstAiurDemux * demux, AiurDemuxStream * stream)
     if((GST_CLOCK_TIME_IS_VALID (demux->clock_offset))
         && (GST_CLOCK_TIME_IS_VALID (demux->start_time))
         && (GST_CLOCK_TIME_IS_VALID (stream->sample_stat.start))){
-        stream->sample_stat.start = stream->sample_stat.start - demux->start_time + demux->clock_offset + (GST_MSECOND * demux->option.streaming_latency);
+        stream->sample_stat.start = stream->sample_stat.start - demux->start_time
+          + demux->clock_offset + demux->media_offset + (GST_MSECOND * demux->option.streaming_latency);
+
         GST_LOG_OBJECT (demux,"***start=%"GST_TIME_FORMAT,GST_TIME_ARGS (stream->sample_stat.start));
     }
     if(demux->option.streaming_latency > 0
         && stream->sample_stat.start > offset + (GST_MSECOND * (demux->option.streaming_latency*3/2))){
         demux->clock_offset -= stream->sample_stat.start - offset - (GST_MSECOND * demux->option.streaming_latency);
         GST_LOG_OBJECT (demux,"***clock_offset=%"GST_TIME_FORMAT,GST_TIME_ARGS (demux->clock_offset));
+    }
+
+    if(GST_CLOCK_TIME_IS_VALID (stream->sample_stat.start) && demux->option.streaming_latency> 0
+        && demux->option.low_latency_tolerance > 0){
+        in_diff = stream->sample_stat.start - offset;
+
+      if (demux->avg_diff == 0)
+        demux->avg_diff = in_diff;
+      else
+        demux->avg_diff = UPDATE_RUNNING_AVG (demux->avg_diff, in_diff);
+
+      GST_LOG_OBJECT (demux,"***diff=%"GST_TIME_FORMAT,GST_TIME_ARGS (demux->avg_diff));
+
+      if( demux->avg_diff > (gint64)GST_MSECOND * (demux->option.streaming_latency+demux->option.low_latency_tolerance)){
+        demux->media_offset -= GST_MSECOND * demux->option.low_latency_tolerance*5/4;
+        demux->avg_diff = 0;
+        GST_LOG_OBJECT(demux,"***media_offset 1=%lld",demux->media_offset);
+      }else if(demux->avg_diff < (gint64)GST_MSECOND*(demux->option.streaming_latency - demux->option.low_latency_tolerance)){
+        demux->media_offset += (GST_MSECOND * demux->option.low_latency_tolerance*3/4);
+        demux->avg_diff = 0;
+        GST_LOG_OBJECT (demux,"***media_offset 2=%lld",demux->media_offset);
+      }
     }
 
 }

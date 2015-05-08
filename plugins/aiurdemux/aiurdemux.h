@@ -91,6 +91,7 @@ enum
   PROP_STREAMING_LATENCY,
   PROP_INDEX_ENABLED,
   PROP_DISABLE_VORBIS_CODEC_DATA,
+  PROP_LOW_LATENCY_TOLERANCE,
 };
 
 
@@ -142,6 +143,7 @@ typedef struct _AiurDemuxOption
   gboolean index_enabled;
   gboolean merge_h264_codec_data;
   gboolean disable_vorbis_codec_data;
+  gint low_latency_tolerance;
 } AiurDemuxOption;
 
 
@@ -315,6 +317,8 @@ struct _GstAiurDemux
     GstClockTime base_offset;
     GstClockTime clock_offset;//clock running time when first buffer arrives
     GstClockTime start_time;//first buffer timestamp
+    GstClockTimeDiff media_offset;
+    GstClockTimeDiff avg_diff;
 
     AiurDemuxOption option;
 
