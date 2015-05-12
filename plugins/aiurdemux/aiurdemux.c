@@ -3010,11 +3010,6 @@ aiurdemux_check_start_offset (GstAiurDemux * demux, AiurDemuxStream * stream)
 
         GST_LOG_OBJECT (demux,"***start=%"GST_TIME_FORMAT,GST_TIME_ARGS (stream->sample_stat.start));
     }
-    if(demux->option.streaming_latency > 0
-        && stream->sample_stat.start > offset + (GST_MSECOND * (demux->option.streaming_latency*3/2))){
-        demux->clock_offset -= stream->sample_stat.start - offset - (GST_MSECOND * demux->option.streaming_latency);
-        GST_LOG_OBJECT (demux,"***clock_offset=%"GST_TIME_FORMAT,GST_TIME_ARGS (demux->clock_offset));
-    }
 
     if(GST_CLOCK_TIME_IS_VALID (stream->sample_stat.start) && demux->option.streaming_latency> 0
         && demux->option.low_latency_tolerance > 0){
