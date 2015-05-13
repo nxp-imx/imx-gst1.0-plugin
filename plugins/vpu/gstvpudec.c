@@ -328,7 +328,10 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
   } else {
     pool = NULL;
     size = vinfo.size;
-    min = max = 0;
+    /* Allocate 3 more buffer as video sink will hold buffer after reuse the
+     * buffer pool */
+    max = 0;
+    min = 3;
 
     update_pool = FALSE;
   }
@@ -338,21 +341,23 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
      * selection */
     GstStructure *config;
     GstCaps *caps;
+    guint size_pre, min_buffers, max_buffers;
     GstBufferPool *pool_pre = gst_video_decoder_get_buffer_pool (bdec);
     config = gst_buffer_pool_get_config (pool_pre);
-    gst_buffer_pool_config_get_params (config, &caps, NULL, NULL, NULL);
+    gst_buffer_pool_config_get_params (config, &caps, &size_pre, &min_buffers,
+                  &max_buffers);
 
     GST_DEBUG_OBJECT (dec, "outcaps caps %" GST_PTR_FORMAT, outcaps);
     GST_DEBUG_OBJECT (dec, "VPU output caps %" GST_PTR_FORMAT, caps);
     if (gst_caps_is_equal (outcaps, caps)) {
       GST_DEBUG_OBJECT (dec, "using previous buffer pool.\n");
-      max = min += GST_VPU_DEC_MIN_BUF_CNT (dec->vpu_dec_object) \
-            + GST_VPU_DEC_FRAMES_PLUS (dec->vpu_dec_object);
 
       if (update_pool)
-        gst_query_set_nth_allocation_pool (query, 0, pool_pre, size, min, max);
+        gst_query_set_nth_allocation_pool (query, 0, pool_pre, size_pre, \
+            min_buffers, max_buffers);
       else
-        gst_query_add_allocation_pool (query, pool_pre, size, min, max);
+        gst_query_add_allocation_pool (query, pool_pre, size_pre, min_buffers, \
+            max_buffers);
 
       gst_structure_free (config);
       gst_object_unref (pool_pre);

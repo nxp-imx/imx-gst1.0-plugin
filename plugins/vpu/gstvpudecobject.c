@@ -351,7 +351,7 @@ gst_vpu_dec_object_stop (GstVpuDecObject * vpu_dec_object)
   VpuDecRetCode dec_ret;
 
   if (vpu_dec_object->gstbuffer_in_vpudec != NULL) {
-    g_list_foreach (vpu_dec_object->gstbuffer_in_vpudec, (GFunc) gst_memory_unref, NULL);
+    g_list_foreach (vpu_dec_object->gstbuffer_in_vpudec, (GFunc) gst_buffer_unref, NULL);
     g_list_free (vpu_dec_object->gstbuffer_in_vpudec);
     vpu_dec_object->gstbuffer_in_vpudec = NULL;
   }
@@ -561,7 +561,7 @@ gst_vpu_dec_object_config (GstVpuDecObject * vpu_dec_object, \
     vpu_dec_object->state = STATE_ALLOCATED_INTERNAL_BUFFER;
   }
 
-  g_list_foreach (vpu_dec_object->gstbuffer_in_vpudec, (GFunc) gst_memory_unref, NULL);
+  g_list_foreach (vpu_dec_object->gstbuffer_in_vpudec, (GFunc) gst_buffer_unref, NULL);
   g_list_free (vpu_dec_object->gstbuffer_in_vpudec);
   vpu_dec_object->gstbuffer_in_vpudec = NULL;
   GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer_in_vpudec list free\n");
