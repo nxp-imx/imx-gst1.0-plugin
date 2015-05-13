@@ -1222,6 +1222,7 @@ fsl_player_ret_val fsl_player_play(fsl_player_handle handle)
     }
 
     pproperty->player_state = FSL_PLAYER_STATUS_PLAYING;
+    pproperty->playback_rate = DEFAULT_PLAYBACK_RATE;
     FSL_PLAYER_PRINT("%s()\n", __FUNCTION__);
 
     FSL_PLAYER_MUTEX_UNLOCK( &(pproperty->status_switching_mutex) );
