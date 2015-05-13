@@ -135,6 +135,7 @@ imx_g2d_alloc_mem(Imx2DDevice *device, PhyMemBlock *memblk)
   memblk->vaddr = (guchar*) pbuf->buf_vaddr;
   memblk->paddr = (guchar*) pbuf->buf_paddr;
   memblk->user_data = (gpointer) pbuf;
+  GST_DEBUG("G2D allocated memory (%p)", memblk->paddr);
 
   return 0;
 }
@@ -144,6 +145,7 @@ static gint imx_g2d_free_mem(Imx2DDevice *device, PhyMemBlock *memblk)
   if (!device || !device->priv || !memblk)
     return -1;
 
+  GST_DEBUG("G2D free memory (%p)", memblk->paddr);
   gint ret = g2d_free ((struct g2d_buf*)(memblk->user_data));
   memblk->user_data = NULL;
   memblk->vaddr = NULL;
@@ -151,6 +153,53 @@ static gint imx_g2d_free_mem(Imx2DDevice *device, PhyMemBlock *memblk)
   memblk->size = 0;
 
   return ret;
+}
+
+static gint imx_g2d_copy_mem(Imx2DDevice* device, PhyMemBlock *dst_mem,
+                             PhyMemBlock *src_mem, guint offset, guint size)
+{
+  struct g2d_buf *pbuf = NULL;
+  void *g2d_handle = NULL;
+  struct g2d_buf src, dst;
+
+  dst_mem->size = src_mem->size;
+
+  pbuf = g2d_alloc (dst_mem->size, 0);
+  if (!pbuf) {
+    GST_ERROR ("g2d_alloc failed.");
+    return -1;
+  }
+  dst_mem->vaddr = (gchar*) pbuf->buf_vaddr;
+  dst_mem->paddr = (gchar*) pbuf->buf_paddr;
+  dst_mem->user_data = (gpointer) pbuf;
+
+  if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
+    GST_ERROR ("Failed to open g2d device.");
+    return -1;
+  }
+
+  src.buf_handle = NULL;
+  src.buf_vaddr = src_mem->vaddr + offset;
+  src.buf_paddr = src_mem->paddr + offset;
+  src.buf_size = src_mem->size - offset;
+  dst.buf_handle = NULL;
+  dst.buf_vaddr = dst_mem->vaddr;
+  dst.buf_paddr = dst_mem->paddr;
+  dst.buf_size = dst_mem->size;
+
+  if (size < 0)
+    size = dst.buf_size;
+
+  g2d_copy (g2d_handle, &dst, &src, size);
+  g2d_finish(g2d_handle);
+  g2d_close (g2d_handle);
+
+  GST_DEBUG ("G2D copy from vaddr (%p), paddr (%p), size (%d) to "
+      "vaddr (%p), paddr (%p), size (%d)",
+      src_mem->vaddr, src_mem->paddr, src_mem->size,
+      dst_mem->vaddr, dst_mem->paddr, dst_mem->size);
+
+  return 0;
 }
 
 static gint imx_g2d_frame_copy(Imx2DDevice *device,
@@ -182,7 +231,9 @@ static gint imx_g2d_frame_copy(Imx2DDevice *device,
 
   ret = g2d_copy (g2d_handle, &dst, &src, dst.buf_size);
 
+  g2d_finish(g2d_handle);
   g2d_close(g2d_handle);
+  GST_LOG("G2D frame memory (%p)->(%p)", from->paddr, to->paddr);
 
   return ret;
 }
@@ -444,6 +495,7 @@ Imx2DDevice * imx_g2d_create(Imx2DDeviceType  device_type)
   device->close               = imx_g2d_close;
   device->alloc_mem           = imx_g2d_alloc_mem;
   device->free_mem            = imx_g2d_free_mem;
+  device->copy_mem            = imx_g2d_copy_mem;
   device->frame_copy          = imx_g2d_frame_copy;
   device->config_input        = imx_g2d_config_input;
   device->config_output       = imx_g2d_config_output;

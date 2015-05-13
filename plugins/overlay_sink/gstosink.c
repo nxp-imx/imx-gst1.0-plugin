@@ -71,7 +71,7 @@ static gboolean overlay_sink_update_video_geo(GstElement * object, GstVideoRecta
   osink->overlay[0].h = win_rect.h;
 
   if (((GstBaseSink*)osink)->eos || GST_STATE(object) == GST_STATE_PAUSED) {
-    gst_overlay_sink_show_frame(osink, osink->prv_buffer);
+    gst_overlay_sink_show_frame((GstBaseSink *)osink, osink->prv_buffer);
   } else {
     osink->config[0] = TRUE;
   }
@@ -178,7 +178,7 @@ gst_overlay_sink_set_property (GObject * object,
       sink->config[idx] = g_value_get_boolean (value);
       if (sink->config[idx] &&
           (((GstBaseSink*)sink)->eos || GST_STATE(sink) == GST_STATE_PAUSED)) {
-        gst_overlay_sink_show_frame(sink, sink->prv_buffer);
+        gst_overlay_sink_show_frame((GstBaseSink *)sink, sink->prv_buffer);
         sink->config[idx] = FALSE;
       }
       break;

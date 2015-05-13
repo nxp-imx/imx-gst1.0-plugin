@@ -23,6 +23,8 @@
 #include "osink_common.h"
 #include "gstallocatorphymem.h"
 
+#define IMX_2D_DEVICE_TYPE_USED     IMX_2D_DEVICE_G2D
+
 gpointer osink_object_new ();
 void osink_object_ref (gpointer osink_handle);
 void osink_object_unref (gpointer osink_handle);

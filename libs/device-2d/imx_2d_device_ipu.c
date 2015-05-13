@@ -173,6 +173,7 @@ imx_ipu_alloc_mem(Imx2DDevice *device, PhyMemBlock *memblk)
   memblk->paddr = (guchar *)mem;
   memblk->vaddr = mmap(0, memblk->size, PROT_READ|PROT_WRITE, MAP_SHARED,
                        ipu->ipu_fd, (dma_addr_t)(memblk->paddr));
+  GST_DEBUG("IPU allocated memory (%p)", memblk->paddr);
 
   return 0;
 }
@@ -186,6 +187,7 @@ static gint imx_ipu_free_mem(Imx2DDevice *device, PhyMemBlock *memblk)
 
   Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
 
+  GST_DEBUG("IPU free memory (%p)", memblk->paddr);
   mem = (dma_addr_t)(memblk->paddr);
   munmap(memblk->vaddr, memblk->size);
 
@@ -201,6 +203,24 @@ static gint imx_ipu_free_mem(Imx2DDevice *device, PhyMemBlock *memblk)
   return 0;
 }
 
+static gint imx_ipu_copy_mem(Imx2DDevice* device, PhyMemBlock *dst_mem,
+                             PhyMemBlock *src_mem, guint offset, guint size)
+{
+  if (!device || !device->priv || !src_mem || !dst_mem)
+    return -1;
+
+  if (size > src_mem->size - offset)
+    size = src_mem->size - offset;
+  memcpy(dst_mem->vaddr, src_mem->vaddr+offset, size);
+
+  GST_DEBUG ("IPU copy from vaddr (%p), paddr (%p), size (%d) to "
+      "vaddr (%p), paddr (%p), size (%d)",
+      src_mem->vaddr, src_mem->paddr, src_mem->size,
+      dst_mem->vaddr, dst_mem->paddr, dst_mem->size);
+
+  return 0;
+}
+
 static gint imx_ipu_frame_copy(Imx2DDevice *device,
                                PhyMemBlock *from, PhyMemBlock *to)
 {
@@ -208,6 +228,7 @@ static gint imx_ipu_frame_copy(Imx2DDevice *device,
     return -1;
 
   memcpy(to->vaddr, from->vaddr, from->size);
+  GST_LOG("IPU frame memory (%p)->(%p)", from->paddr, to->paddr);
 
   return 0;
 }
@@ -544,6 +565,7 @@ Imx2DDevice * imx_ipu_create(Imx2DDeviceType  device_type)
   device->close               = imx_ipu_close;
   device->alloc_mem           = imx_ipu_alloc_mem;
   device->free_mem            = imx_ipu_free_mem;
+  device->copy_mem            = imx_ipu_copy_mem;
   device->frame_copy          = imx_ipu_frame_copy;
   device->config_input        = imx_ipu_config_input;
   device->config_output       = imx_ipu_config_output;

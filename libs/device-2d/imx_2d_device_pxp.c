@@ -201,6 +201,7 @@ imx_pxp_alloc_mem(Imx2DDevice *device, PhyMemBlock *memblk)
   memblk->vaddr = (guchar*) mem->virt_uaddr;
   memblk->paddr = (guchar*) mem->phys_addr;
   memblk->user_data = (gpointer) mem;
+  GST_DEBUG("PXP allocated memory (%p)", memblk->paddr);
 
   return 0;
 }
@@ -210,6 +211,7 @@ static gint imx_pxp_free_mem(Imx2DDevice *device, PhyMemBlock *memblk)
   if (!device || !device->priv || !memblk)
     return -1;
 
+  GST_DEBUG("PXP free memory (%p)", memblk->paddr);
   gint ret = pxp_put_mem ((struct pxp_mem_desc*)(memblk->user_data));
   memblk->user_data = NULL;
   memblk->vaddr = NULL;
@@ -219,6 +221,24 @@ static gint imx_pxp_free_mem(Imx2DDevice *device, PhyMemBlock *memblk)
   return ret;
 }
 
+static gint imx_pxp_copy_mem(Imx2DDevice* device, PhyMemBlock *dst_mem,
+                             PhyMemBlock *src_mem, guint offset, guint size)
+{
+  if (!device || !device->priv || !src_mem || !dst_mem)
+    return -1;
+
+  if (size > src_mem->size - offset)
+    size = src_mem->size - offset;
+  memcpy(dst_mem->vaddr, src_mem->vaddr+offset, size);
+
+  GST_DEBUG ("PXP copy from vaddr (%p), paddr (%p), size (%d) to "
+      "vaddr (%p), paddr (%p), size (%d)",
+      src_mem->vaddr, src_mem->paddr, src_mem->size,
+      dst_mem->vaddr, dst_mem->paddr, dst_mem->size);
+
+  return 0;
+}
+
 static gint imx_pxp_frame_copy(Imx2DDevice *device,
                                PhyMemBlock *from, PhyMemBlock *to)
 {
@@ -226,6 +246,7 @@ static gint imx_pxp_frame_copy(Imx2DDevice *device,
     return -1;
 
   memcpy(to->vaddr, from->vaddr, from->size);
+  GST_LOG("PXP frame memory (%p)->(%p)", from->paddr, to->paddr);
 
   return 0;
 }
@@ -457,6 +478,7 @@ Imx2DDevice * imx_pxp_create(Imx2DDeviceType  device_type)
   device->close               = imx_pxp_close;
   device->alloc_mem           = imx_pxp_alloc_mem;
   device->free_mem            = imx_pxp_free_mem;
+  device->copy_mem            = imx_pxp_copy_mem;
   device->frame_copy          = imx_pxp_frame_copy;
   device->config_input        = imx_pxp_config_input;
   device->config_output       = imx_pxp_config_output;

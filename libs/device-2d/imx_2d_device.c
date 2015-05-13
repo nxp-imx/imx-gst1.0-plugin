@@ -72,3 +72,32 @@ const Imx2DDeviceInfo * imx_get_2d_devices(void)
                            "Freescale IMX 2D Devices");
   return &Imx2DDevices[0];
 }
+
+Imx2DDevice * imx_2d_device_create(Imx2DDeviceType  device_type)
+{
+  Imx2DDeviceInfo *dev_info = imx_get_2d_devices();
+  while (dev_info->name) {
+    if (dev_info->device_type == device_type)
+      return dev_info->create(device_type);
+    dev_info++;
+  }
+
+  GST_ERROR("Unknown 2D device type %d\n", device_type);
+  return NULL;
+}
+
+gint imx_2d_device_destroy(Imx2DDevice *device)
+{
+  if (!device)
+    return -1;
+
+  Imx2DDeviceInfo *dev_info = imx_get_2d_devices();
+  while (dev_info->name) {
+    if (dev_info->device_type == device->device_type)
+      return dev_info->destroy(device);
+    dev_info++;
+  }
+
+  GST_ERROR("Unknown 2D device type %d\n", device->device_type);
+  return -1;
+}

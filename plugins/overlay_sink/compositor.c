@@ -20,6 +20,7 @@
 #include <string.h>
 #include <gst/video/gstvideosink.h>
 #include "compositor.h"
+#include "imx_2d_device.h"
 
 GST_DEBUG_CATEGORY_EXTERN (overlay_sink_debug);
 #define GST_CAT_DEFAULT overlay_sink_debug
@@ -57,7 +58,6 @@ struct _Surface{
   gboolean update;
   gboolean single;
   gboolean hide;
-  gpointer hdevice_surface;
   gint64 blited_frames;
 
   Surface *prev;
@@ -65,7 +65,7 @@ struct _Surface{
 };
 
 typedef struct {
-  gpointer hdevice;
+  Imx2DDevice *hdevice;
   CompositorDstBufferCb dst_buffer_cb;
   GThread *thread;
   GCond cond;
@@ -74,9 +74,57 @@ typedef struct {
 
   Surface *head;
   Surface *tail;
-  PhyMemBlock prvdst;
+  SurfaceBuffer prvdst;
 } CompositorHandle;
 
+static gint
+compositor_do_composite_surface (Imx2DDevice *dev, Surface *surface, SurfaceBuffer *dest)
+{
+  Imx2DVideoInfo in_info;
+  Imx2DCrop incrop, outcrop;
+  gint ret;
+
+  in_info.fmt = surface->info.fmt;
+  in_info.w = surface->info.src.width;
+  in_info.h = surface->info.src.height;
+  in_info.stride = in_info.w;
+
+  ret = dev->config_input(dev, &in_info);
+
+  GST_LOG ("Input: %d, %dx%d", in_info.fmt, in_info.w, in_info.h);
+
+  switch (surface->info.rot) {
+    case 0:   ret |= dev->set_rotate(dev, IMX_2D_ROTATION_0);    break;
+    case 90:  ret |= dev->set_rotate(dev, IMX_2D_ROTATION_90);   break;
+    case 180: ret |= dev->set_rotate(dev, IMX_2D_ROTATION_180);  break;
+    case 270: ret |= dev->set_rotate(dev, IMX_2D_ROTATION_270);  break;
+    default:  ret |= dev->set_rotate(dev, IMX_2D_ROTATION_0);    break;
+  }
+
+  if (ret != 0) {
+    GST_ERROR("device input/rotate config failed");
+    return -1;
+  }
+
+  incrop.x = surface->info.src.left;
+  incrop.y = surface->info.src.top;
+  incrop.w = surface->info.src.right - surface->info.src.left;
+  incrop.h = surface->info.src.bottom - surface->info.src.top;
+
+  outcrop.x = surface->info.dst.left;
+  outcrop.y = surface->info.dst.top;
+  outcrop.w = surface->info.dst.right - surface->info.dst.left;
+  outcrop.h = surface->info.dst.bottom - surface->info.dst.top;
+
+  if (dev->do_convert(dev, &surface->buffer, dest, 0, incrop, outcrop)) {
+    GST_ERROR("device composite failed");
+    return -1;
+  }
+
+  return 0;
+}
+
+// global functions
 static void
 compositor_insert_surface (CompositorHandle *hcompositor, Surface *hsurface)
 {
@@ -218,9 +266,8 @@ compositor_check_keep_ratio (CompositorHandle *hcompositor, Surface *hsurface, S
   return;
 }
 
-static gpointer compositor_do_compositing_surface_list (CompositorHandle *hcompositor)
+static void compositor_do_compositing_surface_list (CompositorHandle *hcompositor)
 {
-  gpointer hdevice;
   Surface *surface, *list;
   SurfaceBuffer dstbuf;
   gboolean upper;
@@ -233,7 +280,7 @@ static gpointer compositor_do_compositing_surface_list (CompositorHandle *hcompo
   if (hcompositor->head != hcompositor->tail) {
     // need to back copy dest buffer for 2 more surfaces
     if (hcompositor->prvdst.vaddr)
-      compositor_device_copy (hcompositor->hdevice, &dstbuf, &hcompositor->prvdst);
+      hcompositor->hdevice->frame_copy(hcompositor->hdevice, &hcompositor->prvdst, &dstbuf);
   }
 
   upper = FALSE;
@@ -263,8 +310,7 @@ static gpointer compositor_do_compositing_surface_list (CompositorHandle *hcompo
 
     if (surface->update || upper) {
       GST_DEBUG ("blit surface (%p)", surface);
-      if (compositor_device_blit_surface (hcompositor->hdevice, surface->hdevice_surface, 
-            &surface->buffer, &dstbuf) < 0) {
+      if (compositor_do_composite_surface (hcompositor->hdevice, surface, &dstbuf) < 0) {
         GST_ERROR ("composite surface (%p) failed.", surface);
         break;
       }
@@ -281,8 +327,6 @@ static gpointer compositor_do_compositing_surface_list (CompositorHandle *hcompo
   }
 
   memcpy (&hcompositor->prvdst, &dstbuf, sizeof (SurfaceBuffer));
-
-  return;
 }
 
 static gpointer compositor_compositing_thread (gpointer compositor)
@@ -295,8 +339,7 @@ static gpointer compositor_compositing_thread (gpointer compositor)
   }
 
   GST_DEBUG ("compositor thread exit");
-
-  return;
+  return compositor;
 }
 
 
@@ -370,12 +413,6 @@ gpointer compositor_add_surface (gpointer compositor, SurfaceInfo *surface_info)
 
   memset (hsurface, 0, sizeof(Surface));
   memcpy (&hsurface->info, surface_info, sizeof(SurfaceInfo));
-  hsurface->hdevice_surface = compositor_device_create_surface (hcompositor->hdevice, surface_info);
-  if (!hsurface->hdevice_surface) {
-    GST_ERROR ("compositor_device_create_surface failed.");
-    g_slice_free1 (sizeof(Surface), hsurface);
-    return NULL;
-  }
 
   GST_DEBUG ("add surface %p", hsurface);
   compositor_insert_surface (hcompositor, hsurface);
@@ -416,9 +453,6 @@ gint compositor_remove_surface (gpointer compositor, gpointer surface)
     hsurface->next->prev = hsurface->prev;
   }
 
-  compositor_device_destroy_surface (hcompositor->hdevice, hsurface->hdevice_surface);
-  g_slice_free1 (sizeof(Surface), hsurface);
-
   return 0;
 }
 
@@ -439,7 +473,7 @@ gint compositor_config_surface (gpointer compositor, gpointer surface, SurfaceIn
     compositor_check_list_draw_area (hcompositor);
   }
 
-  return compositor_device_update_surface_info (hcompositor->hdevice, &hsurface->info, hsurface->hdevice_surface);
+  return 0;
 }
 
 gboolean compositor_check_need_clear_display (gpointer compositor)
@@ -485,4 +519,3 @@ gint64 compositor_get_surface_showed_frames (gpointer compositor, gpointer surfa
 
   return hsurface->blited_frames;
 }
-

@@ -101,6 +101,8 @@ struct _Imx2DDevice {
   gint (*close)       (Imx2DDevice* device);
   gint (*alloc_mem)   (Imx2DDevice* device, PhyMemBlock *memblk);
   gint (*free_mem)    (Imx2DDevice* device, PhyMemBlock *memblk);
+  gint (*copy_mem)    (Imx2DDevice* device, PhyMemBlock *dst_mem,
+                       PhyMemBlock *src_mem, guint offset, guint size);
   gint (*frame_copy)  (Imx2DDevice* device, PhyMemBlock *from, PhyMemBlock *to);
   gint (*set_deinterlace) (Imx2DDevice* device, Imx2DDeinterlaceMode mode);
   gint (*set_rotate)      (Imx2DDevice* device, Imx2DRotationMode mode);
@@ -125,5 +127,7 @@ typedef struct _Imx2DDeviceInfo {
 } Imx2DDeviceInfo;
 
 const Imx2DDeviceInfo * imx_get_2d_devices(void);
+Imx2DDevice * imx_2d_device_create(Imx2DDeviceType  device_type);
+gint imx_2d_device_destroy(Imx2DDevice *device);
 
 #endif /* __IMX_2D_DEVICE_H__ */

@@ -38,10 +38,11 @@ imx_2d_device_allocate (GstAllocatorPhyMem *allocator, PhyMemBlock *memblk)
 
   Imx2DDevice *dev = (Imx2DDevice*)(_allocator->device);
   if (dev) {
-    if (dev->alloc_mem(dev, memblk) < 0)  {
-      GST_ERROR ("imx video convert allocate memory failed.");
+    gint ret = dev->alloc_mem(dev, memblk);
+    if (ret < 0)  {
+      GST_ERROR ("imx 2d device allocate memory failed (%d).", ret);
     } else {
-      GST_LOG ("imx video convert allocated memory (%p), by (%p)",
+      GST_LOG ("imx 2d device allocated memory (%p), by (%p)",
                 memblk->paddr, allocator);
       return 0;
     }
@@ -57,10 +58,31 @@ imx_2d_device_free (GstAllocatorPhyMem *allocator, PhyMemBlock *memblk)
 
   Imx2DDevice *dev = (Imx2DDevice*)(_allocator->device);
   if (dev) {
-    GST_LOG ("imx video convert free memory (%p) of (%p)",
+    GST_LOG ("imx 2d device free memory (%p) of (%p)",
               memblk->paddr, allocator);
-    if (dev->free_mem(dev, memblk) < 0)
-      GST_ERROR ("imx video convert free memory failed.");
+    gint ret = dev->free_mem(dev, memblk);
+    if (ret < 0)
+      GST_ERROR ("imx 2d device free memory failed (%d).", ret);
+    else
+      return 0;
+  }
+
+  return -1;
+}
+
+static gint
+imx_2d_device_copy (GstAllocatorPhyMem *allocator, PhyMemBlock *dst_mem,
+                    PhyMemBlock *src_mem, guint offset, guint size)
+{
+  GstImx2DDeviceAllocator *_allocator = GST_IMX_2D_DEVICE_ALLOCATOR(allocator);
+
+  Imx2DDevice *dev = (Imx2DDevice*)(_allocator->device);
+  if (dev) {
+    GST_LOG ("imx 2d device copy memory (%p)->(%p) of (%p)",
+        src_mem->paddr, dst_mem->paddr, allocator);
+    gint ret = dev->copy_mem(dev, dst_mem, src_mem, offset, size);
+    if (ret < 0)
+      GST_ERROR ("imx 2d device free memory failed (%d).", ret);
     else
       return 0;
   }
@@ -77,6 +99,7 @@ gst_imx_2d_device_allocator_class_init (GstImx2DDeviceAllocatorClass * klass)
 
   parent_class->alloc_phymem = imx_2d_device_allocate;
   parent_class->free_phymem = imx_2d_device_free;
+  parent_class->copy_phymem = imx_2d_device_copy;
 }
 
 static void
@@ -91,10 +114,10 @@ GstAllocator *gst_imx_2d_device_allocator_new (gpointer device)
 
   allocator = g_object_new(gst_imx_2d_device_allocator_get_type(), NULL);
   if (!allocator) {
-    GST_ERROR ("new imx video convert allocator failed.\n");
+    GST_ERROR ("new imx 2d device allocator failed.\n");
   } else {
     allocator->device = device;
-    GST_DEBUG ("created imx video convert allocator(%p).", allocator);
+    GST_DEBUG ("created imx 2d device allocator(%p).", allocator);
   }
 
   return (GstAllocator*) allocator;

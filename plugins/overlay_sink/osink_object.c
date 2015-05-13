@@ -24,7 +24,7 @@
 #include <signal.h>
 
 #include "osink_object.h"
-#include "device.h"
+#include "imx_2d_device.h"
 #include "compositor.h"
 
 GST_DEBUG_CATEGORY_EXTERN (overlay_sink_debug);
@@ -36,7 +36,7 @@ typedef struct {
   gboolean display_enabled[MAX_DISPLAY];
   DisplayInfo disp_info[MAX_DISPLAY];
   gpointer hdisplay[MAX_DISPLAY];
-  gpointer hdevice[MAX_DISPLAY];
+  Imx2DDevice * hdevice[MAX_DISPLAY];
   gpointer hcompositor[MAX_DISPLAY];
 } OSinkHandle;
 
@@ -285,7 +285,8 @@ static void destroy_osink_object()
       gosink->hcompositor[i] = NULL;
     }
     if (gosink->hdevice[i]) {
-      comositor_device_close (gosink->hdevice[i]);
+      gosink->hdevice[i]->close(gosink->hdevice[i]);
+      imx_2d_device_destroy(gosink->hdevice[i]);
       gosink->hdevice[i] = NULL;
     }
     if (gosink->hdisplay[i]) {
@@ -446,34 +447,61 @@ int osink_object_enable_display (gpointer osink_handle, gint display_idx)
 
   LOCK (glock);
   if (handle->display_enabled[display_idx] == FALSE) {
+    gint fmt = handle->disp_info[display_idx].fmt;
+    GstVideoFormat gst_fmt;
+    if (fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'P'))
+      gst_fmt = GST_VIDEO_FORMAT_RGB16;
+    else if (fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'x'))
+      gst_fmt = GST_VIDEO_FORMAT_RGBx;
+    else {
+      UNLOCK (glock);
+      return -1;
+    }
+
     if (init_display (handle->hdisplay[display_idx]) < 0) {
       GST_ERROR ("init display (%s) failed.", handle->disp_info[display_idx].name);
       UNLOCK (glock);
       return -1;
     }
 
-    handle->hdevice[display_idx] = compositor_device_open (
-        DEVICE_G2D, handle->disp_info[display_idx].fmt,
-        handle->disp_info[display_idx].width, handle->disp_info[display_idx].height);
-    if (handle->hdevice[display_idx] == NULL) {
+    Imx2DDevice *dev = imx_2d_device_create(IMX_2D_DEVICE_TYPE_USED);
+    if (dev == NULL) {
       GST_ERROR ("create device failed.");
       deinit_display (handle->hdisplay[display_idx]);
       UNLOCK (glock);
       return -1;
     }
 
-    dstbufcb.context = handle->hdisplay[display_idx];
-    dstbufcb.get_dst_buffer = osink_object_get_compositor_dst_buffer;
-    dstbufcb.flip_dst_buffer = osink_object_flip_compositor_dst_buffer;
-    handle->hcompositor[display_idx] = create_compositor (handle->hdevice[display_idx], &dstbufcb);
-    if (handle->hcompositor[display_idx] == NULL) {
-      GST_ERROR ("create compositor for display (%s) failed.", handle->disp_info[display_idx].name);
+    if (dev->open(dev) < 0) {
+      GST_ERROR ("create device %d failed.", IMX_2D_DEVICE_TYPE_USED);
       deinit_display (handle->hdisplay[display_idx]);
-      comositor_device_close (handle->hdevice[display_idx]);
+      imx_2d_device_destroy(dev);
       UNLOCK (glock);
       return -1;
     }
 
+    Imx2DVideoInfo out_info;
+    out_info.fmt = gst_fmt;
+    out_info.w = handle->disp_info[display_idx].width;
+    out_info.h = handle->disp_info[display_idx].height;
+    out_info.stride = out_info.w;
+    dev->config_output(dev, &out_info);
+
+
+    dstbufcb.context = handle->hdisplay[display_idx];
+    dstbufcb.get_dst_buffer = osink_object_get_compositor_dst_buffer;
+    dstbufcb.flip_dst_buffer = osink_object_flip_compositor_dst_buffer;
+    handle->hcompositor[display_idx] = create_compositor (dev, &dstbufcb);
+    if (handle->hcompositor[display_idx] == NULL) {
+      GST_ERROR ("create compositor for display (%s) failed.", handle->disp_info[display_idx].name);
+      deinit_display (handle->hdisplay[display_idx]);
+      dev->close(dev);
+      imx_2d_device_destroy(dev);
+      UNLOCK (glock);
+      return -1;
+    }
+
+    handle->hdevice[display_idx] = dev;
     handle->display_enabled[display_idx] = TRUE;
   }
 
@@ -599,13 +627,14 @@ gint64 osink_object_get_overlay_showed_frames (gpointer osink_handle, gpointer o
 
 int osink_object_allocate_memory (gpointer osink_handle, PhyMemBlock *memblk)
 {
-  gint ret;
+  gint ret = -1;
   OSinkHandle *handle;
   OSINK_MAKE_HANDLE (-1);
   GET_LOCK (-1);
 
   LOCK (glock);
-  ret = compositor_device_allocate_memory (handle->hdevice[0], memblk);
+  if (handle->hdevice[0])
+    ret = handle->hdevice[0]->alloc_mem(handle->hdevice[0], memblk);
   UNLOCK (glock);
 
   if (ret >= 0)
@@ -618,7 +647,7 @@ int osink_object_allocate_memory (gpointer osink_handle, PhyMemBlock *memblk)
 
 int osink_object_free_memory (gpointer osink_handle, PhyMemBlock *memblk)
 {
-  gint ret;
+  gint ret = -1;
   OSinkHandle *handle;
   OSINK_MAKE_HANDLE (-1);
   GET_LOCK (-1);
@@ -626,7 +655,8 @@ int osink_object_free_memory (gpointer osink_handle, PhyMemBlock *memblk)
   GST_DEBUG ("free memory, vaddr (%p), paddr (%p).", memblk->vaddr, memblk->paddr);
 
   LOCK (glock);
-  ret = compositor_device_free_memory (handle->hdevice[0], memblk);
+  if (handle->hdevice[0])
+    ret = handle->hdevice[0]->free_mem(handle->hdevice[0], memblk);
   UNLOCK (glock);
 
   osink_object_unref (osink_handle);
@@ -637,14 +667,15 @@ int osink_object_free_memory (gpointer osink_handle, PhyMemBlock *memblk)
 int osink_object_copy_memory (gpointer osink_handle, PhyMemBlock *dst_mem,
     PhyMemBlock *src_mem, guint offset, guint size)
 {
-  gint ret;
+  gint ret = -1;
   OSinkHandle *handle;
   OSINK_MAKE_HANDLE (-1);
   GET_LOCK (-1);
 
   LOCK (glock);
-  ret = compositor_device_copy_memory (handle->hdevice[0], dst_mem, src_mem,
-      offset, size);
+  if (handle->hdevice[0])
+    ret = handle->hdevice[0]->copy_mem(handle->hdevice[0],
+                                       dst_mem, src_mem, offset, size);
   UNLOCK (glock);
 
   if (ret >= 0)

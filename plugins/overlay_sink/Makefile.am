@@ -1,10 +1,9 @@
 plugin_LTLIBRARIES = libgstoverlaysinkplugins.la
 
 libgstoverlaysinkplugins_la_SOURCES = gstosink.c \
-				      gstosinkallocator.c \
+              gstosinkallocator.c \
 				      osink_object.c \
 				      compositor.c \
-				      device.c \
 				      displaysv4l2.c
 
 libgstoverlaysinkplugins_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
@@ -14,7 +13,8 @@ libgstoverlaysinkplugins_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
 				 -I$(top_srcdir)/libs/allocator \
 				 -I$(top_srcdir)/libs/gstsutils \
 				 -I$(top_srcdir)/libs/v4l2_core \
-                                 -I$(top_srcdir)/ext-includes
+				 -I$(top_srcdir)/libs/device-2d \
+         -I$(top_srcdir)/ext-includes
 
 libgstoverlaysinkplugins_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 				 $(GST_BASE_LIBS) \
@@ -27,7 +27,7 @@ libgstoverlaysinkplugins_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 libgstoverlaysinkplugins_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstoverlaysinkplugins_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 
-noinst_HEADERS = osink_common.h gstosink.h gstosinkallocator.h osink_object.h compositor.h device.h displays.h
+noinst_HEADERS = osink_common.h gstosink.h gstosinkallocator.h osink_object.h compositor.h displays.h
 
 registry_file1 = imx_6q_display_config
 registry_file2 = imx_6sx_display_config
