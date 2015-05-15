@@ -775,9 +775,9 @@ begin:
             GST_WARNING("decode END error = %x\n", core_ret);
             IDecoder->resetDecoder(handle);
             //send null frame to delete the timestamp
-            beepdec->in_cnt--;
             beepdec->err_cnt ++;
-            ret = gst_audio_decoder_finish_frame (dec, NULL, 1);
+            ret = gst_audio_decoder_finish_frame (dec, NULL, beepdec->in_cnt);
+            beepdec->in_cnt = 0;
             sent = TRUE;
             break;
         }else if(core_ret == ACODEC_PROFILE_NOT_SUPPORT){
