@@ -26,11 +26,13 @@ AVBDIRS = plugins/avb
 
 VIDEO_CONVERT_DIRS = plugins/videoconvert
 
+COMPOSITOR_DIRS = plugins/compositor
+
 TOOLDIRS =    tools/                      \
               tools/gplay                 \
               tools/grecorder
 
-BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS) $(VIDEO_CONVERT_DIRS)
+BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS) $(VIDEO_CONVERT_DIRS) $(COMPOSITOR_DIRS)
               
 if PLATFORM_IS_MX6
 

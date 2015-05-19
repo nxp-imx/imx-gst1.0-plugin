@@ -206,11 +206,28 @@ static gint imx_ipu_free_mem(Imx2DDevice *device, PhyMemBlock *memblk)
 static gint imx_ipu_copy_mem(Imx2DDevice* device, PhyMemBlock *dst_mem,
                              PhyMemBlock *src_mem, guint offset, guint size)
 {
+  dma_addr_t mem;
+
   if (!device || !device->priv || !src_mem || !dst_mem)
     return -1;
 
+  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
+
   if (size > src_mem->size - offset)
     size = src_mem->size - offset;
+
+  dst_mem->user_data = NULL;
+  dst_mem->size = PAGE_ALIGN(size);
+
+  mem = (dma_addr_t)(dst_mem->size);
+  if (ioctl(ipu->ipu_fd, IPU_ALLOC, &mem) < 0) {
+    GST_ERROR("IPU allocate %u bytes memory failed: %s", size, strerror(errno));
+    return -1;
+  }
+
+  dst_mem->paddr = (guchar *)mem;
+  dst_mem->vaddr = mmap(0, dst_mem->size, PROT_READ|PROT_WRITE, MAP_SHARED,
+                       ipu->ipu_fd, (dma_addr_t)(dst_mem->paddr));
   memcpy(dst_mem->vaddr, src_mem->vaddr+offset, size);
 
   GST_DEBUG ("IPU copy from vaddr (%p), paddr (%p), size (%d) to "
@@ -281,6 +298,62 @@ static gint imx_ipu_config_output(Imx2DDevice *device, Imx2DVideoInfo* out_info)
   return 0;
 }
 
+static gint imx_ipu_check_parameters(Imx2DDevice *device,
+    PhyMemBlock *from, PhyMemBlock *to)
+{
+  gint cnt = 100;
+  gboolean check_end = FALSE;
+  gint ret = IPU_CHECK_ERR_INPUT_CROP;
+  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
+
+  while(ret != IPU_CHECK_OK && ret > IPU_CHECK_ERR_MIN) {
+    ret = ioctl((ipu->ipu_fd), IPU_CHECK_TASK, &(ipu->task));
+    GST_TRACE ("IPU CHECK TASK ret=%d", ret);
+
+    switch(ret) {
+      case IPU_CHECK_OK:
+        check_end = TRUE;
+        break;
+      case IPU_CHECK_ERR_SPLIT_INPUTW_OVER:
+        ipu->task.input.crop.w -= 8;
+        cnt--;
+        break;
+      case IPU_CHECK_ERR_SPLIT_INPUTH_OVER:
+        ipu->task.input.crop.h -= 8;
+        cnt--;
+        break;
+      case IPU_CHECK_ERR_SPLIT_OUTPUTW_OVER:
+        ipu->task.output.crop.w -= 8;
+        cnt--;
+        break;
+      case IPU_CHECK_ERR_SPLIT_OUTPUTH_OVER:
+        ipu->task.output.crop.h -= 8;
+        cnt--;
+        break;
+      case IPU_CHECK_ERR_SPLIT_WITH_ROT:
+        if (ipu->task.output.rotate != IPU_ROTATE_NONE) {
+          g_print("out of size range for rotation! (%d,%d):%d\n",
+              ipu->task.output.width, ipu->task.output.height,
+              ipu->task.output.rotate);
+        }
+        check_end = TRUE;
+        break;
+      case IPU_CHECK_ERR_PROC_NO_NEED:
+        GST_INFO ("shouldn't be here, but copy frame directly anyway");
+        imx_ipu_frame_copy(device, from, to);
+        return 1;
+      default:
+        check_end = TRUE;
+        break;
+    }
+
+    if (check_end || cnt <= 0)
+      break;
+  }
+
+  return 0;
+}
+
 static gint imx_ipu_do_convert(Imx2DDevice *device,
                                 PhyMemBlock *from, PhyMemBlock *to,
                                 Imx2DInterlaceType interlace_type,
@@ -338,54 +411,8 @@ static gint imx_ipu_do_convert(Imx2DDevice *device,
       ipu->task.output.crop.w, ipu->task.output.crop.h,
       ipu->task.output.format);
 
-  // Check parameters
-  gint cnt = 100;
-  gboolean check_end = FALSE;
-  gint ret = IPU_CHECK_ERR_INPUT_CROP;
-  while(ret != IPU_CHECK_OK && ret > IPU_CHECK_ERR_MIN) {
-    ret = ioctl((ipu->ipu_fd), IPU_CHECK_TASK, &(ipu->task));
-    GST_TRACE ("IPU CHECK TASK ret=%d", ret);
-
-    switch(ret) {
-      case IPU_CHECK_OK:
-        check_end = TRUE;
-        break;
-      case IPU_CHECK_ERR_SPLIT_INPUTW_OVER:
-        ipu->task.input.crop.w -= 8;
-        cnt--;
-        break;
-      case IPU_CHECK_ERR_SPLIT_INPUTH_OVER:
-        ipu->task.input.crop.h -= 8;
-        cnt--;
-        break;
-      case IPU_CHECK_ERR_SPLIT_OUTPUTW_OVER:
-        ipu->task.output.crop.w -= 8;
-        cnt--;
-        break;
-      case IPU_CHECK_ERR_SPLIT_OUTPUTH_OVER:
-        ipu->task.output.crop.h -= 8;
-        cnt--;
-        break;
-      case IPU_CHECK_ERR_SPLIT_WITH_ROT:
-        if (ipu->task.output.rotate != IPU_ROTATE_NONE) {
-          g_print("out of size range for rotation! (%d,%d):%d\n",
-              ipu->task.output.width, ipu->task.output.height,
-              ipu->task.output.rotate);
-        }
-        check_end = TRUE;
-        break;
-      case IPU_CHECK_ERR_PROC_NO_NEED:
-        GST_INFO ("shouldn't be here, but copy frame directly anyway");
-        imx_ipu_frame_copy(device, from, to);
-        return 0;
-      default:
-        check_end = TRUE;
-        break;
-    }
-
-    if (check_end || cnt <= 0)
-      break;
-  }
+  if (imx_ipu_check_parameters(device, from, to) == 1)
+    return 0;
 
   if (ipu->task.input.deinterlace.enable &&
       ipu->task.input.deinterlace.motion != HIGH_MOTION && ipu->new_input) {
@@ -433,6 +460,76 @@ static gint imx_ipu_do_convert(Imx2DDevice *device,
   ipu->new_input = FALSE;
 
   return 0;
+}
+
+static gint imx_ipu_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
+{
+  if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
+    return -1;
+
+  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
+
+  ipu->task.input.paddr = (dma_addr_t)(src->mem->paddr);
+  ipu->task.input.crop.pos.x = GST_ROUND_UP_16(src->crop.x);
+  ipu->task.input.crop.pos.y = GST_ROUND_UP_16(src->crop.y);
+  ipu->task.input.crop.w = GST_ROUND_DOWN_16((MIN(src->crop.w,
+      (ipu->task.input.width - ipu->task.input.crop.pos.x))));
+  ipu->task.input.crop.h = GST_ROUND_DOWN_16(MIN(src->crop.h,
+      (ipu->task.input.height - ipu->task.input.crop.pos.y)));
+  ipu->task.input.deinterlace.enable = FALSE;
+
+  GST_TRACE ("ipu input : %dx%d(%d,%d->%d,%d), format=0x%x",
+      ipu->task.input.width, ipu->task.input.height,
+      ipu->task.input.crop.pos.x, ipu->task.input.crop.pos.y,
+      ipu->task.input.crop.w, ipu->task.input.crop.h, ipu->task.input.format);
+
+  ipu->task.output.paddr = (dma_addr_t)(dst->mem->paddr);
+  ipu->task.output.crop.pos.x = GST_ROUND_DOWN_16(dst->crop.x);
+  ipu->task.output.crop.pos.y = GST_ROUND_DOWN_16(dst->crop.y);
+  ipu->task.output.crop.w = GST_ROUND_DOWN_16(MIN(dst->crop.w,
+      (ipu->task.output.width - ipu->task.output.crop.pos.x)));
+  ipu->task.output.crop.h = GST_ROUND_DOWN_16(MIN(dst->crop.h,
+      (ipu->task.output.height - ipu->task.output.crop.pos.y)));
+
+  // a little bit trick for crop.w IPU driver has issue when width > 1024 &&
+  // width / 16 = odd.
+  if (ipu->task.output.crop.w > 1024 && (ipu->task.output.crop.w/16) % 2 == 0) {
+    ipu->task.output.crop.w -= (ipu->task.output.crop.w % 16 + 1);
+  }
+
+  GST_TRACE ("ipu output : %dx%d(%d,%d->%d,%d), format=0x%x",
+      ipu->task.output.width, ipu->task.output.height,
+      ipu->task.output.crop.pos.x, ipu->task.output.crop.pos.y,
+      ipu->task.output.crop.w, ipu->task.output.crop.h,ipu->task.output.format);
+
+  if (ipu->task.input.crop.w < 64 || ipu->task.input.crop.h < 64 ||
+      ipu->task.output.crop.w < 64 || ipu->task.output.crop.w < 64) {
+    GST_WARNING("crop parameters invalid");
+    return 0;
+  }
+
+  if (imx_ipu_check_parameters(device, src->mem, dst->mem) == 1)
+    return 0;
+
+  if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
+    GST_WARNING("queuing IPU task failed: %s", strerror(errno));
+    return -1;
+  }
+
+  return 0;
+}
+
+static gint imx_ipu_blend_finish(Imx2DDevice *device)
+{
+  //do nothing
+  return 0;
+}
+
+static gint imx_ipu_fill_color(Imx2DDevice *device, Imx2DFrame *dst,
+                                guint RGBA8888)
+{
+  //don't support color filling by hardware
+  return -1;
 }
 
 static gint imx_ipu_set_rotate(Imx2DDevice *device, Imx2DRotationMode rot)
@@ -530,7 +627,7 @@ static gint imx_ipu_get_capabilities(Imx2DDevice* device)
 {
   return IMX_2D_DEVICE_CAP_CSC | IMX_2D_DEVICE_CAP_DEINTERLACE
           | IMX_2D_DEVICE_CAP_ROTATE | IMX_2D_DEVICE_CAP_SCALE
-          | IMX_2D_DEVICE_CAP_ALPHA | IMX_2D_DEVICE_CAP_OVERLAY;
+          | IMX_2D_DEVICE_CAP_OVERLAY;
 }
 
 static GList* imx_ipu_get_supported_in_fmts(Imx2DDevice* device)
@@ -570,6 +667,9 @@ Imx2DDevice * imx_ipu_create(Imx2DDeviceType  device_type)
   device->config_input        = imx_ipu_config_input;
   device->config_output       = imx_ipu_config_output;
   device->do_convert          = imx_ipu_do_convert;
+  device->blend               = imx_ipu_blend;
+  device->blend_finish        = imx_ipu_blend_finish;
+  device->fill                = imx_ipu_fill_color;
   device->set_rotate          = imx_ipu_set_rotate;
   device->set_deinterlace     = imx_ipu_set_deinterlace;
   device->get_rotate          = imx_ipu_get_rotate;

@@ -26,11 +26,16 @@ GST_DEBUG_CATEGORY_EXTERN (imx2ddevice_debug);
 #define GST_CAT_DEFAULT imx2ddevice_debug
 
 #define PXP_WAIT_COMPLETE_TIME    3
+//#define ENABLE_PXP_ALPHA_OVERLAY
+//#define FILL_COLOR_BY_DEVICE
 
 typedef struct _Imx2DDevicePxp {
   gint capabilities;
   struct pxp_config_data config;
   pxp_chan_handle_t pxp_chan;
+#ifdef FILL_OUT_COLOR
+  gboolean first_frame_done;
+#endif
 } Imx2DDevicePxp;
 
 typedef struct {
@@ -229,6 +234,24 @@ static gint imx_pxp_copy_mem(Imx2DDevice* device, PhyMemBlock *dst_mem,
 
   if (size > src_mem->size - offset)
     size = src_mem->size - offset;
+
+  struct pxp_mem_desc *mem = g_slice_alloc(sizeof(struct pxp_mem_desc));
+  if (!mem)
+    return -1;
+
+  memset(mem, 0, sizeof (struct pxp_mem_desc));
+  mem->size = size;
+
+  gint ret = pxp_get_mem (mem);
+  if (ret < 0) {
+    GST_ERROR("PXP allocate %u bytes memory failed: %s", size, strerror(errno));
+    return -1;
+  }
+
+  dst_mem->vaddr = (guchar*) mem->virt_uaddr;
+  dst_mem->paddr = (guchar*) mem->phys_addr;
+  dst_mem->user_data = (gpointer) mem;
+
   memcpy(dst_mem->vaddr, src_mem->vaddr+offset, size);
 
   GST_DEBUG ("PXP copy from vaddr (%p), paddr (%p), size (%d) to "
@@ -373,6 +396,173 @@ static gint imx_pxp_do_convert(Imx2DDevice *device,
   return ret;
 }
 
+static gint imx_pxp_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
+{
+  gint ret = 0;
+
+  if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
+    return -1;
+
+  Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
+
+#ifdef ENABLE_PXP_ALPHA_OVERLAY
+  pxp->config.ol_param[0].global_alpha_enable = TRUE;
+  pxp->config.ol_param[0].global_alpha = src->alpha;
+  pxp->config.ol_param[0].left = src->crop.x;
+  pxp->config.ol_param[0].top = src->crop.y;
+  pxp->config.ol_param[0].width = src->crop.w;
+  pxp->config.ol_param[0].height = src->crop.h;
+  pxp->config.ol_param[0].stride = src->info.w;
+  const PxpFmtMap *in_map = imx_pxp_get_format(src->info.fmt, pxp_in_fmts_map);
+  pxp->config.ol_param[0].pixel_fmt = in_map->pxp_format;
+  pxp->config.ol_param[0].paddr = (dma_addr_t)src->mem->paddr;
+  pxp->config.ol_param[0].combine_enable = TRUE;
+
+  GST_TRACE ("pxp overlay : %dx%d,%d(%d,%d-%d,%d), format=%x",
+      pxp->config.ol_param[0].width, pxp->config.ol_param[0].height,
+      pxp->config.ol_param[0].stride, pxp->config.ol_param[0].left,
+      pxp->config.ol_param[0].top, pxp->config.ol_param[0].width,
+      pxp->config.ol_param[0].height, pxp->config.ol_param[0].pixel_fmt);
+
+  PhyMemBlock copy_dst;
+  if (imx_pxp_copy_mem(device, &copy_dst, dst->mem, 0, dst->mem->size) < 0)
+    return -1;
+  pxp->config.s0_param.width = src->crop.w;
+  pxp->config.s0_param.height = src->crop.h;
+  pxp->config.s0_param.stride = pxp->config.out_param.stride;
+  pxp->config.s0_param.pixel_fmt = pxp->config.out_param.pixel_fmt;
+  pxp->config.proc_data.srect.left = 0;
+  pxp->config.proc_data.srect.top = 0;
+  pxp->config.proc_data.srect.width = src->crop.w;
+  pxp->config.proc_data.srect.height = src->crop.h;
+  pxp->config.s0_param.paddr = (dma_addr_t)copy_dst.paddr +
+      (dst->crop.y * dst->info.stride +
+          dst->crop.x*(dst->info.stride/dst->info.w));
+
+  pxp->config.proc_data.drect.left = 0;
+  pxp->config.proc_data.drect.top = 0;
+  pxp->config.proc_data.drect.width = src->crop.w;
+  pxp->config.proc_data.drect.height = src->crop.h;
+  pxp->config.out_param.paddr = (dma_addr_t)dst->mem->paddr +
+      (dst->crop.y * dst->info.stride +
+          dst->crop.x*(dst->info.stride/dst->info.w));
+
+  pxp->config.out_param.width = src->crop.w;
+  pxp->config.out_param.height = src->crop.h;
+
+#else
+#ifdef FILL_COLOR_BY_DEVICE
+  if (pxp->first_frame_done == FALSE) {
+    pxp->config.proc_data.drect.left = dst->crop.x;
+    pxp->config.proc_data.drect.top = dst->crop.y;
+    pxp->config.proc_data.drect.width =
+        MIN(dst->crop.w, pxp->config.proc_data.drect.width);
+    pxp->config.proc_data.drect.height =
+        MIN(dst->crop.h, pxp->config.proc_data.drect.height);
+    pxp->config.out_param.paddr = (dma_addr_t)dst->mem->paddr;
+    pxp->first_frame_done = TRUE;
+  } else {
+    pxp->config.proc_data.drect.left = 0;
+    pxp->config.proc_data.drect.top = 0;
+    pxp->config.proc_data.drect.width = dst->crop.w;
+    pxp->config.proc_data.drect.height = dst->crop.h;
+    pxp->config.out_param.paddr = (dma_addr_t)dst->mem->paddr +
+        (dst->crop.y * dst->info.stride +
+            dst->crop.x*(dst->info.stride/dst->info.w));
+
+    pxp->config.out_param.width = pxp->config.proc_data.drect.width;
+    pxp->config.out_param.height = pxp->config.proc_data.drect.height;
+  }
+#else
+  pxp->config.proc_data.drect.left = 0;
+  pxp->config.proc_data.drect.top = 0;
+  pxp->config.proc_data.drect.width = dst->crop.w;
+  pxp->config.proc_data.drect.height = dst->crop.h;
+  pxp->config.out_param.paddr = (dma_addr_t)dst->mem->paddr +
+      (dst->crop.y * dst->info.stride +
+          dst->crop.x*(dst->info.stride/dst->info.w));
+
+  pxp->config.out_param.width = pxp->config.proc_data.drect.width;
+  pxp->config.out_param.height = pxp->config.proc_data.drect.height;
+#endif
+
+  pxp->config.proc_data.srect.left = src->crop.x;
+  pxp->config.proc_data.srect.top = src->crop.y;
+  pxp->config.proc_data.srect.width =
+      MIN(src->crop.w, pxp->config.proc_data.srect.width);
+  pxp->config.proc_data.srect.height =
+      MIN(src->crop.h, pxp->config.proc_data.srect.height);
+  pxp->config.s0_param.paddr = (dma_addr_t)src->mem->paddr;
+#endif
+
+  GST_TRACE ("pxp dest : %dx%d,%d(%d,%d-%d,%d), format=%x",
+      pxp->config.out_param.width, pxp->config.out_param.height,
+      pxp->config.out_param.stride,
+      pxp->config.proc_data.drect.left, pxp->config.proc_data.drect.top,
+      pxp->config.proc_data.drect.width, pxp->config.proc_data.drect.height,
+      pxp->config.out_param.pixel_fmt);
+
+  GST_TRACE ("pxp s0 : %dx%d,%d(%d,%d-%d,%d), format=%x",
+      pxp->config.s0_param.width, pxp->config.s0_param.height,
+      pxp->config.s0_param.stride,
+      pxp->config.proc_data.srect.left, pxp->config.proc_data.srect.top,
+      pxp->config.proc_data.srect.width, pxp->config.proc_data.srect.height,
+      pxp->config.s0_param.pixel_fmt);
+
+  ret = pxp_config_channel(&pxp->pxp_chan, &pxp->config);
+  if (ret < 0) {
+    GST_ERROR("pxp config channel fail (%d)", ret);
+    return -1;
+  }
+
+  ret = pxp_start_channel(&pxp->pxp_chan);
+  if (ret < 0) {
+    GST_ERROR("pxp start channel fail (%d)", ret);
+    return -1;
+  }
+
+  ret = pxp_wait_for_completion(&pxp->pxp_chan, 3);
+  if (ret < 0) {
+    GST_ERROR("pxp wait for completion fail (%d)", ret);
+    return -1;
+  }
+
+#ifdef ENABLE_PXP_ALPHA_OVERLAY
+  imx_pxp_free_mem(device, &copy_dst);
+  pxp->config.ol_param[0].combine_enable = FALSE;
+#endif
+
+  return ret;
+}
+
+static gint imx_pxp_blend_finish(Imx2DDevice *device)
+{
+#ifdef FILL_COLOR_BY_DEVICE
+  Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
+  pxp->first_frame_done = FALSE;
+#endif
+  return 0;
+}
+
+static gint imx_pxp_fill_color(Imx2DDevice *device, Imx2DFrame *dst,
+                                guint RGBA8888)
+{
+  if (!device || !device->priv)
+    return -1;
+
+  Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
+  guint argb = (RGBA8888 & 0xFF00FF00) | ((RGBA8888 & 0x00FF0000) >> 16)
+                  | ((RGBA8888 & 0x000000FF) << 16);
+  pxp->config.proc_data.bgcolor = argb;
+
+#ifdef FILL_COLOR_BY_DEVICE
+  return 0;
+#else
+  //intentionally return -1 to let up layer fill the color
+  return -1;
+#endif
+}
+
 static gint imx_pxp_set_rotate(Imx2DDevice *device, Imx2DRotationMode rot)
 {
   if (!device || !device->priv)
@@ -431,9 +621,11 @@ static gint imx_pxp_get_capabilities (Imx2DDevice* device)
   void *pxp_handle = NULL;
   gint capabilities = 0;
 
-  capabilities = IMX_2D_DEVICE_CAP_SCALE|IMX_2D_DEVICE_CAP_CSC \
-                      |IMX_2D_DEVICE_CAP_ROTATE | IMX_2D_DEVICE_CAP_ALPHA
-                      |IMX_2D_DEVICE_CAP_OVERLAY;
+  capabilities = IMX_2D_DEVICE_CAP_SCALE | IMX_2D_DEVICE_CAP_CSC \
+                      | IMX_2D_DEVICE_CAP_ROTATE | IMX_2D_DEVICE_CAP_OVERLAY;
+#ifdef ENABLE_PXP_ALPHA_OVERLAY
+  capabilities |= IMX_2D_DEVICE_CAP_ALPHA;
+#endif
   return capabilities;
 }
 
@@ -483,6 +675,9 @@ Imx2DDevice * imx_pxp_create(Imx2DDeviceType  device_type)
   device->config_input        = imx_pxp_config_input;
   device->config_output       = imx_pxp_config_output;
   device->do_convert          = imx_pxp_do_convert;
+  device->blend               = imx_pxp_blend;
+  device->blend_finish        = imx_pxp_blend_finish;
+  device->fill                = imx_pxp_fill_color;
   device->set_rotate          = imx_pxp_set_rotate;
   device->set_deinterlace     = imx_pxp_set_deinterlace;
   device->get_rotate          = imx_pxp_get_rotate;

@@ -180,11 +180,11 @@ static gint imx_g2d_copy_mem(Imx2DDevice* device, PhyMemBlock *dst_mem,
 
   src.buf_handle = NULL;
   src.buf_vaddr = src_mem->vaddr + offset;
-  src.buf_paddr = src_mem->paddr + offset;
+  src.buf_paddr = (gint)(src_mem->paddr + offset);
   src.buf_size = src_mem->size - offset;
   dst.buf_handle = NULL;
   dst.buf_vaddr = dst_mem->vaddr;
-  dst.buf_paddr = dst_mem->paddr;
+  dst.buf_paddr = (gint)(dst_mem->paddr);
   dst.buf_size = dst_mem->size;
 
   if (size < 0)
@@ -284,6 +284,51 @@ static gint imx_g2d_config_output(Imx2DDevice *device, Imx2DVideoInfo* out_info)
   return 0;
 }
 
+static gint imx_g2d_set_src_plane(struct g2d_surface *g2d_src, gchar *paddr)
+{
+  switch(g2d_src->format) {
+    case G2D_I420:
+      g2d_src->planes[0] = (gint)(paddr);
+      g2d_src->planes[1] = (gint)(paddr + g2d_src->width * g2d_src->height);
+      g2d_src->planes[2] = g2d_src->planes[1]+g2d_src->width*g2d_src->height/4;
+      break;
+    case G2D_YV12:
+      g2d_src->planes[0] = (gint)(paddr);
+      g2d_src->planes[2] = (gint)(paddr + g2d_src->width * g2d_src->height);
+      g2d_src->planes[1] = g2d_src->planes[2]+g2d_src->width*g2d_src->height/4;
+      break;
+    case G2D_NV12:
+    case G2D_NV21:
+      g2d_src->planes[0] = (gint)(paddr);
+      g2d_src->planes[1] = (gint)(paddr + g2d_src->width * g2d_src->height);
+      break;
+    case G2D_NV16:
+      g2d_src->planes[0] = (gint)(paddr);
+      g2d_src->planes[1] = (gint)(paddr + g2d_src->width * g2d_src->height);
+      break;
+
+    case G2D_RGB565:
+    case G2D_RGBX8888:
+    case G2D_RGBA8888:
+    case G2D_BGRA8888:
+    case G2D_BGRX8888:
+    case G2D_BGR565:
+    case G2D_ARGB8888:
+    case G2D_ABGR8888:
+    case G2D_XRGB8888:
+    case G2D_XBGR8888:
+    case G2D_UYVY:
+    case G2D_YUYV:
+    case G2D_YVYU:
+      g2d_src->planes[0] = (gint)(paddr);
+      break;
+    default:
+      GST_ERROR ("G2D: not supported format.");
+      return -1;
+  }
+  return 0;
+}
+
 static gint imx_g2d_do_convert(Imx2DDevice *device,
                                 PhyMemBlock *from, PhyMemBlock *to,
                                 Imx2DInterlaceType interlace_type,
@@ -308,47 +353,8 @@ static gint imx_g2d_do_convert(Imx2DDevice *device,
   g2d->src.top = incrop.y;
   g2d->src.right = incrop.x + MIN(incrop.w, g2d->src.width);
   g2d->src.bottom = incrop.y + MIN(incrop.h, g2d->src.height);
-
-  switch(g2d->src.format) {
-    case G2D_I420:
-      g2d->src.planes[0] = (gint)(from->paddr);
-      g2d->src.planes[1] = (gint)(from->paddr + g2d->src.width * g2d->src.height);
-      g2d->src.planes[2] = g2d->src.planes[1] + g2d->src.width * g2d->src.height / 4;
-      break;
-    case G2D_YV12:
-      g2d->src.planes[0] = (gint)(from->paddr);
-      g2d->src.planes[2] = (gint)(from->paddr + g2d->src.width * g2d->src.height);
-      g2d->src.planes[1] = g2d->src.planes[2] + g2d->src.width * g2d->src.height / 4;
-      break;
-    case G2D_NV12:
-    case G2D_NV21:
-      g2d->src.planes[0] = (gint)(from->paddr);
-      g2d->src.planes[1] = (gint)(from->paddr + g2d->src.width * g2d->src.height);
-      break;
-    case G2D_NV16:
-      g2d->src.planes[0] = (gint)(from->paddr);
-      g2d->src.planes[1] = (gint)(from->paddr + g2d->src.width * g2d->src.height);
-      break;
-
-    case G2D_RGB565:
-    case G2D_RGBX8888:
-    case G2D_RGBA8888:
-    case G2D_BGRA8888:
-    case G2D_BGRX8888:
-    case G2D_BGR565:
-    case G2D_ARGB8888:
-    case G2D_ABGR8888:
-    case G2D_XRGB8888:
-    case G2D_XBGR8888:
-    case G2D_UYVY:
-    case G2D_YUYV:
-    case G2D_YVYU:
-      g2d->src.planes[0] = (gint)(from->paddr);
-      break;
-    default:
-      GST_ERROR ("G2D: not supported format.");
-      return -1;
-  }
+  if (imx_g2d_set_src_plane (&g2d->src, from->paddr) < 0)
+    return -1;
 
   GST_TRACE ("g2d src : %dx%d,%d(%d,%d-%d,%d), format=%d",
       g2d->src.width, g2d->src.height,g2d->src.stride, g2d->src.left,
@@ -480,6 +486,100 @@ static GList* imx_g2d_get_supported_out_fmts(Imx2DDevice* device)
   return list;
 }
 
+static gint imx_g2d_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
+{
+  gint ret = 0;
+  void *g2d_handle = NULL;
+
+  if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
+    return -1;
+
+  if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
+    GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
+    return -1;
+  }
+
+  Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
+
+  g2d->src.left = src->crop.x;
+  g2d->src.top = src->crop.y;
+  g2d->src.right = src->crop.x + MIN(src->crop.w, g2d->src.width);
+  g2d->src.bottom = src->crop.y + MIN(src->crop.h, g2d->src.height);
+  if (imx_g2d_set_src_plane (&g2d->src, src->mem->paddr) < 0)
+    return -1;
+
+  GST_TRACE ("g2d src : %dx%d,%d(%d,%d-%d,%d), alpha=%d, format=%d",
+      g2d->src.width, g2d->src.height, g2d->src.stride, g2d->src.left,
+      g2d->src.top, g2d->src.right, g2d->src.bottom, g2d->src.global_alpha,
+      g2d->src.format);
+
+  g2d->dst.planes[0] = (gint)(dst->mem->paddr);
+  g2d->dst.left = dst->crop.x;
+  g2d->dst.top = dst->crop.y;
+  g2d->dst.right = dst->crop.x + MIN(dst->crop.w, g2d->dst.width);
+  g2d->dst.bottom = dst->crop.y + MIN(dst->crop.h, g2d->dst.height);
+
+  GST_TRACE ("g2d dest : %dx%d,%d(%d,%d-%d,%d), format=%d",
+      g2d->dst.width, g2d->dst.height, g2d->dst.stride, g2d->dst.left,
+      g2d->dst.top, g2d->dst.right, g2d->dst.bottom, g2d->dst.format);
+
+  g2d->src.blendfunc = G2D_ONE;
+  g2d->dst.blendfunc = G2D_ONE_MINUS_SRC_ALPHA;
+  g2d->src.global_alpha = src->alpha;
+  g2d->dst.global_alpha = dst->alpha;
+
+  g2d_enable(g2d_handle, G2D_BLEND);
+  g2d_enable(g2d_handle, G2D_GLOBAL_ALPHA);
+  ret = g2d_blit(g2d_handle, &g2d->src, &g2d->dst);
+  g2d_disable(g2d_handle, G2D_GLOBAL_ALPHA);
+  g2d_disable(g2d_handle, G2D_BLEND);
+
+  ret |= g2d_finish(g2d_handle);
+
+  g2d_close(g2d_handle);
+
+  return ret;
+}
+
+static gint imx_g2d_blend_finish(Imx2DDevice *device)
+{
+  //do nothing
+  return 0;
+}
+
+static gint imx_g2d_fill_color(Imx2DDevice *device, Imx2DFrame *dst,
+                                guint RGBA8888)
+{
+  void *g2d_handle = NULL;
+  gint ret = 0;
+
+  if (!device || !device->priv || !dst || !dst->mem)
+    return -1;
+
+  if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
+    GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
+    return -1;
+  }
+
+  Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
+  g2d->dst.clrcolor = RGBA8888;
+  g2d->dst.planes[0] = (gint)(dst->mem->paddr);
+  g2d->dst.left = 0;
+  g2d->dst.top = 0;
+  g2d->dst.right = g2d->dst.width;
+  g2d->dst.bottom = g2d->dst.height;
+
+  GST_TRACE ("g2d clear : %dx%d,%d(%d,%d-%d,%d), format=%d",
+      g2d->dst.width, g2d->dst.height, g2d->dst.stride, g2d->dst.left,
+      g2d->dst.top, g2d->dst.right, g2d->dst.bottom, g2d->dst.format);
+
+  ret = g2d_clear(g2d_handle, &g2d->dst);
+  ret |= g2d_finish(g2d_handle);
+  g2d_close(g2d_handle);
+
+  return ret;
+}
+
 Imx2DDevice * imx_g2d_create(Imx2DDeviceType  device_type)
 {
   Imx2DDevice * device = g_slice_alloc(sizeof(Imx2DDevice));
@@ -500,6 +600,9 @@ Imx2DDevice * imx_g2d_create(Imx2DDeviceType  device_type)
   device->config_input        = imx_g2d_config_input;
   device->config_output       = imx_g2d_config_output;
   device->do_convert          = imx_g2d_do_convert;
+  device->blend               = imx_g2d_blend;
+  device->blend_finish        = imx_g2d_blend_finish;
+  device->fill                = imx_g2d_fill_color;
   device->set_rotate          = imx_g2d_set_rotate;
   device->set_deinterlace     = imx_g2d_set_deinterlace;
   device->get_rotate          = imx_g2d_get_rotate;

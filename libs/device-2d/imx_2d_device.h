@@ -89,6 +89,15 @@ typedef struct _Imx2DVideoInfo {
   guint stride;
 } Imx2DVideoInfo;
 
+typedef struct _Imx2DFrame {
+  PhyMemBlock           *mem;
+  Imx2DVideoInfo        info;
+  Imx2DCrop             crop;
+  Imx2DRotationMode     rotate;
+  Imx2DDeinterlaceMode  interlace;
+  gint                  alpha;
+} Imx2DFrame;
+
 typedef struct _Imx2DDevice  Imx2DDevice;
 struct _Imx2DDevice {
   Imx2DDeviceType  device_type;
@@ -111,6 +120,9 @@ struct _Imx2DDevice {
   gint (*do_convert)   (Imx2DDevice* device, PhyMemBlock *from, PhyMemBlock *to,
                         Imx2DInterlaceType interlace_type,
                         Imx2DCrop incrop, Imx2DCrop outcrop);
+  gint (*blend)        (Imx2DDevice* device, Imx2DFrame *dst, Imx2DFrame *src);
+  gint (*blend_finish) (Imx2DDevice* device);
+  gint (*fill)         (Imx2DDevice* device, Imx2DFrame *dst, guint RGBA8888);
 
   gint                 (*get_capabilities)        (Imx2DDevice* device);
   GList*               (*get_supported_in_fmts)   (Imx2DDevice* device);

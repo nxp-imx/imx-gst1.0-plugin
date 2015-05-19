@@ -263,6 +263,9 @@ CHECK_DISABLE_FEATURE(x11, [Disable x11 lib], [X11], [X11/Xlib.h], [library: lib
 CHECK_DISABLE_FEATURE(imxvideoconvert_g2d, [Disable fsl imxvideoconvert_g2d], [G2D], [g2d.h], [plugin: imxvideoconvert_g2d])
 CHECK_DISABLE_FEATURE(imxvideoconvert_ipu, [Disable fsl imxvideoconvert_ipu], [IPU], [ipu.h], [plugin: imxvideoconvert_ipu])
 CHECK_DISABLE_FEATURE(imxvideoconvert_pxp, [Disable fsl imxvideoconvert_pxp], [PXP], [pxp_lib.h], [plugin: imxvideoconvert_pxp])
+CHECK_DISABLE_FEATURE(imxcompositor_g2d, [Disable fsl imxcompositor_g2d], [G2D], [g2d.h], [plugin: imxcompositor_g2d])
+CHECK_DISABLE_FEATURE(imxcompositor_ipu, [Disable fsl imxcompositor_ipu], [IPU], [ipu.h], [plugin: imxcompositor_ipu])
+CHECK_DISABLE_FEATURE(imxcompositor_pxp, [Disable fsl imxcompositor_pxp], [PXP], [pxp_lib.h], [plugin: imxcompositor_pxp])
 
 # Allow headers to be inside include/uapi and include/linux
 #saved_CFLAGS="$CFLAGS"
@@ -289,6 +292,7 @@ plugins/overlay_sink/Makefile
 plugins/vpu/Makefile
 plugins/mp3enc/Makefile
 plugins/videoconvert/Makefile
+plugins/compositor/Makefile
 tools/Makefile
 tools/gplay/Makefile
 tools/grecorder/Makefile)

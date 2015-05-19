@@ -81,7 +81,7 @@ const Imx2DDeviceInfo * imx_get_2d_devices(void)
 
 Imx2DDevice * imx_2d_device_create(Imx2DDeviceType  device_type)
 {
-  Imx2DDeviceInfo *dev_info = imx_get_2d_devices();
+  const Imx2DDeviceInfo *dev_info = imx_get_2d_devices();
   while (dev_info->name) {
     if (dev_info->device_type == device_type) {
       if (dev_info->is_exist()) {
@@ -103,7 +103,7 @@ gint imx_2d_device_destroy(Imx2DDevice *device)
   if (!device)
     return -1;
 
-  Imx2DDeviceInfo *dev_info = imx_get_2d_devices();
+  const Imx2DDeviceInfo *dev_info = imx_get_2d_devices();
   while (dev_info->name) {
     if (dev_info->device_type == device->device_type)
       return dev_info->destroy(device);
