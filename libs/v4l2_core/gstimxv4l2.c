@@ -142,8 +142,8 @@ static IMXV4l2FmtMap g_imxv4l2fmt_maps[] = {
   {GST_VIDEO_CAPS_MAKE("NV12"), V4L2_PIX_FMT_NV12, GST_VIDEO_FORMAT_NV12, 12, 0},
   {GST_VIDEO_CAPS_MAKE("Y42B"), V4L2_PIX_FMT_YUV422P, GST_VIDEO_FORMAT_Y42B, 16, 0},
   /* GST_VIDEO_FORMAT_AYUV is packed 4:4:4 YUV with alpha channel (A0-Y0-U0-V0 ...)
-   * V4L2_PIX_FMT_YUV32 is 32  YUV-8-8-8-8 
-   * V4L2 capture output on SX TV In and PXP output on Kernel 3.14 is 32 bits 
+   * V4L2_PIX_FMT_YUV32 is 32  YUV-8-8-8-8
+   * V4L2 capture output on SX TV In and PXP output on Kernel 3.14 is 32 bits
    * packed AYUV444 with 4 bytes reversed (V0-U0-Y0-A0...). A is 0 */
   {GST_VIDEO_CAPS_MAKE("AYUV"), V4L2_PIX_FMT_YUV32, GST_VIDEO_FORMAT_AYUV, 32, 0},
   {GST_VIDEO_CAPS_MAKE("Y444"), IPU_PIX_FMT_YUV444P, GST_VIDEO_FORMAT_Y444, 24, 0},
@@ -206,7 +206,7 @@ imx_ipu_v4l2out_config_input (IMXV4l2Handle *handle, guint fmt, guint w, guint h
   //align to 8 pixel for IPU limitation
   crop->left = UPALIGNTO8 (crop->left);
   crop->top = UPALIGNTO8 (crop->top);
-  crop->width = DOWNALIGNTO8 (crop->width); 
+  crop->width = DOWNALIGNTO8 (crop->width);
   crop->height = DOWNALIGNTO8 (crop->height);
 
   if (crop->width <=0 || crop->height <= 0) {
@@ -326,11 +326,11 @@ imx_ipu_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint colo
   }
 
   if (enable) {
-    colorKey.enable = 1; 
+    colorKey.enable = 1;
     GST_DEBUG ("set colorKey to (%x) for display (%s)", colorKey.color_key, device);
   }
   else {
-    colorKey.enable = 0; 
+    colorKey.enable = 0;
     GST_DEBUG ("disable colorKey for display (%s)", device);
   }
 
@@ -527,9 +527,9 @@ gst_imx_v4l2_get_default_device_name (gint type)
   char * devname;
 
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-    if (imx_chip_code () == CC_MX6Q)
+    if (HAS_IPU())
       devname = (char*)"/dev/video17";
-    else if (imx_chip_code () == CC_MX60 || imx_chip_code () == CC_MX7D)
+    else if (HAS_PXP())
       devname = (char*)"/dev/video0";
     else {
       GST_ERROR ("UNKNOWN imx SoC.");
@@ -552,11 +552,11 @@ gst_imx_v4l2_get_min_buffer_num (gint type)
 {
   gint num;
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-    if (imx_chip_code () == CC_MX60 || imx_chip_code () == CC_MX7D)
+    if (HAS_PXP())
       num = MAX (V4L2_HOLDED_BUFFERS, MX60_STREAMON_COUNT);
-    else if (imx_chip_code () == CC_MX6Q)
+    else if (HAS_IPU())
       num = MAX (V4L2_HOLDED_BUFFERS, MX6Q_STREAMON_COUNT);
-    else 
+    else
       num = V4L2_HOLDED_BUFFERS;
 
     num += 1;
@@ -756,9 +756,9 @@ gboolean
 gst_imx_v4l2_support_deinterlace (gint type)
 {
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-    if (imx_chip_code () == CC_MX6Q)
+    if (HAS_IPU())
       return TRUE;
-    else if (imx_chip_code () == CC_MX60 || imx_chip_code () == CC_MX7D)
+    else if (HAS_PXP())
       return FALSE;
     else {
       GST_ERROR ("UNKNOWN imx SoC.");
@@ -800,7 +800,7 @@ gst_imx_v4l2output_set_default_res (IMXV4l2Handle *handle)
   return;
 }
 
-static gint 
+static gint
 gst_imx_v4l2capture_config_usb_camera (IMXV4l2Handle *handle, guint fmt, guint w, guint h, guint fps_n, guint fps_d)
 {
   struct v4l2_format v4l2_fmt = {0};
@@ -847,7 +847,7 @@ gst_imx_v4l2capture_config_usb_camera (IMXV4l2Handle *handle, guint fmt, guint w
   return 0;
 }
 
-static gint 
+static gint
 gst_imx_v4l2capture_config_pxp (IMXV4l2Handle *handle, guint fmt, guint w, guint h, guint fps_n, guint fps_d)
 {
 	// can add crop process if needed.
@@ -860,7 +860,7 @@ gst_imx_v4l2capture_config_pxp (IMXV4l2Handle *handle, guint fmt, guint w, guint
   return 0;
 }
 
-static gint 
+static gint
 gst_imx_v4l2capture_config_camera (IMXV4l2Handle *handle, guint fmt, guint w, guint h, guint fps_n, guint fps_d)
 {
   gint input = 1;
@@ -873,7 +873,7 @@ gst_imx_v4l2capture_config_camera (IMXV4l2Handle *handle, guint fmt, guint w, gu
   return gst_imx_v4l2capture_config_pxp (handle, fmt, w, h, fps_n, fps_d);
 }
 
-static gint 
+static gint
 gst_imx_v4l2capture_config_tvin_std (IMXV4l2Handle *handle)
 {
   if (ioctl (handle->v4l2_fd, VIDIOC_G_STD, &handle->id) < 0) {
@@ -889,7 +889,7 @@ gst_imx_v4l2capture_config_tvin_std (IMXV4l2Handle *handle)
   return 0;
 }
 
-static gint 
+static gint
 gst_imx_v4l2capture_set_function (IMXV4l2Handle *handle)
 {
   struct v4l2_capability cap;
@@ -912,7 +912,7 @@ gst_imx_v4l2capture_set_function (IMXV4l2Handle *handle)
       return -1;
     }
     GST_INFO ("sensor chip is %s\n", chip.match.name);
-    
+
     if (!strncmp (chip.match.name, MXC_V4L2_CAPTURE_CAMERA_NAME, 2)) {
       handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_camera;
       handle->support_format_table = g_camera_format_IPU;
@@ -935,7 +935,7 @@ gst_imx_v4l2capture_set_function (IMXV4l2Handle *handle)
       return -1;
     }
     GST_INFO ("sensor chip is %s\n", chip.match.name);
-    
+
     if (!strncmp (chip.match.name, MXC_V4L2_CAPTURE_CAMERA_NAME, 2)) {
       handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_pxp;
       handle->support_format_table = g_camera_format_PXP;
@@ -1008,9 +1008,9 @@ gpointer gst_imx_v4l2_open_device (gchar *device, int type)
 
   GST_INFO ("device name: %s", device);
   if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
-    fd = open(device, O_RDWR, 0); 
+    fd = open(device, O_RDWR, 0);
   } else {
-    fd = open(device, O_RDWR | O_NONBLOCK, 0); 
+    fd = open(device, O_RDWR | O_NONBLOCK, 0);
   }
   if (fd < 0) {
     GST_DEBUG ("Can't open %s.\n", device);
@@ -1028,7 +1028,7 @@ gpointer gst_imx_v4l2_open_device (gchar *device, int type)
     close (fd);
     return NULL;
   }
- 
+
   handle = (IMXV4l2Handle*) g_slice_alloc (sizeof(IMXV4l2Handle));
   if (!handle) {
     GST_ERROR ("allocate for IMXV4l2Handle failed.\n");
@@ -1037,13 +1037,13 @@ gpointer gst_imx_v4l2_open_device (gchar *device, int type)
   }
   memset (handle, 0, sizeof(IMXV4l2Handle));
 
-  handle->v4l2_fd = fd; 
+  handle->v4l2_fd = fd;
   handle->device = device;
   handle->type = type;
   handle->streamon = FALSE;
 
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-    if (imx_chip_code () == CC_MX6Q) {
+    if (HAS_IPU()) {
       handle->dev_itf.v4l2out_config_input = (V4l2outConfigInput)imx_ipu_v4l2out_config_input;
       handle->dev_itf.v4l2out_config_output = (V4l2outConfigOutput)imx_ipu_v4l2out_config_output;
       handle->dev_itf.v4l2out_config_rotate = (V4l2outConfigRotate)imx_ipu_v4l2out_config_rotate;
@@ -1051,7 +1051,7 @@ gpointer gst_imx_v4l2_open_device (gchar *device, int type)
       handle->dev_itf.v4l2out_config_colorkey = (V4l2outConfigColorkey) imx_ipu_v4l2_config_colorkey;
       handle->streamon_count = MX6Q_STREAMON_COUNT;
     }
-    else if (imx_chip_code () == CC_MX60 || imx_chip_code () == CC_MX7D) {
+    else if (HAS_PXP()) {
       handle->dev_itf.v4l2out_config_input = (V4l2outConfigInput)imx_pxp_v4l2out_config_input;
       handle->dev_itf.v4l2out_config_output = (V4l2outConfigOutput)imx_pxp_v4l2out_config_output;
       handle->dev_itf.v4l2out_config_rotate = (V4l2outConfigRotate)imx_pxp_v4l2out_config_rotate;
@@ -1101,7 +1101,7 @@ gint gst_imx_v4l2_reset_device (gpointer v4l2handle)
     }
 
     handle->queued_count = 0;
-  } 
+  }
 
   return 0;
 }
@@ -1191,7 +1191,7 @@ gint gst_imx_v4l2out_config_input (gpointer v4l2handle, guint fmt, guint w, guin
 }
 
 static gboolean
-gst_imx_v4l2out_calc_crop (IMXV4l2Handle *handle, 
+gst_imx_v4l2out_calc_crop (IMXV4l2Handle *handle,
     IMXV4l2Rect *rect_out, GstVideoRectangle *result, IMXV4l2Rect *rect_crop)
 {
   gdouble ratio;
@@ -1246,7 +1246,7 @@ gst_imx_v4l2out_calc_crop (IMXV4l2Handle *handle,
     rect_crop->height = handle->in_crop.height;
     rect_out->top += result->y;
     rect_out->height = result->h;
-  } 
+  }
 
   if (!need_crop && handle->prev_need_crop)
     need_crop = TRUE;
@@ -1262,7 +1262,7 @@ gint gst_imx_v4l2out_config_output (gpointer v4l2handle, IMXV4l2Rect *overlay, g
   struct v4l2_crop crop;
   IMXV4l2Rect *rect = &crop.c;;
   GstVideoRectangle src, dest, result;
-  gboolean brotate; 
+  gboolean brotate;
 
   memcpy (rect, overlay, sizeof(IMXV4l2Rect));
 
@@ -1729,7 +1729,7 @@ gint gst_imx_v4l2_queue_gstbuffer (gpointer v4l2handle, GstBuffer *buffer, GstVi
 #define TRY_INTERVAL (10000) //10ms
 #define MAX_TRY_CNT (TRY_TIMEOUT/TRY_INTERVAL)
 
-gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk, 
+gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk,
     GstVideoFrameFlags * flags)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
@@ -1767,10 +1767,10 @@ gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk,
   /* set field info */
   switch (v4l2buf.field) {
     case V4L2_FIELD_NONE: *flags = GST_VIDEO_FRAME_FLAG_NONE; break;
-    case V4L2_FIELD_TOP: *flags = 
+    case V4L2_FIELD_TOP: *flags =
            GST_VIDEO_FRAME_FLAG_ONEFIELD | GST_VIDEO_FRAME_FLAG_TFF; break;
     case V4L2_FIELD_BOTTOM: *flags = GST_VIDEO_FRAME_FLAG_ONEFIELD; break;
-    case V4L2_FIELD_INTERLACED_TB: *flags = 
+    case V4L2_FIELD_INTERLACED_TB: *flags =
            GST_VIDEO_FRAME_FLAG_INTERLACED | GST_VIDEO_FRAME_FLAG_TFF; break;
     case V4L2_FIELD_INTERLACED_BT: *flags = GST_VIDEO_FRAME_FLAG_INTERLACED; break;
     default: GST_WARNING("unknown field type"); break;
@@ -1790,7 +1790,7 @@ gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk,
   return 0;
 }
 
-gint gst_imx_v4l2_dequeue_gstbuffer (gpointer v4l2handle, GstBuffer **buffer, 
+gint gst_imx_v4l2_dequeue_gstbuffer (gpointer v4l2handle, GstBuffer **buffer,
     GstVideoFrameFlags * flags)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;

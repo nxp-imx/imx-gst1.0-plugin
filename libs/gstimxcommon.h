@@ -70,6 +70,9 @@ typedef enum
   CC_MX53 = CHIPCODE ('M', 'X', '5', '3'),
   CC_MX6Q = CHIPCODE ('M', 'X', '6', 'Q'),
   CC_MX60 = CHIPCODE ('M', 'X', '6', '0'),
+  CC_MX6SL = CHIPCODE ('M', 'X', '6', '1'),
+  CC_MX6SX = CHIPCODE ('M', 'X', '6', '2'),
+  CC_MX6UL = CHIPCODE ('M', 'X', '6', '3'),
   CC_MX7D = CHIPCODE ('M', 'X', '7', 'D'),
   CC_UNKN = CHIPCODE ('U', 'N', 'K', 'N'),
 
@@ -154,8 +157,9 @@ static SOC_INFO soc_info[] = {
   {CC_MX53, "i.MX53"},
   {CC_MX6Q, "i.MX6DL"},
   {CC_MX6Q, "i.MX6Q"},
-  {CC_MX60, "i.MX6SL"},
-  {CC_MX60, "i.MX6SX"},
+  {CC_MX6SL, "i.MX6SL"},
+  {CC_MX6SX, "i.MX6SX"},
+  {CC_MX6UL, "i.MX6UL"},
   {CC_MX7D, "i.MX7D"},
 };
 
@@ -229,5 +233,62 @@ static CHIP_CODE imx_chip_code (void)
 
   return gimx_chip_code;
 }
+
+typedef struct {
+  CHIP_CODE chip_name;
+  gboolean g3d;
+  gboolean g2d;
+  gboolean ipu;
+  gboolean pxp;
+} IMXV4l2FeatureMap;
+
+typedef enum {
+  G3D = 1,
+  G2D,
+  IPU,
+  PXP,
+} CHIP_FEATURE;
+
+static IMXV4l2FeatureMap g_imxv4l2feature_maps[] = {
+  {CC_MX6Q, TRUE, TRUE, TRUE, FALSE},
+  {CC_MX6SL, FALSE, TRUE, FALSE, TRUE},
+  {CC_MX6SX, TRUE, TRUE, FALSE, TRUE},
+  {CC_MX6UL, FALSE, FALSE, FALSE, TRUE},
+  {CC_MX7D, FALSE, FALSE, FALSE, TRUE},
+};
+
+
+static gboolean check_feature(CHIP_CODE chip_name, CHIP_FEATURE feature)
+{
+  int i;
+  gboolean ret = FALSE;
+  for (i=0; i<sizeof(g_imxv4l2feature_maps)/sizeof(IMXV4l2FeatureMap); i++) {
+    if ( chip_name== g_imxv4l2feature_maps[i].chip_name) {
+      switch (feature) {
+        case G3D:
+          ret = g_imxv4l2feature_maps[i].g3d;
+          break;
+        case G2D:
+          ret = g_imxv4l2feature_maps[i].g2d;
+          break;
+        case IPU:
+          ret = g_imxv4l2feature_maps[i].ipu;
+          break;
+        case PXP:
+          ret = g_imxv4l2feature_maps[i].pxp;
+          break;
+        default:
+          break;
+      }
+      break;
+    }
+  }
+  return ret;
+}
+
+#define HAS_G3D() check_feature(imx_chip_code(), G3D)
+#define HAS_G2D() check_feature(imx_chip_code(), G2D)
+#define HAS_IPU() check_feature(imx_chip_code(), IPU)
+#define HAS_PXP() check_feature(imx_chip_code(), PXP)
 
 #endif
