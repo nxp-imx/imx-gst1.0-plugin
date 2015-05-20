@@ -44,6 +44,18 @@ endif
 
 endif
 
+if PLATFORM_IS_MX6QP
+
+if USE_OVERLAY_SINK
+OVERLAYSINKDIRS = plugins/overlay_sink
+endif
+
+if USE_VPU_WRAP
+VPUWRAPDIRS = plugins/vpu
+endif
+
+endif
+
 if PLATFORM_IS_MX6SL
 
 if USE_OVERLAY_SINK
