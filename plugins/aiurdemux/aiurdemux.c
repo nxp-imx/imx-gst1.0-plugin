@@ -2163,7 +2163,7 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
         } else {
           mime =
               g_strdup_printf
-              ("%s, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld, framed=(boolean)true",
+              ("%s, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld",
               codec_mime, stream->info.audio.n_channels,
               stream->info.audio.rate, stream->bitrate);
         }
@@ -2180,7 +2180,7 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
         break;
       case AUDIO_MP3:
         codec_mime =
-            "audio/mpeg, mpegversion=(int)1, framed=(boolean)true";
+            "audio/mpeg, mpegversion=(int)1";
         codec = "MP3";
         mime =
             g_strdup_printf
