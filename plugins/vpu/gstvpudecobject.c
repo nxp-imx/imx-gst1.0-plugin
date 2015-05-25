@@ -160,8 +160,8 @@ gst_vpu_dec_object_init(GstVpuDecObject *vpu_dec_object)
   vpu_dec_object->new_segment = TRUE;
   vpu_dec_object->mosaic_cnt = 0;
   vpu_dec_object->tsm_mode = MODE_AI;
-  vpu_dec_object->last_valid_ts = 0;
-  vpu_dec_object->last_received_ts = 0;
+  vpu_dec_object->last_valid_ts = GST_CLOCK_TIME_NONE;
+  vpu_dec_object->last_received_ts = GST_CLOCK_TIME_NONE;
   vpu_dec_object->vpu_internal_mem.internal_virt_mem = NULL;
   vpu_dec_object->vpu_internal_mem.internal_phy_mem = NULL;
   vpu_dec_object->mv_mem = NULL;
@@ -960,6 +960,8 @@ gst_vpu_dec_object_get_gst_buffer (GstVideoDecoder * bdec, GstVpuDecObject * vpu
 {
   GstBuffer *buffer;
 
+  GST_DEBUG_OBJECT (vpu_dec_object, "min_buf_cnt: %d frame_plus: %d actual_buf_cnt: %d",
+      vpu_dec_object->min_buf_cnt, vpu_dec_object->frame_plus, vpu_dec_object->actual_buf_cnt);
   if (g_list_length (vpu_dec_object->gstbuffer_in_vpudec) \
       < (vpu_dec_object->min_buf_cnt + vpu_dec_object->frame_plus)) {
     buffer = gst_video_decoder_allocate_output_buffer(bdec);
@@ -1225,10 +1227,18 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
     }
     if (buf_ret & VPU_DEC_OUTPUT_EOS) {
       GST_INFO_OBJECT (vpu_dec_object, "Got EOS message!!");
+      /* flush VPU after received EOS. non-key frame will be dropped by VPU when
+       * rewind. non-key frame will buffered by video decoder base which will
+       * cause VPU can't get buffer to decode
+       */
+      gst_vpu_dec_object_flush (bdec, vpu_dec_object);
       break;
     }
-    // send EOS to VPU to force VPU output all video frame for rewind as videodecoder
-    // need it. only can support skip I frame rewind.
+    /* send EOS to VPU to force VPU output all video frame for rewind as videodecoder
+     * need it. only can support skip I frame rewind.
+     * only can output key frame when rewind as video decoder base will buffer output
+     * between key frame, so VPU can't get output buffer to decode and then blocked. 
+     */
     if (vpu_dec_object->tsm_mode == MODE_FIFO) {
       GST_DEBUG_OBJECT (vpu_dec_object, "send eos to VPU.\n");
       frame = NULL;

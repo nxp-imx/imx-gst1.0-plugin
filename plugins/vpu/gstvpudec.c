@@ -324,6 +324,7 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
   if (gst_query_get_n_allocation_pools (query) > 0) {
     gst_query_parse_nth_allocation_pool (query, 0, &pool, &size, &min, &max);
     size = MAX (size, vinfo.size);
+    if (min < 3) min = 3;
     update_pool = TRUE;
   } else {
     pool = NULL;
