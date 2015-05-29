@@ -1520,10 +1520,14 @@ static gboolean gst_imx_video_convert_register (GstPlugin * plugin)
       g_type_set_qdata (type, GST_IMX_VCT_PARAMS_QDATA, (gpointer) in_plugin);
     }
 
-    if (!gst_element_register (plugin, t_name, IMX_GST_PLUGIN_RANK, type)) {
-      GST_ERROR ("Failed to register %s", t_name);
-      g_free (t_name);
-      return FALSE;
+    if (((!strcmp(in_plugin->name, "ipu")) && (HAS_IPU())) ||
+         ((!strcmp(in_plugin->name, "g2d")) && (HAS_G2D())) ||
+         ((!strcmp(in_plugin->name, "pxp")) && (HAS_PXP()))) {
+      if (!gst_element_register (plugin, t_name, IMX_GST_PLUGIN_RANK, type)) {
+        GST_ERROR ("Failed to register %s", t_name);
+        g_free (t_name);
+        return FALSE;
+      }
     }
     g_free (t_name);
 

@@ -1004,11 +1004,15 @@ plugin_init (GstPlugin * plugin)
 {
   GST_DEBUG_CATEGORY_INIT (overlay_sink_debug, "overlaysink", 0, "Freescale IMX video overlay(compositor) sink element");
 
-  if (!gst_element_register (plugin, "overlaysink", IMX_GST_PLUGIN_RANK + 1,
-        GST_TYPE_OVERLAY_SINK))
-    return FALSE;
+  if (HAS_G2D()) {
+    if (!gst_element_register (plugin, "overlaysink", IMX_GST_PLUGIN_RANK + 1,
+          GST_TYPE_OVERLAY_SINK))
+      return FALSE;
 
-  return TRUE;
+    return TRUE; 
+  } else {
+    return FALSE;
+  }
 }
 
 IMX_GST_PLUGIN_DEFINE (overlaysink, "IMX SoC video compositing sink", plugin_init);

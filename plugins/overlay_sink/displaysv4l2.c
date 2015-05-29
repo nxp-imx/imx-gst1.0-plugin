@@ -99,9 +99,9 @@ gint scan_displays(gpointer **phandle, gint *pcount)
   gint i;
   gint count = 0;
 
-  if (imx_chip_code () == CC_MX6Q)
+  if (HAS_IPU())
     entry = gstsutils_init_entry ("/usr/share/imx_6q_display_config");
-  else if (imx_chip_code () == CC_MX60)
+  else if (HAS_PXP())
     entry = gstsutils_init_entry ("/usr/share/imx_6sx_display_config");
   else {
     GST_ERROR ("Not supported platform.");
@@ -129,7 +129,7 @@ gint scan_displays(gpointer **phandle, gint *pcount)
       continue;
     }
 
-    name = gstsutils_get_group_name (group); 
+    name = gstsutils_get_group_name (group);
     if (!name)
       name = "unknown";
 
@@ -181,7 +181,7 @@ gint scan_displays(gpointer **phandle, gint *pcount)
     }
 
     GST_DEBUG ("display(%s), device(%s), fmt(%d), res(%dx%d), ckey(%x), alpha(%d)",
-        hdisplay->name, hdisplay->device, hdisplay->fmt, hdisplay->w, hdisplay->h, 
+        hdisplay->name, hdisplay->device, hdisplay->fmt, hdisplay->w, hdisplay->h,
         hdisplay->color_key, hdisplay->alpha);
 
     phandle[count] = (gpointer)hdisplay;
@@ -343,7 +343,7 @@ gint get_next_display_buffer (gpointer display, SurfaceBuffer *buffer)
     if (gst_imx_v4l2_dequeue_v4l2memblk (hdisplay->v4l2handle, &memblk, &flags) < 0) {
       GST_ERROR ("get buffer from %s failed.", hdisplay->device);
       return -1;
-    } 
+    }
   }
 
   if (!memblk) {

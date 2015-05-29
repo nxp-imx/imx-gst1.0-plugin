@@ -240,6 +240,7 @@ typedef struct {
   gboolean g2d;
   gboolean ipu;
   gboolean pxp;
+  gboolean vpu;
 } IMXV4l2FeatureMap;
 
 typedef enum {
@@ -247,14 +248,15 @@ typedef enum {
   G2D,
   IPU,
   PXP,
+  VPU,
 } CHIP_FEATURE;
 
 static IMXV4l2FeatureMap g_imxv4l2feature_maps[] = {
-  {CC_MX6Q, TRUE, TRUE, TRUE, FALSE},
-  {CC_MX6SL, FALSE, TRUE, FALSE, TRUE},
-  {CC_MX6SX, TRUE, TRUE, FALSE, TRUE},
-  {CC_MX6UL, FALSE, FALSE, FALSE, TRUE},
-  {CC_MX7D, FALSE, FALSE, FALSE, TRUE},
+  {CC_MX6Q, TRUE, TRUE, TRUE, FALSE, TRUE},
+  {CC_MX6SL, FALSE, TRUE, FALSE, TRUE, FALSE},
+  {CC_MX6SX, TRUE, TRUE, FALSE, TRUE, FALSE},
+  {CC_MX6UL, FALSE, FALSE, FALSE, TRUE, FALSE},
+  {CC_MX7D, FALSE, FALSE, FALSE, TRUE, FALSE},
 };
 
 
@@ -277,6 +279,9 @@ static gboolean check_feature(CHIP_CODE chip_name, CHIP_FEATURE feature)
         case PXP:
           ret = g_imxv4l2feature_maps[i].pxp;
           break;
+        case VPU:
+          ret = g_imxv4l2feature_maps[i].vpu;
+          break;
         default:
           break;
       }
@@ -290,5 +295,6 @@ static gboolean check_feature(CHIP_CODE chip_name, CHIP_FEATURE feature)
 #define HAS_G2D() check_feature(imx_chip_code(), G2D)
 #define HAS_IPU() check_feature(imx_chip_code(), IPU)
 #define HAS_PXP() check_feature(imx_chip_code(), PXP)
+#define HAS_VPU() check_feature(imx_chip_code(), VPU)
 
 #endif

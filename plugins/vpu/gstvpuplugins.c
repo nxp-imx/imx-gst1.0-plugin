@@ -31,14 +31,18 @@
 static gboolean
 plugin_init (GstPlugin * plugin)
 {
-  if (!gst_vpu_enc_register (plugin))
-    return FALSE;
-
-  if (!gst_element_register (plugin, "vpudec", IMX_GST_PLUGIN_RANK,
+  if (HAS_VPU()) {
+    if (!gst_vpu_enc_register (plugin))
+      return FALSE;
+    
+    if (!gst_element_register (plugin, "vpudec", IMX_GST_PLUGIN_RANK,
           GST_TYPE_VPU_DEC))
-    return FALSE;
+      return FALSE;
 
-  return TRUE;
+    return TRUE;
+  } else {
+    return FALSE;
+  }
 }
 
 IMX_GST_PLUGIN_DEFINE (vpu, "VPU video codec", plugin_init);
