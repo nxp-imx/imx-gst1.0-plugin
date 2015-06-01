@@ -633,8 +633,13 @@ int osink_object_allocate_memory (gpointer osink_handle, PhyMemBlock *memblk)
   GET_LOCK (-1);
 
   LOCK (glock);
-  if (handle->hdevice[0])
-    ret = handle->hdevice[0]->alloc_mem(handle->hdevice[0], memblk);
+  guint dev_num = 0;
+  for (; dev_num < MAX_DISPLAY; dev_num++) {
+    if (handle->hdevice[dev_num])
+      break;
+  }
+  if (handle->hdevice[dev_num])
+    ret = handle->hdevice[dev_num]->alloc_mem(handle->hdevice[dev_num], memblk);
   UNLOCK (glock);
 
   if (ret >= 0)
@@ -655,8 +660,13 @@ int osink_object_free_memory (gpointer osink_handle, PhyMemBlock *memblk)
   GST_DEBUG ("free memory, vaddr (%p), paddr (%p).", memblk->vaddr, memblk->paddr);
 
   LOCK (glock);
-  if (handle->hdevice[0])
-    ret = handle->hdevice[0]->free_mem(handle->hdevice[0], memblk);
+  guint dev_num = 0;
+  for (; dev_num < MAX_DISPLAY; dev_num++) {
+    if (handle->hdevice[dev_num])
+      break;
+  }
+  if (handle->hdevice[dev_num])
+    ret = handle->hdevice[dev_num]->free_mem(handle->hdevice[dev_num], memblk);
   UNLOCK (glock);
 
   osink_object_unref (osink_handle);
