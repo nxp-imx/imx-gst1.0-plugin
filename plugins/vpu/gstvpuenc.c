@@ -204,7 +204,7 @@ gst_vpu_enc_class_init (GstVpuEncClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_BITRATE,
       g_param_spec_uint ("bitrate", "bit rate",
-        "set bit rate in bps (0 for automatic)",
+        "set bit rate in kbps (0 for automatic)",
         0, G_MAXINT, DEFAULT_BITRATE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   if (in_plugin->std != VPU_V_MJPG) {
     g_object_class_install_property (gobject_class, PROP_GOP_SIZE,
@@ -280,6 +280,7 @@ gst_vpu_enc_init (GstVpuEnc * enc)
   enc->gop_count = 0;
   enc->handle = NULL;
   enc->state = NULL;
+  enc->bitrate_updated = FALSE;
 }
 
 static void
@@ -313,6 +314,7 @@ gst_vpu_enc_set_property (GObject * object, guint prop_id,
   switch (prop_id) {
     case PROP_BITRATE:
       enc->bitrate = g_value_get_uint (value);
+      enc->bitrate_updated = TRUE;
       break;
     case PROP_GOP_SIZE:
       enc->gop_size = g_value_get_uint (value);
@@ -975,6 +977,20 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
     enc_enc_param.nForceIPicture = 1;
     is_sync_point = TRUE;
     GST_LOG_OBJECT(enc, "got request to make this a keyframe - forcing I frame");
+  }
+
+  if (enc->bitrate_updated) {
+    GST_DEBUG_OBJECT(enc, "update bitrate.");
+    int param = enc->bitrate;
+    enc_ret = VPU_EncConfig(enc->handle, VPU_ENC_CONF_BIT_RATE, &param);
+    if (enc_ret != VPU_ENC_RET_SUCCESS) {
+      GST_ERROR_OBJECT(enc, "could not apply default configuration: %s", \
+          gst_vpu_enc_strerror(enc_ret));
+      gst_buffer_unmap (output_buffer, &minfo);
+      ret = GST_FLOW_ERROR;
+      goto bail;
+    }
+    enc->bitrate_updated = FALSE;
   }
 
 	{

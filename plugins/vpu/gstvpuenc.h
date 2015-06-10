@@ -46,6 +46,7 @@ struct _GstVpuEnc {
 	GList * gstbuffer_in_vpuenc;
 	GstBuffer *internal_input_buffer;
   guint gop_count;
+  gboolean bitrate_updated;
 };
 
 struct _GstVpuEncClass {
