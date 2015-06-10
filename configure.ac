@@ -98,12 +98,12 @@ if test "x$HAVE_PKGCONFIG" = "xno"; then
 fi
 
 dnl check target type
-#if  test "$PLATFORM" = "MX6" || test "$PLATFORM" = "MX6SL" || test "$PLATFORM" = "MX6SX" || test "$PLATFORM" = "MX7D" || test "$PLATFORM" = "MX6UL" || test "$PLATFORM" = "MX6QP" ;
-#then
-#  AC_MSG_NOTICE(build for $PLATFORM)
-#else
-#  AC_MSG_ERROR(No target platform specified! Use ./configure PLATFORM=(MX6/MX6QP/MX6SL/MX6SX/MX6UL/MX7D) to retry)
-#fi
+if  test "$PLATFORM" = "MX6" || test "$PLATFORM" = "MX6SL" || test "$PLATFORM" = "MX6SX" || test "$PLATFORM" = "MX7D" || test "$PLATFORM" = "MX6UL" || test "$PLATFORM" = "MX6QP" ;
+then
+  AC_MSG_NOTICE(build for $PLATFORM)
+else
+  AC_MSG_ERROR(No target platform specified! Use ./configure PLATFORM=(MX6/MX6QP/MX6SL/MX6SX/MX6UL/MX7D) to retry)
+fi
 
 AC_SUBST(PLATFORM)
 
@@ -243,13 +243,13 @@ dnl set proper LDFLAGS for plugins
 GST_PLUGIN_LDFLAGS='-module -avoid-version -export-symbols-regex [_]*\(gst_\|Gst\|GST_\).*'
 AC_SUBST(GST_PLUGIN_LDFLAGS)
 
-#AM_CONDITIONAL(PLATFORM_IS_MX6X, test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6SL" || test "x$PLATFORM" = "xMX6SX" || test "x$PLATFORM" = "xMX6UL" || test "x$PLATFORM" = "xMX6QP")
-#AM_CONDITIONAL(PLATFORM_IS_MX6, test "x$PLATFORM" = "xMX6")
-#AM_CONDITIONAL(PLATFORM_IS_MX6SL, test "x$PLATFORM" = "xMX6SL")
-#AM_CONDITIONAL(PLATFORM_IS_MX6SX, test "x$PLATFORM" = "xMX6SX")
-#AM_CONDITIONAL(PLATFORM_IS_MX6UL, test "x$PLATFORM" = "xMX6UL")
-#AM_CONDITIONAL(PLATFORM_IS_MX6QP, test "x$PLATFORM" = "xMX6QP")
-#AM_CONDITIONAL(PLATFORM_IS_MX7D, test "x$PLATFORM" = "xMX7D")
+AM_CONDITIONAL(PLATFORM_IS_MX6X, test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6SL" || test "x$PLATFORM" = "xMX6SX" || test "x$PLATFORM" = "xMX6UL" || test "x$PLATFORM" = "xMX6QP")
+AM_CONDITIONAL(PLATFORM_IS_MX6, test "x$PLATFORM" = "xMX6")
+AM_CONDITIONAL(PLATFORM_IS_MX6SL, test "x$PLATFORM" = "xMX6SL")
+AM_CONDITIONAL(PLATFORM_IS_MX6SX, test "x$PLATFORM" = "xMX6SX")
+AM_CONDITIONAL(PLATFORM_IS_MX6UL, test "x$PLATFORM" = "xMX6UL")
+AM_CONDITIONAL(PLATFORM_IS_MX6QP, test "x$PLATFORM" = "xMX6QP")
+AM_CONDITIONAL(PLATFORM_IS_MX7D, test "x$PLATFORM" = "xMX7D")
 
 
 CHECK_DISABLE_FEATURE(mp3enc, [Disable mp3 encoder plugin], [MP3_ENC], [mp3_enc_interface.h], [plugin: imxmp3enc])

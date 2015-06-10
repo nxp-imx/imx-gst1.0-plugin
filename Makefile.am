@@ -32,6 +32,7 @@ TOOLDIRS =    tools/                      \
 
 BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS) $(VIDEO_CONVERT_DIRS)
               
+if PLATFORM_IS_MX6
 
 if USE_OVERLAY_SINK
 OVERLAYSINKDIRS = plugins/overlay_sink
@@ -41,6 +42,55 @@ if USE_VPU_WRAP
 VPUWRAPDIRS = plugins/vpu
 endif
 
+endif
+
+if PLATFORM_IS_MX6QP
+
+if USE_OVERLAY_SINK
+OVERLAYSINKDIRS = plugins/overlay_sink
+endif
+
+if USE_VPU_WRAP
+VPUWRAPDIRS = plugins/vpu
+endif
+
+endif
+
+if PLATFORM_IS_MX6SL
+
+if USE_OVERLAY_SINK
+OVERLAYSINKDIRS = plugins/overlay_sink
+endif
+
+VPUWRAPDIRS =
+
+endif
+
+if PLATFORM_IS_MX6SX
+
+if USE_OVERLAY_SINK
+OVERLAYSINKDIRS = plugins/overlay_sink
+endif
+
+VPUWRAPDIRS =
+
+endif
+
+if PLATFORM_IS_MX7D
+
+OVERLAYSINKDIRS =
+
+VPUWRAPDIRS =
+
+endif
+
+if PLATFORM_IS_MX6UL
+
+OVERLAYSINKDIRS =
+
+VPUWRAPDIRS =
+
+endif
 
 SUBDIRS =  $(LIBSDIRS) $(BASEDIRS) $(OVERLAYSINKDIRS) $(VPUWRAPDIRS) $(WMA8ENC_DIR) $(MP3ENC_DIR) $(TOOLDIRS)
 
