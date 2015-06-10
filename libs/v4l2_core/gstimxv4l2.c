@@ -136,6 +136,13 @@ typedef struct {
   const gchar *bg_fb_name;
 } IMXV4l2DeviceMap;
 
+#define GST_VIDEO_CAPS_MAKE_BAYER(format)                               \
+    "video/x-bayer, "                                                   \
+    "format = (string) " format ", "                                    \
+    "width = " GST_VIDEO_SIZE_RANGE ", "                                \
+    "height = " GST_VIDEO_SIZE_RANGE ", "                               \
+    "framerate = " GST_VIDEO_FPS_RANGE
+
 static IMXV4l2FmtMap g_imxv4l2fmt_maps[] = {
   {GST_VIDEO_CAPS_MAKE("I420"), V4L2_PIX_FMT_YUV420, GST_VIDEO_FORMAT_I420, 12, 0},
   {GST_VIDEO_CAPS_MAKE("YV12"), V4L2_PIX_FMT_YVU420, GST_VIDEO_FORMAT_YV12, 12, 0},
@@ -156,6 +163,10 @@ static IMXV4l2FmtMap g_imxv4l2fmt_maps[] = {
   {GST_VIDEO_CAPS_MAKE("RGB"), V4L2_PIX_FMT_RGB24, GST_VIDEO_FORMAT_RGB, 24, 0},
   {GST_VIDEO_CAPS_MAKE("BGR"), V4L2_PIX_FMT_BGR24, GST_VIDEO_FORMAT_BGR, 24, 0},
   {GST_VIDEO_CAPS_MAKE("RGB16"), V4L2_PIX_FMT_RGB565, GST_VIDEO_FORMAT_RGB16, 16, 0},
+  {GST_VIDEO_CAPS_MAKE_BAYER("bggr"), V4L2_PIX_FMT_SBGGR8, GST_VIDEO_FORMAT_UNKNOWN, 8, 0},
+  {GST_VIDEO_CAPS_MAKE_BAYER("gbrg"), V4L2_PIX_FMT_SGBRG8, GST_VIDEO_FORMAT_UNKNOWN, 8, 0},
+  {GST_VIDEO_CAPS_MAKE_BAYER("grbg"), V4L2_PIX_FMT_SGRBG8, GST_VIDEO_FORMAT_UNKNOWN, 8, 0},
+  {GST_VIDEO_CAPS_MAKE_BAYER("rggb"), V4L2_PIX_FMT_SRGGB8, GST_VIDEO_FORMAT_UNKNOWN, 8, 0},
 };
 
 static guint g_camera_format[] = {
@@ -833,6 +844,8 @@ gst_imx_v4l2capture_config_usb_camera (IMXV4l2Handle *handle, guint fmt, guint w
     GST_ERROR ("VIDIOC_S_PARM failed");
     return -1;
   }
+  GST_INFO ("frame format: %c%c%c%c",	fmt & 0xff, (fmt >> 8) & 0xff,
+      (fmt >> 16) & 0xff, (fmt >> 24) & 0xff);
 
   v4l2_fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
   v4l2_fmt.fmt.pix.pixelformat = fmt;

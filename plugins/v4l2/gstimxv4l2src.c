@@ -200,6 +200,24 @@ gst_imx_v4l2src_fixate (GstBaseSrc * bsrc, GstCaps * caps)
 static guint
 gst_imx_v4l2_special_fmt (GstCaps *caps)
 {
+  const GstStructure *structure;
+  const char *format;
+
+  structure = gst_caps_get_structure (caps, 0);
+
+  if (gst_structure_has_name (structure, "video/x-bayer")) {
+    format = gst_structure_get_string (structure, "format");
+    if (g_str_equal (format, "bggr")) {
+      return V4L2_PIX_FMT_SBGGR8;
+    } else if (g_str_equal (format, "gbrg")) {
+      return V4L2_PIX_FMT_SGBRG8;
+    } else if (g_str_equal (format, "grbg")) {
+      return V4L2_PIX_FMT_SGRBG8;
+    } else if (g_str_equal (format, "rggb")) {
+      return V4L2_PIX_FMT_SRGGB8;
+    }
+  }
+
   return 0;
 }
 
@@ -417,6 +435,7 @@ gst_imx_v4l2src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
   GstStructure *config;
   gboolean update_pool, update_allocator;
   GstVideoInfo vinfo;
+  const GstStructure *structure;
 
   if (v4l2src->pool){
     gst_query_parse_allocation (query, &outcaps, NULL);
@@ -490,7 +509,14 @@ gst_imx_v4l2src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
     }
     /* no pool, we can make our own */
     GST_DEBUG_OBJECT (v4l2src, "no pool, making new pool");
-    pool = gst_video_buffer_pool_new ();
+
+    structure = gst_caps_get_structure (v4l2src->old_caps, 0);
+
+    if (gst_structure_has_name (structure, "video/x-bayer")) {
+      size = GST_ROUND_UP_4 (v4l2src->w) * v4l2src->h;
+      pool = gst_buffer_pool_new ();
+    } else
+      pool = gst_video_buffer_pool_new ();
   }
   v4l2src->pool = gst_object_ref (pool);
 
