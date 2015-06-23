@@ -453,6 +453,9 @@ gint compositor_remove_surface (gpointer compositor, gpointer surface)
     hsurface->next->prev = hsurface->prev;
   }
 
+  if (surface)
+    g_slice_free1(sizeof(Surface), surface);
+
   return 0;
 }
 
