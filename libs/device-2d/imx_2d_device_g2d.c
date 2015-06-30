@@ -521,3 +521,7 @@ gint imx_g2d_destroy(Imx2DDevice *device)
   return 0;
 }
 
+gboolean imx_g2d_is_exist (void)
+{
+  return HAS_G2D();
+}

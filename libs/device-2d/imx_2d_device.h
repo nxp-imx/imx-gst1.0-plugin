@@ -124,6 +124,7 @@ typedef struct _Imx2DDeviceInfo {
   Imx2DDeviceType  device_type;
   Imx2DDevice*  (*create)   (Imx2DDeviceType  device_type);
   gint          (*destroy)  (Imx2DDevice* dev);
+  gboolean      (*is_exist) (void);
 } Imx2DDeviceInfo;
 
 const Imx2DDeviceInfo * imx_get_2d_devices(void);

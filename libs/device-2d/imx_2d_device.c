@@ -25,16 +25,19 @@ GST_DEBUG_CATEGORY (imx2ddevice_debug);
 #ifdef USE_IPU
 extern Imx2DDevice * imx_ipu_create(Imx2DDeviceType  device_type);
 extern gint imx_ipu_destroy(Imx2DDevice *device);
+extern gboolean imx_ipu_is_exist (void);
 #endif
 
 #ifdef USE_G2D
 extern Imx2DDevice * imx_g2d_create(Imx2DDeviceType  device_type);
 extern gint imx_g2d_destroy(Imx2DDevice *device);
+extern gboolean imx_g2d_is_exist (void);
 #endif
 
 #ifdef USE_PXP
 extern Imx2DDevice * imx_pxp_create(Imx2DDeviceType  device_type);
 extern gint imx_pxp_destroy(Imx2DDevice *device);
+extern gboolean imx_pxp_is_exist (void);
 #endif
 
 static const Imx2DDeviceInfo Imx2DDevices[] = {
@@ -42,7 +45,8 @@ static const Imx2DDeviceInfo Imx2DDevices[] = {
     { .name                     ="ipu",
       .device_type              =IMX_2D_DEVICE_IPU,
       .create                   =imx_ipu_create,
-      .destroy                  =imx_ipu_destroy
+      .destroy                  =imx_ipu_destroy,
+      .is_exist                 =imx_ipu_is_exist
     },
 #endif
 
@@ -50,7 +54,8 @@ static const Imx2DDeviceInfo Imx2DDevices[] = {
     { .name                     ="g2d",
       .device_type              =IMX_2D_DEVICE_G2D,
       .create                   =imx_g2d_create,
-      .destroy                  =imx_g2d_destroy
+      .destroy                  =imx_g2d_destroy,
+      .is_exist                 =imx_g2d_is_exist
     },
 #endif
 
@@ -58,7 +63,8 @@ static const Imx2DDeviceInfo Imx2DDevices[] = {
     { .name                     ="pxp",
       .device_type              =IMX_2D_DEVICE_PXP,
       .create                   =imx_pxp_create,
-      .destroy                  =imx_pxp_destroy
+      .destroy                  =imx_pxp_destroy,
+      .is_exist                 =imx_pxp_is_exist
     },
 #endif
     {
@@ -77,8 +83,14 @@ Imx2DDevice * imx_2d_device_create(Imx2DDeviceType  device_type)
 {
   Imx2DDeviceInfo *dev_info = imx_get_2d_devices();
   while (dev_info->name) {
-    if (dev_info->device_type == device_type)
-      return dev_info->create(device_type);
+    if (dev_info->device_type == device_type) {
+      if (dev_info->is_exist()) {
+        return dev_info->create(device_type);
+      } else {
+        GST_ERROR("device %s not exist", dev_info->name);
+        return NULL;
+      }
+    }
     dev_info++;
   }
 

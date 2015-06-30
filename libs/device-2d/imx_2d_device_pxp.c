@@ -504,7 +504,7 @@ gint imx_pxp_destroy(Imx2DDevice *device)
   return 0;
 }
 
-
-
-
-
+gboolean imx_pxp_is_exist (void)
+{
+  return HAS_PXP();
+}

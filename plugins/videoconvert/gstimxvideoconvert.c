@@ -1512,6 +1512,12 @@ static gboolean gst_imx_video_convert_register (GstPlugin * plugin)
   while (in_plugin->name) {
     GST_LOG ("Registering %s video converter", in_plugin->name);
 
+    if (!in_plugin->is_exist()) {
+      GST_WARNING("device %s not exist", in_plugin->name);
+      in_plugin++;
+      continue;
+    }
+
     t_name = g_strdup_printf ("imxvideoconvert_%s", in_plugin->name);
     type = g_type_from_name (t_name);
 
@@ -1520,14 +1526,10 @@ static gboolean gst_imx_video_convert_register (GstPlugin * plugin)
       g_type_set_qdata (type, GST_IMX_VCT_PARAMS_QDATA, (gpointer) in_plugin);
     }
 
-    if (((!strcmp(in_plugin->name, "ipu")) && (HAS_IPU())) ||
-         ((!strcmp(in_plugin->name, "g2d")) && (HAS_G2D())) ||
-         ((!strcmp(in_plugin->name, "pxp")) && (HAS_PXP()))) {
-      if (!gst_element_register (plugin, t_name, IMX_GST_PLUGIN_RANK, type)) {
-        GST_ERROR ("Failed to register %s", t_name);
-        g_free (t_name);
-        return FALSE;
-      }
+    if (!gst_element_register (plugin, t_name, IMX_GST_PLUGIN_RANK, type)) {
+      GST_ERROR ("Failed to register %s", t_name);
+      g_free (t_name);
+      return FALSE;
     }
     g_free (t_name);
 

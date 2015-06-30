@@ -32,18 +32,58 @@ noinst_HEADERS += video-overlay/gstimxvideooverlay.h \
 endif
 				 
 if USE_IPU
+if PLATFORM_IS_MX6
 libgstfsl_@GST_API_VERSION@_la_SOURCES += device-2d/imx_2d_device_ipu.c
 libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_IPU
 endif
+if PLATFORM_IS_MX6QP
+libgstfsl_@GST_API_VERSION@_la_SOURCES += device-2d/imx_2d_device_ipu.c
+libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_IPU
+endif
+endif
 
 if USE_G2D
+if PLATFORM_IS_MX6
 libgstfsl_@GST_API_VERSION@_la_SOURCES += device-2d/imx_2d_device_g2d.c
 libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_G2D
 libgstfsl_@GST_API_VERSION@_la_LIBADD += -lg2d
 endif
+if PLATFORM_IS_MX6QP
+libgstfsl_@GST_API_VERSION@_la_SOURCES += device-2d/imx_2d_device_g2d.c
+libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_G2D
+libgstfsl_@GST_API_VERSION@_la_LIBADD += -lg2d
+endif
+if PLATFORM_IS_MX6SL
+libgstfsl_@GST_API_VERSION@_la_SOURCES += device-2d/imx_2d_device_g2d.c
+libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_G2D
+libgstfsl_@GST_API_VERSION@_la_LIBADD += -lg2d
+endif
+if PLATFORM_IS_MX6SX
+libgstfsl_@GST_API_VERSION@_la_SOURCES += device-2d/imx_2d_device_g2d.c
+libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_G2D
+libgstfsl_@GST_API_VERSION@_la_LIBADD += -lg2d
+endif
+endif
 
 if USE_PXP
+if PLATFORM_IS_MX6SL
 libgstfsl_@GST_API_VERSION@_la_SOURCES += device-2d/imx_2d_device_pxp.c
 libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_PXP
 libgstfsl_@GST_API_VERSION@_la_LIBADD += -lpxp
+endif
+if PLATFORM_IS_MX6SX
+libgstfsl_@GST_API_VERSION@_la_SOURCES += device-2d/imx_2d_device_pxp.c
+libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_PXP
+libgstfsl_@GST_API_VERSION@_la_LIBADD += -lpxp
+endif
+if PLATFORM_IS_MX6UL
+libgstfsl_@GST_API_VERSION@_la_SOURCES += device-2d/imx_2d_device_pxp.c
+libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_PXP
+libgstfsl_@GST_API_VERSION@_la_LIBADD += -lpxp
+endif
+if PLATFORM_IS_MX7D
+libgstfsl_@GST_API_VERSION@_la_SOURCES += device-2d/imx_2d_device_pxp.c
+libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_PXP
+libgstfsl_@GST_API_VERSION@_la_LIBADD += -lpxp
+endif
 endif
