@@ -126,6 +126,9 @@
 #define IMX_COMPOSITOR_OUTPUT_POOL_MIN_BUFFERS   3
 #define IMX_COMPOSITOR_OUTPUT_POOL_MAX_BUFFERS   30
 
+#define IMX_COMPOSITOR_CSC_LOSS_FACTOR          5 // 0 ~ 10
+#define IMX_COMPOSITOR_CSC_COMPLEX_FACTOR (10 - IMX_COMPOSITOR_CSC_LOSS_FACTOR)
+
 #define DEFAULT_IMXCOMPOSITOR_BACKGROUND        0x00000000
 #define SINK_TEMP_BUFFER_SIZE                   (2048*2048*4)
 
@@ -458,6 +461,197 @@ gst_imxcompositor_sink_query (GstAggregator * agg, GstAggregatorPad * bpad,
   return ret;
 }
 
+static gint get_format_csc_loss(GstVideoFormat in_name, GstVideoFormat out_name)
+{
+#define SCORE_FORMAT_CHANGE       1
+#define SCORE_COLORSPACE_LOSS     2     /* RGB <-> YUV */
+#define SCORE_ALPHA_LOSS          4     /* lose the alpha channel */
+#define SCORE_DEPTH_LOSS          8     /* change bit depth */
+#define SCORE_CHROMA_W_LOSS       4     /* vertical sub-sample */
+#define SCORE_CHROMA_H_LOSS       8     /* horizontal sub-sample */
+#define SCORE_COLOR_LOSS         16     /* convert to GRAY */
+#define COLORSPACE_MASK (GST_VIDEO_FORMAT_FLAG_YUV | \
+                         GST_VIDEO_FORMAT_FLAG_RGB | GST_VIDEO_FORMAT_FLAG_GRAY)
+#define LOSS_MAX  (SCORE_FORMAT_CHANGE + SCORE_COLORSPACE_LOSS + \
+    SCORE_ALPHA_LOSS + SCORE_DEPTH_LOSS + SCORE_CHROMA_W_LOSS + \
+    SCORE_CHROMA_H_LOSS + SCORE_COLOR_LOSS)
+
+  gint loss = LOSS_MAX;
+  GstVideoFormatFlags in_flags, out_flags;
+  const GstVideoFormatInfo *in_info = gst_video_format_get_info(in_name);
+  const GstVideoFormatInfo *out_info = gst_video_format_get_info(out_name);
+
+  if (!in_info || !out_info)
+    return loss;
+
+  if (in_info == out_info)
+    return 0;
+
+  loss = SCORE_FORMAT_CHANGE;
+
+  in_flags = GST_VIDEO_FORMAT_INFO_FLAGS (in_info);
+  out_flags = GST_VIDEO_FORMAT_INFO_FLAGS (out_info);
+
+  if ((out_flags & COLORSPACE_MASK) != (in_flags & COLORSPACE_MASK)) {
+    loss += SCORE_COLORSPACE_LOSS;
+    if (out_flags & GST_VIDEO_FORMAT_FLAG_GRAY)
+      loss += SCORE_COLOR_LOSS;
+  }
+
+  if ((in_flags & GST_VIDEO_FORMAT_FLAG_ALPHA) &&
+      !(out_flags & GST_VIDEO_FORMAT_FLAG_ALPHA))
+    loss += SCORE_ALPHA_LOSS;
+
+  if ((out_flags & GST_VIDEO_FORMAT_FLAG_YUV)
+      && (in_flags & GST_VIDEO_FORMAT_FLAG_YUV)) {
+    if ((in_info->h_sub[1]) < (out_info->h_sub[1]))
+      loss += SCORE_CHROMA_H_LOSS;
+    if ((in_info->w_sub[1]) < (out_info->w_sub[1]))
+      loss += SCORE_CHROMA_W_LOSS;
+  }
+
+  if ((in_info->bits) > (out_info->bits))
+    loss += SCORE_DEPTH_LOSS;
+
+  GST_LOG("%s -> %s, loss = %d", GST_VIDEO_FORMAT_INFO_NAME(in_info),
+                  GST_VIDEO_FORMAT_INFO_NAME(out_info), loss);
+  return loss;
+}
+
+static gint get_format_csc_complexity(GstVideoFormat in_name,
+                                      GstVideoFormat out_name)
+{
+#define COMPLEX_FORMAT_CHANGE       1
+#define COMPLEX_DEPTH_CHANGE        2
+#define COMPLEX_ALPHA_CHANGE        2
+#define COMPLEX_CHROMA_W_CHANGE     4
+#define COMPLEX_CHROMA_H_CHANGE     4
+#define COMPLEX_COLORSPACE_CHANGE   8     /* RGB <-> YUV */
+#define COMPLEX_COLOR_CHANGE        2     /* RGB/YUV <-> GRAY */
+#define COMPLEX_MAX (COMPLEX_FORMAT_CHANGE + COMPLEX_DEPTH_CHANGE +\
+    COMPLEX_ALPHA_CHANGE + COMPLEX_CHROMA_W_CHANGE + COMPLEX_CHROMA_H_CHANGE +\
+    COMPLEX_COLORSPACE_CHANGE + COMPLEX_COLOR_CHANGE)
+
+  gint complex = COMPLEX_MAX;
+  GstVideoFormatFlags in_flags, out_flags;
+  const GstVideoFormatInfo *in_info = gst_video_format_get_info(in_name);
+  const GstVideoFormatInfo *out_info = gst_video_format_get_info(out_name);
+
+  if (!in_info || !out_info)
+    return complex;
+
+  if (in_info == out_info)
+    return 0;
+
+  complex = COMPLEX_FORMAT_CHANGE;
+  in_flags = GST_VIDEO_FORMAT_INFO_FLAGS (in_info);
+  out_flags = GST_VIDEO_FORMAT_INFO_FLAGS (out_info);
+
+  if ((out_flags & (GST_VIDEO_FORMAT_FLAG_YUV|GST_VIDEO_FORMAT_FLAG_RGB))
+      != (in_flags & (GST_VIDEO_FORMAT_FLAG_YUV|GST_VIDEO_FORMAT_FLAG_RGB)))
+    complex += COMPLEX_COLORSPACE_CHANGE;
+
+  if ((out_flags & GST_VIDEO_FORMAT_FLAG_GRAY)
+      != (in_flags & GST_VIDEO_FORMAT_FLAG_GRAY)) {
+      complex += COMPLEX_COLOR_CHANGE;
+      if ((in_flags & GST_VIDEO_FORMAT_FLAG_RGB)
+          || (out_flags & GST_VIDEO_FORMAT_FLAG_RGB))
+        complex += COMPLEX_COLOR_CHANGE;
+  }
+
+  if ((out_flags & GST_VIDEO_FORMAT_FLAG_ALPHA)
+      != (in_flags & GST_VIDEO_FORMAT_FLAG_ALPHA))
+    complex += COMPLEX_ALPHA_CHANGE;
+
+  if ((out_flags & GST_VIDEO_FORMAT_FLAG_YUV)
+      && (in_flags & GST_VIDEO_FORMAT_FLAG_YUV)) {
+    if ((in_info->h_sub[1]) != (out_info->h_sub[1]))
+      complex += COMPLEX_CHROMA_H_CHANGE;
+    if ((in_info->w_sub[1]) != (out_info->w_sub[1]))
+      complex += COMPLEX_CHROMA_W_CHANGE;
+  }
+
+  if ((in_info->bits) != (out_info->bits))
+    complex += COMPLEX_DEPTH_CHANGE;
+
+  GST_LOG("%s -> %s, complex = %d", GST_VIDEO_FORMAT_INFO_NAME(in_info),
+                  GST_VIDEO_FORMAT_INFO_NAME(out_info), complex);
+  return complex;
+}
+
+static GstVideoFormat find_best_src_format(GstAggregator *vagg, GstCaps *o_caps)
+{
+#define COMPLEX_ROTATE_FACTOR   1
+#define COMPLEX_SCALE_FACTOR    1
+
+  GList *l;
+  gint factor_min = G_MAXINT32;
+  GstVideoFormat best_fmt = GST_VIDEO_FORMAT_UNKNOWN;
+
+  if (!(GST_ELEMENT (vagg)->sinkpads)) {
+    GST_DEBUG("no sink pad yet");
+    return best_fmt;
+  }
+
+  if (!o_caps || gst_caps_is_empty (o_caps)) {
+    return best_fmt;
+  }
+
+  GstCaps *caps = gst_caps_normalize(o_caps);
+  GST_DEBUG ("gst_caps_normalize caps: %" GST_PTR_FORMAT, caps);
+
+  GST_OBJECT_LOCK (vagg);
+  gint n = gst_caps_get_size (caps) - 1;
+  for (; n >= 0; n--) {
+    GstStructure *s = gst_caps_get_structure (caps, n);
+    const gchar *fmt = gst_structure_get_string(s, "format");
+    GstVideoFormat o_fmt = gst_video_format_from_string(fmt);
+    gint factor = 0;
+    GstVideoFormat i_fmt;
+
+    for (l = GST_ELEMENT (vagg)->sinkpads; l; l = l->next) {
+      GstVideoAggregatorPad *vaggpad = l->data;
+      GstImxCompositorPad *pad = GST_IMXCOMPOSITOR_PAD (vaggpad);
+
+      gint width = GST_VIDEO_INFO_WIDTH (&vaggpad->info);
+      gint height = GST_VIDEO_INFO_HEIGHT (&vaggpad->info);
+      if (vaggpad->info.finfo)
+        i_fmt = GST_VIDEO_INFO_FORMAT(&vaggpad->info);
+      else
+        continue;
+
+      if (i_fmt == GST_VIDEO_FORMAT_UNKNOWN)
+        continue;
+
+      gint resol = width * height;
+      gint complex = 0;
+      gint loss = 0;
+
+      if (resol == 0)
+        continue;
+
+      if ((pad->width && pad->width != width)
+          || (pad->height && pad->height != height))
+        complex += resol * COMPLEX_SCALE_FACTOR;
+      if (pad->rotate != IMX_2D_ROTATION_0)
+        complex += resol * COMPLEX_ROTATE_FACTOR;
+
+      complex += resol * get_format_csc_complexity(i_fmt, o_fmt);
+      loss = resol * get_format_csc_loss(i_fmt, o_fmt);
+      factor += IMX_COMPOSITOR_CSC_LOSS_FACTOR * loss;
+      factor += IMX_COMPOSITOR_CSC_COMPLEX_FACTOR * complex;
+    }
+    GST_LOG("fmt %s factor %d", fmt, factor);
+    if (factor < factor_min) {
+      best_fmt = o_fmt;
+      factor_min = factor;
+    }
+  }
+  GST_OBJECT_UNLOCK (vagg);
+
+  return best_fmt;
+}
+
 static gboolean
 gst_imxcompositor_src_query (GstAggregator * agg, GstQuery * query)
 {
@@ -483,8 +677,8 @@ gst_imxcompositor_src_query (GstAggregator * agg, GstQuery * query)
       n = gst_caps_get_size (caps) - 1;
       for (; n >= 0; n--) {
         s = gst_caps_get_structure (caps, n);
-        gst_structure_set (s, "width", GST_TYPE_INT_RANGE, 1, G_MAXINT32,
-            "height", GST_TYPE_INT_RANGE, 1, G_MAXINT32, NULL);
+        gst_structure_set (s, "width", GST_TYPE_INT_RANGE, 64, G_MAXINT32,
+            "height", GST_TYPE_INT_RANGE, 64, G_MAXINT32, NULL);
         if (GST_VIDEO_INFO_FPS_D (&vagg->info) != 0) {
           gst_structure_set (s,
               "framerate", GST_TYPE_FRACTION_RANGE, 0, 1, G_MAXINT32, 1, NULL);
@@ -495,7 +689,7 @@ gst_imxcompositor_src_query (GstAggregator * agg, GstQuery * query)
         caps = gst_caps_intersect_full (filter, caps, GST_CAPS_INTERSECT_FIRST);
 
       gst_query_set_caps_result (query, caps);
-      GST_LOG ("query src caps: %" GST_PTR_FORMAT, caps);
+      GST_DEBUG ("query src caps: %" GST_PTR_FORMAT, caps);
       gst_caps_unref (caps);
 
       res = TRUE;
@@ -648,6 +842,22 @@ gst_imxcompositor_update_info (GstVideoAggregator * vagg, GstVideoInfo * info)
   GList *l;
   gint best_width = -1, best_height = -1;
   gboolean ret = TRUE;
+
+  GstCaps *caps, *peer_caps;
+
+  GstAggregator *agg = (GstAggregator*)vagg;
+  caps = gst_pad_get_pad_template_caps (agg->srcpad);
+  peer_caps = gst_pad_peer_query_caps(agg->srcpad, NULL);
+  caps = gst_caps_intersect_full(peer_caps, caps, GST_CAPS_INTERSECT_FIRST);
+  gst_caps_unref (peer_caps);
+
+  GstVideoFormat best_fmt = find_best_src_format(agg, caps);
+  gst_caps_unref (caps);
+  if (best_fmt != GST_VIDEO_FORMAT_UNKNOWN) {
+    gst_video_info_set_format (info, best_fmt, GST_VIDEO_INFO_WIDTH(info),
+                                GST_VIDEO_INFO_HEIGHT(info));
+    GST_DEBUG("Set best format %s", gst_video_format_to_string(best_fmt));
+  }
 
   GST_OBJECT_LOCK (vagg);
   for (l = GST_ELEMENT (vagg)->sinkpads; l; l = l->next) {
@@ -1086,6 +1296,17 @@ gst_imxcompositor_fill_background(Imx2DFrame *dst, guint RGBA8888)
 }
 #endif
 
+static gint imxcompositor_pad_zorder_compare (gconstpointer a, gconstpointer b)
+{
+  if (a && b) {
+    GstImxCompositorPad *pad_a = GST_IMXCOMPOSITOR_PAD (a);
+    GstImxCompositorPad *pad_b = GST_IMXCOMPOSITOR_PAD (b);
+    return (pad_a->zorder - pad_b->zorder);
+  } else {
+    return 0;
+  }
+}
+
 static GstFlowReturn
 gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
                                     GstBuffer * outbuf)
@@ -1120,20 +1341,27 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
     gst_imxcompositor_fill_background(&dst, DEFAULT_IMXCOMPOSITOR_BACKGROUND);
   }
 
-  for (l = GST_ELEMENT (vagg)->sinkpads; l; l = l->next) {
+  //re-order by zorder of pad
+  GList *pads = g_list_copy(GST_ELEMENT (vagg)->sinkpads);
+  pads = g_list_sort(pads, imxcompositor_pad_zorder_compare);
+
+  for (l = pads; l; l = l->next) {
     GstVideoAggregatorPad *ppad = l->data;
     GstImxCompositorPad *pad = GST_IMXCOMPOSITOR_PAD (ppad);
 
     if (ppad->buffer != NULL) {
-#if 0 //what's for?
       GstSegment *seg = &((GstAggregatorPad*)pad)->segment;
-      GstClockTime timestamp = GST_BUFFER_TIMESTAMP (pad->buffer);
+      GstClockTime timestamp = GST_BUFFER_TIMESTAMP (ppad->buffer);
       gint64 stream_time =
           gst_segment_to_stream_time (seg, GST_FORMAT_TIME, timestamp);
       /* sync object properties on stream time */
       if (GST_CLOCK_TIME_IS_VALID (stream_time))
         gst_object_sync_values (GST_OBJECT (pad), stream_time);
-#endif
+
+      if (pad->alpha == 0.0)  {
+        //transparent completely, do nothing
+        continue;
+      }
 
       if (gst_imxcompositor_config_src(imxcomp, pad, &src) < 0) {
         continue;
@@ -1153,6 +1381,37 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
       dst.crop.w = pad->width ? pad->width : ppad->buffer_vinfo.width;
       dst.crop.h = pad->height ? pad->height : ppad->buffer_vinfo.height;
 
+      if (pad->keep_ratio) {
+        GstVideoRectangle s_rect, d_rect, result;
+        s_rect.x = s_rect.y = 0;
+        s_rect.w = src.crop.w;
+        s_rect.h = src.crop.h;
+        d_rect.x = d_rect.y = 0;
+        d_rect.w = dst.crop.w;
+        d_rect.h = dst.crop.h;
+        if (src.rotate == IMX_2D_ROTATION_90 ||
+            src.rotate == IMX_2D_ROTATION_270) {
+          gint tmp = d_rect.w;
+          d_rect.w = d_rect.h;
+          d_rect.h = tmp;
+        }
+
+        gst_video_sink_center_rect (s_rect, d_rect, &result, TRUE);
+
+        if (src.rotate == IMX_2D_ROTATION_90 ||
+            src.rotate == IMX_2D_ROTATION_270) {
+          dst.crop.x += result.y;
+          dst.crop.y += result.x;
+          dst.crop.w = result.h;
+          dst.crop.h = result.w;
+        } else {
+          dst.crop.x += result.x;
+          dst.crop.y += result.y;
+          dst.crop.w = result.w;
+          dst.crop.h = result.h;
+        }
+      }
+
       if (device->blend(device, &dst, &src) < 0) {
         GST_WARNING_OBJECT (pad, "frame blend fail");
         continue;
@@ -1161,6 +1420,8 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
       aggregated++;
     }
   }
+
+  g_list_free(pads);
 
   GST_LOG("Aggregated %d frames", aggregated);
   if (aggregated > 0 && device->blend_finish(device) < 0) {

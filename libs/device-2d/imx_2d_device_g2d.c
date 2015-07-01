@@ -435,27 +435,9 @@ static Imx2DDeinterlaceMode imx_g2d_get_deinterlace (Imx2DDevice* device)
 
 static gint imx_g2d_get_capabilities (Imx2DDevice* device)
 {
-  void *g2d_handle = NULL;
-  gint capabilities = 0;
-
-  if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
-    GST_ERROR ("Failed to open g2d device.");
-  } else {
-    capabilities = IMX_2D_DEVICE_CAP_SCALE|IMX_2D_DEVICE_CAP_CSC \
-                      |IMX_2D_DEVICE_CAP_ROTATE;
-
-    gboolean enable = FALSE;
-    g2d_query_cap(g2d_handle, G2D_GLOBAL_ALPHA, &enable);
-    if (enable)
-      capabilities |= IMX_2D_DEVICE_CAP_ALPHA;
-
-    enable = FALSE;
-    g2d_query_cap(g2d_handle, G2D_BLEND, &enable);
-    if (enable)
-      capabilities |= IMX_2D_DEVICE_CAP_BLEND;
-
-    g2d_close(g2d_handle);
-  }
+  gint capabilities = IMX_2D_DEVICE_CAP_SCALE|IMX_2D_DEVICE_CAP_CSC \
+                      | IMX_2D_DEVICE_CAP_ROTATE | IMX_2D_DEVICE_CAP_ALPHA
+                      | IMX_2D_DEVICE_CAP_BLEND;
 
   return capabilities;
 }

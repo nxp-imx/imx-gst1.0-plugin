@@ -128,6 +128,9 @@ gst_imxcompositor_pad_set_property (GObject * object, guint prop_id,
   GstImxCompositorPad *pad = GST_IMXCOMPOSITOR_PAD (object);
 
   switch (prop_id) {
+    case PROP_IMXCOMPOSITOR_PAD_ZORDER:
+      pad->zorder = g_value_get_int(value);
+      break;
     case PROP_IMXCOMPOSITOR_PAD_XPOS:
       pad->xpos = g_value_get_int (value);
       break;
@@ -144,6 +147,7 @@ gst_imxcompositor_pad_set_property (GObject * object, guint prop_id,
         g_print("!This device don't support alpha blending, "
             "pad alpha setting will be ignored!\n");
       }
+      gst_object_unref(comp);
     }
       break;
     case PROP_IMXCOMPOSITOR_PAD_WIDTH:
@@ -216,8 +220,12 @@ gst_imxcompositor_pad_class_init (GstImxCompositorPadClass * klass)
   g_object_class_install_property (gobject_class,
       PROP_IMXCOMPOSITOR_PAD_KEEP_RATIO,
       g_param_spec_boolean ("keep-ratio", "Keep Aspect Ratio",
-          "Keep the video aspect ratio after resize(not support yet)",
+          "Keep the video aspect ratio after resize",
           DEFAULT_IMXCOMPOSITOR_PAD_KEEP_RATIO,
+          G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (gobject_class, PROP_IMXCOMPOSITOR_PAD_ZORDER,
+      g_param_spec_int ("zorder", "Z-order", "Z order of the picture",
+          0, 10000, DEFAULT_IMXCOMPOSITOR_PAD_ZORDER,
           G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE | G_PARAM_STATIC_STRINGS));
 }
 
@@ -231,6 +239,7 @@ gst_imxcompositor_pad_init (GstImxCompositorPad * compo_pad)
   compo_pad->rotate = DEFAULT_IMXCOMPOSITOR_PAD_ROTATE;
   compo_pad->alpha = DEFAULT_IMXCOMPOSITOR_PAD_ALPHA;
   compo_pad->keep_ratio = DEFAULT_IMXCOMPOSITOR_PAD_KEEP_RATIO;
+  compo_pad->zorder = DEFAULT_IMXCOMPOSITOR_PAD_ZORDER;
   compo_pad->sink_pool = NULL;
   memset(&compo_pad->align, 0, sizeof(GstVideoAlignment));
 }
