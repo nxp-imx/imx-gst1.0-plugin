@@ -81,6 +81,27 @@ AC_DEFUN([CHECK_DISABLE_FEATURE],
     AM_CONDITIONAL(USE_[$3], test "x$HAVE_[$3]" = "xyes")
 ])
 
+AC_DEFUN([CHECK_DISABLE_FEATURE_EX],
+[
+    AC_ARG_ENABLE($1,
+        [AS_HELP_STRING([--disable-[$1]], [$2])],
+        [use_[$1]=$enableval],
+        [use_[$1]=yes])
+    if test "$use_[$1]" = "yes"; then
+        for h in "$4"; do
+            AC_CHECK_HEADERS([$h], HAVE_[$3]=yes && break, HAVE_[$3]=no)
+        done
+        if test "x$HAVE_[$3]" = "xyes" && test "x[$6]" = "xyes"; then
+            enabled_feature="$enabled_feature\n\t\t[$5]"
+        else
+            disabled_feature="$disabled_feature\n\t\t[$5]"
+        fi
+    else
+        disabled_feature="$disabled_feature\n\t\t[$5]"
+    fi
+    AM_CONDITIONAL(USE_[$3], test "x$HAVE_[$3]" = "xyes" && test "x[$6]" = "xyes")
+])
+
 dnl AM_MAINTAINER_MODE provides the option to enable maintainer mode
 AM_MAINTAINER_MODE
 
@@ -251,6 +272,19 @@ AM_CONDITIONAL(PLATFORM_IS_MX6UL, test "x$PLATFORM" = "xMX6UL")
 AM_CONDITIONAL(PLATFORM_IS_MX6QP, test "x$PLATFORM" = "xMX6QP")
 AM_CONDITIONAL(PLATFORM_IS_MX7D, test "x$PLATFORM" = "xMX7D")
 
+if test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6QP"; then
+	 HAVE_DEVICE_IPU=yes
+	 HAVE_DEVICE_G2D=yes
+fi
+
+if test "x$PLATFORM" = "xMX6SL" || test "x$PLATFORM" = "xMX6SX"; then
+	 HAVE_DEVICE_G2D=yes
+	 HAVE_DEVICE_PXP=yes
+fi
+
+if test "x$PLATFORM" = "xMX6UL" || test "x$PLATFORM" = "xMX7D"; then
+	 HAVE_DEVICE_PXP=yes
+fi
 
 CHECK_DISABLE_FEATURE(mp3enc, [Disable mp3 encoder plugin], [MP3_ENC], [mp3_enc_interface.h], [plugin: imxmp3enc])
 CHECK_DISABLE_FEATURE(wma8enc, [Disable wma8 encoder plugin], [WMA8_ENC], [wma8_enc_interface.h], [plugin: wma8_enc])
@@ -260,12 +294,9 @@ CHECK_DISABLE_FEATURE(beep, [Disable beep audio decoder], [BEEP], [fsl_unia.h], 
 CHECK_DISABLE_FEATURE(v4lsink, [Disable fsl v4l sink], [V4L_SINK], [linux/videodev2.h], [plugin: v4lsink])
 CHECK_DISABLE_FEATURE(overlaysink, [Disable fsl overlaysink], [OVERLAY_SINK], [g2d.h], [plugin: overlaysink])
 CHECK_DISABLE_FEATURE(x11, [Disable x11 lib], [X11], [X11/Xlib.h], [library: libX11])
-CHECK_DISABLE_FEATURE(imxvideoconvert_g2d, [Disable fsl imxvideoconvert_g2d], [G2D], [g2d.h], [plugin: imxvideoconvert_g2d])
-CHECK_DISABLE_FEATURE(imxvideoconvert_ipu, [Disable fsl imxvideoconvert_ipu], [IPU], [ipu.h], [plugin: imxvideoconvert_ipu])
-CHECK_DISABLE_FEATURE(imxvideoconvert_pxp, [Disable fsl imxvideoconvert_pxp], [PXP], [pxp_lib.h], [plugin: imxvideoconvert_pxp])
-CHECK_DISABLE_FEATURE(imxcompositor_g2d, [Disable fsl imxcompositor_g2d], [G2D], [g2d.h], [plugin: imxcompositor_g2d])
-CHECK_DISABLE_FEATURE(imxcompositor_ipu, [Disable fsl imxcompositor_ipu], [IPU], [ipu.h], [plugin: imxcompositor_ipu])
-CHECK_DISABLE_FEATURE(imxcompositor_pxp, [Disable fsl imxcompositor_pxp], [PXP], [pxp_lib.h], [plugin: imxcompositor_pxp])
+CHECK_DISABLE_FEATURE_EX(imx2ddevice_g2d, [Disable fsl imx2ddevice_g2d], [IMX_2DDEVICE_G2D], [g2d.h], [imx2ddevice: g2d], [$HAVE_DEVICE_G2D])
+CHECK_DISABLE_FEATURE_EX(imx2ddevice_ipu, [Disable fsl imx2ddevice_ipu], [IMX_2DDEVICE_IPU], [ipu.h], [imx2ddevice: ipu], [$HAVE_DEVICE_IPU])
+CHECK_DISABLE_FEATURE_EX(imx2ddevice_pxp, [Disable fsl imx2ddevice_pxp], [IMX_2DDEVICE_PXP], [pxp_lib.h], [imx2ddevice: pxp], [$HAVE_DEVICE_PXP])
 
 # Allow headers to be inside include/uapi and include/linux
 #saved_CFLAGS="$CFLAGS"
