@@ -158,6 +158,7 @@ typedef struct _gRecorderEngine
   gchar *date_time;
   gint image_width;
   gint image_height;
+  gint image_format;
   gint view_framerate_num;
   gint view_framerate_den;
   gboolean no_xwindow;
@@ -1533,11 +1534,22 @@ static REresult set_camera_output_settings(RecorderEngineHandle handle, RERawVid
   RecorderEngine *h = (RecorderEngine *)(handle);
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
   CHECK_PARAM (videoProperty->videoFormat, RE_COLORFORMAT_LIST_END);
+  gchar *video_format_name;
 
-  //FIXME: set video format.
-  //recorder->image_format = videoProperty->videoFormat;
+  recorder->image_format = videoProperty->videoFormat;
   recorder->image_width = videoProperty->width;
   recorder->image_height = videoProperty->height;
+
+  static KeyMap kKeyMap[] = {
+    { RE_COLORFORMAT_DEFAULT, (REchar *)"I420" },
+    { RE_COLORFORMAT_YUV420PLANAR, (REchar *)"I420" },
+    { RE_COLORFORMAT_YUV420SEMIPLANAR, (REchar *)"NV12" },
+    { RE_COLORFORMAT_YUVY, (REchar *)"YUY2" },
+    { RE_COLORFORMAT_UYVY, (REchar *)"UYVY" },
+  };
+
+  video_format_name = key_value_pair (recorder->image_format, kKeyMap, sizeof(kKeyMap));
+
   //FIXME: work around for USB camera 15/2 fps.
   if (videoProperty->framesPerSecond == 7) {
     recorder->view_framerate_num = 15;
@@ -1558,19 +1570,24 @@ static REresult set_camera_output_settings(RecorderEngineHandle handle, RERawVid
         recorder->camera_output_caps = gst_caps_new_full (gst_structure_new ("video/x-raw",
                 "width", G_TYPE_INT, recorder->image_width,
                 "height", G_TYPE_INT, recorder->image_height,
+                "format", G_TYPE_STRING, video_format_name,
                 "framerate", GST_TYPE_FRACTION, recorder->view_framerate_num,
                 recorder->view_framerate_den, NULL), NULL);
       else
         recorder->camera_output_caps = gst_caps_new_full (gst_structure_new ("video/x-raw",
                 "width", G_TYPE_INT, recorder->image_width,
-                "height", G_TYPE_INT, recorder->image_height, NULL), NULL);
+                "height", G_TYPE_INT, recorder->image_height,
+                "format", G_TYPE_STRING, video_format_name,
+                NULL), NULL);
 
       GST_INFO_OBJECT (recorder->camerabin, "camera output caps is %", 
           GST_PTR_FORMAT, recorder->camera_output_caps);
     } else {
       recorder->camera_output_caps = gst_caps_new_full (gst_structure_new ("video/x-raw",
               "width", G_TYPE_INT, recorder->image_width,
-              "height", G_TYPE_INT, recorder->image_height, NULL), NULL);
+              "height", G_TYPE_INT, recorder->image_height,
+              "format", G_TYPE_STRING, video_format_name,
+              NULL), NULL);
     }
   }
 

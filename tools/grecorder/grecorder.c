@@ -701,6 +701,10 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
         if (optarg)
           pOpt->height = atoi (optarg);
         break;
+      case 'u':
+        if (optarg)
+          pOpt->video_format = atoi (optarg);
+        break;
       case 'f':
         if (optarg)
           pOpt->fps = atoi (optarg);
