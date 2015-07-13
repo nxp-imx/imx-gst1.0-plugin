@@ -337,13 +337,14 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     update_pool = FALSE;
   }
 
-  if (dec->vpu_dec_object->use_my_allocator) {
+  GstBufferPool *pool_pre = gst_video_decoder_get_buffer_pool (bdec);
+  if (pool_pre) {
     /* video track selection case. don't change pool for smoothly video track
      * selection */
     GstStructure *config;
     GstCaps *caps;
     guint size_pre, min_buffers, max_buffers;
-    GstBufferPool *pool_pre = gst_video_decoder_get_buffer_pool (bdec);
+
     config = gst_buffer_pool_get_config (pool_pre);
     gst_buffer_pool_config_get_params (config, &caps, &size_pre, &min_buffers,
                   &max_buffers);

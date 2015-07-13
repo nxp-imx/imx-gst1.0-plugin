@@ -526,16 +526,23 @@ gst_imx_v4l2sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
   v4l2sink->cropmeta.height = h;
 
   if (v4l2sink->pool) {
-    gst_imx_v4l2_reset_device (v4l2sink->v4l2handle);
-    gst_buffer_pool_set_active (v4l2sink->pool, FALSE);
-    gst_object_unref (v4l2sink->pool);
-    v4l2sink->pool = NULL;
+    GstCaps *pcaps;
+    GstStructure *config = gst_buffer_pool_get_config (v4l2sink->pool);
+    gst_buffer_pool_config_get_params (config, &pcaps, NULL, NULL, NULL);
+
+    if (!gst_caps_is_equal (pcaps, caps)) {
+      gst_imx_v4l2_reset_device (v4l2sink->v4l2handle);
+      gst_buffer_pool_set_active (v4l2sink->pool, FALSE);
+      gst_object_unref (v4l2sink->pool);
+      v4l2sink->pool = NULL;
+    }
+    gst_structure_free (config);
   }
 
-  if (gst_imx_v4l2sink_setup_buffer_pool (v4l2sink, caps) < 0)
-    return FALSE;
-
-  v4l2sink->self_pool_configed = FALSE;
+  if (!v4l2sink->pool) {
+    if (gst_imx_v4l2sink_setup_buffer_pool (v4l2sink, caps) < 0)
+      return FALSE;
+  }
 
 #ifdef USE_X11
   gst_imx_video_overlay_prepare_window_handle (v4l2sink->imxoverlay, TRUE);
@@ -556,34 +563,38 @@ gst_imx_v4l2sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
 
   gst_query_parse_allocation (query, &caps, &need_pool);
 
-  if (caps == NULL) {
-    GST_ERROR_OBJECT (v4l2sink, "no caps specified.");
-    return FALSE;
-  }
-
-  GST_DEBUG_OBJECT (v4l2sink, "propose_allocation, pool(%p).", pool);
-
-  if (pool != NULL) {
-    GstCaps *pcaps;
-    GstStructure *config;
-
-    /* we had a pool, check caps */
-    config = gst_buffer_pool_get_config (pool);
-    gst_buffer_pool_config_get_params (config, &pcaps, &size, NULL, NULL);
-#if 0 //FIXME:
-    if (!gst_caps_is_equal (caps, pcaps)) {
-      GST_ERROR_OBJECT (v4l2sink, "different caps in propose, pool with caps %" GST_PTR_FORMAT, pcaps);
-      GST_ERROR_OBJECT (v4l2sink, "upstream caps %" GST_PTR_FORMAT, caps);
-      gst_structure_free (config);
+  if (need_pool) {
+    if (caps == NULL) {
+      GST_ERROR_OBJECT (v4l2sink, "no caps specified.");
       return FALSE;
     }
-#endif
-    gst_structure_free (config);
-  }
 
-  /* we need at least 3 buffers to operate */
-  gst_query_add_allocation_pool (query, pool, size, v4l2sink->min_buffers, v4l2sink->min_buffers);
-  gst_query_add_allocation_param (query, allocator, NULL);
+    GST_DEBUG_OBJECT (v4l2sink, "propose_allocation, pool(%p).", pool);
+
+    if (pool && allocator) {
+      GstCaps *pcaps;
+      GstStructure *config;
+
+      /* we had a pool, check caps */
+      config = gst_buffer_pool_get_config (pool);
+      gst_buffer_pool_config_get_params (config, &pcaps, &size, NULL, NULL);
+#if 0 //FIXME:
+      if (!gst_caps_is_equal (caps, pcaps)) {
+        GST_ERROR_OBJECT (v4l2sink, "different caps in propose, pool with caps %" GST_PTR_FORMAT, pcaps);
+        GST_ERROR_OBJECT (v4l2sink, "upstream caps %" GST_PTR_FORMAT, caps);
+        gst_structure_free (config);
+        return FALSE;
+      }
+#endif
+      gst_structure_free (config);
+
+      /* we need at least 3 buffers to operate */
+      gst_query_add_allocation_pool (query, pool, size, v4l2sink->min_buffers, v4l2sink->min_buffers);
+      gst_query_add_allocation_param (query, allocator, NULL);
+    } else {
+      return FALSE;
+    }
+  }
 
   /* we also support various metadata */
   gst_query_add_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL);

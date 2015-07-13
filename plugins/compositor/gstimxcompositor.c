@@ -719,11 +719,12 @@ gst_imxcompositor_negotiated_caps (GstVideoAggregator * vagg, GstCaps * caps)
     GstCaps *pool_caps;
     config = gst_buffer_pool_get_config (imxcomp->self_out_pool);
     gst_buffer_pool_config_get_params(config, &pool_caps, &size, &min, &max);
-    gst_structure_free (config);
     if (gst_caps_is_equal(pool_caps, caps)) {
+      gst_structure_free (config);
       imxcomp->out_pool = imxcomp->self_out_pool;
       return TRUE;
     }
+    gst_structure_free (config);
   }
 
   /* find a pool for the negotiated caps now */

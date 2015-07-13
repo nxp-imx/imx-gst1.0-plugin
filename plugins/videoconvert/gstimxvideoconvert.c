@@ -1076,10 +1076,10 @@ static gboolean imx_video_convert_decide_allocation(GstBaseTransform *transform,
 
   imxvct->out_pool = pool;
   gst_buffer_pool_config_get_params (config, &outcaps, &size, &min, &max);
-  gst_structure_free (config);
 
   GST_DEBUG_OBJECT(imxvct, "pool config:  outcaps: %" GST_PTR_FORMAT "  "
       "size: %u  min buffers: %u  max buffers: %u", outcaps, size, min, max);
+  gst_structure_free (config);
 
   if (pool) {
     if (num > 0)

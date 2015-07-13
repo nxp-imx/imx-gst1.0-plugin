@@ -517,26 +517,32 @@ gst_overlay_sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
     GST_DEBUG_OBJECT (sink, "prosal set caps %" GST_PTR_FORMAT, caps);
 
     if (sink->pool) {
-      /* must re-allocate buffer pool as up-stream need set config, video buffer
-       * pool should in inactive state */
+      // check caps, if caps not change, reuse previous pool
+      config = gst_buffer_pool_get_config (sink->pool);
+      gst_buffer_pool_config_get_params (config, &pcaps, &size, NULL, NULL);
 
-      if (sink->prv_buffer) {
-        gst_buffer_unref (sink->prv_buffer);
-        sink->prv_buffer = NULL;
+      if (!gst_caps_is_equal (pcaps, caps)) {
+        if (sink->prv_buffer) {
+          gst_buffer_unref (sink->prv_buffer);
+          sink->prv_buffer = NULL;
+        }
+
+        gst_buffer_pool_set_active (sink->pool, FALSE);
+        gst_object_unref (sink->pool);
+        sink->pool = NULL;
+      }
+      gst_structure_free (config);
+    }
+
+    if (!sink->pool) {
+      if (gst_overlay_sink_setup_buffer_pool (sink, caps) < 0) {
+        GST_ERROR_OBJECT (sink, "setup buffer pool failed.");
+        return FALSE;
       }
 
-      gst_buffer_pool_set_active (sink->pool, FALSE);
-      gst_object_unref (sink->pool);
-      sink->pool = NULL;
+      sink->pool_alignment_checked = FALSE;
+      sink->no_phy_buffer = FALSE;
     }
-
-    if (gst_overlay_sink_setup_buffer_pool (sink, caps) < 0) {
-      GST_ERROR_OBJECT (sink, "setup buffer pool failed.");
-      return FALSE;
-    }
-
-    sink->pool_alignment_checked = FALSE;
-    sink->no_phy_buffer = FALSE;
 
     if (sink->pool) {
       config = gst_buffer_pool_get_config (sink->pool);
