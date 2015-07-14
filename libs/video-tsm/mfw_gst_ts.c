@@ -502,7 +502,7 @@ _TSManagerSend2 (void *handle, void *key, int send)
           }
 
           if (send) {
-            if ((ts0 < TSM_ADAPTIVE_INTERVAL (tsm) * 2) || (tsm->big_cnt > 3)) {
+            if ((ts0 < TSM_ADAPTIVE_INTERVAL (tsm) * 5) || (tsm->big_cnt > 3)) {
               tsm->big_cnt = 0;
               tsm->dur_history_total -=
                   tsm->dur_history_buf[tsm->dur_history_tx];
