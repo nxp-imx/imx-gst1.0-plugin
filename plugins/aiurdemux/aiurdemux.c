@@ -3158,7 +3158,9 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
           && (GST_BUFFER_TIMESTAMP (stream->buffer) > stream->time_position)) {
         GST_WARNING ("Timestamp unexpect, maybe a core parser bug!");
         if (demux->n_video_streams == 0) {
-          stream->time_position = GST_BUFFER_TIMESTAMP (stream->buffer);
+          if (GST_BUFFER_TIMESTAMP (stream->buffer) > GST_SECOND)
+            stream->time_position =
+                    GST_BUFFER_TIMESTAMP (stream->buffer) - GST_SECOND;
         }
       }
 
