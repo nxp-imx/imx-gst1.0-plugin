@@ -466,6 +466,8 @@ gst_overlay_sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
   sink->surface_info.src.bottom = h;
   sink->surface_info.src.width = w;
   sink->surface_info.src.height = h;
+  sink->surface_info.alpha = 0xFF;
+
   /* one video frame which allocate by VPU may arrived before propose_allocation.
    * need check alignment for the video frame. */
   sink->pool_alignment_checked = FALSE;

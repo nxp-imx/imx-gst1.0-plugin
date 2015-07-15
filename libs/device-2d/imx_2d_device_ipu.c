@@ -354,27 +354,25 @@ static gint imx_ipu_check_parameters(Imx2DDevice *device,
   return 0;
 }
 
-static gint imx_ipu_do_convert(Imx2DDevice *device,
-                                PhyMemBlock *from, PhyMemBlock *to,
-                                Imx2DInterlaceType interlace_type,
-                                Imx2DCrop incrop, Imx2DCrop outcrop)
+static gint imx_ipu_convert(Imx2DDevice *device,
+                            Imx2DFrame *dst, Imx2DFrame *src)
 {
-  if (!device || !device->priv || !from || !to)
+  if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
     return -1;
 
   Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
 
   // Set input
-  ipu->task.input.paddr = (dma_addr_t)(from->paddr);
-  ipu->task.input.crop.pos.x = GST_ROUND_UP_8(incrop.x);
-  ipu->task.input.crop.pos.y = GST_ROUND_UP_8(incrop.y);
-  ipu->task.input.crop.w = GST_ROUND_DOWN_8((MIN(incrop.w,
+  ipu->task.input.paddr = (dma_addr_t)(src->mem->paddr);
+  ipu->task.input.crop.pos.x = GST_ROUND_UP_8(src->crop.x);
+  ipu->task.input.crop.pos.y = GST_ROUND_UP_8(src->crop.y);
+  ipu->task.input.crop.w = GST_ROUND_DOWN_8((MIN(src->crop.w,
       (ipu->task.input.width - ipu->task.input.crop.pos.x))));
-  ipu->task.input.crop.h = GST_ROUND_DOWN_8(MIN(incrop.h,
+  ipu->task.input.crop.h = GST_ROUND_DOWN_8(MIN(src->crop.h,
       (ipu->task.input.height - ipu->task.input.crop.pos.y)));
 
   if (ipu->deinterlace_enable) {
-    switch (interlace_type) {
+    switch (src->interlace_type) {
     case IMX_2D_INTERLACE_INTERLEAVED:
       ipu->task.input.deinterlace.enable = TRUE;
       break;
@@ -386,9 +384,11 @@ static gint imx_ipu_do_convert(Imx2DDevice *device,
       ipu->task.input.deinterlace.enable = FALSE;
       break;
     }
+  } else {
+    ipu->task.input.deinterlace.enable = FALSE;
   }
 
-  GST_TRACE ("ipu input : %dx%d(%d,%d->%d,%d), format=%d, deinterlace=%s"
+  GST_TRACE ("ipu input : %dx%d(%d,%d->%d,%d), format=0x%x, deinterlace=%s"
       " deinterlace-mode=%d", ipu->task.input.width, ipu->task.input.height,
       ipu->task.input.crop.pos.x, ipu->task.input.crop.pos.y,
       ipu->task.input.crop.w, ipu->task.input.crop.h,
@@ -397,21 +397,27 @@ static gint imx_ipu_do_convert(Imx2DDevice *device,
           ipu->task.input.deinterlace.motion);
 
   // Set output
-  ipu->task.output.paddr = (dma_addr_t)(to->paddr);
-  ipu->task.output.crop.pos.x = GST_ROUND_DOWN_8(outcrop.x);
-  ipu->task.output.crop.pos.y = GST_ROUND_DOWN_8(outcrop.y);
-  ipu->task.output.crop.w = GST_ROUND_UP_8(MIN(outcrop.w,
+  ipu->task.output.paddr = (dma_addr_t)(dst->mem->paddr);
+  ipu->task.output.crop.pos.x = GST_ROUND_DOWN_8(dst->crop.x);
+  ipu->task.output.crop.pos.y = GST_ROUND_DOWN_8(dst->crop.y);
+  ipu->task.output.crop.w = GST_ROUND_UP_8(MIN(dst->crop.w,
       (ipu->task.output.width - ipu->task.output.crop.pos.x)));
-  ipu->task.output.crop.h = GST_ROUND_UP_8(MIN(outcrop.h,
+  ipu->task.output.crop.h = GST_ROUND_UP_8(MIN(dst->crop.h,
       (ipu->task.output.height - ipu->task.output.crop.pos.y)));
 
-  GST_TRACE ("ipu output : %dx%d(%d,%d->%d,%d), format=%d",
+  GST_TRACE ("ipu output : %dx%d(%d,%d->%d,%d), format=0x%x",
       ipu->task.output.width, ipu->task.output.height,
       ipu->task.output.crop.pos.x, ipu->task.output.crop.pos.y,
       ipu->task.output.crop.w, ipu->task.output.crop.h,
       ipu->task.output.format);
 
-  if (imx_ipu_check_parameters(device, from, to) == 1)
+  if (ipu->task.input.crop.w <= 0 || ipu->task.input.crop.h <=0 ||
+      ipu->task.output.crop.w <= 0 || ipu->task.output.crop.h <= 0) {
+    GST_ERROR("crop size error");
+    return -1;
+  }
+
+  if (imx_ipu_check_parameters(device, src->mem, dst->mem) == 1)
     return 0;
 
   if (ipu->task.input.deinterlace.enable &&
@@ -444,7 +450,7 @@ static gint imx_ipu_do_convert(Imx2DDevice *device,
     }
     ipu->vdi.paddr = (guchar *)(ipu->task.input.paddr_n);
 
-    memcpy(ipu->vdi.vaddr, from->vaddr, ipu->vdi.size);
+    memcpy(ipu->vdi.vaddr, src->mem->vaddr, ipu->vdi.size);
   }
 
   // Final conversion
@@ -455,7 +461,7 @@ static gint imx_ipu_do_convert(Imx2DDevice *device,
 
   if (ipu->task.input.deinterlace.enable &&
       ipu->task.input.deinterlace.motion != HIGH_MOTION) {
-    memcpy(ipu->vdi.vaddr, from->vaddr, ipu->vdi.size);
+    memcpy(ipu->vdi.vaddr, src->mem->vaddr, ipu->vdi.size);
   }
   ipu->new_input = FALSE;
 
@@ -464,59 +470,7 @@ static gint imx_ipu_do_convert(Imx2DDevice *device,
 
 static gint imx_ipu_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
 {
-  if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
-    return -1;
-
-  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
-
-  ipu->task.input.paddr = (dma_addr_t)(src->mem->paddr);
-  ipu->task.input.crop.pos.x = GST_ROUND_UP_16(src->crop.x);
-  ipu->task.input.crop.pos.y = GST_ROUND_UP_16(src->crop.y);
-  ipu->task.input.crop.w = GST_ROUND_DOWN_16((MIN(src->crop.w,
-      (ipu->task.input.width - ipu->task.input.crop.pos.x))));
-  ipu->task.input.crop.h = GST_ROUND_DOWN_16(MIN(src->crop.h,
-      (ipu->task.input.height - ipu->task.input.crop.pos.y)));
-  ipu->task.input.deinterlace.enable = FALSE;
-
-  GST_TRACE ("ipu input : %dx%d(%d,%d->%d,%d), format=0x%x",
-      ipu->task.input.width, ipu->task.input.height,
-      ipu->task.input.crop.pos.x, ipu->task.input.crop.pos.y,
-      ipu->task.input.crop.w, ipu->task.input.crop.h, ipu->task.input.format);
-
-  ipu->task.output.paddr = (dma_addr_t)(dst->mem->paddr);
-  ipu->task.output.crop.pos.x = GST_ROUND_DOWN_16(dst->crop.x);
-  ipu->task.output.crop.pos.y = GST_ROUND_DOWN_16(dst->crop.y);
-  ipu->task.output.crop.w = GST_ROUND_DOWN_16(MIN(dst->crop.w,
-      (ipu->task.output.width - ipu->task.output.crop.pos.x)));
-  ipu->task.output.crop.h = GST_ROUND_DOWN_16(MIN(dst->crop.h,
-      (ipu->task.output.height - ipu->task.output.crop.pos.y)));
-
-  // a little bit trick for crop.w IPU driver has issue when width > 1024 &&
-  // width / 16 = odd.
-  if (ipu->task.output.crop.w > 1024 && (ipu->task.output.crop.w/16) % 2 == 0) {
-    ipu->task.output.crop.w -= (ipu->task.output.crop.w % 16 + 1);
-  }
-
-  GST_TRACE ("ipu output : %dx%d(%d,%d->%d,%d), format=0x%x",
-      ipu->task.output.width, ipu->task.output.height,
-      ipu->task.output.crop.pos.x, ipu->task.output.crop.pos.y,
-      ipu->task.output.crop.w, ipu->task.output.crop.h,ipu->task.output.format);
-
-  if (ipu->task.input.crop.w < 64 || ipu->task.input.crop.h < 64 ||
-      ipu->task.output.crop.w < 64 || ipu->task.output.crop.w < 64) {
-    GST_WARNING("crop parameters invalid");
-    return 0;
-  }
-
-  if (imx_ipu_check_parameters(device, src->mem, dst->mem) == 1)
-    return 0;
-
-  if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
-    GST_WARNING("queuing IPU task failed: %s", strerror(errno));
-    return -1;
-  }
-
-  return 0;
+  return imx_ipu_convert(device, dst, src);
 }
 
 static gint imx_ipu_blend_finish(Imx2DDevice *device)
@@ -666,7 +620,7 @@ Imx2DDevice * imx_ipu_create(Imx2DDeviceType  device_type)
   device->frame_copy          = imx_ipu_frame_copy;
   device->config_input        = imx_ipu_config_input;
   device->config_output       = imx_ipu_config_output;
-  device->do_convert          = imx_ipu_do_convert;
+  device->convert             = imx_ipu_convert;
   device->blend               = imx_ipu_blend;
   device->blend_finish        = imx_ipu_blend_finish;
   device->fill                = imx_ipu_fill_color;

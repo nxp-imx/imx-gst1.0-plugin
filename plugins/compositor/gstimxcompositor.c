@@ -425,8 +425,8 @@ gst_imxcompositor_sink_query (GstAggregator * agg, GstAggregatorPad * bpad,
       n = gst_caps_get_size (sinkcaps);
       for (i = 0; i < n; i++) {
         s = gst_caps_get_structure (sinkcaps, i);
-        gst_structure_set (s, "width", GST_TYPE_INT_RANGE, 1, G_MAXINT32,
-            "height", GST_TYPE_INT_RANGE, 1, G_MAXINT32,
+        gst_structure_set (s, "width", GST_TYPE_INT_RANGE, 64, G_MAXINT32,
+            "height", GST_TYPE_INT_RANGE, 64, G_MAXINT32,
             "framerate", GST_TYPE_FRACTION_RANGE, 0, 1, G_MAXINT32, 1, NULL);
         if (!gst_structure_has_field (s, "pixel-aspect-ratio"))
           gst_structure_set (s, "pixel-aspect-ratio", GST_TYPE_FRACTION, 1, 1,
@@ -961,7 +961,7 @@ static gint gst_imxcompositor_config_dst(GstImxCompositor *imxcomp,
   dst->mem = gst_buffer_query_phymem_block (out_frame.buffer);
   dst->alpha = 0xFF; //TODO how to use destination alpha?
   dst->rotate = IMX_2D_ROTATION_0;
-  dst->interlace = IMX_2D_DEINTERLACE_NONE;
+  dst->interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
   dst->crop.x = 0;
   dst->crop.y = 0;
   dst->crop.w = out_frame.info.width;
@@ -1073,7 +1073,7 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
   src->mem = gst_buffer_query_phymem_block (inframe->buffer);
   src->alpha = (gint)(pad->alpha * 255);
   src->rotate = pad->rotate;
-  src->interlace = IMX_2D_DEINTERLACE_NONE;
+  src->interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
   src->crop.x = 0;
   src->crop.y = 0;
   src->crop.w = inframe->info.width;
@@ -1371,7 +1371,7 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
         GST_WARNING_OBJECT (pad, "set rotate failed");
         continue;
       }
-      if (device->set_deinterlace(device, src.interlace) < 0) {
+      if (device->set_deinterlace(device, IMX_2D_DEINTERLACE_NONE) < 0) {
         GST_WARNING_OBJECT (pad, "set deinterlace mode failed");
         continue;
       }

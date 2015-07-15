@@ -329,15 +329,13 @@ static gint imx_g2d_set_src_plane(struct g2d_surface *g2d_src, gchar *paddr)
   return 0;
 }
 
-static gint imx_g2d_do_convert(Imx2DDevice *device,
-                                PhyMemBlock *from, PhyMemBlock *to,
-                                Imx2DInterlaceType interlace_type,
-                                Imx2DCrop incrop, Imx2DCrop outcrop)
+static gint imx_g2d_convert(Imx2DDevice *device,
+                            Imx2DFrame *dst, Imx2DFrame *src)
 {
   gint ret = 0;
   void *g2d_handle = NULL;
 
-  if (!device || !device->priv || !from || !to)
+  if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
     return -1;
 
   // Open g2d
@@ -349,34 +347,48 @@ static gint imx_g2d_do_convert(Imx2DDevice *device,
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
 
   // Set input
-  g2d->src.left = incrop.x;
-  g2d->src.top = incrop.y;
-  g2d->src.right = incrop.x + MIN(incrop.w, g2d->src.width);
-  g2d->src.bottom = incrop.y + MIN(incrop.h, g2d->src.height);
-  if (imx_g2d_set_src_plane (&g2d->src, from->paddr) < 0)
+  g2d->src.global_alpha = src->alpha;
+  g2d->src.left = src->crop.x;
+  g2d->src.top = src->crop.y;
+  g2d->src.right = src->crop.x + MIN(src->crop.w, g2d->src.width);
+  g2d->src.bottom = src->crop.y + MIN(src->crop.h, g2d->src.height);
+  if (imx_g2d_set_src_plane (&g2d->src, src->mem->paddr) < 0)
     return -1;
 
-  GST_TRACE ("g2d src : %dx%d,%d(%d,%d-%d,%d), format=%d",
+  GST_TRACE ("g2d src : %dx%d,%d(%d,%d-%d,%d), alpha=%d, format=%d",
       g2d->src.width, g2d->src.height,g2d->src.stride, g2d->src.left,
-      g2d->src.top, g2d->src.right, g2d->src.bottom,
+      g2d->src.top, g2d->src.right, g2d->src.bottom, g2d->src.global_alpha,
       g2d->src.format);
 
   // Set output
-  g2d->dst.planes[0] = (gint)(to->paddr);
-  g2d->dst.left = outcrop.x;
-  g2d->dst.top = outcrop.y;
-  g2d->dst.right = outcrop.x + MIN(outcrop.w, g2d->dst.width);
-  g2d->dst.bottom = outcrop.y + MIN(outcrop.h, g2d->dst.height);
+  g2d->dst.global_alpha = dst->alpha;
+  g2d->dst.planes[0] = (gint)(dst->mem->paddr);
+  g2d->dst.left = dst->crop.x;
+  g2d->dst.top = dst->crop.y;
+  g2d->dst.right = dst->crop.x + MIN(dst->crop.w, g2d->dst.width);
+  g2d->dst.bottom = dst->crop.y + MIN(dst->crop.h, g2d->dst.height);
 
-  GST_TRACE ("g2d dest : %dx%d,%d(%d,%d-%d,%d), format=%d",
+  GST_TRACE ("g2d dest : %dx%d,%d(%d,%d-%d,%d), alpha=%d, format=%d",
       g2d->dst.width, g2d->dst.height,g2d->dst.stride, g2d->dst.left,
-      g2d->dst.top, g2d->dst.right, g2d->dst.bottom,
+      g2d->dst.top, g2d->dst.right, g2d->dst.bottom, g2d->dst.global_alpha,
       g2d->dst.format);
 
-  // Final conversion
+  // Final blending
+  if (g2d->src.global_alpha < 0xFF) {
+    g2d->src.blendfunc = G2D_ONE;
+    g2d->dst.blendfunc = G2D_ONE_MINUS_SRC_ALPHA;
+    g2d_enable(g2d_handle, G2D_BLEND);
+    g2d_enable(g2d_handle, G2D_GLOBAL_ALPHA);
+  }
+
   ret = g2d_blit(g2d_handle, &g2d->src, &g2d->dst);
+
+  if (g2d->src.global_alpha < 0xFF) {
+    g2d_disable(g2d_handle, G2D_GLOBAL_ALPHA);
+    g2d_disable(g2d_handle, G2D_BLEND);
+  }
+
   ret |= g2d_finish(g2d_handle);
-  g2d_close(g2d_handle);
 
   return ret;
 }
@@ -470,57 +482,7 @@ static GList* imx_g2d_get_supported_out_fmts(Imx2DDevice* device)
 
 static gint imx_g2d_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
 {
-  gint ret = 0;
-  void *g2d_handle = NULL;
-
-  if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
-    return -1;
-
-  if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
-    GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
-    return -1;
-  }
-
-  Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
-
-  g2d->src.left = src->crop.x;
-  g2d->src.top = src->crop.y;
-  g2d->src.right = src->crop.x + MIN(src->crop.w, g2d->src.width);
-  g2d->src.bottom = src->crop.y + MIN(src->crop.h, g2d->src.height);
-  if (imx_g2d_set_src_plane (&g2d->src, src->mem->paddr) < 0)
-    return -1;
-
-  GST_TRACE ("g2d src : %dx%d,%d(%d,%d-%d,%d), alpha=%d, format=%d",
-      g2d->src.width, g2d->src.height, g2d->src.stride, g2d->src.left,
-      g2d->src.top, g2d->src.right, g2d->src.bottom, g2d->src.global_alpha,
-      g2d->src.format);
-
-  g2d->dst.planes[0] = (gint)(dst->mem->paddr);
-  g2d->dst.left = dst->crop.x;
-  g2d->dst.top = dst->crop.y;
-  g2d->dst.right = dst->crop.x + MIN(dst->crop.w, g2d->dst.width);
-  g2d->dst.bottom = dst->crop.y + MIN(dst->crop.h, g2d->dst.height);
-
-  GST_TRACE ("g2d dest : %dx%d,%d(%d,%d-%d,%d), format=%d",
-      g2d->dst.width, g2d->dst.height, g2d->dst.stride, g2d->dst.left,
-      g2d->dst.top, g2d->dst.right, g2d->dst.bottom, g2d->dst.format);
-
-  g2d->src.blendfunc = G2D_ONE;
-  g2d->dst.blendfunc = G2D_ONE_MINUS_SRC_ALPHA;
-  g2d->src.global_alpha = src->alpha;
-  g2d->dst.global_alpha = dst->alpha;
-
-  g2d_enable(g2d_handle, G2D_BLEND);
-  g2d_enable(g2d_handle, G2D_GLOBAL_ALPHA);
-  ret = g2d_blit(g2d_handle, &g2d->src, &g2d->dst);
-  g2d_disable(g2d_handle, G2D_GLOBAL_ALPHA);
-  g2d_disable(g2d_handle, G2D_BLEND);
-
-  ret |= g2d_finish(g2d_handle);
-
-  g2d_close(g2d_handle);
-
-  return ret;
+  return imx_g2d_convert(device, dst, src);
 }
 
 static gint imx_g2d_blend_finish(Imx2DDevice *device)
@@ -581,7 +543,7 @@ Imx2DDevice * imx_g2d_create(Imx2DDeviceType  device_type)
   device->frame_copy          = imx_g2d_frame_copy;
   device->config_input        = imx_g2d_config_input;
   device->config_output       = imx_g2d_config_output;
-  device->do_convert          = imx_g2d_do_convert;
+  device->convert             = imx_g2d_convert;
   device->blend               = imx_g2d_blend;
   device->blend_finish        = imx_g2d_blend_finish;
   device->fill                = imx_g2d_fill_color;

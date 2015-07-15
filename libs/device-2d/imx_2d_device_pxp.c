@@ -328,27 +328,25 @@ static gint imx_pxp_config_output(Imx2DDevice *device, Imx2DVideoInfo* out_info)
   return 0;
 }
 
-static gint imx_pxp_do_convert(Imx2DDevice *device,
-                                PhyMemBlock *from, PhyMemBlock *to,
-                                Imx2DInterlaceType interlace_type,
-                                Imx2DCrop incrop, Imx2DCrop outcrop)
+static gint imx_pxp_convert(Imx2DDevice *device,
+                            Imx2DFrame *dst, Imx2DFrame *src)
 {
   gint ret = 0;
 
-  if (!device || !device->priv || !from || !to)
+  if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
     return -1;
 
   Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
 
   // Set input crop
-  pxp->config.proc_data.srect.left = incrop.x;
-  pxp->config.proc_data.srect.top = incrop.y;
+  pxp->config.proc_data.srect.left = src->crop.x;
+  pxp->config.proc_data.srect.top = src->crop.y;
   pxp->config.proc_data.srect.width =
-      MIN(incrop.w, pxp->config.proc_data.srect.width);
+      MIN(src->crop.w, pxp->config.proc_data.srect.width);
   pxp->config.proc_data.srect.height =
-      MIN(incrop.h, pxp->config.proc_data.srect.height);
+      MIN(src->crop.h, pxp->config.proc_data.srect.height);
 
-  pxp->config.s0_param.paddr = (dma_addr_t)from->paddr;
+  pxp->config.s0_param.paddr = (dma_addr_t)src->mem->paddr;
 
   GST_TRACE ("pxp src : %dx%d,%d(%d,%d-%d,%d), format=%x",
       pxp->config.s0_param.width, pxp->config.s0_param.height,
@@ -358,14 +356,14 @@ static gint imx_pxp_do_convert(Imx2DDevice *device,
       pxp->config.s0_param.pixel_fmt);
 
   // Set output crop
-  pxp->config.proc_data.drect.left = outcrop.x;
-  pxp->config.proc_data.drect.top = outcrop.y;
+  pxp->config.proc_data.drect.left = dst->crop.x;
+  pxp->config.proc_data.drect.top = dst->crop.y;
   pxp->config.proc_data.drect.width =
-      MIN(outcrop.w, pxp->config.proc_data.drect.width);
+      MIN(dst->crop.w, pxp->config.proc_data.drect.width);
   pxp->config.proc_data.drect.height =
-      MIN(outcrop.h, pxp->config.proc_data.drect.height);
+      MIN(dst->crop.h, pxp->config.proc_data.drect.height);
 
-  pxp->config.out_param.paddr = (dma_addr_t)to->paddr;
+  pxp->config.out_param.paddr = (dma_addr_t)dst->mem->paddr;
 
   GST_TRACE ("pxp dest : %dx%d,%d(%d,%d-%d,%d), format=%x",
       pxp->config.out_param.width, pxp->config.out_param.height,
@@ -674,7 +672,7 @@ Imx2DDevice * imx_pxp_create(Imx2DDeviceType  device_type)
   device->frame_copy          = imx_pxp_frame_copy;
   device->config_input        = imx_pxp_config_input;
   device->config_output       = imx_pxp_config_output;
-  device->do_convert          = imx_pxp_do_convert;
+  device->convert             = imx_pxp_convert;
   device->blend               = imx_pxp_blend;
   device->blend_finish        = imx_pxp_blend_finish;
   device->fill                = imx_pxp_fill_color;

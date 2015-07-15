@@ -80,43 +80,50 @@ typedef struct {
 static gint
 compositor_do_composite_surface (Imx2DDevice *dev, Surface *surface, SurfaceBuffer *dest)
 {
-  Imx2DVideoInfo in_info;
-  Imx2DCrop incrop, outcrop;
-  gint ret;
+  Imx2DFrame src, dst;
 
-  in_info.fmt = surface->info.fmt;
-  in_info.w = surface->info.src.width;
-  in_info.h = surface->info.src.height;
-  in_info.stride = in_info.w;
+  dst.mem = dest;
+  dst.alpha = 0xFF;
+  dst.rotate = IMX_2D_ROTATION_0;
+  dst.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
+  dst.crop.x = surface->info.dst.left;
+  dst.crop.y = surface->info.dst.top;
+  dst.crop.w = surface->info.dst.right - surface->info.dst.left;
+  dst.crop.h = surface->info.dst.bottom - surface->info.dst.top;
 
-  ret = dev->config_input(dev, &in_info);
-
-  GST_LOG ("Input: %d, %dx%d", in_info.fmt, in_info.w, in_info.h);
+  src.info.fmt = surface->info.fmt;
+  src.info.w = surface->info.src.width;
+  src.info.h = surface->info.src.height;
+  src.info.stride = src.info.w;
+  src.mem = &surface->buffer;
+  src.alpha = surface->info.alpha;
+  src.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
+  src.crop.x = surface->info.src.left;
+  src.crop.y = surface->info.src.top;
+  src.crop.w = surface->info.src.right - surface->info.src.left;
+  src.crop.h = surface->info.src.bottom - surface->info.src.top;
 
   switch (surface->info.rot) {
-    case 0:   ret |= dev->set_rotate(dev, IMX_2D_ROTATION_0);    break;
-    case 90:  ret |= dev->set_rotate(dev, IMX_2D_ROTATION_90);   break;
-    case 180: ret |= dev->set_rotate(dev, IMX_2D_ROTATION_180);  break;
-    case 270: ret |= dev->set_rotate(dev, IMX_2D_ROTATION_270);  break;
-    default:  ret |= dev->set_rotate(dev, IMX_2D_ROTATION_0);    break;
+    case 0:   src.rotate = IMX_2D_ROTATION_0;    break;
+    case 90:  src.rotate = IMX_2D_ROTATION_90;   break;
+    case 180: src.rotate = IMX_2D_ROTATION_180;  break;
+    case 270: src.rotate = IMX_2D_ROTATION_270;  break;
+    default:  src.rotate = IMX_2D_ROTATION_0;    break;
   }
 
-  if (ret != 0) {
-    GST_ERROR("device input/rotate config failed");
+  if (dev->config_input(dev, &src.info) < 0) {
+    GST_ERROR (" device input config failed");
     return -1;
   }
 
-  incrop.x = surface->info.src.left;
-  incrop.y = surface->info.src.top;
-  incrop.w = surface->info.src.right - surface->info.src.left;
-  incrop.h = surface->info.src.bottom - surface->info.src.top;
+  GST_LOG ("Input: %d, %dx%d", src.info.fmt, src.info.w, src.info.h);
 
-  outcrop.x = surface->info.dst.left;
-  outcrop.y = surface->info.dst.top;
-  outcrop.w = surface->info.dst.right - surface->info.dst.left;
-  outcrop.h = surface->info.dst.bottom - surface->info.dst.top;
+  if (dev->set_rotate(dev, src.rotate) != 0) {
+    GST_ERROR("device rotate config failed");
+    return -1;
+  }
 
-  if (dev->do_convert(dev, &surface->buffer, dest, 0, incrop, outcrop)) {
+  if (dev->blend(dev, &dst, &src) < 0) {
     GST_ERROR("device composite failed");
     return -1;
   }

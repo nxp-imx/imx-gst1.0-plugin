@@ -1150,6 +1150,8 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   GstPhyMemMeta *phymemmeta = NULL;
   GstCaps *caps;
   GstVideoFrame temp_in_frame;
+  Imx2DFrame src, dst;
+  GstVideoCropMeta *in_crop = NULL, *out_crop = NULL;
 
   if (!device)
     return GST_FLOW_ERROR;
@@ -1251,28 +1253,26 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
           phymemmeta->x_padding, phymemmeta->y_padding);
     }
 
-    Imx2DVideoInfo in_info, out_info;
-
-    in_info.fmt = GST_VIDEO_INFO_FORMAT(&(in->info));
-    in_info.w = in->info.width + imxvct->in_video_align.padding_left +
+    src.info.fmt = GST_VIDEO_INFO_FORMAT(&(in->info));
+    src.info.w = in->info.width + imxvct->in_video_align.padding_left +
                 imxvct->in_video_align.padding_right;
-    in_info.h = in->info.height + imxvct->in_video_align.padding_top +
+    src.info.h = in->info.height + imxvct->in_video_align.padding_top +
                 imxvct->in_video_align.padding_bottom;
-    in_info.stride = in->info.stride[0];
+    src.info.stride = in->info.stride[0];
 
-    gint ret = device->config_input(device, &in_info);
+    gint ret = device->config_input(device, &src.info);
 
     GST_LOG ("Input: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(in->info.finfo),
         in->info.width, in->info.height);
 
-    out_info.fmt = GST_VIDEO_INFO_FORMAT(&(out->info));
-    out_info.w = out->info.width + imxvct->out_video_align.padding_left +
+    dst.info.fmt = GST_VIDEO_INFO_FORMAT(&(out->info));
+    dst.info.w = out->info.width + imxvct->out_video_align.padding_left +
                   imxvct->out_video_align.padding_right;
-    out_info.h = out->info.height + imxvct->out_video_align.padding_top +
+    dst.info.h = out->info.height + imxvct->out_video_align.padding_top +
                   imxvct->out_video_align.padding_bottom;
-    out_info.stride = out->info.stride[0];
+    dst.info.stride = out->info.stride[0];
 
-    ret |= device->config_output(device, &out_info);
+    ret |= device->config_output(device, &dst.info);
 
     GST_LOG ("Output: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(out->info.finfo),
         out->info.width, out->info.height);
@@ -1283,18 +1283,12 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     imxvct->pool_config_update = FALSE;
   }
 
-  Imx2DCrop incrop, outcrop;
-  GstVideoCropMeta *in_crop = NULL, *out_crop = NULL;
-
-  incrop.x = 0;
-  incrop.y = 0;
-  incrop.w = in->info.width;
-  incrop.h = in->info.height;
-
-  outcrop.x = 0;
-  outcrop.y = 0;
-  outcrop.w = out->info.width;
-  outcrop.h = out->info.height;
+  src.mem = gst_buffer_query_phymem_block (input_frame->buffer);
+  src.alpha = 0xFF;
+  src.crop.x = 0;
+  src.crop.y = 0;
+  src.crop.w = in->info.width;
+  src.crop.h = in->info.height;
 
   in_crop = gst_buffer_get_video_crop_meta(input_frame->buffer);
   if (in_crop != NULL) {
@@ -1303,34 +1297,16 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     if ((in_crop->x >= in->info.width) || (in_crop->y >= in->info.height))
       return GST_FLOW_ERROR;
 
-    incrop.x += in_crop->x;
-    incrop.y += in_crop->y;
-    incrop.w = MIN(in_crop->width, (in->info.width - in_crop->x));
-    incrop.h = MIN(in_crop->height, (in->info.height - in_crop->y));
+    src.crop.x += in_crop->x;
+    src.crop.y += in_crop->y;
+    src.crop.w = MIN(in_crop->width, (in->info.width - in_crop->x));
+    src.crop.h = MIN(in_crop->height, (in->info.height - in_crop->y));
   }
-
-  out_crop = gst_buffer_get_video_crop_meta(out->buffer);
-  if (out_crop != NULL) {
-    GST_LOG ("output crop meta: (%d, %d, %d, %d).", out_crop->x, out_crop->y,
-        out_crop->width, out_crop->height);
-    if ((out_crop->x >= out->info.width) || (out_crop->y >= out->info.height))
-      return GST_FLOW_ERROR;
-
-    outcrop.x += out_crop->x;
-    outcrop.y += out_crop->y;
-    outcrop.w = MIN(out_crop->width, (out->info.width - out_crop->x));
-    outcrop.h = MIN(out_crop->height, (out->info.height - out_crop->y));
-  }
-
-  //convert
-  PhyMemBlock *from = gst_buffer_query_phymem_block (input_frame->buffer);
-  PhyMemBlock *to = gst_buffer_query_phymem_block (out->buffer);
-  Imx2DInterlaceType interlace_t = IMX_2D_INTERLACE_PROGRESSIVE;
 
   switch (in->info.interlace_mode) {
     case GST_VIDEO_INTERLACE_MODE_INTERLEAVED:
       GST_TRACE("input stream is interleaved");
-      interlace_t = IMX_2D_INTERLACE_INTERLEAVED;
+      src.interlace_type = IMX_2D_INTERLACE_INTERLEAVED;
       break;
     case GST_VIDEO_INTERLACE_MODE_MIXED:
     {
@@ -1339,7 +1315,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
       if (video_meta != NULL) {
         if (video_meta->flags & GST_VIDEO_FRAME_FLAG_INTERLACED) {
           GST_TRACE("frame has video metadata and INTERLACED flag");
-          interlace_t = IMX_2D_INTERLACE_INTERLEAVED;
+          src.interlace_type = IMX_2D_INTERLACE_INTERLEAVED;
         }
       }
       break;
@@ -1349,13 +1325,36 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
       break;
     case GST_VIDEO_INTERLACE_MODE_FIELDS:
       GST_TRACE("input stream is 2-fields");
-      interlace_t = IMX_2D_INTERLACE_FIELDS;
+      src.interlace_type = IMX_2D_INTERLACE_FIELDS;
       break;
     default:
+      src.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
       break;
   }
 
-  if (device->do_convert(device, from, to, interlace_t, incrop, outcrop) == 0) {
+  dst.mem = gst_buffer_query_phymem_block (out->buffer);
+  dst.alpha = 0xFF;
+  dst.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
+  dst.crop.x = 0;
+  dst.crop.y = 0;
+  dst.crop.w = out->info.width;
+  dst.crop.h = out->info.height;
+
+  out_crop = gst_buffer_get_video_crop_meta(out->buffer);
+  if (out_crop != NULL) {
+    GST_LOG ("output crop meta: (%d, %d, %d, %d).", out_crop->x, out_crop->y,
+        out_crop->width, out_crop->height);
+    if ((out_crop->x >= out->info.width) || (out_crop->y >= out->info.height))
+      return GST_FLOW_ERROR;
+
+    dst.crop.x += out_crop->x;
+    dst.crop.y += out_crop->y;
+    dst.crop.w = MIN(out_crop->width, (out->info.width - out_crop->x));
+    dst.crop.h = MIN(out_crop->height, (out->info.height - out_crop->y));
+  }
+
+  //convert
+  if (device->convert(device, &dst, &src) == 0) {
     GST_TRACE ("frame conversion done");
     return GST_FLOW_OK;
   }
