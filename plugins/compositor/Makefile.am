@@ -8,7 +8,8 @@ libgstimxcompositor_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
 				 $(GST_CFLAGS) \
 				 -I$(top_srcdir)/libs \
 				 -I$(top_srcdir)/libs/allocator \
-				 -I$(top_srcdir)/libs/device-2d
+				 -I$(top_srcdir)/libs/device-2d \
+				 -I$(top_srcdir)/libs/overlaycompositionmeta
 				 
 libgstimxcompositor_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 				 -lgstbadbase-$(GST_API_VERSION) \

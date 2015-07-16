@@ -329,6 +329,13 @@ static gint imx_g2d_set_src_plane(struct g2d_surface *g2d_src, gchar *paddr)
   return 0;
 }
 
+static gboolean is_format_has_alpha(enum g2d_format fmt) {
+  if (fmt == G2D_RGBA8888 || fmt == G2D_BGRA8888 ||
+      fmt == G2D_ARGB8888 || fmt == G2D_ABGR8888)
+    return TRUE;
+  return FALSE;
+}
+
 static gint imx_g2d_convert(Imx2DDevice *device,
                             Imx2DFrame *dst, Imx2DFrame *src)
 {
@@ -374,7 +381,7 @@ static gint imx_g2d_convert(Imx2DDevice *device,
       g2d->dst.format);
 
   // Final blending
-  if (g2d->src.global_alpha < 0xFF) {
+  if (g2d->src.global_alpha < 0xFF || is_format_has_alpha(g2d->src.format)) {
     g2d->src.blendfunc = G2D_ONE;
     g2d->dst.blendfunc = G2D_ONE_MINUS_SRC_ALPHA;
     g2d_enable(g2d_handle, G2D_BLEND);
@@ -383,7 +390,7 @@ static gint imx_g2d_convert(Imx2DDevice *device,
 
   ret = g2d_blit(g2d_handle, &g2d->src, &g2d->dst);
 
-  if (g2d->src.global_alpha < 0xFF) {
+  if (g2d->src.global_alpha < 0xFF || is_format_has_alpha(g2d->src.format)) {
     g2d_disable(g2d_handle, G2D_GLOBAL_ALPHA);
     g2d_disable(g2d_handle, G2D_BLEND);
   }

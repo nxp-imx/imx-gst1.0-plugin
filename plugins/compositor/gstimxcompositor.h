@@ -27,6 +27,7 @@
 #include <gst/video/gstvideoaggregator.h>
 #include "gstimxcommon.h"
 #include "imx_2d_device.h"
+#include "imxoverlaycompositionmeta.h"
 
 G_BEGIN_DECLS
 
@@ -48,6 +49,8 @@ struct _GstImxCompositor
   GstVideoAlignment out_align;
   gboolean out_pool_update;
   gint capabilities;
+  GstImxVideoOverlayComposition video_comp;
+  gboolean composition_meta_enable;
 };
 
 struct _GstImxCompositorClass

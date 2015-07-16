@@ -125,6 +125,7 @@
 #define IMX_COMPOSITOR_INPUT_POOL_MAX_BUFFERS   30
 #define IMX_COMPOSITOR_OUTPUT_POOL_MIN_BUFFERS   3
 #define IMX_COMPOSITOR_OUTPUT_POOL_MAX_BUFFERS   30
+#define IMX_COMPOSITOR_COMPOMETA_DEFAULT         FALSE
 
 #define IMX_COMPOSITOR_CSC_LOSS_FACTOR          5 // 0 ~ 10
 #define IMX_COMPOSITOR_CSC_COMPLEX_FACTOR (10 - IMX_COMPOSITOR_CSC_LOSS_FACTOR)
@@ -163,7 +164,8 @@ enum {
   PROP_IMXCOMPOSITOR_OUTPUT_HEIGHT,
 #endif
   PROP_IMXCOMPOSITOR_BACKGROUND_ENABLE,
-  PROP_IMXCOMPOSITOR_BACKGROUND_COLOR
+  PROP_IMXCOMPOSITOR_BACKGROUND_COLOR,
+  PROP_IMXCOMPOSITOR_COMPOSITION_META_ENABLE
 };
 
 static GstElementClass *parent_class = NULL;
@@ -174,6 +176,8 @@ static void gst_imxcompositor_finalize (GObject * object)
   GstStructure *config;
   GstImxCompositorClass *klass =
         (GstImxCompositorClass *) G_OBJECT_GET_CLASS (imxcomp);
+
+  imx_video_overlay_composition_deinit(&imxcomp->video_comp);
 
   GST_IMX_COMPOSITOR_UNREF_BUFFER (imxcomp->sink_tmp_buf);
   GST_IMX_COMPOSITOR_UNREF_POOL (imxcomp->out_pool);
@@ -205,6 +209,9 @@ gst_imxcompositor_get_property (GObject * object,
     case PROP_IMXCOMPOSITOR_BACKGROUND_COLOR:
       g_value_set_uint (value, imxcomp->background);
       break;
+    case PROP_IMXCOMPOSITOR_COMPOSITION_META_ENABLE:
+      g_value_set_boolean(value, imxcomp->composition_meta_enable);
+      break;
 #if 0
     case PROP_IMXCOMPOSITOR_OUTPUT_WIDTH:
       g_value_set_uint (value, imxcomp->width);
@@ -231,6 +238,9 @@ gst_imxcompositor_set_property (GObject * object,
       break;
     case PROP_IMXCOMPOSITOR_BACKGROUND_COLOR:
       imxcomp->background = g_value_get_uint (value);
+      break;
+    case PROP_IMXCOMPOSITOR_COMPOSITION_META_ENABLE:
+      imxcomp->composition_meta_enable = g_value_get_boolean(value);
       break;
 #if 0
     case PROP_IMXCOMPOSITOR_OUTPUT_WIDTH:
@@ -392,12 +402,16 @@ gst_imxcompositor_sink_query (GstAggregator * agg, GstAggregatorPad * bpad,
             IMX_COMPOSITOR_INPUT_POOL_MIN_BUFFERS,
             IMX_COMPOSITOR_INPUT_POOL_MAX_BUFFERS);
         gst_query_add_allocation_param (query, imxcomp->allocator, NULL);
-        gst_query_add_allocation_meta(query, GST_VIDEO_META_API_TYPE, 0);
-        gst_query_add_allocation_meta(query,GST_VIDEO_CROP_META_API_TYPE, NULL);
       }
+
+      gst_query_add_allocation_meta(query, GST_VIDEO_META_API_TYPE, 0);
+      gst_query_add_allocation_meta(query,GST_VIDEO_CROP_META_API_TYPE, NULL);
+      if (imxcomp->composition_meta_enable)
+        imx_video_overlay_composition_add_query_meta (query);
 
       GST_DEBUG_OBJECT (bpad, "ALLOCATION ret %p, %"
                         GST_PTR_FORMAT, imxcompo_pad->sink_pool, query);
+      ret = TRUE;
       break;
     }
     case GST_QUERY_CAPS:
@@ -437,6 +451,13 @@ gst_imxcompositor_sink_query (GstAggregator * agg, GstAggregatorPad * bpad,
       }
 
       filtered_caps = sinkcaps;
+
+      GstImxCompositor *imxcomp = (GstImxCompositor *) (agg);
+      if (imxcomp->composition_meta_enable)
+        imx_video_overlay_composition_add_caps(filtered_caps);
+      else
+        imx_video_overlay_composition_remove_caps(filtered_caps);
+
       if (filter)
         filtered_caps = gst_caps_intersect (sinkcaps, filter);
       caps = gst_caps_intersect (filtered_caps, template_caps);
@@ -1423,6 +1444,26 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
       }
 
       aggregated++;
+
+      if (imxcomp->composition_meta_enable &&
+        imx_video_overlay_composition_has_meta(ppad->buffer)) {
+        GstVideoFrame in, out;
+        if (gst_video_frame_map (&in, &ppad->buffer_vinfo, ppad->buffer,
+                GST_MAP_READ)) {
+          if (gst_video_frame_map (&out, &((GstVideoAggregator*)imxcomp)->info,
+              outbuf, GST_MAP_WRITE)) {
+            gint cnt = imx_video_overlay_composition_composite(
+                          &imxcomp->video_comp, &in, &out);
+            if (cnt >= 0)
+              GST_DEBUG ("processed %d video overlay composition buffers", cnt);
+            else
+              GST_WARNING ("video overlay composition meta handling failed");
+
+            gst_video_frame_unmap(&out);
+          }
+          gst_video_frame_unmap(&in);
+        }
+      }
     }
   }
 
@@ -1454,6 +1495,8 @@ static GstCaps* imx_compositor_caps_from_fmt_list(GList* list)
           "format", G_TYPE_STRING, gst_video_format_to_string(fmt), NULL);
     }
   }
+
+  imx_video_overlay_composition_add_caps(caps);
   return caps;
 }
 
@@ -1533,6 +1576,13 @@ gst_imxcompositor_class_init (GstImxCompositorClass * klass)
           0, 0xFFFFFFFF, DEFAULT_IMXCOMPOSITOR_BACKGROUND,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class,
+      PROP_IMXCOMPOSITOR_COMPOSITION_META_ENABLE,
+      g_param_spec_boolean("composition-meta-enable", "Enable composition meta",
+        "Enable overlay composition meta processing",
+        IMX_COMPOSITOR_COMPOMETA_DEFAULT,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
 #if 0
   g_object_class_install_property (gobject_class,
       PROP_IMXCOMPOSITOR_OUTPUT_WIDTH,
@@ -1569,6 +1619,8 @@ gst_imxcompositor_init (GstImxCompositor * imxcomp)
       imxcomp->allocator = NULL;
       imxcomp->capabilities =imxcomp->device->get_capabilities(imxcomp->device);
       memset (&imxcomp->out_align, 0, sizeof(GstVideoAlignment));
+      imxcomp->composition_meta_enable = FALSE;
+      imx_video_overlay_composition_init(&imxcomp->video_comp, imxcomp->device);
     }
   } else {
     GST_ERROR ("Create 2D device failed.");

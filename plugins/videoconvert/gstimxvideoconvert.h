@@ -23,6 +23,7 @@
 #include <gst/gst.h>
 #include "gstimxcommon.h"
 #include "imx_2d_device.h"
+#include "imxoverlaycompositionmeta.h"
 
 G_BEGIN_DECLS
 
@@ -47,6 +48,10 @@ typedef struct _GstImxVideoConvert {
   GstVideoAlignment in_video_align;
   GstVideoAlignment out_video_align;
   gboolean pool_config_update;
+  Imx2DRotationMode rotate;
+  Imx2DDeinterlaceMode deinterlace;
+  GstImxVideoOverlayComposition video_comp;
+  gboolean composition_meta_enable;
 } GstImxVideoConvert;
 
 typedef struct _GstImxVideoConvertClass {

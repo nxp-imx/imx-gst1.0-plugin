@@ -32,6 +32,7 @@
 
 #define GST_IMX_VIDEO_ROTATION_DEFAULT      IMX_2D_ROTATION_0
 #define GST_IMX_VIDEO_DEINTERLACE_DEFAULT   IMX_2D_DEINTERLACE_NONE
+#define GST_IMX_VIDEO_COMPOMETA_DEFAULT     FALSE
 
 #define GST_IMX_CONVERT_UNREF_BUFFER(buffer) {\
     if (buffer) {                             \
@@ -54,7 +55,8 @@
 enum {
   PROP_0,
   PROP_OUTPUT_ROTATE,
-  PROP_DEINTERLACE_MODE
+  PROP_DEINTERLACE_MODE,
+  PROP_COMPOSITION_META_ENABLE
 };
 
 static GstElementClass *parent_class = NULL;
@@ -119,10 +121,13 @@ static void gst_imx_video_convert_set_property (GObject * object,
 
   switch (prop_id) {
     case PROP_OUTPUT_ROTATE:
-      device->set_rotate(device, g_value_get_enum (value));
+      imxvct->rotate = g_value_get_enum (value);
       break;
     case PROP_DEINTERLACE_MODE:
-      device->set_deinterlace(device, g_value_get_enum (value));
+      imxvct->deinterlace = g_value_get_enum (value);
+      break;
+    case PROP_COMPOSITION_META_ENABLE:
+      imxvct->composition_meta_enable = g_value_get_boolean(value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -149,6 +154,9 @@ static void gst_imx_video_convert_get_property (GObject * object,
     case PROP_DEINTERLACE_MODE:
       g_value_set_enum (value, device->get_deinterlace(device));
       break;
+    case PROP_COMPOSITION_META_ENABLE:
+      g_value_set_boolean(value, imxvct->composition_meta_enable);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -161,6 +169,8 @@ static void gst_imx_video_convert_finalize (GObject * object)
   GstStructure *config;
   GstImxVideoConvertClass *klass =
         (GstImxVideoConvertClass *) G_OBJECT_GET_CLASS (imxvct);
+
+  imx_video_overlay_composition_deinit(&imxvct->video_comp);
 
   GST_IMX_CONVERT_UNREF_BUFFER (imxvct->in_buf);
   GST_IMX_CONVERT_UNREF_POOL (imxvct->in_pool);
@@ -258,6 +268,12 @@ static GstCaps* imx_video_convert_transform_caps(GstBaseTransform *transform,
 
     gst_caps_append_structure(tmp, st);
   }
+
+  GstImxVideoConvert *imxvct = (GstImxVideoConvert *) (transform);
+  if (imxvct->composition_meta_enable)
+    imx_video_overlay_composition_add_caps(tmp);
+  else
+    imx_video_overlay_composition_remove_caps(tmp);
 
   GST_DEBUG("transformed: %" GST_PTR_FORMAT, tmp);
 
@@ -375,6 +391,7 @@ static GstCaps* imx_video_convert_caps_from_fmt_list(GList* list)
 
   for (i=0; i<g_list_length (list); i++) {
     GstVideoFormat fmt = (GstVideoFormat)g_list_nth_data(list, i);
+
     if (caps) {
       GstCaps *newcaps = gst_caps_new_simple("video/x-raw",
           "format", G_TYPE_STRING, gst_video_format_to_string(fmt), NULL);
@@ -384,6 +401,9 @@ static GstCaps* imx_video_convert_caps_from_fmt_list(GList* list)
           "format", G_TYPE_STRING, gst_video_format_to_string(fmt), NULL);
     }
   }
+
+  imx_video_overlay_composition_add_caps(caps);
+
   return caps;
 }
 
@@ -997,6 +1017,9 @@ imx_video_convert_propose_allocation(GstBaseTransform *transform,
   gst_query_add_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL);
   gst_query_add_allocation_meta (query, GST_VIDEO_CROP_META_API_TYPE, NULL);
 
+  if (imxvct->composition_meta_enable)
+    imx_video_overlay_composition_add_query_meta (query);
+
   return TRUE;
 }
 
@@ -1253,35 +1276,35 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
           phymemmeta->x_padding, phymemmeta->y_padding);
     }
 
-    src.info.fmt = GST_VIDEO_INFO_FORMAT(&(in->info));
-    src.info.w = in->info.width + imxvct->in_video_align.padding_left +
-                imxvct->in_video_align.padding_right;
-    src.info.h = in->info.height + imxvct->in_video_align.padding_top +
-                imxvct->in_video_align.padding_bottom;
-    src.info.stride = in->info.stride[0];
-
-    gint ret = device->config_input(device, &src.info);
-
-    GST_LOG ("Input: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(in->info.finfo),
-        in->info.width, in->info.height);
-
-    dst.info.fmt = GST_VIDEO_INFO_FORMAT(&(out->info));
-    dst.info.w = out->info.width + imxvct->out_video_align.padding_left +
-                  imxvct->out_video_align.padding_right;
-    dst.info.h = out->info.height + imxvct->out_video_align.padding_top +
-                  imxvct->out_video_align.padding_bottom;
-    dst.info.stride = out->info.stride[0];
-
-    ret |= device->config_output(device, &dst.info);
-
-    GST_LOG ("Output: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(out->info.finfo),
-        out->info.width, out->info.height);
-
-    if (ret != 0)
-      return GST_FLOW_ERROR;
-
     imxvct->pool_config_update = FALSE;
   }
+
+  src.info.fmt = GST_VIDEO_INFO_FORMAT(&(in->info));
+  src.info.w = in->info.width + imxvct->in_video_align.padding_left +
+              imxvct->in_video_align.padding_right;
+  src.info.h = in->info.height + imxvct->in_video_align.padding_top +
+              imxvct->in_video_align.padding_bottom;
+  src.info.stride = in->info.stride[0];
+
+  gint ret = device->config_input(device, &src.info);
+
+  GST_LOG ("Input: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(in->info.finfo),
+      in->info.width, in->info.height);
+
+  dst.info.fmt = GST_VIDEO_INFO_FORMAT(&(out->info));
+  dst.info.w = out->info.width + imxvct->out_video_align.padding_left +
+                imxvct->out_video_align.padding_right;
+  dst.info.h = out->info.height + imxvct->out_video_align.padding_top +
+                imxvct->out_video_align.padding_bottom;
+  dst.info.stride = out->info.stride[0];
+
+  ret |= device->config_output(device, &dst.info);
+
+  GST_LOG ("Output: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(out->info.finfo),
+      out->info.width, out->info.height);
+
+  if (ret != 0)
+    return GST_FLOW_ERROR;
 
   src.mem = gst_buffer_query_phymem_block (input_frame->buffer);
   src.alpha = 0xFF;
@@ -1289,6 +1312,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   src.crop.y = 0;
   src.crop.w = in->info.width;
   src.crop.h = in->info.height;
+  src.rotate = imxvct->rotate;
 
   in_crop = gst_buffer_get_video_crop_meta(input_frame->buffer);
   if (in_crop != NULL) {
@@ -1301,6 +1325,17 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     src.crop.y += in_crop->y;
     src.crop.w = MIN(in_crop->width, (in->info.width - in_crop->x));
     src.crop.h = MIN(in_crop->height, (in->info.height - in_crop->y));
+  }
+
+  //rotate and de-interlace setting
+  if (device->set_rotate(device, imxvct->rotate) < 0) {
+    GST_WARNING_OBJECT (imxvct, "set rotate failed");
+    return GST_FLOW_ERROR;
+  }
+
+  if (device->set_deinterlace(device, imxvct->deinterlace) < 0) {
+    GST_WARNING_OBJECT (imxvct, "set deinterlace mode failed");
+    return GST_FLOW_ERROR;
   }
 
   switch (in->info.interlace_mode) {
@@ -1356,6 +1391,18 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   //convert
   if (device->convert(device, &dst, &src) == 0) {
     GST_TRACE ("frame conversion done");
+
+    if (imxvct->composition_meta_enable) {
+      if (imx_video_overlay_composition_has_meta(in->buffer)) {
+        gint cnt =
+          imx_video_overlay_composition_composite(&imxvct->video_comp, in, out);
+        if (cnt >= 0)
+          GST_DEBUG ("processed %d video overlay composition buffers", cnt);
+        else
+          GST_WARNING ("video overlay composition meta handling failed");
+      }
+    }
+
     return GST_FLOW_OK;
   }
 
@@ -1443,6 +1490,12 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   }
 
+  g_object_class_install_property (gobject_class, PROP_COMPOSITION_META_ENABLE,
+      g_param_spec_boolean("composition-meta-enable", "Enable composition meta",
+        "Enable overlay composition meta processing",
+        GST_IMX_VIDEO_COMPOMETA_DEFAULT,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   in_plugin->destroy(dev);
 
   base_transform_class->src_event =
@@ -1483,6 +1536,10 @@ gst_imx_video_convert_init (GstImxVideoConvert * imxvct)
       imxvct->out_pool = NULL;
       imxvct->self_out_pool = NULL;
       imxvct->pool_config_update = TRUE;
+      imxvct->rotate = IMX_2D_ROTATION_0;
+      imxvct->deinterlace = IMX_2D_DEINTERLACE_NONE;
+      imxvct->composition_meta_enable = FALSE;
+      imx_video_overlay_composition_init(&imxvct->video_comp, imxvct->device);
     }
   } else {
     GST_ERROR ("Create video process device failed.");

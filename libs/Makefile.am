@@ -7,6 +7,7 @@ libgstfsl_@GST_API_VERSION@_la_SOURCES = allocator/gstallocatorphymem.c \
 	v4l2_core/gstimxv4l2.c \
 	device-2d/imx_2d_device.c \
 	device-2d/imx_2d_device_allocator.c \
+	overlaycompositionmeta/imxoverlaycompositionmeta.c \
   gstimxcommon.h
 
 libgstfsl_@GST_API_VERSION@_la_CFLAGS = $(GST_BASE_CFLAGS) $(GST_CFLAGS)
@@ -20,7 +21,8 @@ noinst_HEADERS = allocator/gstallocatorphymem.h \
     gstsutils/gstsutils.h \
     v4l2_core/gstimxv4l2.h \
     device-2d/imx_2d_device.h \
-    device-2d/imx_2d_device_allocator.h
+    device-2d/imx_2d_device_allocator.h \
+    overlaycompositionmeta/imxoverlaycompositionmeta.h
 
 if USE_X11
 libgstfsl_@GST_API_VERSION@_la_SOURCES += video-overlay/gstimxvideooverlay.c \
