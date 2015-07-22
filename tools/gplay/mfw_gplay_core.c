@@ -462,6 +462,10 @@ static gboolean my_bus_callback(GstBus *bus, GstMessage *msg, gpointer data)
         {
             FSL_PLAYER_PRINT("EOS Found!\n");
 
+            /* if there is already an EOS msg got. there might be chance hang if no one sema_post the eso_semaphore*/
+            if (pproperty->player_state==FSL_PLAYER_STATUS_STOPPED)
+                break;
+
             // Reset mute to none-mute. for example, play over when in FF/SF/FB status
             if( pproperty->bmute )
             {
