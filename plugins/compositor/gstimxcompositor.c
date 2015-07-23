@@ -752,25 +752,29 @@ gst_imxcompositor_negotiated_caps (GstVideoAggregator * vagg, GstCaps * caps)
     while (i < num ) {
       gst_query_parse_nth_allocation_pool(query, i, &pool, &size, &min, &max);
       if (pool) {
-        gst_query_parse_nth_allocation_param (query, i, &allocator, NULL);
+        config = gst_buffer_pool_get_config(pool);
+        gst_buffer_pool_config_get_allocator(config, &allocator, NULL);
 
         if (allocator && GST_IS_ALLOCATOR_PHYMEM(allocator)) {
           gst_imxcompositor_set_pool_alignment(caps, pool);
           if (min < IMX_COMPOSITOR_OUTPUT_POOL_MIN_BUFFERS)
             min = IMX_COMPOSITOR_OUTPUT_POOL_MIN_BUFFERS;
           max = IMX_COMPOSITOR_OUTPUT_POOL_MAX_BUFFERS;
-          config = gst_buffer_pool_get_config (pool);
           gst_buffer_pool_config_set_params (config, caps, size, min, max);
           gst_buffer_pool_set_config (pool, config);
           GST_IMX_COMPOSITOR_UNREF_POOL (imxcomp->out_pool);
           imxcomp->out_pool = pool;
-          gst_object_unref (allocator);
           gst_query_unref (query);
           imxcomp->negotiated = TRUE;
           imxcomp->out_pool_update = TRUE;
           return TRUE;
         } else {
           GST_LOG_OBJECT (imxcomp, "no phy allocator in output pool (%p)",pool);
+        }
+
+        if (config) {
+          gst_structure_free (config);
+          config = NULL;
         }
 
         if (allocator) {
