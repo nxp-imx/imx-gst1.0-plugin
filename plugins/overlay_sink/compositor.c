@@ -21,6 +21,7 @@
 #include <gst/video/gstvideosink.h>
 #include "compositor.h"
 #include "imx_2d_device.h"
+#include "imxoverlaycompositionmeta.h"
 
 GST_DEBUG_CATEGORY_EXTERN (overlay_sink_debug);
 #define GST_CAT_DEFAULT overlay_sink_debug
@@ -75,14 +76,15 @@ typedef struct {
   Surface *head;
   Surface *tail;
   SurfaceBuffer prvdst;
+  GstImxVideoOverlayComposition vcomp;
 } CompositorHandle;
 
 static gint
-compositor_do_composite_surface (Imx2DDevice *dev, Surface *surface, SurfaceBuffer *dest)
+compositor_do_composite_surface (CompositorHandle *hcompositor, Surface *surface, SurfaceBuffer *dest)
 {
   Imx2DFrame src, dst;
 
-  dst.mem = dest;
+  dst.mem = &dest->mem;
   dst.alpha = 0xFF;
   dst.rotate = IMX_2D_ROTATION_0;
   dst.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
@@ -95,7 +97,7 @@ compositor_do_composite_surface (Imx2DDevice *dev, Surface *surface, SurfaceBuff
   src.info.w = surface->info.src.width;
   src.info.h = surface->info.src.height;
   src.info.stride = src.info.w;
-  src.mem = &surface->buffer;
+  src.mem = &surface->buffer.mem;
   src.alpha = surface->info.alpha;
   src.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
   src.crop.x = surface->info.src.left;
@@ -111,21 +113,53 @@ compositor_do_composite_surface (Imx2DDevice *dev, Surface *surface, SurfaceBuff
     default:  src.rotate = IMX_2D_ROTATION_0;    break;
   }
 
-  if (dev->config_input(dev, &src.info) < 0) {
+  if (hcompositor->hdevice->config_input(hcompositor->hdevice, &src.info) < 0) {
     GST_ERROR (" device input config failed");
     return -1;
   }
 
   GST_LOG ("Input: %d, %dx%d", src.info.fmt, src.info.w, src.info.h);
 
-  if (dev->set_rotate(dev, src.rotate) != 0) {
+  if (hcompositor->hdevice->set_rotate(hcompositor->hdevice, src.rotate) != 0) {
     GST_ERROR("device rotate config failed");
     return -1;
   }
 
-  if (dev->blend(dev, &dst, &src) < 0) {
+  if (hcompositor->hdevice->blend(hcompositor->hdevice, &dst, &src) < 0) {
     GST_ERROR("device composite failed");
     return -1;
+  }
+
+  if (surface->buffer.buf) {
+    if (imx_video_overlay_composition_has_meta(
+                                      (GstBuffer *)(surface->buffer.buf))) {
+      VideoCompositionVideoInfo in_v, out_v;
+      memset (&in_v, 0, sizeof(VideoCompositionVideoInfo));
+      memset (&out_v, 0, sizeof(VideoCompositionVideoInfo));
+      in_v.buf = (GstBuffer *)(surface->buffer.buf);
+      in_v.width = src.info.w;
+      in_v.height = src.info.h;
+      in_v.rotate = src.rotate;
+      in_v.crop_x = src.crop.x;
+      in_v.crop_y = src.crop.y;
+      in_v.crop_w = src.crop.w;
+      in_v.crop_h = src.crop.h;
+
+      out_v.mem = dst.mem;
+      out_v.rotate = IMX_2D_ROTATION_0;
+      out_v.crop_x = dst.crop.x;
+      out_v.crop_y = dst.crop.y;
+      out_v.crop_w = dst.crop.w;
+      out_v.crop_h = dst.crop.h;
+
+      gint cnt = imx_video_overlay_composition_composite(&hcompositor->vcomp,
+                                                         &in_v, &out_v, FALSE);
+
+      if (cnt >= 0)
+        GST_DEBUG ("processed %d video overlay composition buffers", cnt);
+      else
+        GST_WARNING ("video overlay composition meta handling failed");
+    }
   }
 
   return 0;
@@ -280,14 +314,14 @@ static void compositor_do_compositing_surface_list (CompositorHandle *hcomposito
   gboolean upper;
 
   if (hcompositor->dst_buffer_cb.get_dst_buffer (hcompositor->dst_buffer_cb.context, &dstbuf) < 0) {
-    GST_ERROR ("compositor dst buffer is invalid vaddr(%p), paddr(%p)", dstbuf.vaddr, dstbuf.paddr);
+    GST_ERROR ("compositor dst buffer is invalid vaddr(%p), paddr(%p)", dstbuf.mem.vaddr, dstbuf.mem.paddr);
     return;
   }
 
   if (hcompositor->head != hcompositor->tail) {
     // need to back copy dest buffer for 2 more surfaces
-    if (hcompositor->prvdst.vaddr)
-      hcompositor->hdevice->frame_copy(hcompositor->hdevice, &hcompositor->prvdst, &dstbuf);
+    if (hcompositor->prvdst.mem.vaddr)
+      hcompositor->hdevice->frame_copy(hcompositor->hdevice, &hcompositor->prvdst.mem, &dstbuf);
   }
 
   upper = FALSE;
@@ -296,7 +330,7 @@ static void compositor_do_compositing_surface_list (CompositorHandle *hcomposito
     surface = list;
     list = list->next;
 
-    if (NULL == surface->buffer.paddr) {
+    if (NULL == surface->buffer.mem.paddr) {
       GST_WARNING ("Surface is empty, don't need update.");
       continue;
     }
@@ -317,7 +351,7 @@ static void compositor_do_compositing_surface_list (CompositorHandle *hcomposito
 
     if (surface->update || upper) {
       GST_DEBUG ("blit surface (%p)", surface);
-      if (compositor_do_composite_surface (hcompositor->hdevice, surface, &dstbuf) < 0) {
+      if (compositor_do_composite_surface (hcompositor, surface, &dstbuf) < 0) {
         GST_ERROR ("composite surface (%p) failed.", surface);
         break;
       }
@@ -364,6 +398,7 @@ gpointer create_compositor(gpointer device, CompositorDstBufferCb *pcallback)
 
   memset (hcompositor, 0, sizeof(CompositorHandle));
   hcompositor->hdevice = device;
+  imx_video_overlay_composition_init(&hcompositor->vcomp, device);
   hcompositor->dst_buffer_cb.context = pcallback->context;
   hcompositor->dst_buffer_cb.get_dst_buffer = pcallback->get_dst_buffer;
   hcompositor->dst_buffer_cb.flip_dst_buffer = pcallback->flip_dst_buffer;
@@ -397,6 +432,7 @@ void destroy_compositor(gpointer compositor)
   }
   g_mutex_clear (&hcompositor->lock);
   g_cond_clear (&hcompositor->cond);
+  imx_video_overlay_composition_deinit(&hcompositor->vcomp);
   g_slice_free1 (sizeof(CompositorHandle), hcompositor);
 
   return;
@@ -504,7 +540,7 @@ gint compositor_update_surface (gpointer compositor, gpointer surface, SurfaceBu
   }
 
   GST_DEBUG ("update surface (%p), buffer vaddr (%p) paddr (%p)", 
-      hsurface, buffer->vaddr, buffer->paddr);
+      hsurface, buffer->mem.vaddr, buffer->mem.paddr);
 
   memcpy (&hsurface->buffer, buffer, sizeof(SurfaceBuffer));
   hsurface->update = TRUE;

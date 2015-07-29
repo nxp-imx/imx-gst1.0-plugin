@@ -351,7 +351,7 @@ gint get_next_display_buffer (gpointer display, SurfaceBuffer *buffer)
     return -1;
   }
 
-  memcpy (buffer, memblk, sizeof (SurfaceBuffer));
+  memcpy (&(buffer->mem), memblk, sizeof (PhyMemBlock));
 
   //GST_DEBUG ("get display buffer, vaddr (%p) paddr (%p).", buffer->vaddr, buffer->paddr);
 
@@ -367,7 +367,7 @@ gint flip_display_buffer (gpointer display, SurfaceBuffer *buffer)
   //GST_DEBUG ("flip display buffer, vaddr (%p) paddr (%p).", buffer->vaddr, buffer->paddr);
 
   for (i=0; i<DISPLAY_NUM_BUFFERS; i++) {
-    if (buffer->vaddr == hdisplay->memblk[i].vaddr)
+    if (buffer->mem.vaddr == hdisplay->memblk[i].vaddr)
       memblk = &hdisplay->memblk[i];
   }
 

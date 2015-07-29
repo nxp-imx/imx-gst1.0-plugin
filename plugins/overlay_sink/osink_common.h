@@ -58,6 +58,9 @@ typedef struct {
   DestRect dst;
 } SurfaceInfo;
 
-typedef PhyMemBlock SurfaceBuffer;
+typedef struct {
+  PhyMemBlock mem;
+  GstBuffer *buf;
+} SurfaceBuffer;
 
 #endif

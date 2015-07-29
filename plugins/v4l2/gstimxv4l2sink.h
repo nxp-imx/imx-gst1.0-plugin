@@ -24,6 +24,7 @@
 #include <gst/video/gstvideometa.h>
 #include "gstimxcommon.h"
 #include "gstimxv4l2.h"
+#include "imxoverlaycompositionmeta.h"
 
 #define GST_TYPE_IMX_V4L2SINK \
   (gst_imx_v4l2sink_get_type())
@@ -65,6 +66,9 @@ struct _GstImxV4l2Sink {
 #ifdef USE_X11
   void *imxoverlay;
 #endif
+  GstImxVideoOverlayComposition video_comp;
+  gboolean composition_meta_enable;
+  Imx2DDevice *blend_dev;
 };
 
 struct _GstImxV4l2SinkClass {

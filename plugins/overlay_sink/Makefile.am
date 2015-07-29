@@ -14,6 +14,7 @@ libgstoverlaysinkplugins_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
 				 -I$(top_srcdir)/libs/gstsutils \
 				 -I$(top_srcdir)/libs/v4l2_core \
 				 -I$(top_srcdir)/libs/device-2d \
+				 -I$(top_srcdir)/libs/overlaycompositionmeta \
          -I$(top_srcdir)/ext-includes
 
 libgstoverlaysinkplugins_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \

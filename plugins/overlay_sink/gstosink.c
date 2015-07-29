@@ -28,6 +28,7 @@
 #ifdef USE_X11
 #include "gstimxvideooverlay.h"
 #endif
+#include "imxoverlaycompositionmeta.h"
 
 #define ALIGNMENT (16)
 #define ISALIGNED(a, b) (!(a & (b-1)))
@@ -39,6 +40,7 @@ GST_DEBUG_CATEGORY (overlay_sink_debug);
 enum
 {
   OVERLAY_SINK_PROP_0,
+  OVERLAY_SINK_PROP_COMPOSITION_META_ENABLE,
   OVERLAY_SINK_PROP_DISP_ON_0,
   OVERLAY_SINK_PROP_DISPWIN_X_0,
   OVERLAY_SINK_PROP_DISPWIN_Y_0,
@@ -52,6 +54,7 @@ enum
 };
 
 #define OVERLAY_SINK_PROP_DISP_LENGTH (OVERLAY_SINK_PROP_DISP_MAX_0-OVERLAY_SINK_PROP_DISP_ON_0)
+#define OVERLAY_SINK_COMPOMETA_DEFAULT     FALSE
 
 static GstFlowReturn
 gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer);
@@ -126,6 +129,11 @@ gst_overlay_sink_set_property (GObject * object,
   gint val;
 
   GST_DEBUG_OBJECT (sink, "set_property (%d).", prop_id);
+
+  if (prop_id == OVERLAY_SINK_PROP_COMPOSITION_META_ENABLE) {
+    sink->composition_meta_enable = g_value_get_boolean(value);
+    return;
+  }
 
   idx = (prop_id - OVERLAY_SINK_PROP_DISP_ON_0) / OVERLAY_SINK_PROP_DISP_LENGTH;
   prop = prop_id - idx * OVERLAY_SINK_PROP_DISP_LENGTH;
@@ -203,6 +211,11 @@ gst_overlay_sink_get_property (GObject * object,
   guint idx, prop; 
 
   GST_DEBUG_OBJECT (sink, "get_property (%d).", prop_id);
+
+  if (prop_id == OVERLAY_SINK_PROP_COMPOSITION_META_ENABLE) {
+    g_value_set_boolean(value, sink->composition_meta_enable);
+    return;
+  }
 
   idx = (prop_id - OVERLAY_SINK_PROP_DISP_ON_0) / OVERLAY_SINK_PROP_DISP_LENGTH;
   prop = prop_id - idx * OVERLAY_SINK_PROP_DISP_LENGTH;
@@ -562,6 +575,8 @@ gst_overlay_sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
 
   gst_query_add_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL);
   gst_query_add_allocation_meta (query, GST_VIDEO_CROP_META_API_TYPE, NULL);
+  if (sink->composition_meta_enable)
+    imx_video_overlay_composition_add_query_meta (query);
 
   return TRUE;
 }
@@ -654,9 +669,10 @@ gst_overlay_sink_get_surface_buffer (GstBuffer *gstbuffer, SurfaceBuffer *surfac
     return -1;
   }
 
-  surface_buffer->size = memblk->size;
-  surface_buffer->vaddr = memblk->vaddr;
-  surface_buffer->paddr = memblk->paddr;
+  surface_buffer->mem.size = memblk->size;
+  surface_buffer->mem.vaddr = memblk->vaddr;
+  surface_buffer->mem.paddr = memblk->paddr;
+  surface_buffer->buf = NULL;
 
   return 0;
 }
@@ -670,12 +686,13 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
   GstVideoFrameFlags flags = GST_VIDEO_FRAME_FLAG_NONE;
   SurfaceBuffer surface_buffer;
   gint i;
+  GstVideoInfo info;
+  GstCaps *caps = gst_pad_get_current_caps (GST_VIDEO_SINK_PAD (sink));
+  gst_video_info_from_caps (&info, caps);
 
   if (!gst_buffer_is_phymem (buffer)) {
     // check if physical buffer
     GstBuffer *buffer2 = NULL;
-    GstCaps *caps = gst_pad_get_current_caps (GST_VIDEO_SINK_PAD (sink));
-    GstVideoInfo info;
     GstVideoFrame frame1, frame2;
 
     GST_DEBUG_OBJECT (sink, "not physical buffer.");
@@ -699,7 +716,6 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
       return GST_FLOW_ERROR;
     }
 
-    gst_video_info_from_caps (&info, caps);
     gst_video_frame_map (&frame1, &info, buffer, GST_MAP_READ);
     gst_video_frame_map (&frame2, &info, buffer2, GST_MAP_WRITE);
 
@@ -707,7 +723,11 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
     gst_video_frame_unmap (&frame1);
     gst_video_frame_unmap (&frame2);
-    gst_caps_unref (caps);
+
+    if (sink->composition_meta_enable
+        && imx_video_overlay_composition_has_meta(buffer)) {
+      imx_video_overlay_composition_copy_meta(buffer2, buffer);
+    }
 
     buffer = buffer2;
     sink->no_phy_buffer = TRUE;
@@ -715,6 +735,8 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     gst_buffer_ref (buffer);
     sink->no_phy_buffer = FALSE;
   }
+
+  gst_caps_unref (caps);
 
   if (gst_overlay_sink_get_surface_buffer (buffer, &surface_buffer) < 0) {
     GST_ERROR_OBJECT (sink, "Can't get surface buffer from gst buffer (%p).", buffer);
@@ -724,9 +746,15 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     return GST_FLOW_OK;
   }
 
-  GST_DEBUG_OBJECT (sink, "show gstbuffer (%p), surface_buffer vaddr (%p) paddr (%p).",
-      buffer, surface_buffer.vaddr, surface_buffer.paddr);
+  if (sink->composition_meta_enable
+      && imx_video_overlay_composition_has_meta(buffer)) {
+    surface_buffer.buf = buffer;
+  } else {
+    surface_buffer.buf = NULL;
+  }
 
+  GST_DEBUG_OBJECT (sink, "show gstbuffer (%p), surface_buffer vaddr (%p) paddr (%p).",
+      buffer, surface_buffer.mem.vaddr, surface_buffer.mem.paddr);
 
   gst_overlay_sink_check_alignment (sink, buffer);
 
@@ -769,6 +797,7 @@ gst_overlay_sink_finalize (GstOverlaySink * overlay_sink)
     overlay_sink->imxoverlay = NULL;
   }
 #endif
+
   G_OBJECT_CLASS (parent_class)->finalize ((GObject *) (overlay_sink));
 }
 
@@ -783,6 +812,13 @@ gst_overlay_sink_install_properties (GObjectClass *gobject_class)
 
   if (!osink_obj)
     return;
+
+  g_object_class_install_property (gobject_class,
+      OVERLAY_SINK_PROP_COMPOSITION_META_ENABLE,
+      g_param_spec_boolean("composition-meta-enable", "Enable composition meta",
+        "Enable overlay composition meta processing",
+        OVERLAY_SINK_COMPOMETA_DEFAULT,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   display_count = osink_object_get_display_count (osink_obj);
   prop = OVERLAY_SINK_PROP_DISP_ON_0;
@@ -931,6 +967,22 @@ gst_overlay_sink_get_static_caps ()
     gst_caps_append_structure (caps, structure);
   }
 
+  imx_video_overlay_composition_add_caps(caps);
+
+  return caps;
+}
+
+static GstCaps *gst_overlay_sink_get_caps (GstBaseSink *sink, GstCaps* filter)
+{
+  GstOverlaySink *overlay_sink = GST_OVERLAY_SINK (sink);
+
+  GstCaps *caps = gst_overlay_sink_get_static_caps();
+  if (!overlay_sink->composition_meta_enable)
+    imx_video_overlay_composition_remove_caps(caps);
+
+  if (filter)
+    caps = gst_caps_intersect (caps, filter);
+
   return caps;
 }
 
@@ -958,7 +1010,7 @@ gst_overlay_sink_class_init (GstOverlaySinkClass * klass)
   gst_element_class_add_pad_template (element_class,
       gst_pad_template_new ("sink", GST_PAD_SINK, GST_PAD_ALWAYS, gst_overlay_sink_get_static_caps ()));
 
-  //FIXME:basesink_class->get_caps = GST_DEBUG_FUNCPTR (gst_overlay_sink_get_caps);
+  basesink_class->get_caps = GST_DEBUG_FUNCPTR (gst_overlay_sink_get_caps);
   basesink_class->set_caps = GST_DEBUG_FUNCPTR (gst_overlay_sink_set_caps);
   basesink_class->propose_allocation = GST_DEBUG_FUNCPTR (gst_overlay_sink_propose_allocation);
   basesink_class->render = GST_DEBUG_FUNCPTR (gst_overlay_sink_show_frame);
@@ -994,6 +1046,7 @@ gst_overlay_sink_init (GstOverlaySink * overlay_sink)
   overlay_sink->no_phy_buffer = FALSE;
   overlay_sink->pool_activated = FALSE;
   overlay_sink->pool_alignment_checked = FALSE;
+  overlay_sink->composition_meta_enable = FALSE;
 
 #ifdef USE_X11
   overlay_sink->imxoverlay = gst_imx_video_overlay_init ((GstElement *)overlay_sink,

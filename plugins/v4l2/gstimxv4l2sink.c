@@ -21,6 +21,7 @@
 #include <gst/video/gstvideopool.h>
 #include "gstimxv4l2sink.h"
 #include "gstimxv4l2allocator.h"
+#include "imx_2d_device.h"
 
 #define ALIGNMENT_8 (8)
 #define ALIGNMENT_2 (2)
@@ -33,6 +34,8 @@
 
 GST_DEBUG_CATEGORY (imxv4l2sink_debug);
 #define GST_CAT_DEFAULT imxv4l2sink_debug
+
+#define IMX_V4L2SINK_COMPOMETA_DEFAULT     FALSE
 
 enum {
   PROP_0,
@@ -49,7 +52,8 @@ enum {
   PROP_KEEP_VIDEO_RATIO,
   PROP_DEINTERLACE_ENABLE,
   PROP_DEINTERLACE_MOTION,
-  PROP_CONFIG
+  PROP_CONFIG,
+  PROP_COMPOSITION_META_ENABLE
 };
 
 enum {
@@ -162,6 +166,9 @@ gst_imx_v4l2sink_set_property (GObject * object,
     case PROP_CONFIG:
       v4l2sink->config = g_value_get_boolean (value);
       break;
+    case PROP_COMPOSITION_META_ENABLE:
+      v4l2sink->composition_meta_enable = g_value_get_boolean(value);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -216,6 +223,9 @@ gst_imx_v4l2sink_get_property (GObject * object,
       break;
     case PROP_CONFIG:
       g_value_set_boolean (value, v4l2sink->config);
+      break;
+    case PROP_COMPOSITION_META_ENABLE:
+      g_value_set_boolean(value, v4l2sink->composition_meta_enable);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -599,6 +609,8 @@ gst_imx_v4l2sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
   /* we also support various metadata */
   gst_query_add_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL);
   gst_query_add_allocation_meta (query, GST_VIDEO_CROP_META_API_TYPE, NULL);
+  if (v4l2sink->composition_meta_enable)
+    imx_video_overlay_composition_add_query_meta (query);
 
   return TRUE;
 }
@@ -636,10 +648,12 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     not_v4l2buffer = TRUE;
   gst_memory_unref (mem);
 
+  GstVideoInfo info;
+  GstCaps *caps = gst_pad_get_current_caps (GST_VIDEO_SINK_PAD (v4l2sink));
+  gst_video_info_from_caps (&info, caps);
+
   if (not_v4l2buffer) {
     GstBuffer *v4l2_buffer = NULL;
-    GstCaps *caps = gst_pad_get_current_caps (GST_VIDEO_SINK_PAD (v4l2sink));
-    GstVideoInfo info;
     GstVideoFrame frame1, frame2;
 
     GST_DEBUG_OBJECT (v4l2sink, "not v4l2 allocated buffer.");
@@ -663,7 +677,7 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
       return GST_FLOW_ERROR;
     }
 
-    gst_video_info_from_caps (&info, caps);
+
     gst_video_frame_map (&frame1, &info, v4l2_buffer, GST_MAP_WRITE);
     gst_video_frame_map (&frame2, &info, buffer, GST_MAP_READ);
 
@@ -671,10 +685,16 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
     gst_video_frame_unmap (&frame1);
     gst_video_frame_unmap (&frame2);
-    gst_caps_unref (caps);
+
+    if (v4l2sink->composition_meta_enable
+        && imx_video_overlay_composition_has_meta(buffer)) {
+      imx_video_overlay_composition_copy_meta(v4l2_buffer, buffer);
+    }
 
     buffer = v4l2_buffer;
   }
+
+  gst_caps_unref (caps);
 
   if (cropmeta && gst_imx_v4l2sink_incrop_changed_and_set (cropmeta, &v4l2sink->cropmeta)) {
     v4l2sink->config = TRUE;
@@ -721,6 +741,44 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     v4l2sink->config = FALSE;
   }
 
+  if (v4l2sink->composition_meta_enable) {
+    if (imx_video_overlay_composition_has_meta(buffer)) {
+
+      VideoCompositionVideoInfo in_v, out_v;
+      memset (&in_v, 0, sizeof(VideoCompositionVideoInfo));
+      memset (&out_v, 0, sizeof(VideoCompositionVideoInfo));
+      in_v.buf = buffer;
+      in_v.fmt = out_v.fmt = info.finfo->format;
+      in_v.width = out_v.width = info.width;
+      in_v.height = out_v.height = info.height;
+      in_v.stride = out_v.stride = info.stride[0];
+      in_v.crop_x = out_v.crop_x = v4l2sink->crop.left;
+      in_v.crop_y = out_v.crop_y = v4l2sink->crop.top;
+      in_v.crop_w = out_v.crop_w = v4l2sink->crop.width;
+      in_v.crop_h = out_v.crop_h = v4l2sink->crop.height;
+
+      switch (v4l2sink->rotate) {
+        case 0:   in_v.rotate = IMX_2D_ROTATION_0;    break;
+        case 90:  in_v.rotate = IMX_2D_ROTATION_90;   break;
+        case 180: in_v.rotate = IMX_2D_ROTATION_180;  break;
+        case 270: in_v.rotate = IMX_2D_ROTATION_270;  break;
+        default:  in_v.rotate = IMX_2D_ROTATION_0;    break;
+      }
+
+      out_v.mem = gst_buffer_query_phymem_block(buffer);
+      out_v.rotate = IMX_2D_ROTATION_0;
+      memcpy(&out_v.align, &(v4l2sink->video_align), sizeof(GstVideoAlignment));
+
+      gint cnt = imx_video_overlay_composition_composite(&v4l2sink->video_comp,
+                                                         &in_v, &out_v, TRUE);
+
+      if (cnt >= 0)
+        GST_DEBUG ("processed %d video overlay composition buffers", cnt);
+      else
+        GST_WARNING ("video overlay composition meta handling failed");
+    }
+  }
+
   if (!not_v4l2buffer)
     gst_buffer_ref (buffer);
 
@@ -758,6 +816,13 @@ gst_imx_v4l2sink_finalize (GstImxV4l2Sink * v4l2sink)
     v4l2sink->imxoverlay = NULL;
   }
 #endif
+
+  if (v4l2sink->blend_dev) {
+    v4l2sink->blend_dev->close(v4l2sink->blend_dev);
+    imx_video_overlay_composition_deinit(&v4l2sink->video_comp);
+    imx_2d_device_destroy(v4l2sink->blend_dev);
+  }
+
   G_OBJECT_CLASS (parent_class)->finalize ((GObject *) (v4l2sink));
 }
 
@@ -830,6 +895,12 @@ gst_imx_v4l2sink_install_properties (GObjectClass *gobject_class)
           0, 2, 2, G_PARAM_READWRITE));
   }
 
+  g_object_class_install_property (gobject_class, PROP_COMPOSITION_META_ENABLE,
+      g_param_spec_boolean("composition-meta-enable", "Enable composition meta",
+        "Enable overlay composition meta processing",
+        IMX_V4L2SINK_COMPOMETA_DEFAULT,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   return;
 }
 
@@ -871,6 +942,22 @@ gst_imx_v4l2sink_get_all_caps ()
     caps = gst_imx_v4l2sink_default_caps ();
   }
 
+  imx_video_overlay_composition_add_caps(caps);
+
+  return caps;
+}
+
+static GstCaps *gst_imx_v4l2sink_get_caps (GstBaseSink *sink, GstCaps* filter)
+{
+  GstImxV4l2Sink *v4l2sink = GST_IMX_V4L2SINK (sink);
+
+  GstCaps *caps = gst_imx_v4l2sink_get_all_caps();
+  if (!v4l2sink->composition_meta_enable)
+    imx_video_overlay_composition_remove_caps(caps);
+
+  if (filter)
+    caps = gst_caps_intersect (caps, filter);
+
   return caps;
 }
 
@@ -899,7 +986,7 @@ gst_imx_v4l2sink_class_init (GstImxV4l2SinkClass * klass)
       gst_pad_template_new ("sink", GST_PAD_SINK, GST_PAD_ALWAYS,
         gst_imx_v4l2sink_get_all_caps ()));
 
-  //FIXME:basesink_class->get_caps = GST_DEBUG_FUNCPTR (gst_imx_v4l2sink_get_caps);
+  basesink_class->get_caps = GST_DEBUG_FUNCPTR (gst_imx_v4l2sink_get_caps);
   basesink_class->set_caps = GST_DEBUG_FUNCPTR (gst_imx_v4l2sink_set_caps);
   basesink_class->propose_allocation =
     GST_DEBUG_FUNCPTR (gst_imx_v4l2sink_propose_allocation);
@@ -939,6 +1026,22 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
                                               v4l2sink_config_color_key,
                                               v4l2sink_config_global_alpha);
 #endif
+
+  v4l2sink->composition_meta_enable = FALSE;
+  v4l2sink->blend_dev = NULL;
+  if (HAS_IPU())
+    v4l2sink->blend_dev = imx_2d_device_create(IMX_2D_DEVICE_IPU);
+  else if (HAS_PXP())
+    v4l2sink->blend_dev = imx_2d_device_create(IMX_2D_DEVICE_PXP);
+/*
+  else if (HAS_G2D())
+    v4l2sink->blend_dev = imx_2d_device_create(IMX_2D_DEVICE_G2D);
+*/
+
+  if (v4l2sink->blend_dev) {
+    v4l2sink->blend_dev->open(v4l2sink->blend_dev);
+    imx_video_overlay_composition_init(&v4l2sink->video_comp,v4l2sink->blend_dev);
+  }
 
   g_print("====== IMXV4L2SINK: %s build on %s %s. ======\n",  (VERSION),__DATE__,__TIME__);
 

@@ -75,6 +75,7 @@ struct _GstOverlaySink {
 #ifdef USE_X11
   void *imxoverlay;
 #endif
+  gboolean composition_meta_enable;
 };
 
 struct _GstOverlaySinkClass {
