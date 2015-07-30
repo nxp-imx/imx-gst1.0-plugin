@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (C) 2014-2015 Freescale Semiconductor, Inc. All rights reserved.
  *
  */
  
@@ -35,24 +35,31 @@
  *         Author:  Dr. Fritz Mehner (mn), mehner@fh-swf.de
  *        Company:  FH Südwestfalen, Iserlohn
  *
+ *       Modified:  Haihua Hu
+ *           Date:  08/03/2015
+ *        Company:  Freescale Semiconductor
  * =====================================================================================
  */
 #ifndef __PLAYLIST_H__
 #define __PLAYLIST_H__
 
-#include "fsl_player_types.h"
+#include <gst/gst.h>
+#include "playengine.h"
 
-typedef struct {
-    fsl_player_s8 * name;
-} PlayItem;
+typedef void * PlayListHandle;
 
-void * createPlayList(fsl_player_s8 * title);
-PlayItem * addItemAtTail(void * hdl, fsl_player_s8 * iName, fsl_player_s32 copy);
-PlayItem * getFirstItem(void * hdl);
-PlayItem * getLastItem(void * hdl);
-PlayItem * getPrevItem(PlayItem * itm);
-PlayItem * getNextItem(PlayItem * itm);
-void destroyPlayList(void * hdl);
+PlayListHandle    createPlayList();
+void              destroyPlayList (PlayListHandle handle);
+
+PlayEngineResult  isPlayListEmpty (PlayListHandle handle, gboolean *empty);
+PlayEngineResult  isLastItem      (PlayListHandle handle, gboolean *islast);
+PlayEngineResult  isFirstItem     (PlayListHandle handle, gboolean *isfirst);
+PlayEngineResult  addItemAtTail   (PlayListHandle handle, gchar *iName);
+
+const gchar *     getFirstItem    (PlayListHandle handle);
+const gchar *     getLastItem     (PlayListHandle handle);
+const gchar *     getCurItem      (PlayListHandle handle);
+const gchar *     getPrevItem     (PlayListHandle handle);
+const gchar *     getNextItem     (PlayListHandle handle);
  
 #endif
-

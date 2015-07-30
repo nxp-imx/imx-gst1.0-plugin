@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (C) 2015-2015 Freescale Semiconductor, Inc. All rights reserved.
  *
  */
  
@@ -35,6 +35,9 @@
  *         Author:  Dr. Fritz Mehner (mn), mehner@fh-swf.de
  *        Company:  FH Südwestfalen, Iserlohn
  *
+ *       Modified:  Haihua Hu
+ *           Date:  08/03/2015
+ *        Company:  Freescale Semiconductor
  * =====================================================================================
  */
 #include <stdio.h>
@@ -45,34 +48,28 @@
 #define MEM_ZERO(ptr,size) memset((ptr),0,(size))
 #define PL_ERR printf
 
-#define DEFAULT_PL_TITLE "default"
-
-typedef struct _PlayList PlayList;
 
 typedef struct _PlayItemCtl{
-    PlayItem pi;
-    void * buffer;
-    PlayList * pl;
+    gchar * iName;
     struct _PlayItemCtl * prev;
     struct _PlayItemCtl * next;
 }PlayItemCtl;
 
 
-struct _PlayList{
+typedef struct _PlayList{
     PlayItemCtl * head;
     PlayItemCtl * tail;
-    fsl_player_s8 * title;
-};
+    PlayItemCtl * cur;
+}PlayList;
 
-static void destroyPlayItemCtl(PlayItemCtl * item)
+static void 
+destroyPlayItemCtl(PlayItemCtl * item)
 {
-    if (item->buffer)
-        MEM_FREE(item->buffer);
     MEM_FREE(item);
 }
 
-void * 
-createPlayList(char * title)
+PlayListHandle 
+createPlayList()
 {
     PlayList * pl = MEM_ALLOC(sizeof(PlayList));
     if (pl==NULL){
@@ -82,32 +79,41 @@ createPlayList(char * title)
 
     MEM_ZERO(pl, sizeof(PlayList));
 
-    if (title==NULL)
-        title = DEFAULT_PL_TITLE;
+    return (PlayListHandle)pl;
 
-    
-    pl->title = MEM_ALLOC(strlen(title)+1);
-    if (pl->title==NULL){
-        PL_ERR("%s failed, no memory!\n");
-        goto err;
-    }
-    strcpy(pl->title, title);
-    
-    
-    return (void *)pl;
 err:
     if (pl){
         MEM_FREE(pl);
         pl=NULL;
     }
-    return (void *)pl;
+
+    return (PlayListHandle)pl;
 }
 
-PlayItem * 
-addItemAtTail(void * hdl, fsl_player_s8 * iName, fsl_player_s32 copy)
+PlayEngineResult
+isPlayListEmpty(PlayListHandle handle,
+                gboolean *empty)
+{
+  PlayList * pl = (PlayList *)handle;
+  if(pl == NULL || empty == NULL)
+  {
+      PL_ERR("%s failed, parameters error!\n", __FUNCTION__);
+      return PLAYENGINE_ERROR_BAD_PARAM;
+  }
+  if(!pl->head)
+    *empty = TRUE;
+  else
+    *empty = FALSE;
+
+  return PLAYENGINE_SUCCESS;
+}
+
+PlayEngineResult
+addItemAtTail(PlayListHandle handle,
+              gchar * iName)
 {
     PlayItemCtl * item = NULL;
-    PlayList * pl = (PlayList *)hdl;
+    PlayList * pl = (PlayList *)handle;
     
     if ((pl==NULL)||(iName==NULL)){
         PL_ERR("%s failed, parameters error!\n", __FUNCTION__);
@@ -116,25 +122,19 @@ addItemAtTail(void * hdl, fsl_player_s8 * iName, fsl_player_s32 copy)
 
     item = MEM_ALLOC(sizeof(PlayItemCtl));
     if (item==NULL){
-        PL_ERR("%s failed, no memory!\n");
+        PL_ERR("%s failed, no memory!\n", __FUNCTION__);
         goto err;
     }
 
     MEM_ZERO(item, sizeof(PlayItemCtl));
 
-    if (copy){
-        item->buffer = MEM_ALLOC(strlen(iName));
-        if (item->buffer==NULL){
-            PL_ERR("%s failed, no memory!\n");
-            goto err;
-        }
-        strcpy(item->buffer, iName);
-        item->pi.name = item->buffer;
-    }else{
-        item->pi.name = iName;
+    item->iName = (gchar *)MEM_ALLOC(strlen(iName)+1);
+    if (item->iName == NULL)
+    {
+        PL_ERR("%s failed, no memory!\n", __FUNCTION__);
+        goto err;
     }
-
-    item->pl = pl;
+    strcpy(item->iName, iName);
 
     item->prev = pl->tail;
     
@@ -142,74 +142,167 @@ addItemAtTail(void * hdl, fsl_player_s8 * iName, fsl_player_s32 copy)
         pl->tail->next = item;
         pl->tail= item;
     }else{
-        pl->head = pl->tail = item;
+        pl->head = item;
+        pl->tail = item;
+        pl->cur = item;
     }
-    return (PlayItem *)item;
+    return PLAYENGINE_SUCCESS;
 err:
     if (item){
         MEM_FREE(item);
         item=NULL;
     }
-    return (PlayItem *)item;
+    return PLAYENGINE_FAILURE;
 }
 
-PlayItem * 
-getFirstItem(void * hdl)
+const gchar *
+getFirstItem(PlayListHandle handle)
 {
-    PlayList * pl = (PlayList *)hdl;
+    PlayList * pl = (PlayList *)handle;
     if (pl==NULL){
         PL_ERR("%s failed, parameters error!\n", __FUNCTION__);
         return NULL;
     }
-    return (PlayItem *)(pl->head);
+    if(!pl->head)
+    {
+        PL_ERR("Play list is empty\n");
+        return NULL;
+    }
+    pl->cur = pl->head;
+    return pl->head->iName;
 }
 
-PlayItem * 
-getLastItem(void * hdl)
+const gchar * 
+getLastItem(PlayListHandle handle)
 {
-    PlayList * pl = (PlayList *)hdl;
+    PlayList * pl = (PlayList *)handle;
     if (pl==NULL){
         PL_ERR("%s failed, parameters error!\n", __FUNCTION__);
         return NULL;
     }
-    return (PlayItem *)(pl->tail);
+    if(!pl->head)
+    {
+        PL_ERR("Play list is empty\n");
+        return NULL;
+    }
+    pl->cur = pl->tail;
+    return pl->tail->iName;
 }
 
-PlayItem * 
-getPrevItem(PlayItem * itm)
+const gchar *
+getCurItem(PlayListHandle handle)
 {
-    PlayItemCtl * item = (PlayItemCtl *)itm;
-    if (item==NULL){
+    PlayList * pl = (PlayList *)handle;
+    if (pl==NULL){
         PL_ERR("%s failed, parameters error!\n", __FUNCTION__);
         return NULL;
     }
-    return (PlayItem *)(item->prev);
+    if(!pl->head)
+    {
+        PL_ERR("Play list is empty\n");
+        return NULL;
+    }
+    return pl->cur->iName;
 }
 
-PlayItem * 
-getNextItem(PlayItem * itm)
+const gchar *
+getPrevItem(PlayListHandle handle)
 {
-    PlayItemCtl * item = (PlayItemCtl *)itm;
-    if (item==NULL){
+    PlayList * pl = (PlayList *)handle;
+    if (pl==NULL){
         PL_ERR("%s failed, parameters error!\n", __FUNCTION__);
         return NULL;
     }
-    return (PlayItem *)(item->next);
+    if(!pl->head)
+    {
+        PL_ERR("Play list is empty\n");
+        return NULL;
+    }
+    if(!pl->cur->prev)
+    {
+        PL_ERR("%s No previous item!\n", __FUNCTION__);
+        return NULL;
+    }
+    pl->cur = pl->cur->prev;
+    return pl->cur->iName;
+}
+
+const gchar * 
+getNextItem(PlayListHandle handle)
+{
+    PlayList * pl = (PlayList *)handle;
+    if (pl==NULL){
+        PL_ERR("%s failed, parameters error!\n", __FUNCTION__);
+        return NULL;
+    }
+    if(!pl->head)
+    {
+        PL_ERR("Play list is empty\n");
+        return NULL;
+    }
+    if(!pl->cur->next)
+    {
+        PL_ERR("%s No next item!\n", __FUNCTION__);
+        return NULL;
+    }
+    pl->cur = pl->cur->next;
+    return pl->cur->iName;
+}
+
+PlayEngineResult
+isLastItem(PlayListHandle handle,
+            gboolean *islast)
+{
+    PlayList * pl = (PlayList *)handle;
+    if (pl==NULL || islast==NULL){
+        PL_ERR("%s failed, parameters error!\n", __FUNCTION__);
+        return PLAYENGINE_ERROR_BAD_PARAM;
+    }
+    if(!pl->head)
+    {
+        PL_ERR("Play list is empty\n");
+        return PLAYENGINE_FAILURE;
+    }
+    if(pl->cur == pl->tail)
+    {
+        *islast = TRUE;
+    }else
+    {
+        *islast = FALSE;
+    }
+    return PLAYENGINE_SUCCESS;
+}
+
+PlayEngineResult
+isFirstItem(PlayListHandle handle,
+            gboolean *isfirst)
+{
+    PlayList * pl = (PlayList *)handle;
+    if (pl==NULL || isfirst==NULL){
+        PL_ERR("%s failed, parameters error!\n", __FUNCTION__);
+        return PLAYENGINE_ERROR_BAD_PARAM;
+    }
+    if(!pl->head)
+    {
+        PL_ERR("Play list is empty\n");
+        return PLAYENGINE_FAILURE;
+    }
+    if(pl->cur == pl->head)
+    {
+        *isfirst = TRUE;
+    }else
+    {
+        *isfirst = FALSE;
+    }
+    return PLAYENGINE_SUCCESS;
 }
 
 void 
-destroyPlayList(void * hdl)
+destroyPlayList(PlayListHandle handle)
 {
-    PlayList * pl = (PlayList *)hdl;
+    PlayList * pl = (PlayList *)handle;
     PlayItemCtl * item, *itemnext;
 
-    if (!pl)
-      return;
-
-     if (pl->title){
-      MEM_FREE(pl->title);
-     }
-    
     if (pl==NULL){
         PL_ERR("%s failed, parameters error!\n", __FUNCTION__);
         return;
@@ -221,6 +314,5 @@ destroyPlayList(void * hdl)
         item=itemnext;
     }
     MEM_FREE(pl);
+    pl = NULL;
 }
-
-

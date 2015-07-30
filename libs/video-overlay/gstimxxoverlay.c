@@ -61,8 +61,14 @@ static void
 update_video_win (ImxVideoOverlay * imxxoverlay)
 {
   ImxXOverlay *xoverlay = (ImxXOverlay *)imxxoverlay->private;
-  if (!xoverlay || !xoverlay->disp || !imxxoverlay->video_win)
+  if (!xoverlay || !xoverlay->disp)
     return;
+
+  if (!imxxoverlay->video_win && imxxoverlay->update_video_geo) { 
+    // no window applied 
+    imxxoverlay->update_video_geo(imxxoverlay->parent,imxxoverlay->render_rect);
+    return;
+  }       
 
   Window win = imxxoverlay->video_win;
   Display *dpy = xoverlay->disp;
