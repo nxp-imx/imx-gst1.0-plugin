@@ -1447,22 +1447,38 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
 
       if (imxcomp->composition_meta_enable &&
         imx_video_overlay_composition_has_meta(ppad->buffer)) {
-        GstVideoFrame in, out;
-        if (gst_video_frame_map (&in, &ppad->buffer_vinfo, ppad->buffer,
-                GST_MAP_READ)) {
-          if (gst_video_frame_map (&out, &((GstVideoAggregator*)imxcomp)->info,
-              outbuf, GST_MAP_WRITE)) {
-            gint cnt = imx_video_overlay_composition_composite(
-                          &imxcomp->video_comp, &in, &out);
-            if (cnt >= 0)
-              GST_DEBUG ("processed %d video overlay composition buffers", cnt);
-            else
-              GST_WARNING ("video overlay composition meta handling failed");
+        VideoCompositionVideoInfo in_v, out_v;
+        memset (&in_v, 0, sizeof(VideoCompositionVideoInfo));
+        memset (&out_v, 0, sizeof(VideoCompositionVideoInfo));
+        in_v.buf = ppad->buffer;
+        in_v.fmt = src.info.fmt;
+        in_v.width = src.info.w;
+        in_v.height = src.info.h;
+        in_v.stride = src.info.stride;
+        in_v.rotate = src.rotate;
+        in_v.crop_x = src.crop.x;
+        in_v.crop_y = src.crop.y;
+        in_v.crop_w = src.crop.w;
+        in_v.crop_h = src.crop.h;
 
-            gst_video_frame_unmap(&out);
-          }
-          gst_video_frame_unmap(&in);
-        }
+        out_v.mem = dst.mem;
+        out_v.fmt = dst.info.fmt;
+        out_v.width = dst.info.w;
+        out_v.height = dst.info.h;
+        out_v.stride = dst.info.stride;
+        out_v.rotate = IMX_2D_ROTATION_0;
+        out_v.crop_x = dst.crop.x;
+        out_v.crop_y = dst.crop.y;
+        out_v.crop_w = dst.crop.w;
+        out_v.crop_h = dst.crop.h;
+
+        gint cnt = imx_video_overlay_composition_composite(&imxcomp->video_comp,
+                                                          &in_v, &out_v, FALSE);
+
+        if (cnt >= 0)
+          GST_DEBUG ("processed %d video overlay composition buffers", cnt);
+        else
+          GST_WARNING ("video overlay composition meta handling failed");
       }
     }
   }

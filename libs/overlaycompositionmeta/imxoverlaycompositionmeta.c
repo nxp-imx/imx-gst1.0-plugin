@@ -179,17 +179,25 @@ void imx_video_overlay_composition_deinit(GstImxVideoOverlayComposition *vcomp)
 
     vcomp->tmp_buf = NULL;
     vcomp->allocator = NULL;
+    vcomp->device = NULL;
   }
 }
 
 gboolean imx_video_overlay_composition_has_meta(GstBuffer *in)
 {
-  GstVideoOverlayCompositionMeta *compmeta =
-      gst_buffer_get_video_overlay_composition_meta(in);
+  gpointer state = NULL;
+  GstMeta *meta;
+  GstVideoOverlayCompositionMeta *compmeta;
 
-  if (compmeta && GST_IS_VIDEO_OVERLAY_COMPOSITION (compmeta->overlay)) {
-    return TRUE;
+  while ((meta = gst_buffer_iterate_meta (in, &state))) {
+    if (meta->info->api == GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE) {
+      compmeta = (GstVideoOverlayCompositionMeta*)meta;
+      if (GST_IS_VIDEO_OVERLAY_COMPOSITION (compmeta->overlay)) {
+        return TRUE;
+      }
+    }
   }
+
   return FALSE;
 }
 
@@ -252,26 +260,71 @@ void imx_video_overlay_composition_add_query_meta(GstQuery *query)
                            GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE, NULL);
 }
 
+void imx_video_overlay_composition_copy_meta(GstBuffer *dst, GstBuffer *src)
+{
+  gpointer state = NULL;
+  GstMeta *meta;
+  GstVideoOverlayCompositionMeta *compmeta;
+
+  while ((meta = gst_buffer_iterate_meta (src, &state))) {
+    if (meta->info->api == GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE) {
+      compmeta = (GstVideoOverlayCompositionMeta*)meta;
+      if (GST_IS_VIDEO_OVERLAY_COMPOSITION (compmeta->overlay)) {
+        gst_buffer_add_video_overlay_composition_meta(dst,
+                        gst_video_overlay_composition_copy(compmeta->overlay));
+      }
+    }
+  }
+}
+
+gint imx_video_overlay_composition_remove_meta(GstBuffer *buffer)
+{
+  gint ret = 0;
+  GstVideoOverlayCompositionMeta *compmeta;
+
+  if (gst_buffer_is_writable(buffer)) {
+    while(compmeta = gst_buffer_get_video_overlay_composition_meta(buffer))
+      gst_buffer_remove_video_overlay_composition_meta(buffer, compmeta);
+  } else {
+    g_print("remove video composition meta failed: buffer not writable\n");
+    ret = -1;
+  }
+
+  return ret;
+}
+
 gint imx_video_overlay_composition_composite(
                                       GstImxVideoOverlayComposition *vcomp,
-                                      GstVideoFrame *in, GstVideoFrame *out)
+                                      VideoCompositionVideoInfo *in_v,
+                                      VideoCompositionVideoInfo *out_v,
+                                      gboolean config_out)
 {
+  GstVideoOverlayCompositionMeta *compmeta;
   gint blend_cnt = -1;
+  gpointer state = NULL;
+  GstMeta *meta;
 
-  GstVideoOverlayCompositionMeta *compmeta =
-      gst_buffer_get_video_overlay_composition_meta(in->buffer);
+  if (!vcomp || !in_v || !in_v->buf || !out_v || !out_v->mem)
+    return -1;
 
-  if (compmeta && GST_IS_VIDEO_OVERLAY_COMPOSITION (compmeta->overlay)) {
+  while ((meta = gst_buffer_iterate_meta (in_v->buf, &state))) {
+    if (meta->info->api == GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE) {
+      compmeta = (GstVideoOverlayCompositionMeta*)meta;
+    } else {
+      continue;
+    }
+
+    if (!GST_IS_VIDEO_OVERLAY_COMPOSITION (compmeta->overlay)) {
+      continue;
+    }
+
     guint n;
     GstVideoOverlayComposition *comp = compmeta->overlay;
-    guint video_w = GST_VIDEO_INFO_WIDTH(&in->info);
-    guint video_h = GST_VIDEO_INFO_HEIGHT(&in->info);
     guint num = gst_video_overlay_composition_n_rectangles (comp);
     blend_cnt = 0;
 
-    GST_INFO ("Blending composition %p with %u rectangles onto video buffer %p "
-        "(%ux%u, format %s)", comp, num, in->buffer, video_w, video_h,
-        gst_video_format_to_string(GST_VIDEO_INFO_FORMAT(&in->info)));
+    GST_INFO ("Blending composition %p with %u rectangles onto buffer %p",
+                comp, num, in_v->buf);
 
     for (n = 0; n < num; n++) {
       GstVideoOverlayRectangle *rect;
@@ -329,11 +382,10 @@ gint imx_video_overlay_composition_composite(
       aligned_w = ALIGNTO(vmeta->width, ALIGNMENT);
       aligned_h = ALIGNTO(vmeta->height, ALIGNMENT);
 
-      GST_INFO ("t_fmt=%s, orgi=%s, phy=%d, w=%d, h=%d, r_w=%d, r_h=%d\n",
+      GST_INFO ("t_fmt=%s, orgi=%s, phy=%d, w=%d, h=%d",
           gst_video_format_to_string(t_fmt),
           gst_video_format_to_string(vmeta->format),
-          gst_buffer_is_phymem(ovbuf), vmeta->width, vmeta->height,
-          render_w, render_h);
+          gst_buffer_is_phymem(ovbuf), vmeta->width, vmeta->height);
 
       if (t_fmt != vmeta->format || !gst_buffer_is_phymem(ovbuf)) {
         // need copy buffer
@@ -341,13 +393,21 @@ gint imx_video_overlay_composition_composite(
           vcomp->allocator =
                  gst_imx_2d_device_allocator_new((gpointer)(vcomp->device));
 
+        if (!vcomp->allocator) {
+          g_print("create allocator for overlay buffer failed\n");
+          continue;
+        }
+
         if (!vcomp->tmp_buf) {
           vcomp->tmp_buf = gst_buffer_new_allocate(vcomp->allocator,
               IMX_OVERLAY_COMPOSITION_INIT_BUFFER_SIZE, NULL);
           if (vcomp->tmp_buf)
             vcomp->tmp_buf_size = IMX_OVERLAY_COMPOSITION_INIT_BUFFER_SIZE;
-          else
+          else {
             vcomp->tmp_buf_size = 0;
+            g_print("allocate buffer by allocator failed, size=%d\n",
+                IMX_OVERLAY_COMPOSITION_INIT_BUFFER_SIZE);
+          }
         } else {
           if (vcomp->tmp_buf_size < aligned_w * aligned_h * 4) {
             GstBuffer *tmp_buf = gst_buffer_new_allocate(vcomp->allocator,
@@ -362,7 +422,7 @@ gint imx_video_overlay_composition_composite(
 
         if (!vcomp->tmp_buf) {
           g_print ("!!!allocate buffer for overlay [%d] failed, "
-             "this video overlay buffer size is out of hardware capability", n);
+           "this video overlay buffer size is out of hardware capability\n", n);
           continue;
         }
 
@@ -419,6 +479,14 @@ gint imx_video_overlay_composition_composite(
         in_buf = ovbuf;
       }
 
+      gst_video_overlay_rectangle_get_render_rectangle (rect,
+                                  &render_x, &render_y, &render_w, &render_h);
+
+      GST_INFO ("rectangle %u %p: %ux%u, render size:%ux%u, format %s -> %s,",
+          n, rect, vmeta->width, vmeta->height, render_w, render_h,
+          gst_video_format_to_string(vmeta->format),
+          gst_video_format_to_string(t_fmt));
+
       // start blending
       src.info.fmt = t_fmt;
       src.info.stride = src.info.w;
@@ -437,12 +505,12 @@ gint imx_video_overlay_composition_composite(
       src.crop.y = 0;
       src.crop.w = vmeta->width;
       src.crop.h = vmeta->height;
-      src.rotate = IMX_2D_ROTATION_0;
+      src.rotate = in_v->rotate;
       src.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
 
       in_crop = gst_buffer_get_video_crop_meta(ovbuf);
       if (in_crop != NULL) {
-        if ((in_crop->x < in->info.width) && (in_crop->y < in->info.height)) {
+        if ((in_crop->x < in_v->width) && (in_crop->y < in_v->height)) {
           src.crop.x += in_crop->x;
           src.crop.y += in_crop->y;
           src.crop.w = MIN(in_crop->width, (vmeta->width - in_crop->x));
@@ -460,22 +528,28 @@ gint imx_video_overlay_composition_composite(
         continue;
       }
 
-      gst_video_overlay_rectangle_get_render_rectangle (rect,
-                                  &render_x, &render_y, &render_w, &render_h);
+      if (config_out) {
+        dst.info.fmt = out_v->fmt;
+        dst.info.w = out_v->width +
+            out_v->align.padding_left + out_v->align.padding_right;
+        dst.info.h = out_v->height +
+            out_v->align.padding_top + out_v->align.padding_bottom;
+        dst.info.stride = out_v->stride;
 
-      GST_INFO ("rectangle %u %p: %ux%u, render size:%ux%u, format %s -> %s,",
-          n, rect, vmeta->width, vmeta->height, render_w, render_h,
-          gst_video_format_to_string(vmeta->format),
-          gst_video_format_to_string(t_fmt));
+        if (vcomp->device->config_output(vcomp->device, &dst.info) < 0) {
+          GST_WARNING ("config output failed");
+          continue;
+        }
+      }
 
-      dst.mem = gst_buffer_query_phymem_block (out->buffer);
+      dst.mem = out_v->mem;
       dst.alpha = 0xFF;
-      dst.rotate = IMX_2D_ROTATION_0;
+      dst.rotate = out_v->rotate;
       dst.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
-      dst.crop.x = render_x * (out->info.width) / in->info.width;
-      dst.crop.y = render_y * (out->info.height) / in->info.height;
-      dst.crop.w = render_w * (out->info.width) / in->info.width;
-      dst.crop.h = render_h * (out->info.height) / in->info.height;
+      dst.crop.x = out_v->crop_x + render_x * (out_v->crop_w) / in_v->crop_w;
+      dst.crop.y = out_v->crop_y + render_y * (out_v->crop_h) / in_v->crop_h;
+      dst.crop.w = render_w * (out_v->crop_w) / in_v->crop_w;
+      dst.crop.h = render_h * (out_v->crop_h) / in_v->crop_h;
 
       if (vcomp->device->blend(vcomp->device, &dst, &src) < 0) {
         GST_WARNING ("blending overlay buffer [%d] failed", n);
@@ -484,9 +558,9 @@ gint imx_video_overlay_composition_composite(
 
       blend_cnt++;
     }
-
-    GST_INFO("blended %d overlay buffers", blend_cnt);
   }
+
+  GST_INFO("blended %d overlay buffers", blend_cnt);
 
   return blend_cnt;
 }

@@ -33,6 +33,21 @@ typedef struct _GstImxVideoOverlayComposition {
   guint tmp_buf_size;
 } GstImxVideoOverlayComposition;
 
+typedef struct _VideoCompositionVideoInfo {
+  GstVideoFormat fmt;
+  guint width;
+  guint height;
+  guint stride;
+  guint crop_x;
+  guint crop_y;
+  guint crop_w;
+  guint crop_h;
+  Imx2DRotationMode rotate;
+  GstVideoAlignment align;
+  PhyMemBlock *mem;
+  GstBuffer *buf;
+} VideoCompositionVideoInfo;
+
 void imx_video_overlay_composition_init(GstImxVideoOverlayComposition *vcomp,
                                         Imx2DDevice *device);
 void imx_video_overlay_composition_deinit(GstImxVideoOverlayComposition *vcomp);
@@ -42,6 +57,8 @@ void imx_video_overlay_composition_remove_caps(GstCaps *caps);
 void imx_video_overlay_composition_add_query_meta(GstQuery *query);
 gint imx_video_overlay_composition_composite(
                                       GstImxVideoOverlayComposition *vcomp,
-                                      GstVideoFrame *in, GstVideoFrame *out);
+                                      VideoCompositionVideoInfo *in,
+                                      VideoCompositionVideoInfo *out,
+                                      gboolean config_out);
 
 #endif /* __IMXOVERLAYCOMPOSITIONMETA_H__ */
