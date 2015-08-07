@@ -25,6 +25,20 @@
 
 #define IPU_DEVICE_NAME "/dev/mxc_ipu"
 
+/*
+ * IPU has limitation of overlay size which is 1024x1024,
+ * define following macro to enable overlay even size larger then 1024x1024
+ * the overlay will be cut into several blocks, each block will no larger than
+ * 1024x1024. one block will be processed each time.
+ * if this macro isn't defined, then the overlay will be processed as normal
+ * input which means the alpha will be disable.
+ */
+#define IPU_OVERLAY_SIZE_LIMIT_BREAK_DOWN
+
+#define IPU_OVERLAY_WIDTH_MAX     1024
+#define IPU_OVERLAY_HEIGHT_MAX    1024
+#define IPU_OVERLAY_BUF_SIZE_MAX  (1024*1024*4)
+
 GST_DEBUG_CATEGORY_EXTERN (imx2ddevice_debug);
 #define GST_CAT_DEFAULT imx2ddevice_debug
 
@@ -34,6 +48,8 @@ typedef struct _Imx2DDeviceIpu {
   gboolean deinterlace_enable;
   PhyMemBlock vdi;
   gboolean  new_input;
+  PhyMemBlock ov_temp;
+  PhyMemBlock ov_resize;
 } Imx2DDeviceIpu;
 
 typedef struct {
@@ -125,34 +141,6 @@ static gint imx_ipu_open(Imx2DDevice *device)
   return 0;
 }
 
-static gint imx_ipu_close(Imx2DDevice *device)
-{
-  if (!device)
-    return -1;
-
-  if (device) {
-    Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
-    if (ipu) {
-      if (ipu->vdi.vaddr) {
-        dma_addr_t mem = (dma_addr_t)(ipu->vdi.paddr);
-        munmap(ipu->vdi.vaddr, ipu->vdi.size);
-        if (ioctl(ipu->ipu_fd, IPU_FREE, &mem) < 0) {
-          GST_ERROR("IPU could not free vdibuf memory at 0x%x: %s", mem,
-              strerror(errno));
-        }
-        ipu->vdi.vaddr = NULL;
-        ipu->vdi.paddr = NULL;
-        ipu->vdi.size = 0;
-      }
-      close(ipu->ipu_fd);
-      g_slice_free1(sizeof(Imx2DDeviceIpu), ipu);
-      device->priv = NULL;
-    }
-  }
-
-  return 0;
-}
-
 static gint
 imx_ipu_alloc_mem(Imx2DDevice *device, PhyMemBlock *memblk)
 {
@@ -185,6 +173,9 @@ static gint imx_ipu_free_mem(Imx2DDevice *device, PhyMemBlock *memblk)
   if (!device || !device->priv || !memblk)
     return -1;
 
+  if (memblk->vaddr == NULL)
+    return 0;
+
   Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
 
   GST_DEBUG("IPU free memory (%p)", memblk->paddr);
@@ -199,6 +190,26 @@ static gint imx_ipu_free_mem(Imx2DDevice *device, PhyMemBlock *memblk)
   memblk->paddr = NULL;
   memblk->vaddr = NULL;
   memblk->size = 0;
+
+  return 0;
+}
+
+static gint imx_ipu_close(Imx2DDevice *device)
+{
+  if (!device)
+    return -1;
+
+  if (device) {
+    Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
+    if (ipu) {
+      imx_ipu_free_mem(device, &ipu->ov_resize);
+      imx_ipu_free_mem(device, &ipu->ov_temp);
+      imx_ipu_free_mem(device, &ipu->vdi);
+      close(ipu->ipu_fd);
+      g_slice_free1(sizeof(Imx2DDeviceIpu), ipu);
+      device->priv = NULL;
+    }
+  }
 
   return 0;
 }
@@ -354,6 +365,14 @@ static gint imx_ipu_check_parameters(Imx2DDevice *device,
   return 0;
 }
 
+static gboolean is_format_has_alpha(guint ipu_format) {
+  if (ipu_format == IPU_PIX_FMT_BGRA32
+      || ipu_format == IPU_PIX_FMT_RGBA32
+      || ipu_format == IPU_PIX_FMT_ABGR32)
+    return TRUE;
+  return FALSE;
+}
+
 static gint imx_ipu_convert(Imx2DDevice *device,
                             Imx2DFrame *dst, Imx2DFrame *src)
 {
@@ -361,6 +380,8 @@ static gint imx_ipu_convert(Imx2DDevice *device,
     return -1;
 
   Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
+
+  ipu->task.overlay_en = FALSE;
 
   // Set input
   ipu->task.input.paddr = (dma_addr_t)(src->mem->paddr);
@@ -422,33 +443,16 @@ static gint imx_ipu_convert(Imx2DDevice *device,
 
   if (ipu->task.input.deinterlace.enable &&
       ipu->task.input.deinterlace.motion != HIGH_MOTION && ipu->new_input) {
-    if (ipu->vdi.vaddr) {
-      dma_addr_t mem = (dma_addr_t)(ipu->vdi.paddr);
-      munmap(ipu->vdi.vaddr, ipu->vdi.size);
-      if (ioctl(ipu->ipu_fd, IPU_FREE, &mem) < 0) {
-        GST_ERROR("IPU could not free vdibuf memory at 0x%x: %s", mem,
-            strerror(errno));
-      }
-      ipu->vdi.vaddr = NULL;
-      ipu->vdi.paddr = NULL;
-      ipu->vdi.size = 0;
-    }
+    imx_ipu_free_mem(device, &ipu->vdi);
 
     ipu->vdi.size = ipu->task.input.width * ipu->task.input.height *
                     (imx_ipu_get_bpp(ipu->task.input.format) / 8);
-    ipu->task.input.paddr_n = ipu->vdi.size;
-    if (ioctl(ipu->ipu_fd, IPU_ALLOC, &ipu->task.input.paddr_n) < 0) {
-      GST_ERROR ("ioctl IPU_ALLOC failed");
-      return -1;
-    }
-
-    ipu->vdi.vaddr = mmap(0, ipu->vdi.size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                  ipu->ipu_fd, ipu->task.input.paddr_n);
+    imx_ipu_alloc_mem(device, &ipu->vdi);
     if (!ipu->vdi.vaddr) {
       GST_ERROR ("mmap vdibuf failed");
       return -1;
     }
-    ipu->vdi.paddr = (guchar *)(ipu->task.input.paddr_n);
+    ipu->task.input.paddr_n = (dma_addr_t)ipu->vdi.paddr;
 
     memcpy(ipu->vdi.vaddr, src->mem->vaddr, ipu->vdi.size);
   }
@@ -468,9 +472,445 @@ static gint imx_ipu_convert(Imx2DDevice *device,
   return 0;
 }
 
+static gint imx_ipu_overlay(Imx2DDevice *device,
+                            Imx2DFrame *dst, Imx2DFrame *src)
+{
+  guint orig_dst_w;
+  guint orig_dst_h;
+  guint orig_dst_fmt;
+  guint orig_src_fmt;
+  guint dst_final_x;
+  guint dst_final_y;
+  guint dst_final_w;
+  guint dst_final_h;
+  guint src_w, src_h, src_x, src_y;
+
+  if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
+    return -1;
+
+  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
+  ipu->task.input.deinterlace.enable = FALSE;
+
+  orig_dst_w = ipu->task.output.width;
+  orig_dst_h = ipu->task.output.height;
+  orig_dst_fmt = ipu->task.output.format;
+  orig_src_fmt = ipu->task.input.format;
+  dst_final_x = GST_ROUND_UP_8(dst->crop.x);
+  dst_final_y = GST_ROUND_UP_8(dst->crop.y);
+  dst_final_w = GST_ROUND_DOWN_8(MIN(dst->crop.w, (orig_dst_w - dst_final_x)));
+  dst_final_h = GST_ROUND_DOWN_8(MIN(dst->crop.h, (orig_dst_h - dst_final_y)));
+  src_x = GST_ROUND_UP_8(src->crop.x);
+  src_y = GST_ROUND_UP_8(src->crop.y);
+  src_w = GST_ROUND_DOWN_8((MIN(src->crop.w, (src->info.w - src_x))));
+  src_h = GST_ROUND_DOWN_8((MIN(src->crop.h, (src->info.h - src_y))));
+
+  if (src->crop.w > IPU_OVERLAY_WIDTH_MAX
+      || src->crop.h > IPU_OVERLAY_HEIGHT_MAX) {
+#ifdef IPU_OVERLAY_SIZE_LIMIT_BREAK_DOWN
+    guint src_bk_x, src_bk_y, src_bk_w, src_bk_h;
+    gint remain_w, remain_h;
+    gboolean scaled = FALSE;
+
+    if (dst_final_w != src_w || dst_final_h != src_h) {
+      //scaled, copy a non-scale temp input
+      scaled = TRUE;
+      guint BPP = 4;
+      const IpuFmtMap *fmt_map = imx_ipu_get_format(dst->info.fmt);
+      if (fmt_map)
+        BPP = fmt_map->bpp/8 + (fmt_map->bpp%8 ? 1 : 0);
+
+      if (ipu->ov_resize.vaddr == NULL) {
+        ipu->ov_resize.size = src_w * src_h * BPP;
+        if (imx_ipu_alloc_mem(device, &ipu->ov_resize) < 0)
+          return -1;
+      } else if (ipu->ov_resize.size < (src_w * src_h * BPP)) {
+        imx_ipu_free_mem(device, &ipu->ov_resize);
+        ipu->ov_resize.size = src_w * src_h * BPP;
+        if (imx_ipu_alloc_mem(device, &ipu->ov_resize) < 0)
+          return -1;
+      }
+
+      ipu->task.input.paddr = (dma_addr_t)(dst->mem->paddr);
+      ipu->task.input.width = orig_dst_w;
+      ipu->task.input.height = orig_dst_h;
+      ipu->task.input.format = orig_dst_fmt;
+      ipu->task.input.crop.pos.x = dst_final_x;
+      ipu->task.input.crop.pos.y = dst_final_y;
+      ipu->task.input.crop.w = dst_final_w;
+      ipu->task.input.crop.h = dst_final_h;
+
+      GST_TRACE ("temp input src : %dx%d(%d,%d->%d,%d), format=0x%x\n",
+          ipu->task.input.width, ipu->task.input.height,
+          ipu->task.input.crop.pos.x, ipu->task.input.crop.pos.y,
+          ipu->task.input.crop.w, ipu->task.input.crop.h,
+          ipu->task.input.format);
+
+      ipu->task.output.paddr = (dma_addr_t)(ipu->ov_resize.paddr);
+      ipu->task.output.width = src_w;
+      ipu->task.output.height = src_h;
+      ipu->task.output.format = orig_dst_fmt;
+      ipu->task.output.crop.pos.x = 0;
+      ipu->task.output.crop.pos.y = 0;
+      ipu->task.output.crop.w = src_w;
+      ipu->task.output.crop.h = src_h;
+
+      GST_TRACE ("temp input dst : %dx%d(%d,%d->%d,%d), format=0x%x\n",
+          ipu->task.output.width, ipu->task.output.height,
+          ipu->task.output.crop.pos.x, ipu->task.output.crop.pos.y,
+          ipu->task.output.crop.w, ipu->task.output.crop.h,
+          ipu->task.output.format);
+
+      ipu->task.overlay_en = FALSE;
+
+      if (imx_ipu_check_parameters(device, dst->mem, &ipu->ov_resize) == 0) {
+        if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
+          GST_ERROR("copy temp input failed: %s", strerror(errno));
+          imx_ipu_free_mem(device, &ipu->ov_resize);
+          return -1;
+        }
+      }
+    }
+
+    for (remain_h=src_h, src_bk_y=src_y; remain_h > 0;
+         remain_h-=IPU_OVERLAY_HEIGHT_MAX, src_bk_y+=IPU_OVERLAY_HEIGHT_MAX) {
+      if (remain_h > IPU_OVERLAY_HEIGHT_MAX)
+        src_bk_h = IPU_OVERLAY_HEIGHT_MAX;
+      else
+        src_bk_h = remain_h;
+
+      for (remain_w=src_w, src_bk_x=src_x; remain_w > 0;
+          remain_w-=IPU_OVERLAY_WIDTH_MAX, src_bk_x+=IPU_OVERLAY_WIDTH_MAX) {
+        if (remain_w > IPU_OVERLAY_WIDTH_MAX)
+          src_bk_w = IPU_OVERLAY_WIDTH_MAX;
+        else
+          src_bk_w = remain_w;
+
+        if (ipu->ov_temp.vaddr == NULL) {
+          ipu->ov_temp.size = IPU_OVERLAY_BUF_SIZE_MAX;
+          if (imx_ipu_alloc_mem(device, &ipu->ov_temp) < 0) {
+            if (scaled)
+              imx_ipu_free_mem(device, &ipu->ov_resize);
+            return -1;
+          }
+        }
+
+        // overlay src with dst in dst crop area to temp buffer
+        // with the format of src format and size in dst crop size
+        if (scaled) {
+          ipu->task.input.paddr = (dma_addr_t)(ipu->ov_resize.paddr);
+          ipu->task.input.width = src_w;
+          ipu->task.input.height = src_h;
+          ipu->task.input.crop.pos.x = src_bk_x;
+          ipu->task.input.crop.pos.y = src_bk_y;
+        } else {
+          ipu->task.input.paddr = (dma_addr_t)(dst->mem->paddr);
+          ipu->task.input.width = orig_dst_w;
+          ipu->task.input.height = orig_dst_h;
+          ipu->task.input.crop.pos.x = dst_final_x + src_bk_x;
+          ipu->task.input.crop.pos.y = dst_final_y + src_bk_y;
+        }
+        ipu->task.input.format = orig_dst_fmt;
+        ipu->task.input.crop.w = src_bk_w;
+        ipu->task.input.crop.h = src_bk_h;
+
+        GST_TRACE ("ipu overlapped src : %dx%d(%d,%d->%d,%d), format=0x%x\n",
+            ipu->task.input.width, ipu->task.input.height,
+            ipu->task.input.crop.pos.x, ipu->task.input.crop.pos.y,
+            ipu->task.input.crop.w, ipu->task.input.crop.h,
+            ipu->task.input.format);
+
+        ipu->task.output.paddr = (dma_addr_t)(ipu->ov_temp.paddr);
+        ipu->task.output.width = src_bk_w;
+        ipu->task.output.height = src_bk_h;
+        ipu->task.output.format = orig_src_fmt;
+        ipu->task.output.crop.pos.x = 0;
+        ipu->task.output.crop.pos.y = 0;
+        ipu->task.output.crop.w = src_bk_w;
+        ipu->task.output.crop.h = src_bk_h;
+
+        GST_TRACE ("ipu overlapped dst : %dx%d(%d,%d->%d,%d), format=0x%x\n",
+            ipu->task.output.width, ipu->task.output.height,
+            ipu->task.output.crop.pos.x, ipu->task.output.crop.pos.y,
+            ipu->task.output.crop.w, ipu->task.output.crop.h,
+            ipu->task.output.format);
+
+        if (src->alpha == 0xFF && is_format_has_alpha(orig_src_fmt))
+          ipu->task.overlay.alpha.mode = IPU_ALPHA_MODE_LOCAL;
+        else
+          ipu->task.overlay.alpha.mode = IPU_ALPHA_MODE_GLOBAL;
+        ipu->task.overlay.alpha.gvalue = src->alpha;
+        ipu->task.overlay.alpha.loc_alp_paddr = (dma_addr_t)NULL;
+        ipu->task.overlay.colorkey.enable = FALSE;
+        ipu->task.overlay.width = src->info.w;
+        ipu->task.overlay.height = src->info.h;
+        ipu->task.overlay.format = orig_src_fmt;
+        ipu->task.overlay.paddr = (dma_addr_t)(src->mem->paddr);
+        ipu->task.overlay.crop.pos.x = src_bk_x;
+        ipu->task.overlay.crop.pos.y = src_bk_y;
+        ipu->task.overlay.crop.w = src_bk_w;
+        ipu->task.overlay.crop.h = src_bk_h;
+
+        GST_TRACE ("ipu overlay: %dx%d(%d,%d->%d,%d), format=0x%x\n",
+            ipu->task.overlay.width, ipu->task.overlay.height,
+            ipu->task.overlay.crop.pos.x, ipu->task.overlay.crop.pos.y,
+            ipu->task.overlay.crop.w, ipu->task.overlay.crop.h,
+            ipu->task.overlay.format);
+
+        ipu->task.overlay_en = TRUE;
+
+        if (imx_ipu_check_parameters(device, src->mem, &ipu->ov_temp) == 0) {
+          if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
+            GST_ERROR("overlay src to temp buffer failed: %s", strerror(errno));
+            imx_ipu_free_mem(device, &ipu->ov_temp);
+            if (scaled)
+              imx_ipu_free_mem(device, &ipu->ov_resize);
+            return -1;
+          }
+        }
+
+        // convert the temp buffer to dst crop area with the dst format
+        ipu->task.input.paddr = (dma_addr_t)(ipu->ov_temp.paddr);
+        ipu->task.input.width = src_bk_w;
+        ipu->task.input.height = src_bk_h;
+        ipu->task.input.format = orig_src_fmt;
+        ipu->task.input.crop.pos.x = 0;
+        ipu->task.input.crop.pos.y = 0;
+        ipu->task.input.crop.w = src_bk_w;
+        ipu->task.input.crop.h = src_bk_h;
+
+        GST_TRACE ("ipu tmp input : %dx%d(%d,%d->%d,%d), format=0x%x\n",
+            ipu->task.input.width, ipu->task.input.height,
+            ipu->task.input.crop.pos.x, ipu->task.input.crop.pos.y,
+            ipu->task.input.crop.w, ipu->task.input.crop.h,
+            ipu->task.input.format);
+
+        if (scaled) {
+          ipu->task.output.paddr = (dma_addr_t)(ipu->ov_resize.paddr);
+          ipu->task.output.width = src_w;
+          ipu->task.output.height = src_h;
+          ipu->task.output.crop.pos.x = src_bk_x;
+          ipu->task.output.crop.pos.y = src_bk_y;
+        } else {
+          ipu->task.output.paddr = (dma_addr_t)(dst->mem->paddr);
+          ipu->task.output.width = orig_dst_w;
+          ipu->task.output.height = orig_dst_h;
+          ipu->task.output.crop.pos.x = dst_final_x + src_bk_x;
+          ipu->task.output.crop.pos.y = dst_final_y + src_bk_y;
+        }
+        ipu->task.output.format = orig_dst_fmt;
+        ipu->task.output.crop.w = src_bk_w;
+        ipu->task.output.crop.h = src_bk_h;
+
+        GST_TRACE ("ipu output final: %dx%d(%d,%d->%d,%d), format=0x%x\n",
+            ipu->task.output.width, ipu->task.output.height,
+            ipu->task.output.crop.pos.x, ipu->task.output.crop.pos.y,
+            ipu->task.output.crop.w, ipu->task.output.crop.h,
+            ipu->task.output.format);
+
+        ipu->task.overlay_en = FALSE;
+
+        if (scaled) {
+          if (imx_ipu_check_parameters(device, &ipu->ov_temp, &ipu->ov_resize) == 0) {
+            if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
+              GST_ERROR("temp buffer to dst failed: %s", strerror(errno));
+              imx_ipu_free_mem(device, &ipu->ov_temp);
+              imx_ipu_free_mem(device, &ipu->ov_resize);
+              return -1;
+            }
+          }
+        } else {
+          if (imx_ipu_check_parameters(device, &ipu->ov_temp, dst->mem) == 0) {
+            if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
+              GST_ERROR("temp buffer to dst failed: %s", strerror(errno));
+              imx_ipu_free_mem(device, &ipu->ov_temp);
+              return -1;
+            }
+          }
+        }
+
+        imx_ipu_free_mem(device, &ipu->ov_temp);
+      }
+    }
+
+    if (scaled) {
+      ipu->task.input.paddr = (dma_addr_t)(ipu->ov_resize.paddr);
+      ipu->task.input.width = src_w;
+      ipu->task.input.height = src_h;
+      ipu->task.input.format = orig_dst_fmt;
+      ipu->task.input.crop.pos.x = 0;
+      ipu->task.input.crop.pos.y = 0;
+      ipu->task.input.crop.w = src_w;
+      ipu->task.input.crop.h = src_h;
+
+      GST_TRACE ("temp input src : %dx%d(%d,%d->%d,%d), format=0x%x\n",
+          ipu->task.input.width, ipu->task.input.height,
+          ipu->task.input.crop.pos.x, ipu->task.input.crop.pos.y,
+          ipu->task.input.crop.w, ipu->task.input.crop.h,
+          ipu->task.input.format);
+
+      ipu->task.output.paddr = (dma_addr_t)(dst->mem->paddr);
+      ipu->task.output.width = orig_dst_w;
+      ipu->task.output.height = orig_dst_h;
+      ipu->task.output.format = orig_dst_fmt;
+      ipu->task.output.crop.pos.x = dst_final_x;
+      ipu->task.output.crop.pos.y = dst_final_y;
+      ipu->task.output.crop.w = dst_final_w;
+      ipu->task.output.crop.h = dst_final_h;
+
+      GST_TRACE ("temp input dst : %dx%d(%d,%d->%d,%d), format=0x%x\n",
+          ipu->task.output.width, ipu->task.output.height,
+          ipu->task.output.crop.pos.x, ipu->task.output.crop.pos.y,
+          ipu->task.output.crop.w, ipu->task.output.crop.h,
+          ipu->task.output.format);
+
+      ipu->task.overlay_en = FALSE;
+
+      if (imx_ipu_check_parameters(device, &ipu->ov_resize, dst->mem) == 0) {
+        if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
+          GST_ERROR("copy temp input failed: %s", strerror(errno));
+          imx_ipu_free_mem(device, &ipu->ov_resize);
+          return -1;
+        }
+      }
+
+      imx_ipu_free_mem(device, &ipu->ov_resize);
+    }
+
+    return 0;
+
+#else
+    return imx_ipu_convert(device, dst, src);
+#endif
+  }
+
+  // allocate a new temp buffer
+  if (ipu->ov_temp.vaddr == NULL) {
+    ipu->ov_temp.size = IPU_OVERLAY_BUF_SIZE_MAX;
+    if (imx_ipu_alloc_mem(device, &ipu->ov_temp) < 0)
+      return -1;
+  }
+
+  // overlay src with dst in dst crop area to temp buffer
+  // with the format of src format and size in dst crop size
+  ipu->task.input.paddr = (dma_addr_t)(dst->mem->paddr);
+  ipu->task.input.width = orig_dst_w;
+  ipu->task.input.height = orig_dst_h;
+  ipu->task.input.format = orig_dst_fmt;
+  ipu->task.input.crop.pos.x = dst_final_x;
+  ipu->task.input.crop.pos.y = dst_final_y;
+  ipu->task.input.crop.w = dst_final_w;
+  ipu->task.input.crop.h = dst_final_h;
+
+  GST_TRACE ("ipu overlapped src : %dx%d(%d,%d->%d,%d), format=0x%x\n",
+      ipu->task.input.width, ipu->task.input.height,
+      ipu->task.input.crop.pos.x, ipu->task.input.crop.pos.y,
+      ipu->task.input.crop.w, ipu->task.input.crop.h,
+      ipu->task.input.format);
+
+  ipu->task.output.paddr = (dma_addr_t)(ipu->ov_temp.paddr);
+  ipu->task.output.width = src_w;
+  ipu->task.output.height = src_h;
+  ipu->task.output.format = orig_src_fmt;
+  ipu->task.output.crop.pos.x = 0;
+  ipu->task.output.crop.pos.y = 0;
+  ipu->task.output.crop.w = src_w;
+  ipu->task.output.crop.h = src_h;
+
+  GST_TRACE ("ipu overlapped dst : %dx%d(%d,%d->%d,%d), format=0x%x\n",
+      ipu->task.output.width, ipu->task.output.height,
+      ipu->task.output.crop.pos.x, ipu->task.output.crop.pos.y,
+      ipu->task.output.crop.w, ipu->task.output.crop.h,
+      ipu->task.output.format);
+
+  if (src->alpha == 0xFF && is_format_has_alpha(orig_src_fmt))
+    ipu->task.overlay.alpha.mode = IPU_ALPHA_MODE_LOCAL;
+  else
+    ipu->task.overlay.alpha.mode = IPU_ALPHA_MODE_GLOBAL;
+  ipu->task.overlay.alpha.gvalue = src->alpha;
+  ipu->task.overlay.alpha.loc_alp_paddr = (dma_addr_t)NULL;
+  ipu->task.overlay.colorkey.enable = FALSE;
+  ipu->task.overlay.width = src->info.w;
+  ipu->task.overlay.height = src->info.h;
+  ipu->task.overlay.format = orig_src_fmt;
+  ipu->task.overlay.paddr = (dma_addr_t)(src->mem->paddr);
+  ipu->task.overlay.crop.pos.x = src_x;
+  ipu->task.overlay.crop.pos.y = src_y;
+  ipu->task.overlay.crop.w = src_w;
+  ipu->task.overlay.crop.h = src_h;
+
+  GST_TRACE ("ipu overlay: %dx%d(%d,%d->%d,%d), format=0x%x\n",
+      ipu->task.overlay.width, ipu->task.overlay.height,
+      ipu->task.overlay.crop.pos.x, ipu->task.overlay.crop.pos.y,
+      ipu->task.overlay.crop.w, ipu->task.overlay.crop.h,
+      ipu->task.overlay.format);
+
+  ipu->task.overlay_en = TRUE;
+
+  if (imx_ipu_check_parameters(device, src->mem, &ipu->ov_temp) == 0) {
+    if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
+      GST_ERROR("overlay src to temp buffer failed: %s", strerror(errno));
+      imx_ipu_free_mem(device, &ipu->ov_temp);
+      return -1;
+    }
+  }
+
+  // convert the temp buffer to dst crop area with the dst format
+  ipu->task.input.paddr = (dma_addr_t)(ipu->ov_temp.paddr);
+  ipu->task.input.width = src_w;
+  ipu->task.input.height = src_h;
+  ipu->task.input.format = orig_src_fmt;
+  ipu->task.input.crop.pos.x = 0;
+  ipu->task.input.crop.pos.y = 0;
+  ipu->task.input.crop.w = src_w;
+  ipu->task.input.crop.h = src_h;
+
+  GST_TRACE ("ipu tmp input : %dx%d(%d,%d->%d,%d), format=0x%x\n",
+      ipu->task.input.width, ipu->task.input.height,
+      ipu->task.input.crop.pos.x, ipu->task.input.crop.pos.y,
+      ipu->task.input.crop.w, ipu->task.input.crop.h,
+      ipu->task.input.format);
+
+  ipu->task.output.paddr = (dma_addr_t)(dst->mem->paddr);
+  ipu->task.output.width = orig_dst_w;
+  ipu->task.output.height = orig_dst_h;
+  ipu->task.output.format = orig_dst_fmt;
+  ipu->task.output.crop.pos.x = dst_final_x;
+  ipu->task.output.crop.pos.y = dst_final_y;
+  ipu->task.output.crop.w = dst_final_w;
+  ipu->task.output.crop.h = dst_final_h;
+
+  GST_TRACE ("ipu output final: %dx%d(%d,%d->%d,%d), format=0x%x\n",
+      ipu->task.output.width, ipu->task.output.height,
+      ipu->task.output.crop.pos.x, ipu->task.output.crop.pos.y,
+      ipu->task.output.crop.w, ipu->task.output.crop.h,
+      ipu->task.output.format);
+
+  ipu->task.overlay_en = FALSE;
+
+  if (imx_ipu_check_parameters(device, &ipu->ov_temp, dst->mem) == 0) {
+    if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
+      GST_ERROR("temp buffer to dst failed: %s", strerror(errno));
+      imx_ipu_free_mem(device, &ipu->ov_temp);
+      return -1;
+    }
+  }
+
+  imx_ipu_free_mem(device, &ipu->ov_temp);
+  return 0;
+}
+
 static gint imx_ipu_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
 {
-  return imx_ipu_convert(device, dst, src);
+  if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
+    return -1;
+
+  Imx2DDeviceIpu *ipu = (Imx2DDeviceIpu *) (device->priv);
+
+  if (src->alpha < 0xFF || is_format_has_alpha(ipu->task.input.format)) {
+    return imx_ipu_overlay(device, dst, src);
+  } else {
+    return imx_ipu_convert(device, dst, src);
+  }
 }
 
 static gint imx_ipu_blend_finish(Imx2DDevice *device)
@@ -581,7 +1021,7 @@ static gint imx_ipu_get_capabilities(Imx2DDevice* device)
 {
   return IMX_2D_DEVICE_CAP_CSC | IMX_2D_DEVICE_CAP_DEINTERLACE
           | IMX_2D_DEVICE_CAP_ROTATE | IMX_2D_DEVICE_CAP_SCALE
-          | IMX_2D_DEVICE_CAP_OVERLAY;
+          | IMX_2D_DEVICE_CAP_OVERLAY | IMX_2D_DEVICE_CAP_ALPHA;
 }
 
 static GList* imx_ipu_get_supported_in_fmts(Imx2DDevice* device)
