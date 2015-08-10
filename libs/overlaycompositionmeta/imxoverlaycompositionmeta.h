@@ -60,5 +60,9 @@ gint imx_video_overlay_composition_composite(
                                       VideoCompositionVideoInfo *in,
                                       VideoCompositionVideoInfo *out,
                                       gboolean config_out);
+void imx_video_overlay_composition_copy_meta(GstBuffer *dst, GstBuffer *src,
+                                             guint in_width, guint in_height,
+                                             guint out_width, guint out_height);
+gint imx_video_overlay_composition_remove_meta(GstBuffer *buffer);
 
 #endif /* __IMXOVERLAYCOMPOSITIONMETA_H__ */

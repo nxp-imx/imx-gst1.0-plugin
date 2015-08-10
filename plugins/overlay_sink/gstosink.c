@@ -54,7 +54,7 @@ enum
 };
 
 #define OVERLAY_SINK_PROP_DISP_LENGTH (OVERLAY_SINK_PROP_DISP_MAX_0-OVERLAY_SINK_PROP_DISP_ON_0)
-#define OVERLAY_SINK_COMPOMETA_DEFAULT     FALSE
+#define OVERLAY_SINK_COMPOMETA_DEFAULT     TRUE
 
 static GstFlowReturn
 gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer);
@@ -726,7 +726,8 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
     if (sink->composition_meta_enable
         && imx_video_overlay_composition_has_meta(buffer)) {
-      imx_video_overlay_composition_copy_meta(buffer2, buffer);
+      imx_video_overlay_composition_copy_meta(buffer2, buffer,
+          info.width, info.height, info.width, info.height);
     }
 
     buffer = buffer2;
@@ -1046,7 +1047,7 @@ gst_overlay_sink_init (GstOverlaySink * overlay_sink)
   overlay_sink->no_phy_buffer = FALSE;
   overlay_sink->pool_activated = FALSE;
   overlay_sink->pool_alignment_checked = FALSE;
-  overlay_sink->composition_meta_enable = FALSE;
+  overlay_sink->composition_meta_enable = OVERLAY_SINK_COMPOMETA_DEFAULT;
 
 #ifdef USE_X11
   overlay_sink->imxoverlay = gst_imx_video_overlay_init ((GstElement *)overlay_sink,

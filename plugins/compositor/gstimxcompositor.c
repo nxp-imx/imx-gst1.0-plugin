@@ -1364,7 +1364,7 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
       gst_imxcompositor_fill_background(&dst, imxcomp->background);
     }
   } else {
-    gst_imxcompositor_fill_background(&dst, DEFAULT_IMXCOMPOSITOR_BACKGROUND);
+    //gst_imxcompositor_fill_background(&dst, DEFAULT_IMXCOMPOSITOR_BACKGROUND);
   }
 
   //re-order by zorder of pad
@@ -1406,6 +1406,15 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
       dst.crop.y = pad->ypos;
       dst.crop.w = pad->width ? pad->width : ppad->buffer_vinfo.width;
       dst.crop.h = pad->height ? pad->height : ppad->buffer_vinfo.height;
+
+      if (dst.crop.x >= ((GstVideoAggregator*)imxcomp)->info.width ||
+          dst.crop.y >= ((GstVideoAggregator*)imxcomp)->info.height)
+        continue;
+
+      dst.crop.w = MIN(dst.crop.w,
+          ((GstVideoAggregator*)imxcomp)->info.width - dst.crop.x);
+      dst.crop.h = MIN(dst.crop.h,
+          ((GstVideoAggregator*)imxcomp)->info.height - dst.crop.y);
 
       if (pad->keep_ratio) {
         GstVideoRectangle s_rect, d_rect, result;
@@ -1635,7 +1644,7 @@ gst_imxcompositor_init (GstImxCompositor * imxcomp)
       imxcomp->allocator = NULL;
       imxcomp->capabilities =imxcomp->device->get_capabilities(imxcomp->device);
       memset (&imxcomp->out_align, 0, sizeof(GstVideoAlignment));
-      imxcomp->composition_meta_enable = FALSE;
+      imxcomp->composition_meta_enable = IMX_COMPOSITOR_COMPOMETA_DEFAULT;
       imx_video_overlay_composition_init(&imxcomp->video_comp, imxcomp->device);
     }
   } else {

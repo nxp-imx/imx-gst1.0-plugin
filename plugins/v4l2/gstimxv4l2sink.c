@@ -688,7 +688,8 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
     if (v4l2sink->composition_meta_enable
         && imx_video_overlay_composition_has_meta(buffer)) {
-      imx_video_overlay_composition_copy_meta(v4l2_buffer, buffer);
+      imx_video_overlay_composition_copy_meta(v4l2_buffer, buffer,
+          info.width, info.height, info.width, info.height);
     }
 
     buffer = v4l2_buffer;
@@ -1027,7 +1028,7 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
                                               v4l2sink_config_global_alpha);
 #endif
 
-  v4l2sink->composition_meta_enable = FALSE;
+  v4l2sink->composition_meta_enable = IMX_V4L2SINK_COMPOMETA_DEFAULT;
   v4l2sink->blend_dev = NULL;
   if (HAS_IPU())
     v4l2sink->blend_dev = imx_2d_device_create(IMX_2D_DEVICE_IPU);

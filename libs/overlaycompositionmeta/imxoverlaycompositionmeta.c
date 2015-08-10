@@ -260,18 +260,43 @@ void imx_video_overlay_composition_add_query_meta(GstQuery *query)
                            GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE, NULL);
 }
 
-void imx_video_overlay_composition_copy_meta(GstBuffer *dst, GstBuffer *src)
+void imx_video_overlay_composition_copy_meta(GstBuffer *dst, GstBuffer *src,
+                                             guint in_width, guint in_height,
+                                             guint out_width, guint out_height)
 {
   gpointer state = NULL;
   GstMeta *meta;
   GstVideoOverlayCompositionMeta *compmeta;
+  GstVideoOverlayComposition *comp_copy;
 
   while ((meta = gst_buffer_iterate_meta (src, &state))) {
     if (meta->info->api == GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE) {
       compmeta = (GstVideoOverlayCompositionMeta*)meta;
       if (GST_IS_VIDEO_OVERLAY_COMPOSITION (compmeta->overlay)) {
-        gst_buffer_add_video_overlay_composition_meta(dst,
-                        gst_video_overlay_composition_copy(compmeta->overlay));
+        comp_copy = gst_video_overlay_composition_copy(compmeta->overlay);
+        if (comp_copy) {
+          if ((in_width != out_width || in_height != out_height) &&
+              (in_width && out_width && in_height && out_height)) {
+            guint num = gst_video_overlay_composition_n_rectangles (comp_copy);
+            guint n;
+            GstVideoOverlayRectangle *rect;
+            gint render_x, render_y;
+            guint render_w, render_h;
+
+            rect = gst_video_overlay_composition_get_rectangle(comp_copy, n);
+            gst_video_overlay_rectangle_get_render_rectangle (rect,
+                &render_x, &render_y, &render_w, &render_h);
+
+            render_x = render_x * out_width / in_width;
+            render_w = render_w * out_width / in_width;
+            render_y = render_y * out_height / in_height;
+            render_h = render_h * out_height / in_height;
+            gst_video_overlay_rectangle_set_render_rectangle(rect,
+                render_x, render_y, render_w, render_h);
+          }
+
+          gst_buffer_add_video_overlay_composition_meta(dst, comp_copy);
+        }
       }
     }
   }
@@ -482,8 +507,9 @@ gint imx_video_overlay_composition_composite(
       gst_video_overlay_rectangle_get_render_rectangle (rect,
                                   &render_x, &render_y, &render_w, &render_h);
 
-      GST_INFO ("rectangle %u %p: %ux%u, render size:%ux%u, format %s -> %s,",
-          n, rect, vmeta->width, vmeta->height, render_w, render_h,
+      GST_INFO ("rectangle %u %p: %ux%u, render %u,%u,%ux,%u, format %s -> %s,",
+          n, rect, vmeta->width, vmeta->height, render_x, render_y,
+          render_w, render_h,
           gst_video_format_to_string(vmeta->format),
           gst_video_format_to_string(t_fmt));
 
@@ -528,8 +554,17 @@ gint imx_video_overlay_composition_composite(
         continue;
       }
 
+      dst.mem = out_v->mem;
+      dst.info.fmt = out_v->fmt;
+      dst.alpha = 0xFF;
+      dst.rotate = out_v->rotate;
+      dst.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
+      dst.crop.x = out_v->crop_x + render_x * (out_v->crop_w) / in_v->crop_w;
+      dst.crop.y = out_v->crop_y + render_y * (out_v->crop_h) / in_v->crop_h;
+      dst.crop.w = render_w * (out_v->crop_w) / in_v->crop_w;
+      dst.crop.h = render_h * (out_v->crop_h) / in_v->crop_h;
+
       if (config_out) {
-        dst.info.fmt = out_v->fmt;
         dst.info.w = out_v->width +
             out_v->align.padding_left + out_v->align.padding_right;
         dst.info.h = out_v->height +
@@ -541,15 +576,6 @@ gint imx_video_overlay_composition_composite(
           continue;
         }
       }
-
-      dst.mem = out_v->mem;
-      dst.alpha = 0xFF;
-      dst.rotate = out_v->rotate;
-      dst.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
-      dst.crop.x = out_v->crop_x + render_x * (out_v->crop_w) / in_v->crop_w;
-      dst.crop.y = out_v->crop_y + render_y * (out_v->crop_h) / in_v->crop_h;
-      dst.crop.w = render_w * (out_v->crop_w) / in_v->crop_w;
-      dst.crop.h = render_h * (out_v->crop_h) / in_v->crop_h;
 
       if (vcomp->device->blend(vcomp->device, &dst, &src) < 0) {
         GST_WARNING ("blending overlay buffer [%d] failed", n);

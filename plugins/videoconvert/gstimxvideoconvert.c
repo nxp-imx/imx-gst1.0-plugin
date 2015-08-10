@@ -1427,6 +1427,11 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
         else
           GST_WARNING ("video overlay composition meta handling failed");
       }
+    } else {
+      if (imx_video_overlay_composition_has_meta(in->buffer)) {
+        imx_video_overlay_composition_copy_meta(out->buffer, in->buffer,
+            src.crop.w, src.crop.h, dst.crop.w, dst.crop.h);
+      }
     }
 
     return GST_FLOW_OK;
@@ -1564,7 +1569,7 @@ gst_imx_video_convert_init (GstImxVideoConvert * imxvct)
       imxvct->pool_config_update = TRUE;
       imxvct->rotate = IMX_2D_ROTATION_0;
       imxvct->deinterlace = IMX_2D_DEINTERLACE_NONE;
-      imxvct->composition_meta_enable = FALSE;
+      imxvct->composition_meta_enable = GST_IMX_VIDEO_COMPOMETA_DEFAULT;
       imx_video_overlay_composition_init(&imxvct->video_comp, imxvct->device);
     }
   } else {
