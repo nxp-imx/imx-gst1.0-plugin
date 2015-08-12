@@ -1045,6 +1045,15 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
       gst_video_frame_copy(&temp_in_frame, inframe);
       inframe = &temp_in_frame;
       gst_video_frame_unmap(&temp_in_frame);
+
+      if (imxcomp->composition_meta_enable
+              && imx_video_overlay_composition_has_meta(ppad->buffer)) {
+        imx_video_overlay_composition_remove_meta(imxcomp->sink_tmp_buf);
+        imx_video_overlay_composition_copy_meta(imxcomp->sink_tmp_buf,
+            ppad->buffer,
+            inframe->info.width, inframe->info.height,
+            inframe->info.width, inframe->info.height);
+      }
     } else {
       GST_ERROR_OBJECT (pad,
           "Can't get input buffer,ignore this frame,continue next");

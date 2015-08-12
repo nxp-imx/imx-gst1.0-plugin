@@ -52,6 +52,7 @@ typedef struct _GstImxVideoConvert {
   Imx2DDeinterlaceMode deinterlace;
   GstImxVideoOverlayComposition video_comp;
   gboolean composition_meta_enable;
+  gboolean in_place;
 } GstImxVideoConvert;
 
 typedef struct _GstImxVideoConvertClass {

@@ -32,7 +32,8 @@
 
 #define GST_IMX_VIDEO_ROTATION_DEFAULT      IMX_2D_ROTATION_0
 #define GST_IMX_VIDEO_DEINTERLACE_DEFAULT   IMX_2D_DEINTERLACE_NONE
-#define GST_IMX_VIDEO_COMPOMETA_DEFAULT     FALSE
+#define GST_IMX_VIDEO_COMPOMETA_DEFAULT              FALSE
+#define GST_IMX_VIDEO_COMPOMETA_IN_PLACE_DEFAULT     FALSE
 
 #define GST_IMX_CONVERT_UNREF_BUFFER(buffer) {\
     if (buffer) {                             \
@@ -56,7 +57,8 @@ enum {
   PROP_0,
   PROP_OUTPUT_ROTATE,
   PROP_DEINTERLACE_MODE,
-  PROP_COMPOSITION_META_ENABLE
+  PROP_COMPOSITION_META_ENABLE,
+  PROP_COMPOSITION_META_IN_PLACE
 };
 
 static GstElementClass *parent_class = NULL;
@@ -129,6 +131,9 @@ static void gst_imx_video_convert_set_property (GObject * object,
     case PROP_COMPOSITION_META_ENABLE:
       imxvct->composition_meta_enable = g_value_get_boolean(value);
       break;
+    case PROP_COMPOSITION_META_IN_PLACE:
+      imxvct->in_place = g_value_get_boolean(value);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -156,6 +161,9 @@ static void gst_imx_video_convert_get_property (GObject * object,
       break;
     case PROP_COMPOSITION_META_ENABLE:
       g_value_set_boolean(value, imxvct->composition_meta_enable);
+      break;
+    case PROP_COMPOSITION_META_IN_PLACE:
+      g_value_set_boolean(value, imxvct->in_place);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -270,10 +278,8 @@ static GstCaps* imx_video_convert_transform_caps(GstBaseTransform *transform,
   }
 
   GstImxVideoConvert *imxvct = (GstImxVideoConvert *) (transform);
-  if (imxvct->composition_meta_enable)
-    imx_video_overlay_composition_add_caps(tmp);
-  else
-    imx_video_overlay_composition_remove_caps(tmp);
+
+  imx_video_overlay_composition_add_caps(tmp);
 
   GST_DEBUG("transformed: %" GST_PTR_FORMAT, tmp);
 
@@ -964,6 +970,9 @@ imx_video_convert_propose_allocation(GstBaseTransform *transform,
   /* passthrough, we're done */
   if (decide_query == NULL) {
     GST_DEBUG ("doing passthrough query");
+    if (imxvct->composition_meta_enable && imxvct->in_place) {
+      imx_video_overlay_composition_add_query_meta (query);
+    }
     return gst_pad_peer_query (transform->srcpad, query);
   } else {
     guint i, n_metas;
@@ -1159,6 +1168,25 @@ static gboolean imx_video_convert_set_info(GstVideoFilter *filter,
   }
 */
 
+  if (!imxvct->composition_meta_enable || imxvct->in_place) {
+    //if src and sink caps only has video overlay composition feature difference
+    //then force to work in pass through mode.
+    GstCapsFeatures *in_f, *out_f;
+    in_f = gst_caps_get_features(in, 0);
+    out_f = gst_caps_get_features(out, 0);
+    if (in_f && !gst_caps_features_is_equal(in_f, out_f)) {
+      GstCapsFeatures *f = gst_caps_features_new(
+          GST_CAPS_FEATURE_MEMORY_SYSTEM_MEMORY,
+          GST_CAPS_FEATURE_META_GST_VIDEO_OVERLAY_COMPOSITION, NULL);
+      GstCaps *copy_out = gst_caps_copy(out);
+      gst_caps_set_features(copy_out, 0, f);
+      if (gst_caps_is_equal(in, copy_out)) {
+        gst_base_transform_set_passthrough((GstBaseTransform*)filter, TRUE);
+      }
+      gst_caps_unref(copy_out);
+    }
+  }
+
   GST_DEBUG ("set info from %" GST_PTR_FORMAT " to %" GST_PTR_FORMAT, in, out);
 
   return TRUE;
@@ -1213,6 +1241,13 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
       gst_video_frame_copy(&temp_in_frame, in);
       input_frame = &temp_in_frame;
       gst_video_frame_unmap(&temp_in_frame);
+
+      if (imxvct->composition_meta_enable
+              && imx_video_overlay_composition_has_meta(in->buffer)) {
+        imx_video_overlay_composition_remove_meta(imxvct->in_buf);
+        imx_video_overlay_composition_copy_meta(imxvct->in_buf, in->buffer,
+            in->info.width, in->info.height, in->info.width, in->info.height);
+      }
     } else {
       GST_ERROR ("Can't get input buffer");
       return GST_FLOW_ERROR;
@@ -1419,13 +1454,16 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
         gint cnt = imx_video_overlay_composition_composite(&imxvct->video_comp,
                                                           &in_v, &out_v, FALSE);
 
-        if (cnt >= 0)
+        if (cnt >= 0) {
+          imx_video_overlay_composition_remove_meta(out->buffer);
           GST_DEBUG ("processed %d video overlay composition buffers", cnt);
-        else
+        } else {
           GST_WARNING ("video overlay composition meta handling failed");
+        }
       }
     } else {
-      if (imx_video_overlay_composition_has_meta(in->buffer)) {
+      if (imx_video_overlay_composition_has_meta(in->buffer) &&
+          !imx_video_overlay_composition_has_meta(out->buffer)) {
         imx_video_overlay_composition_copy_meta(out->buffer, in->buffer,
             src.crop.w, src.crop.h, dst.crop.w, dst.crop.h);
       }
@@ -1435,6 +1473,102 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   }
 
   return GST_FLOW_ERROR;
+}
+
+static GstFlowReturn
+imx_video_convert_transform_frame_ip(GstVideoFilter *filter, GstVideoFrame *in)
+{
+  GstImxVideoConvert *imxvct = (GstImxVideoConvert *)(filter);
+  GstPhyMemMeta *phymemmeta = NULL;
+
+  if (imxvct->composition_meta_enable) {
+    if (!gst_buffer_is_phymem(in->buffer)) {
+      gpointer state = NULL;
+      GstMeta *meta;
+      GstVideoOverlayCompositionMeta *compmeta;
+
+      while ((meta = gst_buffer_iterate_meta (in, &state))) {
+        if (meta->info->api == GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE) {
+          compmeta = (GstVideoOverlayCompositionMeta*)meta;
+          if (GST_IS_VIDEO_OVERLAY_COMPOSITION (compmeta->overlay)) {
+            gst_video_overlay_composition_blend (compmeta->overlay, in);
+          }
+        }
+      }
+
+      imx_video_overlay_composition_remove_meta(in->buffer);
+      return GST_FLOW_OK;
+    } else if (imx_video_overlay_composition_has_meta(in->buffer)) {
+      if (imxvct->pool_config_update) {
+        if (imxvct->in_pool && gst_buffer_pool_is_active (imxvct->in_pool)) {
+          GstStructure *config = gst_buffer_pool_get_config (imxvct->in_pool);
+          memset (&imxvct->in_video_align, 0, sizeof(GstVideoAlignment));
+          if (gst_buffer_pool_config_has_option (config,
+              GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
+            gst_buffer_pool_config_get_video_alignment (config,
+                &imxvct->in_video_align);
+          }
+
+          gst_structure_free (config);
+        } else {
+          memset (&imxvct->in_video_align, 0, sizeof(GstVideoAlignment));
+          phymemmeta = GST_PHY_MEM_META_GET (in->buffer);
+          if (phymemmeta) {
+            imxvct->in_video_align.padding_right = phymemmeta->x_padding;
+            imxvct->in_video_align.padding_bottom = phymemmeta->y_padding;
+          }
+        }
+
+        imxvct->pool_config_update = FALSE;
+      }
+
+      gint crop_x = 0;
+      gint crop_y = 0;
+      guint crop_w = in->info.width;
+      guint crop_h = in->info.height;
+
+      GstVideoCropMeta *in_crop = gst_buffer_get_video_crop_meta(in->buffer);
+      if (in_crop != NULL) {
+        if ((in_crop->x < in->info.width) && (in_crop->y < in->info.height)) {
+          crop_x += in_crop->x;
+          crop_y += in_crop->y;
+          crop_w = MIN(in_crop->width, (in->info.width - in_crop->x));
+          crop_h = MIN(in_crop->height, (in->info.height - in_crop->y));
+        }
+      }
+
+      VideoCompositionVideoInfo in_v, out_v;
+      memset (&in_v, 0, sizeof(VideoCompositionVideoInfo));
+      memset (&out_v, 0, sizeof(VideoCompositionVideoInfo));
+      in_v.buf = in->buffer;
+      in_v.fmt = out_v.fmt = GST_VIDEO_INFO_FORMAT(&(in->info));
+      in_v.width = out_v.width = in->info.width;
+      in_v.height = out_v.height = in->info.height;
+      in_v.stride = out_v.stride = in->info.stride[0];
+      in_v.rotate = out_v.rotate = IMX_2D_ROTATION_0;
+      in_v.crop_x = out_v.crop_x = crop_x;
+      in_v.crop_y = out_v.crop_y = crop_y;
+      in_v.crop_w = out_v.crop_w = crop_w;
+      in_v.crop_h = out_v.crop_h = crop_h;
+
+      out_v.mem = gst_buffer_query_phymem_block (in->buffer);
+      memcpy(&out_v.align, &(imxvct->in_video_align),sizeof(GstVideoAlignment));
+
+      gint cnt = imx_video_overlay_composition_composite(&imxvct->video_comp,
+                                                         &in_v, &out_v, TRUE);
+
+      if (cnt >= 0) {
+        imx_video_overlay_composition_remove_meta(in->buffer);
+        GST_DEBUG ("processed %d video overlay composition buffers", cnt);
+      } else {
+        GST_WARNING ("video overlay composition meta handling failed");
+      }
+    } else {
+      GST_DEBUG("no video overlay composition meta");
+    }
+  }
+
+  return GST_FLOW_OK;
 }
 
 static void
@@ -1524,6 +1658,14 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
         GST_IMX_VIDEO_COMPOMETA_DEFAULT,
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class,
+      PROP_COMPOSITION_META_IN_PLACE,
+      g_param_spec_boolean("in-place", "Handle composition meta in place",
+        "Handle composition meta in place in pass through mode, "
+        "video overlay composition will blended onto input buffer",
+        GST_IMX_VIDEO_COMPOMETA_IN_PLACE_DEFAULT,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   in_plugin->destroy(dev);
 
   base_transform_class->src_event =
@@ -1542,6 +1684,8 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
       GST_DEBUG_FUNCPTR(imx_video_convert_set_info);
   video_filter_class->transform_frame =
       GST_DEBUG_FUNCPTR(imx_video_convert_transform_frame);
+  video_filter_class->transform_frame_ip =
+      GST_DEBUG_FUNCPTR(imx_video_convert_transform_frame_ip);
 
   base_transform_class->passthrough_on_same_caps = TRUE;
 }
@@ -1567,6 +1711,7 @@ gst_imx_video_convert_init (GstImxVideoConvert * imxvct)
       imxvct->rotate = IMX_2D_ROTATION_0;
       imxvct->deinterlace = IMX_2D_DEINTERLACE_NONE;
       imxvct->composition_meta_enable = GST_IMX_VIDEO_COMPOMETA_DEFAULT;
+      imxvct->in_place = GST_IMX_VIDEO_COMPOMETA_IN_PLACE_DEFAULT;
       imx_video_overlay_composition_init(&imxvct->video_comp, imxvct->device);
     }
   } else {
