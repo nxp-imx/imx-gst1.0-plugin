@@ -504,6 +504,13 @@ static gint imx_ipu_overlay(Imx2DDevice *device,
   src_w = GST_ROUND_DOWN_8((MIN(src->crop.w, (src->info.w - src_x))));
   src_h = GST_ROUND_DOWN_8((MIN(src->crop.h, (src->info.h - src_y))));
 
+  if (ipu->ov_temp.vaddr == NULL) {
+    ipu->ov_temp.size = IPU_OVERLAY_BUF_SIZE_MAX;
+    if (imx_ipu_alloc_mem(device, &ipu->ov_temp) < 0) {
+      return -1;
+    }
+  }
+
   if (src->crop.w > IPU_OVERLAY_WIDTH_MAX
       || src->crop.h > IPU_OVERLAY_HEIGHT_MAX) {
 #ifdef IPU_OVERLAY_SIZE_LIMIT_BREAK_DOWN
@@ -565,7 +572,6 @@ static gint imx_ipu_overlay(Imx2DDevice *device,
       if (imx_ipu_check_parameters(device, dst->mem, &ipu->ov_resize) == 0) {
         if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
           GST_ERROR("copy temp input failed: %s", strerror(errno));
-          imx_ipu_free_mem(device, &ipu->ov_resize);
           return -1;
         }
       }
@@ -584,15 +590,6 @@ static gint imx_ipu_overlay(Imx2DDevice *device,
           src_bk_w = IPU_OVERLAY_WIDTH_MAX;
         else
           src_bk_w = remain_w;
-
-        if (ipu->ov_temp.vaddr == NULL) {
-          ipu->ov_temp.size = IPU_OVERLAY_BUF_SIZE_MAX;
-          if (imx_ipu_alloc_mem(device, &ipu->ov_temp) < 0) {
-            if (scaled)
-              imx_ipu_free_mem(device, &ipu->ov_resize);
-            return -1;
-          }
-        }
 
         // overlay src with dst in dst crop area to temp buffer
         // with the format of src format and size in dst crop size
@@ -661,9 +658,6 @@ static gint imx_ipu_overlay(Imx2DDevice *device,
         if (imx_ipu_check_parameters(device, src->mem, &ipu->ov_temp) == 0) {
           if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
             GST_ERROR("overlay src to temp buffer failed: %s", strerror(errno));
-            imx_ipu_free_mem(device, &ipu->ov_temp);
-            if (scaled)
-              imx_ipu_free_mem(device, &ipu->ov_resize);
             return -1;
           }
         }
@@ -713,8 +707,6 @@ static gint imx_ipu_overlay(Imx2DDevice *device,
           if (imx_ipu_check_parameters(device, &ipu->ov_temp, &ipu->ov_resize) == 0) {
             if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
               GST_ERROR("temp buffer to dst failed: %s", strerror(errno));
-              imx_ipu_free_mem(device, &ipu->ov_temp);
-              imx_ipu_free_mem(device, &ipu->ov_resize);
               return -1;
             }
           }
@@ -722,13 +714,10 @@ static gint imx_ipu_overlay(Imx2DDevice *device,
           if (imx_ipu_check_parameters(device, &ipu->ov_temp, dst->mem) == 0) {
             if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
               GST_ERROR("temp buffer to dst failed: %s", strerror(errno));
-              imx_ipu_free_mem(device, &ipu->ov_temp);
               return -1;
             }
           }
         }
-
-        imx_ipu_free_mem(device, &ipu->ov_temp);
       }
     }
 
@@ -768,12 +757,9 @@ static gint imx_ipu_overlay(Imx2DDevice *device,
       if (imx_ipu_check_parameters(device, &ipu->ov_resize, dst->mem) == 0) {
         if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
           GST_ERROR("copy temp input failed: %s", strerror(errno));
-          imx_ipu_free_mem(device, &ipu->ov_resize);
           return -1;
         }
       }
-
-      imx_ipu_free_mem(device, &ipu->ov_resize);
     }
 
     return 0;
@@ -781,13 +767,6 @@ static gint imx_ipu_overlay(Imx2DDevice *device,
 #else
     return imx_ipu_convert(device, dst, src);
 #endif
-  }
-
-  // allocate a new temp buffer
-  if (ipu->ov_temp.vaddr == NULL) {
-    ipu->ov_temp.size = IPU_OVERLAY_BUF_SIZE_MAX;
-    if (imx_ipu_alloc_mem(device, &ipu->ov_temp) < 0)
-      return -1;
   }
 
   // overlay src with dst in dst crop area to temp buffer
@@ -849,7 +828,6 @@ static gint imx_ipu_overlay(Imx2DDevice *device,
   if (imx_ipu_check_parameters(device, src->mem, &ipu->ov_temp) == 0) {
     if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
       GST_ERROR("overlay src to temp buffer failed: %s", strerror(errno));
-      imx_ipu_free_mem(device, &ipu->ov_temp);
       return -1;
     }
   }
@@ -890,12 +868,10 @@ static gint imx_ipu_overlay(Imx2DDevice *device,
   if (imx_ipu_check_parameters(device, &ipu->ov_temp, dst->mem) == 0) {
     if (ioctl(ipu->ipu_fd, IPU_QUEUE_TASK, &(ipu->task)) < 0) {
       GST_ERROR("temp buffer to dst failed: %s", strerror(errno));
-      imx_ipu_free_mem(device, &ipu->ov_temp);
       return -1;
     }
   }
 
-  imx_ipu_free_mem(device, &ipu->ov_temp);
   return 0;
 }
 
