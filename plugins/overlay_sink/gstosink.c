@@ -25,9 +25,7 @@
 #include "gstosink.h"
 #include "gstosinkallocator.h"
 #include "allocator/gstphymemmeta.h"
-#ifdef USE_X11
 #include "gstimxvideooverlay.h"
-#endif
 #include "imxoverlaycompositionmeta.h"
 
 #define ALIGNMENT (16)
@@ -59,7 +57,6 @@ enum
 static GstFlowReturn
 gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer);
 
-#ifdef USE_X11
 GST_IMPLEMENT_VIDEO_OVERLAY_METHODS (GstOverlaySink, gst_overlay_sink);
 
 static gboolean overlay_sink_update_video_geo(GstElement * object, GstVideoRectangle win_rect) {
@@ -95,16 +92,13 @@ static void overlay_sink_config_color_key(GObject * object, gboolean enable, gui
   if (osink && osink->osink_obj)
     osink_object_set_color_key(osink->osink_obj, 0, enable, color_key);
 }
-#endif
 
 #define gst_overlay_sink_parent_class parent_class
-#ifdef USE_X11
 G_DEFINE_TYPE_WITH_CODE (GstOverlaySink, gst_overlay_sink, GST_TYPE_VIDEO_SINK,
     G_IMPLEMENT_INTERFACE (GST_TYPE_VIDEO_OVERLAY,
         gst_overlay_sink_video_overlay_interface_init));
-#else
-G_DEFINE_TYPE (GstOverlaySink, gst_overlay_sink, GST_TYPE_VIDEO_SINK);
-#endif
+
+//G_DEFINE_TYPE (GstOverlaySink, gst_overlay_sink, GST_TYPE_VIDEO_SINK);
 
 static gint
 gst_overlay_sink_output_config (GstOverlaySink *sink, gint idx) 
@@ -317,9 +311,8 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
           }
 
           sink->frame_showed = 0;
-#ifdef USE_X11
-        gst_imx_video_overlay_start (sink->imxoverlay);
-#endif
+
+          gst_imx_video_overlay_start (sink->imxoverlay);
         }
       break;
     default:
@@ -332,9 +325,9 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       {
         gint i;
-#ifdef USE_X11
+
         gst_imx_video_overlay_stop (sink->imxoverlay);
-#endif
+
         if (sink->prv_buffer) {
           gst_buffer_unref (sink->prv_buffer);
           sink->prv_buffer = NULL;
@@ -504,9 +497,7 @@ gst_overlay_sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
     }
   }
 
-#ifdef USE_X11
   gst_imx_video_overlay_prepare_window_handle (sink->imxoverlay, TRUE);
-#endif
 
   return TRUE;
 }
@@ -792,12 +783,10 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 static void
 gst_overlay_sink_finalize (GstOverlaySink * overlay_sink)
 {
-#ifdef USE_X11
   if (overlay_sink->imxoverlay) {
     gst_imx_video_overlay_finalize (overlay_sink->imxoverlay);
     overlay_sink->imxoverlay = NULL;
   }
-#endif
 
   G_OBJECT_CLASS (parent_class)->finalize ((GObject *) (overlay_sink));
 }
@@ -1049,12 +1038,10 @@ gst_overlay_sink_init (GstOverlaySink * overlay_sink)
   overlay_sink->pool_alignment_checked = FALSE;
   overlay_sink->composition_meta_enable = OVERLAY_SINK_COMPOMETA_DEFAULT;
 
-#ifdef USE_X11
   overlay_sink->imxoverlay = gst_imx_video_overlay_init ((GstElement *)overlay_sink,
                                               overlay_sink_update_video_geo,
                                               overlay_sink_config_color_key,
                                               overlay_sink_config_global_alpha);
-#endif
 
   g_print("====== OVERLAYSINK: %s build on %s %s. ======\n",  (VERSION),__DATE__,__TIME__);
 

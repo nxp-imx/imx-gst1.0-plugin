@@ -72,9 +72,7 @@ struct _GstOverlaySink {
   gint min_buffers;
   gint max_buffers;
   GstBuffer *prv_buffer;
-#ifdef USE_X11
   void *imxoverlay;
-#endif
   gboolean composition_meta_enable;
 };
 

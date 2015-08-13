@@ -84,7 +84,7 @@ void gst_imx_video_overlay_prepare_window_handle (ImxVideoOverlay * imxxoverlay,
                                                   gboolean required);
 void gst_imx_video_overlay_interface_init (GstVideoOverlayInterface * iface);
 void gst_imx_video_overlay_set_window_handle (ImxVideoOverlay *imxxoverlay,
-                                              guintptr id);
+                                              gulong id);
 void gst_imx_video_overlay_expose (ImxVideoOverlay * imxxoverlay);
 void gst_imx_video_overlay_handle_events (ImxVideoOverlay * imxxoverlay,
                                           gboolean handle_events);

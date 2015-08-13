@@ -15,7 +15,8 @@ libgstoverlaysinkplugins_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
 				 -I$(top_srcdir)/libs/v4l2_core \
 				 -I$(top_srcdir)/libs/device-2d \
 				 -I$(top_srcdir)/libs/overlaycompositionmeta \
-         -I$(top_srcdir)/ext-includes
+         -I$(top_srcdir)/ext-includes \
+         -I$(top_srcdir)/libs/video-overlay
 
 libgstoverlaysinkplugins_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 				 $(GST_BASE_LIBS) \
@@ -35,8 +36,3 @@ registry_file2 = imx_6sx_display_config
 
 data_DATA = $(registry_file1) $(registry_file2)
 EXTRA_DIST = $(registry_file1) $(registry_file2)
-
-if USE_X11
-libgstoverlaysinkplugins_la_CFLAGS += -DUSE_X11
-libgstoverlaysinkplugins_la_CFLAGS += -I$(top_srcdir)/libs/video-overlay
-endif

@@ -8,6 +8,7 @@ libgstfsl_@GST_API_VERSION@_la_SOURCES = allocator/gstallocatorphymem.c \
 	device-2d/imx_2d_device.c \
 	device-2d/imx_2d_device_allocator.c \
 	overlaycompositionmeta/imxoverlaycompositionmeta.c \
+	video-overlay/gstimxvideooverlay.c \
   gstimxcommon.h
 
 libgstfsl_@GST_API_VERSION@_la_CFLAGS = $(GST_BASE_CFLAGS) $(GST_CFLAGS)
@@ -22,15 +23,14 @@ noinst_HEADERS = allocator/gstallocatorphymem.h \
     v4l2_core/gstimxv4l2.h \
     device-2d/imx_2d_device.h \
     device-2d/imx_2d_device_allocator.h \
-    overlaycompositionmeta/imxoverlaycompositionmeta.h
+    overlaycompositionmeta/imxoverlaycompositionmeta.h \
+    video-overlay/gstimxvideooverlay.h
 
 if USE_X11
-libgstfsl_@GST_API_VERSION@_la_SOURCES += video-overlay/gstimxvideooverlay.c \
-																					video-overlay/gstimxxoverlay.c
+libgstfsl_@GST_API_VERSION@_la_SOURCES += video-overlay/gstimxxoverlay.c
 libgstfsl_@GST_API_VERSION@_la_LIBADD += -lX11
 libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_X11    
-noinst_HEADERS += video-overlay/gstimxvideooverlay.h \
-									video-overlay/gstimxxoverlay.h
+noinst_HEADERS += video-overlay/gstimxxoverlay.h
 endif
 				 
 if USE_IMX_2DDEVICE_IPU

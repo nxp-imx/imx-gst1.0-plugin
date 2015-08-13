@@ -19,9 +19,6 @@
 
 #include <stdio.h>
 #include <string.h>
-/* for XkbKeycodeToKeysym */
-#include <X11/XKBlib.h>
-#include <gst/video/navigation.h>
 #include "gstimxvideooverlay.h"
 
 #ifdef USE_X11
@@ -79,7 +76,7 @@ gst_imx_video_overlay_init(GstElement *element,
   if (!set_alpha)
     GST_ERROR("Alpha setting callback NULL, video overlay may not work");
 
-  const gchar *colorkey = getenv ("COLORKEY");
+  const gchar *colorkey = (gchar *)getenv ("COLORKEY");
   if (colorkey && (strlen(colorkey) > 1)) {
     overlay->colorkey = strtol(colorkey, NULL, 16);
   } else {
@@ -87,7 +84,7 @@ gst_imx_video_overlay_init(GstElement *element,
     gchar str[10] = {0};
     sprintf(str, "%08x", overlay->colorkey);
     setenv("COLORKEY", str, TRUE);
-    g_print("set color key:%s\n", str);
+    GST_INFO("set color key:%s\n", str);
   }
 
   return overlay;
@@ -145,7 +142,7 @@ gst_imx_video_overlay_stop (ImxVideoOverlay * imxxoverlay)
 
 void
 gst_imx_video_overlay_set_window_handle (ImxVideoOverlay *imxxoverlay,
-                                        guintptr id)
+                                         gulong id)
 {
   GST_DEBUG ("winid %lu", id);
   if (!imxxoverlay || !imxxoverlay->parent ||
@@ -154,13 +151,13 @@ gst_imx_video_overlay_set_window_handle (ImxVideoOverlay *imxxoverlay,
     return;
   }
 
-  if (imxxoverlay->video_win != (XID)id) {
-    if (imxxoverlay->internal_win && (XID)id != imxxoverlay->internal_win) {
+  if (imxxoverlay->video_win != id) {
+    if (imxxoverlay->internal_win && id != imxxoverlay->internal_win) {
       if (imxxoverlay->destroy_win)
         imxxoverlay->destroy_win(imxxoverlay);
     }
-    imxxoverlay->video_win = (XID)id;
-    GST_DEBUG ("Setting XID to %lu", (gulong) id);
+    imxxoverlay->video_win = id;
+    GST_DEBUG ("Setting XID to %lu", id);
   }
 
   if (id != 0) {
@@ -239,8 +236,13 @@ gst_imx_video_overlay_expose (ImxVideoOverlay * imxxoverlay)
       !GST_IS_VIDEO_OVERLAY(imxxoverlay->parent))
     return;
 
-  if (imxxoverlay->update_win_geo)
-    imxxoverlay->update_win_geo (imxxoverlay);
+  if (imxxoverlay->video_win) {
+    if (imxxoverlay->update_win_geo)
+      imxxoverlay->update_win_geo (imxxoverlay);
+  } else if (imxxoverlay->update_video_geo) {
+    // no window applied
+    imxxoverlay->update_video_geo(imxxoverlay->parent,imxxoverlay->render_rect);
+  }
 }
 
 gboolean

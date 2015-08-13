@@ -63,9 +63,7 @@ struct _GstImxV4l2Sink {
   guint min_buffers;
   gboolean self_pool_configed;
   gboolean pool_activated;
-#ifdef USE_X11
   void *imxoverlay;
-#endif
   GstImxVideoOverlayComposition video_comp;
   gboolean composition_meta_enable;
   Imx2DDevice *blend_dev;

@@ -22,15 +22,12 @@
 #include "gstimxv4l2sink.h"
 #include "gstimxv4l2allocator.h"
 #include "imx_2d_device.h"
+#include "gstimxvideooverlay.h"
 
 #define ALIGNMENT_8 (8)
 #define ALIGNMENT_2 (2)
 #define ISALIGNED(a, b) (!(a & (b-1)))
 #define ALIGNTO(a, b) ((a + (b-1)) & (~(b-1)))
-
-#ifdef USE_X11
-#include "gstimxvideooverlay.h"
-#endif
 
 GST_DEBUG_CATEGORY (imxv4l2sink_debug);
 #define GST_CAT_DEFAULT imxv4l2sink_debug
@@ -62,7 +59,6 @@ enum {
   CONFIG_ROTATE = 0x4
 };
 
-#ifdef USE_X11
 GST_IMPLEMENT_VIDEO_OVERLAY_METHODS (GstImxV4l2Sink, gst_imx_v4l2sink);
 
 static gboolean v4l2sink_update_video_geo(GstElement * object, GstVideoRectangle win_rect) {
@@ -93,16 +89,13 @@ static void v4l2sink_config_color_key(GObject * object, gboolean enable, guint c
   if (v4l2sink && v4l2sink->v4l2handle)
     gst_imx_v4l2out_config_color_key(v4l2sink->v4l2handle, enable, color_key);
 }
-#endif
 
 #define gst_imx_v4l2sink_parent_class parent_class
-#ifdef USE_X11
 G_DEFINE_TYPE_WITH_CODE (GstImxV4l2Sink, gst_imx_v4l2sink, GST_TYPE_VIDEO_SINK,
     G_IMPLEMENT_INTERFACE (GST_TYPE_VIDEO_OVERLAY,
                        gst_imx_v4l2sink_video_overlay_interface_init));
-#else
-G_DEFINE_TYPE (GstImxV4l2Sink, gst_imx_v4l2sink, GST_TYPE_VIDEO_SINK);
-#endif
+
+//G_DEFINE_TYPE (GstImxV4l2Sink, gst_imx_v4l2sink, GST_TYPE_VIDEO_SINK);
 
 static void
 gst_imx_v4l2sink_set_property (GObject * object,
@@ -282,9 +275,8 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
         gst_imx_v4l2_config_deinterlace (v4l2sink->v4l2handle, 
             v4l2sink->do_deinterlace, v4l2sink->deinterlace_motion);
       }
-#ifdef USE_X11
-        gst_imx_video_overlay_start (v4l2sink->imxoverlay);
-#endif
+
+      gst_imx_video_overlay_start (v4l2sink->imxoverlay);
       break;
     default:
       break;
@@ -295,9 +287,7 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
   switch (transition) {
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       if (v4l2sink->v4l2handle) {
-#ifdef USE_X11
         gst_imx_video_overlay_stop (v4l2sink->imxoverlay);
-#endif
 
         if (gst_imx_v4l2_reset_device (v4l2sink->v4l2handle) < 0) {
           return GST_STATE_CHANGE_FAILURE;
@@ -554,9 +544,7 @@ gst_imx_v4l2sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
       return FALSE;
   }
 
-#ifdef USE_X11
   gst_imx_video_overlay_prepare_window_handle (v4l2sink->imxoverlay, TRUE);
-#endif
 
   return TRUE;
 }
@@ -811,12 +799,10 @@ gst_imx_v4l2sink_finalize (GstImxV4l2Sink * v4l2sink)
   if (v4l2sink->device)
     g_free (v4l2sink->device);
 
-#ifdef USE_X11
   if (v4l2sink->imxoverlay) {
     gst_imx_video_overlay_finalize (v4l2sink->imxoverlay);
     v4l2sink->imxoverlay = NULL;
   }
-#endif
 
   if (v4l2sink->blend_dev) {
     v4l2sink->blend_dev->close(v4l2sink->blend_dev);
@@ -1021,12 +1007,10 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   v4l2sink->min_buffers = gst_imx_v4l2_get_min_buffer_num (V4L2_BUF_TYPE_VIDEO_OUTPUT);
   v4l2sink->pool_activated = FALSE;
 
-#ifdef USE_X11
   v4l2sink->imxoverlay = gst_imx_video_overlay_init ((GstElement *)v4l2sink,
                                               v4l2sink_update_video_geo,
                                               v4l2sink_config_color_key,
                                               v4l2sink_config_global_alpha);
-#endif
 
   v4l2sink->composition_meta_enable = IMX_V4L2SINK_COMPOMETA_DEFAULT;
   v4l2sink->blend_dev = NULL;
