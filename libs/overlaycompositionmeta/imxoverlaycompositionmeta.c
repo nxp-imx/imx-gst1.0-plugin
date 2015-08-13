@@ -559,10 +559,34 @@ gint imx_video_overlay_composition_composite(
       dst.alpha = 0xFF;
       dst.rotate = out_v->rotate;
       dst.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
-      dst.crop.x = out_v->crop_x + render_x * (out_v->crop_w) / in_v->crop_w;
-      dst.crop.y = out_v->crop_y + render_y * (out_v->crop_h) / in_v->crop_h;
-      dst.crop.w = render_w * (out_v->crop_w) / in_v->crop_w;
-      dst.crop.h = render_h * (out_v->crop_h) / in_v->crop_h;
+      switch(src.rotate) {
+      case IMX_2D_ROTATION_90:
+        dst.crop.x = out_v->crop_x +
+                    (in_v->height-render_y-render_h)*out_v->crop_w/in_v->crop_h;
+        dst.crop.y = out_v->crop_y + render_x*out_v->crop_h/in_v->crop_w;
+        dst.crop.w = render_h * out_v->crop_w / in_v->crop_h;
+        dst.crop.h = render_w * out_v->crop_h / in_v->crop_w;
+        break;
+      case IMX_2D_ROTATION_180:
+        dst.crop.x = out_v->crop_x + render_x * out_v->crop_w / in_v->crop_w;
+        dst.crop.y = out_v->crop_y +
+                    (in_v->height-render_y-render_h)*out_v->crop_h/in_v->crop_h;
+        dst.crop.w = render_w * out_v->crop_w / in_v->crop_w;
+        dst.crop.h = render_h * out_v->crop_h / in_v->crop_h;
+        break;
+      case IMX_2D_ROTATION_270:
+        dst.crop.x = out_v->crop_x + render_y*out_v->crop_w/in_v->crop_h;
+        dst.crop.y = out_v->crop_y + render_x*out_v->crop_h/in_v->crop_w;
+        dst.crop.w = render_h * out_v->crop_w / in_v->crop_h;
+        dst.crop.h = render_w * out_v->crop_h / in_v->crop_w;
+        break;
+      default:
+        dst.crop.x = out_v->crop_x + render_x * out_v->crop_w / in_v->crop_w;
+        dst.crop.y = out_v->crop_y + render_y * out_v->crop_h / in_v->crop_h;
+        dst.crop.w = render_w * out_v->crop_w / in_v->crop_w;
+        dst.crop.h = render_h * out_v->crop_h / in_v->crop_h;
+        break;
+      }
 
       if (config_out) {
         dst.info.w = out_v->width +

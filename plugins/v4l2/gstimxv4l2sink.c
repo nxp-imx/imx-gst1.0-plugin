@@ -745,17 +745,9 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
       in_v.crop_y = out_v.crop_y = v4l2sink->crop.top;
       in_v.crop_w = out_v.crop_w = v4l2sink->crop.width;
       in_v.crop_h = out_v.crop_h = v4l2sink->crop.height;
-
-      switch (v4l2sink->rotate) {
-        case 0:   in_v.rotate = IMX_2D_ROTATION_0;    break;
-        case 90:  in_v.rotate = IMX_2D_ROTATION_90;   break;
-        case 180: in_v.rotate = IMX_2D_ROTATION_180;  break;
-        case 270: in_v.rotate = IMX_2D_ROTATION_270;  break;
-        default:  in_v.rotate = IMX_2D_ROTATION_0;    break;
-      }
+      in_v.rotate = out_v.rotate = IMX_2D_ROTATION_0;
 
       out_v.mem = gst_buffer_query_phymem_block(buffer);
-      out_v.rotate = IMX_2D_ROTATION_0;
       memcpy(&out_v.align, &(v4l2sink->video_align), sizeof(GstVideoAlignment));
 
       gint cnt = imx_video_overlay_composition_composite(&v4l2sink->video_comp,
