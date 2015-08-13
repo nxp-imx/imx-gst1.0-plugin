@@ -873,7 +873,7 @@ setup_pipeline (gRecorderEngine *recorder)
     if (recorder->video_detect_name)
       recorder->vfsink_name = "imxv4l2sink";
     else
-      recorder->vfsink_name = "glimagesink";
+      recorder->vfsink_name = "overlaysink";
 
   /* configure used elements */
   res &=
@@ -1638,7 +1638,8 @@ static REresult add_time_stamp(RecorderEngineHandle handle, REboolean bAddTimeSt
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
 
   if (bAddTimeStamp) {
-    recorder->date_time = "clockoverlay halignment=left valignment=top time-format=%Y/%m/%d::%H:%M:%S ! queue ! timeoverlay halignment=right valignment=top text=\"Stream time:\" ! queue";
+    //recorder->date_time = "clockoverlay halignment=left valignment=top time-format=%Y/%m/%d::%H:%M:%S ! queue ! timeoverlay halignment=right valignment=top text=\"Stream time:\" ! queue ! imxvideoconvert_ipu composition-meta-enable=true in-place=true ! queue";
+    recorder->date_time = "clockoverlay halignment=left valignment=top time-format=%Y/%m/%d::%H:%M:%S ! queue ! imxvideoconvert_ipu composition-meta-enable=true in-place=true ! queue";
   } else {
     recorder->date_time = NULL;
   }
