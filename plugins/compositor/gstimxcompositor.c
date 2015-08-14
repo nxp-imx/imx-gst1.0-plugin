@@ -131,7 +131,7 @@
 #define IMX_COMPOSITOR_CSC_COMPLEX_FACTOR (10 - IMX_COMPOSITOR_CSC_LOSS_FACTOR)
 
 #define DEFAULT_IMXCOMPOSITOR_BACKGROUND        0x00000000
-#define SINK_TEMP_BUFFER_SIZE                   (2048*2048*4)
+#define SINK_TEMP_BUFFER_INIT_SIZE              (1920*1088*2)
 
 #define GST_IMX_COMPOSITOR_PARAMS_QDATA   \
           g_quark_from_static_string("imxcompositor-params")
@@ -417,60 +417,99 @@ gst_imxcompositor_sink_query (GstAggregator * agg, GstAggregatorPad * bpad,
     case GST_QUERY_CAPS:
     {
       GstCaps *filter, *caps;
-      GstCaps *sinkcaps;
-      GstCaps *template_caps;
+      GstCaps *srccaps;
+      GstCaps *sink_template;
 
       gst_query_parse_caps (query, &filter);
 
       GstCaps *filtered_caps;
       GstStructure *s;
-      gboolean had_current_caps = TRUE;
       gint i, n;
 
-      template_caps = gst_pad_get_pad_template_caps (GST_PAD (bpad));
-      sinkcaps = gst_pad_get_current_caps (GST_PAD (bpad));
-      if (sinkcaps == NULL) {
-        had_current_caps = FALSE;
-        sinkcaps = template_caps;
-      }
+      srccaps = gst_pad_get_current_caps (GST_PAD (agg->srcpad));
+      if (srccaps == NULL)
+        srccaps = gst_pad_get_pad_template_caps (GST_PAD (agg->srcpad));
 
-      sinkcaps = gst_caps_make_writable (sinkcaps);
+      srccaps = gst_caps_make_writable (srccaps);
 
-      n = gst_caps_get_size (sinkcaps);
+      n = gst_caps_get_size (srccaps);
       for (i = 0; i < n; i++) {
-        s = gst_caps_get_structure (sinkcaps, i);
+        s = gst_caps_get_structure (srccaps, i);
         gst_structure_set (s, "width", GST_TYPE_INT_RANGE, 64, G_MAXINT32,
             "height", GST_TYPE_INT_RANGE, 64, G_MAXINT32,
             "framerate", GST_TYPE_FRACTION_RANGE, 0, 1, G_MAXINT32, 1, NULL);
-        if (!gst_structure_has_field (s, "pixel-aspect-ratio"))
-          gst_structure_set (s, "pixel-aspect-ratio", GST_TYPE_FRACTION, 1, 1,
-              NULL);
-
         gst_structure_remove_fields (s, "colorimetry", "chroma-site", "format",
             NULL);
       }
 
-      filtered_caps = sinkcaps;
+      sink_template = gst_pad_get_pad_template_caps (GST_PAD (bpad));
+      filtered_caps = gst_caps_intersect(srccaps, sink_template);
 
-      GstImxCompositor *imxcomp = (GstImxCompositor *) (agg);
+      GST_LOG_OBJECT(bpad, "srccaps: %" GST_PTR_FORMAT, srccaps);
+      GST_LOG_OBJECT(bpad, "sink_template: %" GST_PTR_FORMAT, sink_template);
+      GST_LOG_OBJECT(bpad, "filtered_caps: %" GST_PTR_FORMAT, filtered_caps);
+
       if (imxcomp->composition_meta_enable)
         imx_video_overlay_composition_add_caps(filtered_caps);
       else
         imx_video_overlay_composition_remove_caps(filtered_caps);
 
       if (filter)
-        filtered_caps = gst_caps_intersect (sinkcaps, filter);
-      caps = gst_caps_intersect (filtered_caps, template_caps);
-
-      gst_caps_unref (sinkcaps);
-      if (filter)
-        gst_caps_unref (filtered_caps);
-      if (had_current_caps)
-        gst_caps_unref (template_caps);
+        caps = gst_caps_intersect (filtered_caps, filter);
+      else
+        caps = filtered_caps;
 
       GST_LOG_OBJECT(bpad, "query sink caps: %" GST_PTR_FORMAT, caps);
       gst_query_set_caps_result (query, caps);
+      if (filter)
+        gst_caps_unref (filtered_caps);
+      gst_caps_unref (srccaps);
+      gst_caps_unref (sink_template);
       gst_caps_unref (caps);
+      ret = TRUE;
+      break;
+    }
+    case GST_QUERY_ACCEPT_CAPS:
+    {
+      GstCaps *caps;
+      gst_query_parse_accept_caps (query, &caps);
+      GstCaps *accepted_caps;
+      GstCaps *sink_template;
+      GstCaps *srccaps;
+      gint i, n;
+      GstStructure *s;
+
+      GST_DEBUG_OBJECT (bpad, "%" GST_PTR_FORMAT, caps);
+
+      srccaps = gst_pad_get_current_caps (GST_PAD (agg->srcpad));
+      if (srccaps == NULL)
+        srccaps = gst_pad_get_pad_template_caps (GST_PAD (agg->srcpad));
+
+      srccaps = gst_caps_make_writable (srccaps);
+
+      GST_LOG_OBJECT (bpad, "sink caps %" GST_PTR_FORMAT, srccaps);
+
+      n = gst_caps_get_size (srccaps);
+      for (i = 0; i < n; i++) {
+        s = gst_caps_get_structure (srccaps, i);
+        gst_structure_set (s, "width", GST_TYPE_INT_RANGE, 64, G_MAXINT32,
+            "height", GST_TYPE_INT_RANGE, 64, G_MAXINT32,
+            "framerate", GST_TYPE_FRACTION_RANGE, 0, 1, G_MAXINT32, 1, NULL);
+
+        gst_structure_remove_fields (s, "colorimetry", "chroma-site", "format",
+                NULL);
+      }
+
+      sink_template = gst_pad_get_pad_template_caps (GST_PAD (bpad));
+      accepted_caps = gst_caps_intersect(srccaps, sink_template);
+      gst_caps_unref(srccaps);
+
+      ret = gst_caps_can_intersect (caps, accepted_caps);
+      GST_DEBUG_OBJECT (bpad, "%saccepted caps %" GST_PTR_FORMAT,
+          (ret ? "" : "not "), caps);
+      gst_caps_unref (accepted_caps);
+      gst_caps_unref (sink_template);
+      gst_query_set_accept_caps_result (query, ret);
       ret = TRUE;
       break;
     }
@@ -1035,14 +1074,24 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
       imxcomp->allocator =
                gst_imx_2d_device_allocator_new((gpointer)(imxcomp->device));
 
-    if (!imxcomp->sink_tmp_buf)
+    if (!imxcomp->sink_tmp_buf) {
       imxcomp->sink_tmp_buf = gst_buffer_new_allocate(imxcomp->allocator,
-          SINK_TEMP_BUFFER_SIZE, NULL);
+          SINK_TEMP_BUFFER_INIT_SIZE, NULL);
+      imxcomp->sink_tmp_buf_size = SINK_TEMP_BUFFER_INIT_SIZE;
+    }
+
+    if (imxcomp->sink_tmp_buf &&
+        ppad->buffer_vinfo.size > SINK_TEMP_BUFFER_INIT_SIZE) {
+      GST_IMX_COMPOSITOR_UNREF_BUFFER(imxcomp->sink_tmp_buf);
+      imxcomp->sink_tmp_buf = gst_buffer_new_allocate(imxcomp->allocator,
+          ppad->buffer_vinfo.size, NULL);
+      imxcomp->sink_tmp_buf_size = ppad->buffer_vinfo.size;
+    }
 
     if (imxcomp->sink_tmp_buf) {
-      gst_video_frame_map(&temp_in_frame, &(inframe->info),
+      gst_video_frame_map(&temp_in_frame, &(ppad->buffer_vinfo),
           imxcomp->sink_tmp_buf, GST_MAP_WRITE);
-      gst_video_frame_copy(&temp_in_frame, inframe);
+      gst_video_frame_copy(&temp_in_frame, &frame);
       inframe = &temp_in_frame;
       gst_video_frame_unmap(&temp_in_frame);
 
@@ -1096,7 +1145,8 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
                 pad->align.padding_top + pad->align.padding_bottom;
   src->info.stride = inframe->info.stride[0];
 
-  GST_LOG_OBJECT (pad, "Input: %s, %dx%d", GST_VIDEO_FORMAT_INFO_NAME(inframe->info.finfo),
+  GST_LOG_OBJECT (pad, "Input: %s, %dx%d",
+      GST_VIDEO_FORMAT_INFO_NAME(inframe->info.finfo),
       inframe->info.width, inframe->info.height);
 
   if (imxcomp->device->config_input(imxcomp->device, &src->info) < 0) {
@@ -1647,6 +1697,7 @@ gst_imxcompositor_init (GstImxCompositor * imxcomp)
       GST_ERROR ("Open 2D device failed.");
     } else {
       imxcomp->sink_tmp_buf = NULL;
+      imxcomp->sink_tmp_buf_size = 0;
       imxcomp->out_pool = NULL;
       imxcomp->self_out_pool = NULL;
       imxcomp->out_pool_update = TRUE;

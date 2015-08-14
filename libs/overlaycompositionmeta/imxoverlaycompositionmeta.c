@@ -433,15 +433,15 @@ gint imx_video_overlay_composition_composite(
             g_print("allocate buffer by allocator failed, size=%d\n",
                 IMX_OVERLAY_COMPOSITION_INIT_BUFFER_SIZE);
           }
-        } else {
-          if (vcomp->tmp_buf_size < aligned_w * aligned_h * 4) {
-            GstBuffer *tmp_buf = gst_buffer_new_allocate(vcomp->allocator,
-                (aligned_w * aligned_h * 4), NULL);
-            if (tmp_buf) {
-              vcomp->tmp_buf_size = (aligned_w * aligned_h * 4);
-              gst_buffer_unref(vcomp->tmp_buf);
-              vcomp->tmp_buf = tmp_buf;
-            }
+        }
+
+        if (vcomp->tmp_buf && vcomp->tmp_buf_size < aligned_w * aligned_h * 4) {
+          GstBuffer *tmp_buf = gst_buffer_new_allocate(vcomp->allocator,
+              (aligned_w * aligned_h * 4), NULL);
+          if (tmp_buf) {
+            vcomp->tmp_buf_size = (aligned_w * aligned_h * 4);
+            gst_buffer_unref(vcomp->tmp_buf);
+            vcomp->tmp_buf = tmp_buf;
           }
         }
 

@@ -24,7 +24,7 @@
 #include "gstimxcommon.h"
 #include "../device-2d/imx_2d_device.h"
 
-#define IMX_OVERLAY_COMPOSITION_INIT_BUFFER_SIZE       ((1920*1080*4)/4)
+#define IMX_OVERLAY_COMPOSITION_INIT_BUFFER_SIZE       ((1920*1088*4)/4)
 
 typedef struct _GstImxVideoOverlayComposition {
   Imx2DDevice *device;

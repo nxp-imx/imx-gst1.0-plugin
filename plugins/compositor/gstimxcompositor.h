@@ -45,6 +45,7 @@ struct _GstImxCompositor
   GstBufferPool *out_pool;
   GstBufferPool *self_out_pool;
   GstBuffer *sink_tmp_buf;
+  guint sink_tmp_buf_size;
   GstAllocator *allocator;
   GstVideoAlignment out_align;
   gboolean out_pool_update;
