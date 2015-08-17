@@ -48,6 +48,8 @@ typedef struct _VideoCompositionVideoInfo {
   GstBuffer *buf;
 } VideoCompositionVideoInfo;
 
+gboolean imx_video_overlay_composition_is_out_fmt_support(Imx2DDevice *device,
+                                                    GstVideoFormat fmt);
 void imx_video_overlay_composition_init(GstImxVideoOverlayComposition *vcomp,
                                         Imx2DDevice *device);
 void imx_video_overlay_composition_deinit(GstImxVideoOverlayComposition *vcomp);

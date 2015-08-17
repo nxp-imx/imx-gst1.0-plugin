@@ -1229,8 +1229,8 @@ gst_imxcompositor_fill_background(Imx2DFrame *dst, guint RGBA8888)
 {
   gchar *p = dst->mem->vaddr;
   gint i;
-  gint R,G,B,A;
-  gdouble Y,U,V;
+  gchar R,G,B,A,Y,U,V;
+  gdouble y,u,v;
 
   R = RGBA8888 & 0x000000FF;
   G = (RGBA8888 & 0x0000FF00) >> 8;
@@ -1238,15 +1238,32 @@ gst_imxcompositor_fill_background(Imx2DFrame *dst, guint RGBA8888)
   A = (RGBA8888 & 0xFF000000) >> 24;
 
   //BT.709
-  Y = (0.213*R + 0.715*G + 0.072*B);
-  U = -0.117*R - 0.394*G + 0.511*B + 128;
-  V = 0.511*R - 0.464*G - 0.047*B + 128;
+  y = (0.213*R + 0.715*G + 0.072*B);
+  u = -0.117*R - 0.394*G + 0.511*B + 128;
+  v = 0.511*R - 0.464*G - 0.047*B + 128;
 
-  if (Y > 255.0)  Y = 255;
-  if (U < 0.0) U = 0;
-  if (U > 255.0) U = 255;
-  if (V < 0.0) V = 0;
-  if (V > 255.0) V = 255;
+  if (y > 255.0)
+    Y = 255;
+  else
+    Y = (gchar)y;
+  if (u < 0.0)
+    U = 0;
+  else
+    U = (gchar)u;
+  if (u > 255.0)
+    U = 255;
+  else
+    U = (gchar)u;
+  if (v < 0.0)
+    V = 0;
+  else
+    V = (gchar)v;
+  if (v > 255.0)
+    V = 255;
+  else
+    V = (gchar)v;
+
+  GST_INFO("RGBA8888 to %s\n", gst_video_format_to_string(dst->info.fmt));
 
   switch (dst->info.fmt) {
     case GST_VIDEO_FORMAT_RGBx:
@@ -1539,6 +1556,8 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
         out_v.crop_y = dst.crop.y;
         out_v.crop_w = dst.crop.w;
         out_v.crop_h = dst.crop.h;
+
+        memcpy(&out_v.align, &(imxcomp->out_align), sizeof(GstVideoAlignment));
 
         gint cnt = imx_video_overlay_composition_composite(&imxcomp->video_comp,
                                                           &in_v, &out_v, FALSE);

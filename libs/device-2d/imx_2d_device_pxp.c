@@ -26,15 +26,20 @@ GST_DEBUG_CATEGORY_EXTERN (imx2ddevice_debug);
 #define GST_CAT_DEFAULT imx2ddevice_debug
 
 #define PXP_WAIT_COMPLETE_TIME    3
-//#define ENABLE_PXP_ALPHA_OVERLAY
-//#define FILL_COLOR_BY_DEVICE
+#define ENABLE_PXP_ALPHA_OVERLAY
+#define PXP_OVERLAY_TMP_BUF_SIZE_INIT       (1280*720*2)
+#define PXP_OVERLAY_RGB_TMP_BUF_SIZE_INIT   (1280*720*2)
 
 typedef struct _Imx2DDevicePxp {
   gint capabilities;
   struct pxp_config_data config;
   pxp_chan_handle_t pxp_chan;
-#ifdef FILL_OUT_COLOR
   gboolean first_frame_done;
+#ifdef ENABLE_PXP_ALPHA_OVERLAY
+  PhyMemBlock ov_temp;
+  PhyMemBlock dummy;
+  PhyMemBlock rgb_temp;
+  guint background;
 #endif
 } Imx2DDevicePxp;
 
@@ -46,6 +51,7 @@ typedef struct {
 
 static PxpFmtMap pxp_in_fmts_map[] = {
     {GST_VIDEO_FORMAT_BGRx,   PXP_PIX_FMT_RGB32,    32},
+    {GST_VIDEO_FORMAT_BGRA,   PXP_PIX_FMT_BGRA32,   32},
     {GST_VIDEO_FORMAT_RGB16,  PXP_PIX_FMT_RGB565,   16},
     {GST_VIDEO_FORMAT_RGB15,  PXP_PIX_FMT_RGB555,   16},
 
@@ -102,7 +108,7 @@ static const PxpFmtMap * imx_pxp_get_format(GstVideoFormat format,
     map++;
   };
 
-  GST_ERROR ("pxp : format (%x) is not supported.",
+  GST_ERROR ("pxp : format (%s) is not supported.",
               gst_video_format_to_string(format));
 
   return NULL;
@@ -138,50 +144,11 @@ static gint imx_pxp_open(Imx2DDevice *device)
   memset(pxp, 0, sizeof (Imx2DDevicePxp));
   memcpy(&pxp->pxp_chan, &pxp_chan, sizeof(pxp_chan_handle_t));
 
-/* not necessary, pxp already memset to 0
-  pxp->config.proc_data.scaling = 0;
-  pxp->config.proc_data.bgcolor = 0;
-  pxp->config.proc_data.overlay_state = 0;
-  pxp->config.proc_data.lut_transform = PXP_LUT_NONE;
-
-  //Initialize OL parameters, No overlay will be used for PxP operation
-  gint i;
-  for (i=0; i < 8; i++) {
-    pxp->config.ol_param[i].combine_enable = false;
-    pxp->config.ol_param[i].width = 0;
-    pxp->config.ol_param[i].height = 0;
-    pxp->config.ol_param[i].pixel_fmt = PXP_PIX_FMT_RGB565;
-    pxp->config.ol_param[i].color_key_enable = false;
-    pxp->config.ol_param[i].color_key = -1;
-    pxp->config.ol_param[i].global_alpha_enable = false;
-    pxp->config.ol_param[i].global_alpha = 0;
-    pxp->config.ol_param[i].local_alpha_enable = false;
-  }
-*/
-
   device->priv = (gpointer)pxp;
 
   GST_DEBUG("requested pxp chan handle %d", pxp->pxp_chan.handle);
   return 0;
 }
-
-static gint imx_pxp_close(Imx2DDevice *device)
-{
-  if (!device)
-    return -1;
-
-  if (device) {
-    Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
-    if (pxp) {
-      pxp_release_channel(&pxp->pxp_chan);
-      pxp_uninit();
-      g_slice_free1(sizeof(Imx2DDevicePxp), pxp);
-    }
-    device->priv = NULL;
-  }
-  return 0;
-}
-
 
 static gint
 imx_pxp_alloc_mem(Imx2DDevice *device, PhyMemBlock *memblk)
@@ -216,6 +183,9 @@ static gint imx_pxp_free_mem(Imx2DDevice *device, PhyMemBlock *memblk)
   if (!device || !device->priv || !memblk)
     return -1;
 
+  if (memblk->vaddr == NULL)
+    return 0;
+
   GST_DEBUG("PXP free memory (%p)", memblk->paddr);
   gint ret = pxp_put_mem ((struct pxp_mem_desc*)(memblk->user_data));
   memblk->user_data = NULL;
@@ -224,6 +194,27 @@ static gint imx_pxp_free_mem(Imx2DDevice *device, PhyMemBlock *memblk)
   memblk->size = 0;
 
   return ret;
+}
+
+static gint imx_pxp_close(Imx2DDevice *device)
+{
+  if (!device)
+    return -1;
+
+  if (device) {
+    Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
+    if (pxp) {
+      imx_pxp_free_mem(device, &pxp->ov_temp);
+      imx_pxp_free_mem(device, &pxp->dummy);
+      imx_pxp_free_mem(device, &pxp->rgb_temp);
+      pxp_release_channel(&pxp->pxp_chan);
+      pxp_uninit();
+      g_slice_free1(sizeof(Imx2DDevicePxp), pxp);
+    }
+    device->priv = NULL;
+  }
+
+  return 0;
 }
 
 static gint imx_pxp_copy_mem(Imx2DDevice* device, PhyMemBlock *dst_mem,
@@ -320,12 +311,34 @@ static gint imx_pxp_config_output(Imx2DDevice *device, Imx2DVideoInfo* out_info)
   pxp->config.out_param.width = out_info->w;
   pxp->config.out_param.height = out_info->h;
   pxp->config.out_param.stride = out_info->w;
-  //if (pxp->config.proc_data.rotate % 180)
-  //  pxp->config.out_param.stride = out_info->h;
 
   GST_TRACE("output format = %s", gst_video_format_to_string(out_info->fmt));
 
   return 0;
+}
+
+static gint imx_pxp_do_channel(Imx2DDevicePxp *pxp)
+{
+  gint ret = 0;
+  ret = pxp_config_channel(&pxp->pxp_chan, &pxp->config);
+  if (ret < 0) {
+    GST_ERROR("pxp config channel fail (%d)", ret);
+    return -1;
+  }
+
+  ret = pxp_start_channel(&pxp->pxp_chan);
+  if (ret < 0) {
+    GST_ERROR("pxp start channel fail (%d)", ret);
+    return -1;
+  }
+
+  ret = pxp_wait_for_completion(&pxp->pxp_chan, 3);
+  if (ret < 0) {
+    GST_ERROR("pxp wait for completion fail (%d)", ret);
+    return -1;
+  }
+
+  return ret;
 }
 
 static gint imx_pxp_convert(Imx2DDevice *device,
@@ -337,6 +350,7 @@ static gint imx_pxp_convert(Imx2DDevice *device,
     return -1;
 
   Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
+  memset(&pxp->config.ol_param[0], 0, sizeof(struct pxp_layer_param));
 
   // Set input crop
   pxp->config.proc_data.srect.left = src->crop.x;
@@ -373,28 +387,11 @@ static gint imx_pxp_convert(Imx2DDevice *device,
       pxp->config.out_param.pixel_fmt);
 
   // Final conversion
-  ret = pxp_config_channel(&pxp->pxp_chan, &pxp->config);
-  if (ret < 0) {
-    GST_ERROR("pxp config channel fail (%d)", ret);
-    return -1;
-  }
-
-  ret = pxp_start_channel(&pxp->pxp_chan);
-  if (ret < 0) {
-    GST_ERROR("pxp start channel fail (%d)", ret);
-    return -1;
-  }
-
-  ret = pxp_wait_for_completion(&pxp->pxp_chan, 3);
-  if (ret < 0) {
-    GST_ERROR("pxp wait for completion fail (%d)", ret);
-    return -1;
-  }
-
-  return ret;
+  return imx_pxp_do_channel(pxp);
 }
 
-static gint imx_pxp_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
+static gint imx_pxp_blend_without_alpha(Imx2DDevice *device,
+                                        Imx2DFrame *dst, Imx2DFrame *src)
 {
   gint ret = 0;
 
@@ -402,54 +399,8 @@ static gint imx_pxp_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
     return -1;
 
   Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
+  memset(&pxp->config.ol_param[0], 0, sizeof(struct pxp_layer_param));
 
-#ifdef ENABLE_PXP_ALPHA_OVERLAY
-  pxp->config.ol_param[0].global_alpha_enable = TRUE;
-  pxp->config.ol_param[0].global_alpha = src->alpha;
-  pxp->config.ol_param[0].left = src->crop.x;
-  pxp->config.ol_param[0].top = src->crop.y;
-  pxp->config.ol_param[0].width = src->crop.w;
-  pxp->config.ol_param[0].height = src->crop.h;
-  pxp->config.ol_param[0].stride = src->info.w;
-  const PxpFmtMap *in_map = imx_pxp_get_format(src->info.fmt, pxp_in_fmts_map);
-  pxp->config.ol_param[0].pixel_fmt = in_map->pxp_format;
-  pxp->config.ol_param[0].paddr = (dma_addr_t)src->mem->paddr;
-  pxp->config.ol_param[0].combine_enable = TRUE;
-
-  GST_TRACE ("pxp overlay : %dx%d,%d(%d,%d-%d,%d), format=%x",
-      pxp->config.ol_param[0].width, pxp->config.ol_param[0].height,
-      pxp->config.ol_param[0].stride, pxp->config.ol_param[0].left,
-      pxp->config.ol_param[0].top, pxp->config.ol_param[0].width,
-      pxp->config.ol_param[0].height, pxp->config.ol_param[0].pixel_fmt);
-
-  PhyMemBlock copy_dst;
-  if (imx_pxp_copy_mem(device, &copy_dst, dst->mem, 0, dst->mem->size) < 0)
-    return -1;
-  pxp->config.s0_param.width = src->crop.w;
-  pxp->config.s0_param.height = src->crop.h;
-  pxp->config.s0_param.stride = pxp->config.out_param.stride;
-  pxp->config.s0_param.pixel_fmt = pxp->config.out_param.pixel_fmt;
-  pxp->config.proc_data.srect.left = 0;
-  pxp->config.proc_data.srect.top = 0;
-  pxp->config.proc_data.srect.width = src->crop.w;
-  pxp->config.proc_data.srect.height = src->crop.h;
-  pxp->config.s0_param.paddr = (dma_addr_t)copy_dst.paddr +
-      (dst->crop.y * dst->info.stride +
-          dst->crop.x*(dst->info.stride/dst->info.w));
-
-  pxp->config.proc_data.drect.left = 0;
-  pxp->config.proc_data.drect.top = 0;
-  pxp->config.proc_data.drect.width = src->crop.w;
-  pxp->config.proc_data.drect.height = src->crop.h;
-  pxp->config.out_param.paddr = (dma_addr_t)dst->mem->paddr +
-      (dst->crop.y * dst->info.stride +
-          dst->crop.x*(dst->info.stride/dst->info.w));
-
-  pxp->config.out_param.width = src->crop.w;
-  pxp->config.out_param.height = src->crop.h;
-
-#else
-#ifdef FILL_COLOR_BY_DEVICE
   if (pxp->first_frame_done == FALSE) {
     pxp->config.proc_data.drect.left = dst->crop.x;
     pxp->config.proc_data.drect.top = dst->crop.y;
@@ -471,27 +422,12 @@ static gint imx_pxp_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
     pxp->config.out_param.width = pxp->config.proc_data.drect.width;
     pxp->config.out_param.height = pxp->config.proc_data.drect.height;
   }
-#else
-  pxp->config.proc_data.drect.left = 0;
-  pxp->config.proc_data.drect.top = 0;
-  pxp->config.proc_data.drect.width = dst->crop.w;
-  pxp->config.proc_data.drect.height = dst->crop.h;
-  pxp->config.out_param.paddr = (dma_addr_t)dst->mem->paddr +
-      (dst->crop.y * dst->info.stride +
-          dst->crop.x*(dst->info.stride/dst->info.w));
-
-  pxp->config.out_param.width = pxp->config.proc_data.drect.width;
-  pxp->config.out_param.height = pxp->config.proc_data.drect.height;
-#endif
 
   pxp->config.proc_data.srect.left = src->crop.x;
   pxp->config.proc_data.srect.top = src->crop.y;
-  pxp->config.proc_data.srect.width =
-      MIN(src->crop.w, pxp->config.proc_data.srect.width);
-  pxp->config.proc_data.srect.height =
-      MIN(src->crop.h, pxp->config.proc_data.srect.height);
+  pxp->config.proc_data.srect.width = MIN(src->crop.w, src->info.w);
+  pxp->config.proc_data.srect.height = MIN(src->crop.h, src->info.h);
   pxp->config.s0_param.paddr = (dma_addr_t)src->mem->paddr;
-#endif
 
   GST_TRACE ("pxp dest : %dx%d,%d(%d,%d-%d,%d), format=%x",
       pxp->config.out_param.width, pxp->config.out_param.height,
@@ -507,38 +443,354 @@ static gint imx_pxp_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
       pxp->config.proc_data.srect.width, pxp->config.proc_data.srect.height,
       pxp->config.s0_param.pixel_fmt);
 
-  ret = pxp_config_channel(&pxp->pxp_chan, &pxp->config);
-  if (ret < 0) {
-    GST_ERROR("pxp config channel fail (%d)", ret);
+  return imx_pxp_do_channel(pxp);
+}
+
+static gint imx_pxp_overlay(Imx2DDevice *device,
+                            Imx2DFrame *dst, Imx2DFrame *src)
+{
+  guint orig_dst_w;
+  guint orig_dst_h;
+  guint orig_dst_s;
+  guint orig_dst_fmt;
+  guint orig_src_fmt;
+  guint BPP = 4;
+  const PxpFmtMap *fmt_map = NULL;
+
+  if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
+    return -1;
+
+  Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
+  memset(&pxp->config.ol_param[0], 0, sizeof(struct pxp_layer_param));
+
+  orig_src_fmt = pxp->config.s0_param.pixel_fmt;
+  orig_dst_fmt = pxp->config.out_param.pixel_fmt;
+  orig_dst_w = dst->info.w;
+  orig_dst_h = dst->info.h;
+  orig_dst_s = dst->info.w;
+
+  if (pxp->ov_temp.vaddr == NULL) {
+    pxp->ov_temp.size = PXP_OVERLAY_TMP_BUF_SIZE_INIT;
+    if (imx_pxp_alloc_mem(device, &pxp->ov_temp) < 0)
+      return -1;
+  }
+
+  fmt_map = imx_pxp_get_format(dst->info.fmt, pxp_out_fmts_map);
+  if (fmt_map)
+    BPP = fmt_map->bpp/8 + (fmt_map->bpp%8 ? 1 : 0);
+
+  if (pxp->ov_temp.vaddr
+      && pxp->ov_temp.size < (dst->crop.w * dst->crop.h * BPP)) {
+    imx_pxp_free_mem(device, &pxp->ov_temp);
+    pxp->ov_temp.size = dst->crop.w * dst->crop.h * BPP;
+    GST_LOG ("reallocte memory %d, BPP=%d", pxp->ov_temp.size, BPP);
+    if (imx_pxp_alloc_mem(device, &pxp->ov_temp) < 0)
+      return -1;
+  }
+
+  if (pxp->ov_temp.vaddr == NULL)
+    return -1;
+
+  if (pxp->first_frame_done == FALSE) {
+    //pxp background was filled along with output, if the first frame isn't done
+    //we need fill the background before we can apply alpha blending on the
+    //background.
+    //output a small dummy area with the color of background to let pxp fill all
+    //output frame with background color.
+    if (pxp->dummy.vaddr == NULL) {
+      pxp->dummy.size = 16 * 16 * 4;
+      if (imx_pxp_alloc_mem(device, &pxp->dummy) < 0)
+        return -1;
+    }
+
+    gchar R,G,B,A;
+    R = pxp->background & 0x000000FF;
+    G = (pxp->background & 0x0000FF00) >> 8;
+    B = (pxp->background & 0x00FF0000) >> 16;
+    A = (pxp->background & 0xFF000000) >> 24;
+
+    gchar *p = pxp->dummy.vaddr;
+    gint i;
+    for (i = 0; i < 16*16; i++) {
+      p[4 * i + 0] = B;
+      p[4 * i + 1] = G;
+      p[4 * i + 2] = R;
+      p[4 * i + 3] = A;
+    }
+
+    pxp->config.proc_data.srect.left = 0;
+    pxp->config.proc_data.srect.top = 0;
+    pxp->config.proc_data.srect.width = 16;
+    pxp->config.proc_data.srect.height = 16;
+    pxp->config.s0_param.width = 16;
+    pxp->config.s0_param.height = 16;
+    pxp->config.s0_param.stride = 16;
+    pxp->config.s0_param.pixel_fmt = PXP_PIX_FMT_RGB32;
+    pxp->config.s0_param.paddr = (dma_addr_t)pxp->dummy.paddr;
+
+    pxp->config.proc_data.drect.left = 0;
+    pxp->config.proc_data.drect.top = 0;
+    pxp->config.proc_data.drect.width = 16;
+    pxp->config.proc_data.drect.height = 16;
+    pxp->config.out_param.paddr = (dma_addr_t)dst->mem->paddr;
+
+    imx_pxp_do_channel(pxp);
+    pxp->first_frame_done = TRUE;
+  }
+
+  // get the original overlapped destination area to tmep buffer
+  pxp->config.s0_param.paddr = (dma_addr_t)dst->mem->paddr;
+  pxp->config.s0_param.pixel_fmt = orig_dst_fmt;
+  pxp->config.s0_param.width = orig_dst_w;
+  pxp->config.s0_param.height = orig_dst_h;
+  pxp->config.s0_param.stride = orig_dst_s;
+  pxp->config.proc_data.srect.left = dst->crop.x;
+  pxp->config.proc_data.srect.top = dst->crop.y;
+  pxp->config.proc_data.srect.width = MIN(dst->crop.w, orig_dst_w-dst->crop.x);
+  pxp->config.proc_data.srect.height = MIN(dst->crop.h, orig_dst_h-dst->crop.y);
+
+  GST_TRACE ("pxp temp src : %dx%d,%d(%d,%d-%d,%d), format=%x",
+      pxp->config.s0_param.width, pxp->config.s0_param.height,
+      pxp->config.s0_param.stride,
+      pxp->config.proc_data.srect.left, pxp->config.proc_data.srect.top,
+      pxp->config.proc_data.srect.width, pxp->config.proc_data.srect.height,
+      pxp->config.s0_param.pixel_fmt);
+
+  pxp->config.out_param.paddr = (dma_addr_t)pxp->ov_temp.paddr;
+  pxp->config.proc_data.drect.left = 0;
+  pxp->config.proc_data.drect.top = 0;
+  pxp->config.proc_data.drect.width = pxp->config.proc_data.srect.width;
+  pxp->config.proc_data.drect.height = pxp->config.proc_data.srect.height;
+  pxp->config.out_param.pixel_fmt = orig_dst_fmt;
+  pxp->config.out_param.width = dst->crop.w;
+  pxp->config.out_param.height = dst->crop.h;
+  pxp->config.out_param.stride = dst->crop.w;
+
+  GST_TRACE ("pxp temp dest : %dx%d,%d(%d,%d-%d,%d), format=%x",
+      pxp->config.out_param.width, pxp->config.out_param.height,
+      pxp->config.out_param.stride,
+      pxp->config.proc_data.drect.left, pxp->config.proc_data.drect.top,
+      pxp->config.proc_data.drect.width, pxp->config.proc_data.drect.height,
+      pxp->config.out_param.pixel_fmt);
+
+  if (imx_pxp_do_channel(pxp) < 0) {
+    GST_ERROR("pxp overlay copy temp dst buffer failed");
     return -1;
   }
 
-  ret = pxp_start_channel(&pxp->pxp_chan);
-  if (ret < 0) {
-    GST_ERROR("pxp start channel fail (%d)", ret);
-    return -1;
+  if (orig_src_fmt == PXP_PIX_FMT_RGB32 || orig_src_fmt == PXP_PIX_FMT_BGRA32 ||
+      orig_src_fmt == PXP_PIX_FMT_RGB565 || orig_src_fmt == PXP_PIX_FMT_RGB555){
+    //overlay don't support resize, resize to s0 size before blending
+    if (dst->crop.w != src->crop.w || dst->crop.h != src->crop.h) {
+      if (pxp->rgb_temp.vaddr == NULL) {
+        pxp->rgb_temp.size = PXP_OVERLAY_RGB_TMP_BUF_SIZE_INIT;
+        if (imx_pxp_alloc_mem(device, &pxp->rgb_temp) < 0)
+          return -1;
+      }
+
+      guint BPP = 2;
+      if (orig_src_fmt == PXP_PIX_FMT_RGB32
+          || orig_src_fmt == PXP_PIX_FMT_BGRA32)
+        BPP = 4;
+
+      if (pxp->rgb_temp.vaddr
+          && pxp->rgb_temp.size < (orig_dst_w * orig_dst_h * BPP)) {
+        imx_pxp_free_mem(device, &pxp->rgb_temp);
+        pxp->rgb_temp.size = orig_dst_w * orig_dst_h * BPP;
+        GST_LOG ("reallocte memory %d", pxp->rgb_temp.size);
+        if (imx_pxp_alloc_mem(device, &pxp->rgb_temp) < 0)
+          return -1;
+      }
+
+      pxp->config.s0_param.paddr = (dma_addr_t)src->mem->paddr;
+      pxp->config.s0_param.pixel_fmt = orig_src_fmt;
+      pxp->config.s0_param.width = src->info.w;
+      pxp->config.s0_param.height = src->info.h;
+      pxp->config.s0_param.stride = src->info.w;
+      pxp->config.proc_data.srect.left = src->crop.x;
+      pxp->config.proc_data.srect.top = src->crop.y;
+      pxp->config.proc_data.srect.width = MIN(src->crop.w, src->info.w);
+      pxp->config.proc_data.srect.height = MIN(src->crop.h, src->info.h);
+
+      GST_TRACE ("pxp rgb resize src : %dx%d,%d(%d,%d-%d,%d), format=%x",
+          pxp->config.s0_param.width, pxp->config.s0_param.height,
+          pxp->config.s0_param.stride,
+          pxp->config.proc_data.srect.left, pxp->config.proc_data.srect.top,
+          pxp->config.proc_data.srect.width, pxp->config.proc_data.srect.height,
+          pxp->config.s0_param.pixel_fmt);
+
+      pxp->config.out_param.paddr = (dma_addr_t)pxp->rgb_temp.paddr;
+      pxp->config.proc_data.drect.left = 0;
+      pxp->config.proc_data.drect.top = 0;
+      pxp->config.proc_data.drect.width = MIN(dst->crop.w, orig_dst_w-dst->crop.x);
+      pxp->config.proc_data.drect.height = MIN(dst->crop.h, orig_dst_h-dst->crop.y);
+      pxp->config.out_param.pixel_fmt = orig_src_fmt;
+      pxp->config.out_param.width = dst->crop.w;
+      pxp->config.out_param.height = dst->crop.h;
+      pxp->config.out_param.stride = dst->crop.w;
+
+      GST_TRACE ("pxp rgb resize dest : %dx%d,%d(%d,%d-%d,%d), format=%x",
+          pxp->config.out_param.width, pxp->config.out_param.height,
+          pxp->config.out_param.stride,
+          pxp->config.proc_data.drect.left, pxp->config.proc_data.drect.top,
+          pxp->config.proc_data.drect.width, pxp->config.proc_data.drect.height,
+          pxp->config.out_param.pixel_fmt);
+
+      if (imx_pxp_do_channel(pxp) < 0) {
+        GST_ERROR("pxp overlay copy temp dst buffer failed");
+        return -1;
+      }
+
+      pxp->config.ol_param[0].left = 0;
+      pxp->config.ol_param[0].top = 0;
+      pxp->config.ol_param[0].stride = dst->crop.w;
+      pxp->config.ol_param[0].paddr = (dma_addr_t)pxp->rgb_temp.paddr;
+    } else {
+      pxp->config.ol_param[0].left = src->crop.x;
+      pxp->config.ol_param[0].top = src->crop.y;
+      pxp->config.ol_param[0].stride = src->info.w;
+      pxp->config.ol_param[0].paddr = (dma_addr_t)src->mem->paddr;
+    }
+
+    pxp->config.ol_param[0].pixel_fmt = orig_src_fmt;
+  } else {
+    //overlay don't support YUV color space. need convert src to RGB space first
+    if (pxp->rgb_temp.vaddr == NULL) {
+      pxp->rgb_temp.size = PXP_OVERLAY_RGB_TMP_BUF_SIZE_INIT;
+      if (imx_pxp_alloc_mem(device, &pxp->rgb_temp) < 0)
+        return -1;
+    }
+
+    if (pxp->rgb_temp.vaddr
+        && pxp->rgb_temp.size < (dst->crop.w * dst->crop.h * 2)) {
+      imx_pxp_free_mem(device, &pxp->rgb_temp);
+      pxp->rgb_temp.size = dst->crop.w * dst->crop.h * 2;
+      GST_LOG ("reallocte memory %d", pxp->rgb_temp.size);
+      if (imx_pxp_alloc_mem(device, &pxp->rgb_temp) < 0)
+        return -1;
+    }
+
+    pxp->config.s0_param.paddr = (dma_addr_t)src->mem->paddr;
+    pxp->config.s0_param.pixel_fmt = orig_src_fmt;
+    pxp->config.s0_param.width = src->info.w;
+    pxp->config.s0_param.height = src->info.h;
+    pxp->config.s0_param.stride = src->info.w;
+    pxp->config.proc_data.srect.left = src->crop.x;
+    pxp->config.proc_data.srect.top = src->crop.y;
+    pxp->config.proc_data.srect.width = MIN(src->crop.w, src->info.w);
+    pxp->config.proc_data.srect.height = MIN(src->crop.h, src->info.h);
+
+    GST_TRACE ("pxp rgb temp src : %dx%d,%d(%d,%d-%d,%d), format=%x",
+        pxp->config.s0_param.width, pxp->config.s0_param.height,
+        pxp->config.s0_param.stride,
+        pxp->config.proc_data.srect.left, pxp->config.proc_data.srect.top,
+        pxp->config.proc_data.srect.width, pxp->config.proc_data.srect.height,
+        pxp->config.s0_param.pixel_fmt);
+
+    pxp->config.out_param.paddr = (dma_addr_t)pxp->rgb_temp.paddr;
+    pxp->config.proc_data.drect.left = 0;
+    pxp->config.proc_data.drect.top = 0;
+    pxp->config.proc_data.drect.width = MIN(dst->crop.w, orig_dst_w-dst->crop.x);
+    pxp->config.proc_data.drect.height = MIN(dst->crop.h, orig_dst_h-dst->crop.y);
+    pxp->config.out_param.pixel_fmt = PXP_PIX_FMT_RGB565;
+    pxp->config.out_param.width = dst->crop.w;
+    pxp->config.out_param.height = dst->crop.h;
+    pxp->config.out_param.stride = dst->crop.w;
+
+    GST_TRACE ("pxp rgb temp dest : %dx%d,%d(%d,%d-%d,%d), format=%x",
+        pxp->config.out_param.width, pxp->config.out_param.height,
+        pxp->config.out_param.stride,
+        pxp->config.proc_data.drect.left, pxp->config.proc_data.drect.top,
+        pxp->config.proc_data.drect.width, pxp->config.proc_data.drect.height,
+        pxp->config.out_param.pixel_fmt);
+
+    if (imx_pxp_do_channel(pxp) < 0) {
+      GST_ERROR("pxp overlay copy temp dst buffer failed");
+      return -1;
+    }
+
+    pxp->config.ol_param[0].left = 0;
+    pxp->config.ol_param[0].top = 0;
+    pxp->config.ol_param[0].stride = pxp->config.proc_data.drect.width;
+    pxp->config.ol_param[0].pixel_fmt = PXP_PIX_FMT_RGB565;
+    pxp->config.ol_param[0].paddr = (dma_addr_t)pxp->rgb_temp.paddr;
   }
 
-  ret = pxp_wait_for_completion(&pxp->pxp_chan, 3);
-  if (ret < 0) {
-    GST_ERROR("pxp wait for completion fail (%d)", ret);
+  pxp->config.ol_param[0].global_alpha_enable = TRUE;
+  pxp->config.ol_param[0].global_alpha = src->alpha;
+  pxp->config.ol_param[0].local_alpha_enable = TRUE;
+  pxp->config.ol_param[0].global_override = FALSE;
+  pxp->config.ol_param[0].width = dst->crop.w;
+  pxp->config.ol_param[0].height = dst->crop.h;
+  pxp->config.ol_param[0].combine_enable = TRUE;
+
+  GST_TRACE ("pxp overlay : %dx%d,%d(%d,%d-%d,%d), format=%x",
+      pxp->config.ol_param[0].width, pxp->config.ol_param[0].height,
+      pxp->config.ol_param[0].stride, pxp->config.ol_param[0].left,
+      pxp->config.ol_param[0].top, pxp->config.ol_param[0].width,
+      pxp->config.ol_param[0].height, pxp->config.ol_param[0].pixel_fmt);
+
+  pxp->config.s0_param.width = dst->crop.w;
+  pxp->config.s0_param.height = dst->crop.h;
+  pxp->config.s0_param.stride = pxp->config.s0_param.width;
+  pxp->config.s0_param.pixel_fmt = orig_dst_fmt;
+  pxp->config.proc_data.srect.left = 0;
+  pxp->config.proc_data.srect.top = 0;
+  pxp->config.proc_data.srect.width = dst->crop.w;
+  pxp->config.proc_data.srect.height = dst->crop.h;
+  pxp->config.s0_param.paddr = (dma_addr_t)pxp->ov_temp.paddr;
+
+  GST_TRACE ("pxp src : %dx%d,%d(%d,%d-%d,%d), format=%x",
+      pxp->config.s0_param.width, pxp->config.s0_param.height,
+      pxp->config.s0_param.stride,
+      pxp->config.proc_data.srect.left, pxp->config.proc_data.srect.top,
+      pxp->config.proc_data.srect.width, pxp->config.proc_data.srect.height,
+      pxp->config.s0_param.pixel_fmt);
+
+  pxp->config.out_param.pixel_fmt = orig_dst_fmt;
+  pxp->config.out_param.stride = orig_dst_s;
+  pxp->config.proc_data.drect.left = 0;
+  pxp->config.proc_data.drect.top = 0;
+  pxp->config.proc_data.drect.width = dst->crop.w;
+  pxp->config.proc_data.drect.height = dst->crop.h;
+  pxp->config.out_param.paddr = (dma_addr_t)dst->mem->paddr +
+                        (dst->crop.y * dst->info.stride + dst->crop.x * BPP);
+  pxp->config.out_param.width = pxp->config.proc_data.drect.width;
+  pxp->config.out_param.height = pxp->config.proc_data.drect.height;
+
+  GST_TRACE ("pxp dest : %dx%d,%d(%d,%d-%d,%d), format=%x",
+      pxp->config.out_param.width, pxp->config.out_param.height,
+      pxp->config.out_param.stride,
+      pxp->config.proc_data.drect.left, pxp->config.proc_data.drect.top,
+      pxp->config.proc_data.drect.width, pxp->config.proc_data.drect.height,
+      pxp->config.out_param.pixel_fmt);
+
+  return imx_pxp_do_channel(pxp);
+}
+
+static gboolean is_format_has_alpha(guint pxp_format) {
+  return (pxp_format == PXP_PIX_FMT_BGRA32 || pxp_format == PXP_PIX_FMT_VUY444);
+}
+
+static gint imx_pxp_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
+{
+  if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
     return -1;
+
+  Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
+
+  if (src->alpha < 0xFF
+      || is_format_has_alpha(pxp->config.s0_param.pixel_fmt)) {
+    return imx_pxp_overlay(device, dst, src);
+  } else {
+    return imx_pxp_blend_without_alpha(device, dst, src);
   }
-
-#ifdef ENABLE_PXP_ALPHA_OVERLAY
-  imx_pxp_free_mem(device, &copy_dst);
-  pxp->config.ol_param[0].combine_enable = FALSE;
-#endif
-
-  return ret;
 }
 
 static gint imx_pxp_blend_finish(Imx2DDevice *device)
 {
-#ifdef FILL_COLOR_BY_DEVICE
   Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
   pxp->first_frame_done = FALSE;
-#endif
   return 0;
 }
 
@@ -547,18 +799,57 @@ static gint imx_pxp_fill_color(Imx2DDevice *device, Imx2DFrame *dst,
 {
   if (!device || !device->priv)
     return -1;
+  guint bgcolor;
+
+  gchar R,G,B,A,Y,U,V;
+  gdouble y,u,v;
+
+  R = RGBA8888 & 0x000000FF;
+  G = (RGBA8888 & 0x0000FF00) >> 8;
+  B = (RGBA8888 & 0x00FF0000) >> 16;
+  A = (RGBA8888 & 0xFF000000) >> 24;
 
   Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
-  guint argb = (RGBA8888 & 0xFF00FF00) | ((RGBA8888 & 0x00FF0000) >> 16)
-                  | ((RGBA8888 & 0x000000FF) << 16);
-  pxp->config.proc_data.bgcolor = argb;
 
-#ifdef FILL_COLOR_BY_DEVICE
+  if (dst->info.fmt == GST_VIDEO_FORMAT_BGRx
+      || dst->info.fmt == GST_VIDEO_FORMAT_RGB16
+      || dst->info.fmt == GST_VIDEO_FORMAT_BGRA
+      || dst->info.fmt == GST_VIDEO_FORMAT_BGR) {
+    bgcolor = (A << 24)| (R << 16) | (G << 8) | B;
+  } else {
+    //BT.709
+    y = (0.213*R + 0.715*G + 0.072*B);
+    u = -0.117*R - 0.394*G + 0.511*B + 128;
+    v = 0.511*R - 0.464*G - 0.047*B + 128;
+
+    if (y > 255.0)
+      Y = 255;
+    else
+      Y = (gchar)y;
+    if (u < 0.0)
+      U = 0;
+    else
+      U = (gchar)u;
+    if (u > 255.0)
+      U = 255;
+    else
+      U = (gchar)u;
+    if (v < 0.0)
+      V = 0;
+    else
+      V = (gchar)v;
+    if (v > 255.0)
+      V = 255;
+    else
+      V = (gchar)v;
+
+    bgcolor = (A << 24) | (Y << 16) | (U << 8) | V;
+  }
+
+  pxp->config.proc_data.bgcolor = bgcolor;
+  pxp->background = RGBA8888;
+
   return 0;
-#else
-  //intentionally return -1 to let up layer fill the color
-  return -1;
-#endif
 }
 
 static gint imx_pxp_set_rotate(Imx2DDevice *device, Imx2DRotationMode rot)
@@ -624,6 +915,7 @@ static gint imx_pxp_get_capabilities (Imx2DDevice* device)
 #ifdef ENABLE_PXP_ALPHA_OVERLAY
   capabilities |= IMX_2D_DEVICE_CAP_ALPHA;
 #endif
+
   return capabilities;
 }
 
@@ -699,5 +991,6 @@ gint imx_pxp_destroy(Imx2DDevice *device)
 
 gboolean imx_pxp_is_exist (void)
 {
-  return HAS_PXP();
+  return TRUE;
+  //return HAS_PXP();
 }

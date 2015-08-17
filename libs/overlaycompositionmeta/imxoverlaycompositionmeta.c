@@ -160,6 +160,21 @@ static gint overlay_composition_buffer_convert(
   return 0;
 }
 
+gboolean imx_video_overlay_composition_is_out_fmt_support(Imx2DDevice *device,
+                                                          GstVideoFormat fmt)
+{
+  GList *list = device->get_supported_out_fmts(device);
+  GList *l;
+  for (l=list; l; l=l->next) {
+    if (fmt == (GstVideoFormat)l->data) {
+      g_list_free(list);
+      return TRUE;
+    }
+  }
+  g_list_free(list);
+  return FALSE;
+}
+
 void imx_video_overlay_composition_init(GstImxVideoOverlayComposition *vcomp,
                                         Imx2DDevice *device)
 {
@@ -588,13 +603,13 @@ gint imx_video_overlay_composition_composite(
         break;
       }
 
-      if (config_out) {
-        dst.info.w = out_v->width +
-            out_v->align.padding_left + out_v->align.padding_right;
-        dst.info.h = out_v->height +
-            out_v->align.padding_top + out_v->align.padding_bottom;
-        dst.info.stride = out_v->stride;
+      dst.info.w = out_v->width +
+          out_v->align.padding_left + out_v->align.padding_right;
+      dst.info.h = out_v->height +
+          out_v->align.padding_top + out_v->align.padding_bottom;
+      dst.info.stride = out_v->stride;
 
+      if (config_out) {
         if (vcomp->device->config_output(vcomp->device, &dst.info) < 0) {
           GST_WARNING ("config output failed");
           continue;

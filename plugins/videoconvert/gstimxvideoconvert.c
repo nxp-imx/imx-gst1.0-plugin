@@ -1450,6 +1450,9 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
         out_v.crop_w = dst.crop.w;
         out_v.crop_h = dst.crop.h;
 
+        memcpy(&out_v.align, &(imxvct->out_video_align),
+                sizeof(GstVideoAlignment));
+
         gint cnt = imx_video_overlay_composition_composite(&imxvct->video_comp,
                                                           &in_v, &out_v, FALSE);
 

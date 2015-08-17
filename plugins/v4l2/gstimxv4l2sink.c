@@ -590,8 +590,20 @@ gst_imx_v4l2sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
   /* we also support various metadata */
   gst_query_add_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL);
   gst_query_add_allocation_meta (query, GST_VIDEO_CROP_META_API_TYPE, NULL);
-  if (v4l2sink->composition_meta_enable)
-    imx_video_overlay_composition_add_query_meta (query);
+  if (v4l2sink->composition_meta_enable && v4l2sink->blend_dev) {
+    GstVideoInfo info;
+    if (gst_video_info_from_caps (&info, caps)) {
+      if (imx_video_overlay_composition_is_out_fmt_support(v4l2sink->blend_dev,
+                                                           info.finfo->format))
+        imx_video_overlay_composition_add_query_meta (query);
+      else
+        g_print("!!!device don't support %s format, can't do in-place "
+            "blending, will try software blending!!!\n",
+                  gst_video_format_to_string(info.finfo->format));
+    } else {
+      GST_WARNING("get video info from caps failed");
+    }
+  }
 
   return TRUE;
 }
@@ -790,8 +802,8 @@ gst_imx_v4l2sink_finalize (GstImxV4l2Sink * v4l2sink)
   }
 
   if (v4l2sink->blend_dev) {
-    v4l2sink->blend_dev->close(v4l2sink->blend_dev);
     imx_video_overlay_composition_deinit(&v4l2sink->video_comp);
+    v4l2sink->blend_dev->close(v4l2sink->blend_dev);
     imx_2d_device_destroy(v4l2sink->blend_dev);
   }
 
@@ -1004,7 +1016,7 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   else if (HAS_PXP())
     v4l2sink->blend_dev = imx_2d_device_create(IMX_2D_DEVICE_PXP);
 /*
-  else if (HAS_G2D())
+  else if (HAS_G2D())  G2D don't support YUV color space
     v4l2sink->blend_dev = imx_2d_device_create(IMX_2D_DEVICE_G2D);
 */
 
