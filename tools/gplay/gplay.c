@@ -718,11 +718,35 @@ print_menu()
 static void 
 signal_handler(int sig)
 {
-  g_print(" Aborted by signal[%d] Interrupt...\n", sig);
-  gexit_main = TRUE;
-  gexit_display_thread = TRUE;
+  switch(sig)
+  {
+    case SIGINT:
+      g_print(" Aborted by signal[%d] Interrupt...\n", sig);
+      gexit_main = TRUE;
+      gexit_display_thread = TRUE;
+    break;
+
+    case SIGTTIN:
+    /* Nothing need do */
+    break;
+
+    default:
+    break;
+  }
 }
 
+static void
+reset_signal(int sig, void *handler)
+{
+  if(!handler)
+    return;
+
+  struct sigaction act;
+  act.sa_handler = handler;
+  sigemptyset(&act.sa_mask);
+  act.sa_flags = 0;
+  sigaction(sig, &act, NULL);
+}
 
 int 
 main(int argc,char *argv[])
@@ -733,11 +757,9 @@ main(int argc,char *argv[])
   GThread * display_thread = NULL;
   CustomData PlayData;
 
-  struct sigaction act;
-  act.sa_handler = signal_handler;
-  sigemptyset(&act.sa_mask);
-  act.sa_flags = 0;
-  sigaction(SIGINT, &act, NULL);
+  reset_signal(SIGINT, signal_handler);
+  /* support gplay to run in backend */
+  reset_signal(SIGTTIN, signal_handler);
 
   if( argc < 2 )
   {
