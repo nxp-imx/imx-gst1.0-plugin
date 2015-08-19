@@ -70,10 +70,9 @@ static gboolean overlay_sink_update_video_geo(GstElement * object, GstVideoRecta
   osink->overlay[0].w = win_rect.w;
   osink->overlay[0].h = win_rect.h;
 
+  osink->config[0] = TRUE;
   if (((GstBaseSink*)osink)->eos || GST_STATE(object) == GST_STATE_PAUSED) {
     gst_overlay_sink_show_frame((GstBaseSink *)osink, osink->prv_buffer);
-  } else {
-    osink->config[0] = TRUE;
   }
 
   return TRUE;
