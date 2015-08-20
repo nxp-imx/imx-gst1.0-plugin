@@ -641,51 +641,52 @@ print_metadata(PlayEngine *engine)
     engine->get_metadata((PlayEngineHandle)engine, &metadata);
     engine->get_duration((PlayEngineHandle)engine, &duration);
 
-    g_print("\nMedia URI: %s\n", metadata.pathname);
-    g_print("\tContainer: %s\n", metadata.container);
-    g_print("\tDuration: %d seconds\n", (gint32)(duration/1000000000));
-    g_print("\tTitle: %s\n", metadata.title);
-    g_print("\tAritist: %s\n", metadata.artist);
-    g_print("\tAlbum: %s\n", metadata.album);
-    g_print("\tCreationDate: %s\n", metadata.year);
-    g_print("\tGenre: %s\n", metadata.genre);
-    g_print("\tAlbumartist: %s\n", metadata.albumartist);
-    g_print("\tComposer: %s\n", metadata.composer);
-    g_print("\tCopyright: %s\n", metadata.copyright);
-    g_print("\tDescription: %s\n", metadata.description);
-    g_print("\tPerformer: %s\n", metadata.performer);
-    g_print("\tKeywords: %s\n", metadata.keywords);
-    g_print("\tComment: %s\n", metadata.comment);
-    g_print("\tTool: %s\n", metadata.tool);
-    g_print("\tLocation latitude: %s\n", metadata.location_latitude);
-    g_print("\tLocation longtitude: %s\n", metadata.location_longtitude);
-    g_print("\tTrackCount: %d\n", metadata.track_count);
-    g_print("\tTrackNumber: %d\n", metadata.track_number);
-    g_print("\tDiscNumber: %d\n", metadata.disc_number);
-    g_print("\tRating: %d\n", metadata.rating);
+    /* g_print not support Chinese, should use printf when show metadata */
+    printf("\nMedia URI: %s\n", metadata.pathname);
+    printf("\tContainer: %s\n", metadata.container);
+    printf("\tDuration: %d seconds\n", (gint32)(duration/1000000000));
+    printf("\tTitle: %s\n", metadata.title);
+    printf("\tAritist: %s\n", metadata.artist);
+    printf("\tAlbum: %s\n", metadata.album);
+    printf("\tCreationDate: %s\n", metadata.year);
+    printf("\tGenre: %s\n", metadata.genre);
+    printf("\tAlbumartist: %s\n", metadata.albumartist);
+    printf("\tComposer: %s\n", metadata.composer);
+    printf("\tCopyright: %s\n", metadata.copyright);
+    printf("\tDescription: %s\n", metadata.description);
+    printf("\tPerformer: %s\n", metadata.performer);
+    printf("\tKeywords: %s\n", metadata.keywords);
+    printf("\tComment: %s\n", metadata.comment);
+    printf("\tTool: %s\n", metadata.tool);
+    printf("\tLocation latitude: %s\n", metadata.location_latitude);
+    printf("\tLocation longtitude: %s\n", metadata.location_longtitude);
+    printf("\tTrackCount: %d\n", metadata.track_count);
+    printf("\tTrackNumber: %d\n", metadata.track_number);
+    printf("\tDiscNumber: %d\n", metadata.disc_number);
+    printf("\tRating: %d\n", metadata.rating);
     for (i=0; i<metadata.n_audio; i++) {
-      g_print("Audio%d:\n", i);
-      g_print("\tCodec: %s\n", metadata.audio_info[i].codec_type);
-      g_print("\tSample Rate: %d\n", metadata.audio_info[i].samplerate);
-      g_print("\tChannels: %d\n", metadata.audio_info[i].channels);
-      g_print("\tBitrate: %d\n", metadata.audio_info[i].bitrate);
-      g_print("\tLanguage Code: %s\n", metadata.audio_info[i].language);
+      printf("Audio%d:\n", i);
+      printf("\tCodec: %s\n", metadata.audio_info[i].codec_type);
+      printf("\tSample Rate: %d\n", metadata.audio_info[i].samplerate);
+      printf("\tChannels: %d\n", metadata.audio_info[i].channels);
+      printf("\tBitrate: %d\n", metadata.audio_info[i].bitrate);
+      printf("\tLanguage Code: %s\n", metadata.audio_info[i].language);
     }
 
     for (i=0; i<metadata.n_video; i++) {
-      g_print("Video%d:\n", i);
-      g_print("\tCodec: %s\n", metadata.video_info[i].codec_type);
-      g_print("\tWidth: %d\n", metadata.video_info[i].width);
-      g_print("\tHeight: %d\n", metadata.video_info[i].height);
-      g_print("\tFrame Rate: %f\n", (float)metadata.video_info[i].framerate_numerator / (float)metadata.video_info[i].framerate_denominator);
-      g_print("\tBitrate: %d\n", metadata.video_info[i].bitrate);
-      g_print("\tLanguage Code: %s\n", metadata.video_info[i].language);
+      printf("Video%d:\n", i);
+      printf("\tCodec: %s\n", metadata.video_info[i].codec_type);
+      printf("\tWidth: %d\n", metadata.video_info[i].width);
+      printf("\tHeight: %d\n", metadata.video_info[i].height);
+      printf("\tFrame Rate: %f\n", (float)metadata.video_info[i].framerate_numerator / (float)metadata.video_info[i].framerate_denominator);
+      printf("\tBitrate: %d\n", metadata.video_info[i].bitrate);
+      printf("\tLanguage Code: %s\n", metadata.video_info[i].language);
     }
 
     for (i=0; i<metadata.n_subtitle; i++) {
-      g_print("subtitle%d:\n", i);
-      g_print("\tCodec: %s\n", metadata.subtitle_info[i].codec_type);
-      g_print("\tLanguage Code: %s\n", metadata.subtitle_info[i].language);
+      printf("subtitle%d:\n", i);
+      printf("\tCodec: %s\n", metadata.subtitle_info[i].codec_type);
+      printf("\tLanguage Code: %s\n", metadata.subtitle_info[i].language);
     }
 }
 

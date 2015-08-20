@@ -278,150 +278,167 @@ get_metadata_tag( const GstTagList * list,
   engine_data = (PlayEngineData *)engine->priv;
   imx_metadata *meta = &engine_data->meta;
   for (i = 0; i < count; i++) {
-    const GValue *val = gst_tag_list_get_value_index (list, tag, i);
-    //g_error ("\t%20s : tag of type %s\n", tag, G_VALUE_TYPE_NAME (val));
+    gchar * str = NULL;
 
-    /* A media may have 'datatime' or 'date' for year metadata */
-    if (strncmp(gst_tag_get_nick(tag), "datetime", 8) == 0) {
-        GstDateTime *datetime = NULL;
-        gchar *str = NULL;
-        if (gst_tag_list_get_date_time(list, tag, &datetime)) {
-            str = gst_date_time_to_iso8601_string(datetime);
-            strncpy(meta->year, str, sizeof(meta->year));
-            meta->year[sizeof(meta->year) - 1] = '\0';
-            
-            g_free(str);
-            gst_date_time_unref(datetime);
+    if(gst_tag_get_type(tag) == G_TYPE_STRING)
+    {
+      if(!gst_tag_list_get_string_index(list,tag,i,&str))
+      {
+        g_assert_not_reached();
+      }
+      if(str == NULL)
+      {
+        g_warning("tag list get string pointer return NULL");
+        return PLAYENGINE_FAILURE;
+      }
+    }else if(gst_tag_get_type(tag) == GST_TYPE_BUFFER)
+    {
+      GstBuffer *img;
+      img = gst_value_get_buffer(gst_tag_list_get_value_index(list, tag, i));
+      if(img)
+      {
+        gchar *caps_str;
+        GstMapInfo minfo;
+        gst_buffer_map (img, &minfo, GST_MAP_READ);
+        caps_str = g_strdup("unknown");
+        str = g_strdup_printf("buffer of %u bytes, type: %s", minfo.size, caps_str);
+        if( NULL != caps_str )
+        {
+          g_free(caps_str);
         }
-        
-    } else if (strncmp(gst_tag_get_nick(tag), "date", 4) == 0) {
-        gchar *date = g_strdup_value_contents(
-                                gst_tag_list_get_value_index(list, tag, i));
-        strncpy(meta->year, date, sizeof(meta->year));
+        gst_buffer_unmap (img, &minfo);
+      }
+      else
+      {
+        str = g_strdup("NULL buffer");
+      }
+    }
+    else
+    {
+      str = g_strdup_value_contents(gst_tag_list_get_value_index(list, tag, i));
+    }
+
+    if (i == 0) {
+      if (strncmp(gst_tag_get_nick(tag), "datetime", 8) == 0) {
+        const GValue *val;
+        val = gst_tag_list_get_value_index(list, tag, i);
+        GstDateTime *dt = g_value_get_boxed(val);
+        gchar *dt_str = gst_date_time_to_iso8601_string(dt);
+        strncpy(meta->year, dt_str, sizeof(meta->year));
         meta->year[sizeof(meta->year) - 1] = '\0';
-    }
-
-    if (G_VALUE_HOLDS_STRING (val)) {
-      const gchar *str = g_value_get_string (val);
-      if (str) {
-        if( strncmp(gst_tag_get_nick(tag), "container format", 16) == 0 ) {
-          strncpy(meta->container, str, sizeof(meta->container));
-          meta->container[sizeof(meta->container) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "location", 8) == 0) {
-          strncpy(meta->pathname, str, sizeof(meta->pathname));
-          meta->pathname[sizeof(meta->pathname) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "title", 5) == 0) {
-          strncpy(meta->title, str, sizeof(meta->title));
-          meta->title[sizeof(meta->title) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "artist", 6) == 0) {
-          strncpy(meta->artist, str, sizeof(meta->artist));
-          meta->artist[sizeof(meta->artist) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "album", 5) == 0) {
-          strncpy(meta->album, str, sizeof(meta->album));
-          meta->album[sizeof(meta->album) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "genre", 5) == 0) {
-          strncpy(meta->genre, str, sizeof(meta->genre));
-          meta->genre[sizeof(meta->genre) - 1] = '\0';
-        }
-        /* below picks form old gplay's metadata */
-        if( strncmp(gst_tag_get_nick(tag), "album artist", 12) == 0 ) {
-          strncpy(meta->albumartist, str, sizeof(meta->albumartist));
-          meta->albumartist[sizeof(meta->albumartist) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "composer", 8) == 0) {
-          strncpy(meta->composer, str, sizeof(meta->composer));
-          meta->composer[sizeof(meta->composer) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "copyright", 9) == 0) {
-          strncpy(meta->copyright, str, sizeof(meta->copyright));
-          meta->copyright[sizeof(meta->copyright) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "description", 11) == 0) {
-          strncpy(meta->description, str, sizeof(meta->description));
-          meta->description[sizeof(meta->description) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "performer", 9) == 0) {
-          strncpy(meta->performer, str, sizeof(meta->performer));
-          meta->performer[sizeof(meta->performer) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "keywords", 8) == 0) {
-          strncpy(meta->keywords, str, sizeof(meta->keywords));
-          meta->keywords[sizeof(meta->keywords) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "comment", 7) == 0) {
-          strncpy(meta->comment, str, sizeof(meta->comment));
-          meta->comment[sizeof(meta->comment) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "application name", 16) == 0) {
-          strncpy(meta->tool, str, sizeof(meta->tool));
-          meta->tool[sizeof(meta->tool) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "geo location latitude", 21) == 0) {
-          strncpy(meta->location_latitude, str, sizeof(meta->location_latitude));
-          meta->location_latitude[sizeof(meta->location_latitude) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "geo location longitude", 22) == 0) {
-          strncpy(meta->location_longtitude, str, sizeof(meta->location_longtitude));
-          meta->location_longtitude[sizeof(meta->location_longtitude) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "track count", 11) == 0) {
-          meta->track_count = g_value_get_uint(val);
-        }
-        if (strncmp(gst_tag_get_nick(tag), "track number", 11) == 0) {
-          meta->track_number = g_value_get_uint(val);
-        }
-        if (strncmp(gst_tag_get_nick(tag), "disc_number", 10) == 0) {
-          meta->disc_number = g_value_get_uint(val);
-        }
-        if (strncmp(gst_tag_get_nick(tag), "user rating", 11) == 0) {
-          meta->rating = g_value_get_uint(val);
-        }
+        g_free(dt_str);
+        gst_date_time_unref(dt);
+      } else if (strncmp(gst_tag_get_nick(tag), "date", 4) == 0) {
+        strncpy(meta->year, str, sizeof(meta->year));
+        meta->year[sizeof(meta->year) - 1] = '\0';
+      }else if( strncmp(gst_tag_get_nick(tag), "container format", 16) == 0 ) {
+        strncpy(meta->container, str, sizeof(meta->container));
+        meta->container[sizeof(meta->container) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "location", 8) == 0) {
+        strncpy(meta->pathname, str, sizeof(meta->pathname));
+        meta->pathname[sizeof(meta->pathname) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "title", 5) == 0) {
+        strncpy(meta->title, str, sizeof(meta->title));
+        meta->title[sizeof(meta->title) - 1] = '\0';
+      }else if( strncmp(gst_tag_get_nick(tag), "album artist", 12) == 0 ) {
+        strncpy(meta->albumartist, str, sizeof(meta->albumartist));
+        meta->albumartist[sizeof(meta->albumartist) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "album", 5) == 0) {
+        strncpy(meta->album, str, sizeof(meta->album));
+        meta->album[sizeof(meta->album) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "artist", 6) == 0) {
+        strncpy(meta->artist, str, sizeof(meta->artist));
+        meta->artist[sizeof(meta->artist) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "genre", 5) == 0) {
+        strncpy(meta->genre, str, sizeof(meta->genre));
+        meta->genre[sizeof(meta->genre) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "composer", 8) == 0) {
+        strncpy(meta->composer, str, sizeof(meta->composer));
+        meta->composer[sizeof(meta->composer) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "copyright", 9) == 0) {
+        strncpy(meta->copyright, str, sizeof(meta->copyright));
+        meta->copyright[sizeof(meta->copyright) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "description", 11) == 0) {
+        strncpy(meta->description, str, sizeof(meta->description));
+        meta->description[sizeof(meta->description) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "performer", 9) == 0) {
+        strncpy(meta->performer, str, sizeof(meta->performer));
+        meta->performer[sizeof(meta->performer) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "keywords", 8) == 0) {
+        strncpy(meta->keywords, str, sizeof(meta->keywords));
+        meta->keywords[sizeof(meta->keywords) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "comment", 7) == 0) {
+        strncpy(meta->comment, str, sizeof(meta->comment));
+        meta->comment[sizeof(meta->comment) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "application name", 16) == 0) {
+        strncpy(meta->tool, str, sizeof(meta->tool));
+        meta->tool[sizeof(meta->tool) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "geo location latitude", 21) == 0) {
+        strncpy(meta->location_latitude, str, sizeof(meta->location_latitude));
+        meta->location_latitude[sizeof(meta->location_latitude) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "geo location longitude", 22) == 0) {
+        strncpy(meta->location_longtitude, str, sizeof(meta->location_longtitude));
+        meta->location_longtitude[sizeof(meta->location_longtitude) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "track count", 11) == 0) {
+        const GValue *val;
+        val = gst_tag_list_get_value_index(list, tag, i);
+        meta->track_count = g_value_get_uint(val);
+      }else if (strncmp(gst_tag_get_nick(tag), "track number", 11) == 0) {
+        const GValue *val;
+        val = gst_tag_list_get_value_index(list, tag, i);
+        meta->track_number = g_value_get_uint(val);
+      }else if (strncmp(gst_tag_get_nick(tag), "disc number", 10) == 0) {
+        const GValue *val;
+        val = gst_tag_list_get_value_index(list, tag, i);
+        meta->disc_number = g_value_get_uint(val);
+      }else if (strncmp(gst_tag_get_nick(tag), "user rating", 11) == 0) {
+        const GValue *val;
+        val = gst_tag_list_get_value_index(list, tag, i);
+        meta->rating = g_value_get_uint(val);
+      }
 #ifdef GET_STREAM_INFO_FROM_TAGS
-        if (strncmp(gst_tag_get_nick(tag), "audio codec", 11) == 0) {
-          strncpy(meta->audiocodec, str, sizeof(meta->audiocodec));
-          meta->audiocodec[sizeof(meta->audiocodec) - 1] = '\0';
-        }
-        if (strncmp(gst_tag_get_nick(tag), "video codec", 11) == 0) {
-          strncpy(meta->videocodec, str, sizeof(meta->videocodec));
-          meta->videocodec[sizeof(meta->videocodec) - 1] = '\0';
-        }
+      else if (strncmp(gst_tag_get_nick(tag), "audio codec", 11) == 0) {
+        strncpy(meta->audiocodec, str, sizeof(meta->audiocodec));
+        meta->audiocodec[sizeof(meta->audiocodec) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "video codec", 11) == 0) {
+        strncpy(meta->videocodec, str, sizeof(meta->videocodec));
+        meta->videocodec[sizeof(meta->videocodec) - 1] = '\0';
+      }else if (strncmp(gst_tag_get_nick(tag), "bitrate", 7) == 0) {
+        const GValue *val;
+        val = gst_tag_list_get_value_index(list, tag, i);
+        meta->audiobitrate = g_value_get_uint(val);
+      }else if (strncmp(gst_tag_get_nick(tag), "image width", 11) == 0) {
+        const GValue *val;
+        val = gst_tag_list_get_value_index(list, tag, i);
+        meta->width =  g_value_get_uint(val);
+      }else if (strncmp(gst_tag_get_nick(tag), "image height", 12) == 0) {
+        const GValue *val;
+        val = gst_tag_list_get_value_index(list, tag, i);
+        meta->height = g_value_get_uint(val);
+      }else if (strncmp(gst_tag_get_nick(tag), "frame rate", 10) == 0) {
+        const GValue *val;
+        val = gst_tag_list_get_value_index(list, tag, i);
+        meta->framerate = g_value_get_uint(val);
+      }else if (strncmp(gst_tag_get_nick(tag), "video bitrate", 13) == 0) {
+        const GValue *val;
+        val = gst_tag_list_get_value_index(list, tag, i);
+        meta->videobitrate = g_value_get_uint(val);
+      }else if (strncmp(gst_tag_get_nick(tag), "number of channels", 18) == 0) {
+        const GValue *val;
+        val = gst_tag_list_get_value_index(list, tag, i);
+        meta->channels = g_value_get_uint(val);
+      }else if (strncmp(gst_tag_get_nick(tag), "sampling frequency (Hz)", 23) == 0) {
+        const GValue *val;
+        val = gst_tag_list_get_value_index(list, tag, i);
+        meta->samplerate = g_value_get_uint(val);
+      }
 #endif
-      }
     }
-#ifdef GET_STREAM_INFO_FROM_TAGS
-    else if (G_VALUE_HOLDS_UINT (val)) {
-      guint value = g_value_get_uint (val);
-      if (strncmp(gst_tag_get_nick(tag), "bitrate", 7) == 0) {
-        meta->audiobitrate = value;
-      }
-      if (strncmp(gst_tag_get_nick(tag), "image width", 11) == 0) {
-        meta->width = value;
-      }
-      if (strncmp(gst_tag_get_nick(tag), "image height", 12) == 0) {
-        meta->height = value;
-      }
-      if (strncmp(gst_tag_get_nick(tag), "frame rate", 10) == 0) {
-        meta->framerate = value;
-      }
-      if (strncmp(gst_tag_get_nick(tag), "video bitrate", 13) == 0) {
-        meta->videobitrate = value;
-      }
-      if (strncmp(gst_tag_get_nick(tag), "number of channels", 18) == 0) {
-        meta->channels = value;
-      }
-      if (strncmp(gst_tag_get_nick(tag), "sampling frequency (Hz)", 23) == 0) {
-        meta->samplerate = value;
-      }
-    }
-#endif
     else {
       continue;
     }
+    if(str)
+      g_free(str);
   }
 
   return PLAYENGINE_SUCCESS; 
