@@ -48,12 +48,18 @@ enum
   PROP_OUTPUT_FORMAT,
   PROP_ADAPTIVE_FRAME_DROP,
   PROP_FRAMES_PLUS,
+  PROP_USE_VPU_MEMORY
 };
 
 #define DEFAULT_LOW_LATENCY FALSE
 #define DEFAULT_OUTPUT_FORMAT 0
 #define DEFAULT_ADAPTIVE_FRAME_DROP TRUE
 #define DEFAULT_FRAMES_PLUS 3
+/* Default to use VPU memory for video frame buffer as all video frame buffer
+ * must registe to VPU. Change video frame buffer will cause close VPU which
+ * will cause video stream lost.
+ */
+#define DEFAULT_USE_VPU_MEMORY TRUE
 
 GST_DEBUG_CATEGORY_STATIC (vpu_dec_debug);
 #define GST_CAT_DEFAULT vpu_dec_debug
@@ -124,7 +130,11 @@ gst_vpu_dec_class_init (GstVpuDecClass * klass)
       g_param_spec_uint ("frame-plus", "addtionlal frames",
         "set number of addtional frames for smoothly playback", 
           0, 16, DEFAULT_FRAMES_PLUS, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
+  g_object_class_install_property (gobject_class, PROP_USE_VPU_MEMORY,
+      g_param_spec_boolean ("use-vpu-memory", "use vpu memory",
+        "use vpu allocate video frame buffer", 
+          DEFAULT_USE_VPU_MEMORY, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+ 
   gst_element_class_add_pad_template (element_class,
           gst_pad_template_new ("sink", GST_PAD_SINK, GST_PAD_ALWAYS,
           gst_vpu_dec_object_get_sink_caps ()));
@@ -161,6 +171,7 @@ gst_vpu_dec_init (GstVpuDec * dec)
   GST_VPU_DEC_OUTPUT_FORMAT (dec->vpu_dec_object) = DEFAULT_OUTPUT_FORMAT;
   GST_VPU_DEC_FRAME_DROP (dec->vpu_dec_object) = DEFAULT_ADAPTIVE_FRAME_DROP;
   GST_VPU_DEC_FRAMES_PLUS (dec->vpu_dec_object) = DEFAULT_FRAMES_PLUS;
+  GST_VPU_DEC_USE_VPU_MEMORY (dec->vpu_dec_object) = DEFAULT_USE_VPU_MEMORY;
   GST_VPU_DEC_MIN_BUF_CNT (dec->vpu_dec_object) = 0;
   dec->vpu_dec_object->use_my_pool = FALSE;
   dec->vpu_dec_object->use_my_allocator = FALSE;
@@ -188,6 +199,9 @@ gst_vpu_dec_get_property (GObject * object, guint prop_id, GValue * value,
     case PROP_FRAMES_PLUS:
       g_value_set_uint (value, GST_VPU_DEC_FRAMES_PLUS (dec->vpu_dec_object));
       break;
+    case PROP_USE_VPU_MEMORY:
+      g_value_set_boolean (value, GST_VPU_DEC_USE_VPU_MEMORY (dec->vpu_dec_object));
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -212,6 +226,9 @@ gst_vpu_dec_set_property (GObject * object, guint prop_id,
       break;
     case PROP_FRAMES_PLUS:
       GST_VPU_DEC_FRAMES_PLUS (dec->vpu_dec_object) = g_value_get_uint (value);
+      break;
+    case PROP_USE_VPU_MEMORY:
+      GST_VPU_DEC_USE_VPU_MEMORY (dec->vpu_dec_object) = g_value_get_boolean (value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -337,13 +354,13 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     update_pool = FALSE;
   }
 
-  GstBufferPool *pool_pre = gst_video_decoder_get_buffer_pool (bdec);
-  if (pool_pre) {
+  if (dec->vpu_dec_object->use_my_pool && dec->vpu_dec_object->use_my_allocator) {
     /* video track selection case. don't change pool for smoothly video track
      * selection */
     GstStructure *config;
     GstCaps *caps;
     guint size_pre, min_buffers, max_buffers;
+    GstBufferPool *pool_pre = gst_video_decoder_get_buffer_pool (bdec);
 
     config = gst_buffer_pool_get_config (pool_pre);
     gst_buffer_pool_config_get_params (config, &caps, &size_pre, &min_buffers,
@@ -373,6 +390,15 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
 
     gst_structure_free (config);
     gst_object_unref (pool_pre);
+  }
+
+  if (GST_VPU_DEC_USE_VPU_MEMORY (dec->vpu_dec_object)) {
+    if (allocator)
+      gst_object_unref (allocator);
+    allocator = NULL;
+    if (pool)
+      gst_object_unref (pool);
+    pool = NULL;
   }
 
   if (allocator == NULL || !GST_IS_ALLOCATOR_PHYMEM (allocator)) {
