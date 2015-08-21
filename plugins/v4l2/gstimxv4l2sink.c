@@ -335,13 +335,6 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
   return ret;
 }
 
-#if 0 //FIXME:
-static GstCaps *
-gst_imx_v4l2sink_get_caps (GstBaseSink * bsink, GstCaps * filter)
-{
-}
-#endif
-
 static guint
 gst_imx_v4l2_special_fmt (GstCaps *caps)
 {
@@ -930,7 +923,7 @@ static GstCaps *gst_imx_v4l2sink_get_caps (GstBaseSink *sink, GstCaps* filter)
 {
   GstImxV4l2Sink *v4l2sink = GST_IMX_V4L2SINK (sink);
 
-  GstCaps *caps = gst_imx_v4l2sink_get_all_caps();
+  GstCaps *caps = gst_caps_copy(gst_pad_get_pad_template_caps(sink->sinkpad));
   if (!v4l2sink->composition_meta_enable)
     imx_video_overlay_composition_remove_caps(caps);
 
