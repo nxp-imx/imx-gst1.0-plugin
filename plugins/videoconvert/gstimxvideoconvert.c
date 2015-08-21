@@ -154,10 +154,10 @@ static void gst_imx_video_convert_get_property (GObject * object,
 
   switch (prop_id) {
     case PROP_OUTPUT_ROTATE:
-      g_value_set_enum (value, device->get_rotate(device));
+      g_value_set_enum (value, imxvct->rotate);
       break;
     case PROP_DEINTERLACE_MODE:
-      g_value_set_enum (value, device->get_deinterlace(device));
+      g_value_set_enum (value, imxvct->deinterlace);
       break;
     case PROP_COMPOSITION_META_ENABLE:
       g_value_set_boolean(value, imxvct->composition_meta_enable);
@@ -444,9 +444,8 @@ static guint imx_video_convert_fixate_format_caps(GstBaseTransform *transform,
    * then passthrough is not possible, we need limit the othercaps
    * with device conversion limitation
    */
-  if (device->get_rotate(device) != IMX_2D_ROTATION_0 ||
-      (device->get_deinterlace(device) != IMX_2D_DEINTERLACE_NONE &&
-          interlace)) {
+  if (imxvct->rotate != IMX_2D_ROTATION_0 ||
+      (imxvct->deinterlace != IMX_2D_DEINTERLACE_NONE && interlace)) {
     GList* list = device->get_supported_out_fmts(device);
     GstCaps *out_caps = imx_video_convert_caps_from_fmt_list(list);
     g_list_free(list);
@@ -1146,14 +1145,14 @@ static gboolean imx_video_convert_set_info(GstVideoFilter *filter,
   if (from_interlace &&
       (g_strcmp0(from_interlace, "interleaved") == 0
           || g_strcmp0(from_interlace, "mixed") == 0)) {
-    if (IMX_2D_DEINTERLACE_NONE != device->get_deinterlace(device)) {
+    if (IMX_2D_DEINTERLACE_NONE != imxvct->deinterlace) {
       gst_structure_set(outs,
           "interlace-mode", G_TYPE_STRING, "progressive", NULL);
       gst_base_transform_set_passthrough((GstBaseTransform*)filter, FALSE);
     }
   }
 
-  if (IMX_2D_ROTATION_0 != device->get_rotate(device))
+  if (IMX_2D_ROTATION_0 != imxvct->rotate)
     gst_base_transform_set_passthrough((GstBaseTransform*)filter, FALSE);
 
 /* can't remove since caps fixed
