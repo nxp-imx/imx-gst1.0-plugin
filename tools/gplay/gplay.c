@@ -1131,10 +1131,8 @@ main(int argc,char *argv[])
             }
             else
             {
-                playengine->select_video((PlayEngineHandle)playengine, video_track_no);;
+                playengine->select_video((PlayEngineHandle)playengine, video_track_no);
             }
-            playengine->get_position((PlayEngineHandle)playengine, &elapsed);
-            playengine->seek((PlayEngineHandle)playengine, elapsed/1000000000, FALSE);
             gDisable_display = FALSE;
             //kb_set_raw_term(STDIN_FILENO);
         }
@@ -1156,10 +1154,8 @@ main(int argc,char *argv[])
             }
             else
             {
-                playengine->select_audio((PlayEngineHandle)playengine, audio_track_no);;
+                playengine->select_audio((PlayEngineHandle)playengine, audio_track_no);
             }
-            playengine->get_position((PlayEngineHandle)playengine, &elapsed);
-            playengine->seek((PlayEngineHandle)playengine, elapsed/1000000000, FALSE);
             gDisable_display = FALSE;
             //kb_set_raw_term(STDIN_FILENO);
         }
