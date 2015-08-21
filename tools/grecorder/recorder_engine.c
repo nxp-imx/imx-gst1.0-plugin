@@ -388,6 +388,20 @@ sync_bus_callback (GstBus * bus, GstMessage * message, gpointer data)
   GST_LOG ("Got %s sync message\n", GST_MESSAGE_TYPE_NAME (message));
 
   switch (GST_MESSAGE_TYPE (message)) {
+    case GST_MESSAGE_ERROR:{
+      GError *err;
+      gchar *debug;
+
+      gst_message_parse_error (message, &err, &debug);
+      g_print ("Error: %s\n", err->message);
+      g_error_free (err);
+      g_free (debug);
+
+      if(recorder->app_callback != NULL) {
+        (*(recorder->app_callback))(recorder->pAppData, RE_EVENT_ERROR_UNKNOWN, 0);
+      }
+      break;
+    }
     case GST_MESSAGE_ELEMENT:{
       st = gst_message_get_structure (message);
       if (st) {
