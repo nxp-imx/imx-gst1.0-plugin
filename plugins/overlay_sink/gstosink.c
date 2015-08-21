@@ -680,6 +680,12 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
   GstCaps *caps = gst_pad_get_current_caps (GST_VIDEO_SINK_PAD (sink));
   gst_video_info_from_caps (&info, caps);
 
+  if(!buffer)
+  {
+    GST_ERROR_OBJECT (sink, "Invalid buffer pointer.");
+    return GST_FLOW_ERROR;
+  }
+
   if (!gst_buffer_is_phymem (buffer)) {
     // check if physical buffer
     GstBuffer *buffer2 = NULL;
