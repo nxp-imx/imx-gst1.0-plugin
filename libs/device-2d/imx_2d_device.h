@@ -76,8 +76,8 @@ typedef struct {
 } Imx2DTransformMap;
 
 typedef struct _Imx2DCrop {
-  guint x;
-  guint y;
+  gint x;
+  gint y;
   guint w;
   guint h;
 } Imx2DCrop;

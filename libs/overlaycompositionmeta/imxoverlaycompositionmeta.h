@@ -38,8 +38,8 @@ typedef struct _VideoCompositionVideoInfo {
   guint width;
   guint height;
   guint stride;
-  guint crop_x;
-  guint crop_y;
+  gint crop_x;
+  gint crop_y;
   guint crop_w;
   guint crop_h;
   Imx2DRotationMode rotate;

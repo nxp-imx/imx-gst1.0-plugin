@@ -574,6 +574,16 @@ gint imx_video_overlay_composition_composite(
       dst.alpha = 0xFF;
       dst.rotate = out_v->rotate;
       dst.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
+
+      if (render_x < 0)
+        render_x = 0;
+      if (render_y < 0)
+        render_y = 0;
+      if (render_x + render_w > in_v->crop_w)
+        render_w = in_v->crop_w - render_x;
+      if (render_y + render_h > in_v->crop_h)
+        render_h = in_v->crop_h - render_y;
+
       switch(src.rotate) {
       case IMX_2D_ROTATION_90:
         dst.crop.x = out_v->crop_x +
@@ -608,6 +618,13 @@ gint imx_video_overlay_composition_composite(
       dst.info.h = out_v->height +
           out_v->align.padding_top + out_v->align.padding_bottom;
       dst.info.stride = out_v->stride;
+
+      GST_INFO ("(%d,%d,%d,%d)->(%d,%d,%d,%d) base on "
+          "in(%d,%d,%d,%d),out(%d,%d,%d,%d)",
+          render_x,render_y,render_w,render_h,
+          dst.crop.x,dst.crop.y,dst.crop.w,dst.crop.h,
+          in_v->crop_x,in_v->crop_y,in_v->crop_w,in_v->crop_h,
+          out_v->crop_x,out_v->crop_y,out_v->crop_w,out_v->crop_h);
 
       if (config_out) {
         if (vcomp->device->config_output(vcomp->device, &dst.info) < 0) {
