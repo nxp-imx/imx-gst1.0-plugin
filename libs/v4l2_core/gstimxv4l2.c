@@ -106,6 +106,7 @@ typedef struct {
   IMXV4l2Rect in_crop;
   gboolean do_deinterlace;
   gint buffer_count;
+  guint memory_mode;
   gint allocated;
   IMXV4l2BufferPair buffer_pair[MAX_BUFFER];
   gint rotate;
@@ -1442,6 +1443,30 @@ static void * gst_imx_v4l2_find_buffer(gpointer v4l2handle, PhyMemBlock *memblk)
       return &handle->buffer_pair[i].v4l2buffer;
   }
 
+  if (handle->memory_mode == V4L2_MEMORY_USERPTR) {
+    struct v4l2_buffer *v4l2buf;
+
+    if (handle->allocated >= MAX_BUFFER) {
+      GST_ERROR ("No more v4l2 buffer for allocating.\n");
+      return -1;
+    }
+
+    v4l2buf = &handle->buffer_pair[handle->allocated].v4l2buffer;
+    memset (v4l2buf, 0, sizeof(struct v4l2_buffer));
+    v4l2buf->type = handle->type;
+    v4l2buf->memory = handle->memory_mode;
+    v4l2buf->index = handle->allocated;
+    v4l2buf->m.userptr = memblk->paddr;
+    v4l2buf->length = memblk->size;
+    handle->buffer_pair[handle->allocated].vaddr = memblk->vaddr;
+
+    handle->allocated ++;
+
+    GST_DEBUG ("Allocated v4l2buffer(%p), type(%d), index(%d), memblk(%p), vaddr(%p), paddr(%p), size(%d).",
+        v4l2buf, v4l2buf->type, handle->allocated - 1, memblk, memblk->vaddr, memblk->paddr, memblk->size);
+    return v4l2buf;
+  }
+
   GST_ERROR ("Can't find the buffer 0x%08X.", memblk->paddr);
   return NULL;
 }
@@ -1457,7 +1482,7 @@ gint gst_imx_v4l2_set_buffer_count (gpointer v4l2handle, guint count, guint memo
 
   buf_req.type = handle->type;
   buf_req.count = count;
-  buf_req.memory = memory_mode;
+  handle->memory_mode = buf_req.memory = memory_mode;
   if (ioctl(handle->v4l2_fd, VIDIOC_REQBUFS, &buf_req) < 0) {
     GST_ERROR("Request %d buffers failed\n", count);
     return -1;
@@ -1472,6 +1497,11 @@ gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
   struct v4l2_buffer *v4l2buf;
 
+  if (handle->memory_mode == V4L2_MEMORY_USERPTR) {
+    GST_INFO ("USERPTR mode, needn't allocate memory.\n");
+    return 0;
+  }
+
   if (handle->allocated >= handle->buffer_count) {
     GST_ERROR ("No more v4l2 buffer for allocating.\n");
     return -1;
@@ -1480,7 +1510,7 @@ gint gst_imx_v4l2_allocate_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   v4l2buf = &handle->buffer_pair[handle->allocated].v4l2buffer;
   memset (v4l2buf, 0, sizeof(struct v4l2_buffer));
   v4l2buf->type = handle->type;
-  v4l2buf->memory = V4L2_MEMORY_MMAP;
+  v4l2buf->memory = handle->memory_mode;
   v4l2buf->index = handle->allocated;
 
   if (ioctl(handle->v4l2_fd, VIDIOC_QUERYBUF, v4l2buf) < 0) {
@@ -1539,7 +1569,7 @@ gint gst_imx_v4l2_register_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   v4l2buf = &handle->buffer_pair[handle->allocated].v4l2buffer;
   memset (v4l2buf, 0, sizeof(struct v4l2_buffer));
   v4l2buf->type = handle->type;
-  v4l2buf->memory = V4L2_MEMORY_USERPTR;
+  v4l2buf->memory = handle->memory_mode;
   v4l2buf->index = handle->allocated;
   v4l2buf->m.userptr = memblk->paddr;
   v4l2buf->length = memblk->size;
@@ -1757,7 +1787,7 @@ gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk,
 
   memset (&v4l2buf, 0, sizeof(v4l2buf));
   v4l2buf.type = handle->type;
-  v4l2buf.memory = V4L2_MEMORY_MMAP;
+  v4l2buf.memory = handle->memory_mode;
 
   while (ioctl (handle->v4l2_fd, VIDIOC_DQBUF, &v4l2buf) < 0) {
     trycnt ++;

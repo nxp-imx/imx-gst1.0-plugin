@@ -63,6 +63,8 @@ struct _GstImxV4l2Sink {
   guint min_buffers;
   gboolean self_pool_configed;
   gboolean pool_activated;
+  gboolean use_userptr_mode;
+  GHashTable *v4l2buffer2buffer_table;
   void *imxoverlay;
   GstImxVideoOverlayComposition video_comp;
   gboolean composition_meta_enable;

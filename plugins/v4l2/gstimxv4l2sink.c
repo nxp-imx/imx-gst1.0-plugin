@@ -28,6 +28,7 @@
 #define ALIGNMENT_2 (2)
 #define ISALIGNED(a, b) (!(a & (b-1)))
 #define ALIGNTO(a, b) ((a + (b-1)) & (~(b-1)))
+#define MAX_BUFFER (32)
 
 GST_DEBUG_CATEGORY (imxv4l2sink_debug);
 #define GST_CAT_DEFAULT imxv4l2sink_debug
@@ -394,8 +395,13 @@ gst_imx_v4l2_allocator_cb (gpointer user_data, gint *count)
     if (gst_imx_v4l2sink_configure_input (v4l2sink) < 0)
       return -1;
 
-    if (gst_imx_v4l2_set_buffer_count (v4l2sink->v4l2handle, max, V4L2_MEMORY_MMAP) < 0)
-      return -1;
+    if (v4l2sink->use_userptr_mode) {
+      if (gst_imx_v4l2_set_buffer_count (v4l2sink->v4l2handle, MAX_BUFFER, V4L2_MEMORY_USERPTR) < 0)
+        return -1;
+    } else {
+      if (gst_imx_v4l2_set_buffer_count (v4l2sink->v4l2handle, max, V4L2_MEMORY_MMAP) < 0)
+        return -1;
+    }
 
     *count = max;
   }
@@ -464,6 +470,8 @@ gst_imx_v4l2sink_setup_buffer_pool (GstImxV4l2Sink *v4l2sink, GstCaps *caps)
     GST_ERROR_OBJECT (v4l2sink, "set buffer pool failed.\n");
     return -1;
   }
+
+  g_hash_table_remove_all (v4l2sink->v4l2buffer2buffer_table);
 
   return 0;
 }
@@ -631,6 +639,7 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
   GstVideoMeta *vmeta = NULL;
   GstVideoFrameFlags flags = GST_VIDEO_FRAME_FLAG_NONE;
   GstMemory *mem = NULL;
+  GstBuffer *v4l2_buffer = NULL, *in_buffer = NULL;
 
   cropmeta = gst_buffer_get_video_crop_meta (buffer);
   vmeta = gst_buffer_get_video_meta (buffer);
@@ -646,10 +655,14 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
   gst_video_info_from_caps (&info, caps);
 
   if (not_v4l2buffer) {
-    GstBuffer *v4l2_buffer = NULL;
     GstVideoFrame frame1, frame2;
 
     GST_DEBUG_OBJECT (v4l2sink, "not v4l2 allocated buffer.");
+
+    v4l2sink->use_userptr_mode = FALSE;
+    if (gst_buffer_is_phymem (buffer) && HAS_IPU()) {
+      v4l2sink->use_userptr_mode = TRUE;
+    }
 
     if (!v4l2sink->pool && gst_imx_v4l2sink_setup_buffer_pool (v4l2sink, caps) < 0) {
       gst_caps_unref (caps);
@@ -671,13 +684,27 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     }
 
 
-    gst_video_frame_map (&frame1, &info, v4l2_buffer, GST_MAP_WRITE);
-    gst_video_frame_map (&frame2, &info, buffer, GST_MAP_READ);
+    if (v4l2sink->use_userptr_mode) {
+      PhyMemBlock *memblk1, *memblk2;
 
-    gst_video_frame_copy (&frame1, &frame2);
+      GST_DEBUG_OBJECT (v4l2sink, "not v4l2 allocated buffer. put physical address");
+      memblk1 = gst_buffer_query_phymem_block (v4l2_buffer);
+      memblk2 = gst_buffer_query_phymem_block (buffer);
+      memblk1->vaddr = memblk2->vaddr;
+      memblk1->paddr = memblk2->paddr;
+      memblk1->size = memblk2->size;
+      in_buffer = buffer;
+      g_hash_table_replace (v4l2sink->v4l2buffer2buffer_table, 
+          (gpointer)(memblk1->vaddr), (gpointer)(buffer));
+    } else {
+      gst_video_frame_map (&frame1, &info, v4l2_buffer, GST_MAP_WRITE);
+      gst_video_frame_map (&frame2, &info, buffer, GST_MAP_READ);
 
-    gst_video_frame_unmap (&frame1);
-    gst_video_frame_unmap (&frame2);
+      gst_video_frame_copy (&frame1, &frame2);
+
+      gst_video_frame_unmap (&frame1);
+      gst_video_frame_unmap (&frame2);
+    }
 
     if (v4l2sink->composition_meta_enable
         && imx_video_overlay_composition_has_meta(buffer)) {
@@ -779,13 +806,25 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
   v4l2sink->frame_showed ++;
 
-  buffer = NULL;
-  if (gst_imx_v4l2_dequeue_gstbuffer (v4l2sink->v4l2handle, &buffer, &flags) < 0) {
+  v4l2_buffer = NULL;
+  if (gst_imx_v4l2_dequeue_gstbuffer (v4l2sink->v4l2handle, &v4l2_buffer, &flags) < 0) {
     GST_ERROR_OBJECT (v4l2sink, "Dequeue buffer failed.");
     return GST_FLOW_ERROR;
   }
-  if (buffer)
-    gst_buffer_unref (buffer);
+
+  if (v4l2sink->use_userptr_mode) {
+    if (in_buffer)
+      gst_buffer_ref (in_buffer);
+    if (v4l2_buffer) {
+      PhyMemBlock *memblk;
+      memblk = gst_buffer_query_phymem_block (v4l2_buffer);
+      buffer = g_hash_table_lookup(v4l2sink->v4l2buffer2buffer_table, memblk->vaddr);
+      if (buffer)
+        gst_buffer_unref (buffer);
+    }
+  }
+  if (v4l2_buffer)
+    gst_buffer_unref (v4l2_buffer);
 
   return GST_FLOW_OK;
 }
@@ -793,6 +832,11 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 static void
 gst_imx_v4l2sink_finalize (GstImxV4l2Sink * v4l2sink)
 {
+  if (v4l2sink->v4l2buffer2buffer_table != NULL) {
+    g_hash_table_destroy (v4l2sink->v4l2buffer2buffer_table);
+    v4l2sink->v4l2buffer2buffer_table = NULL;
+  }
+
   if (v4l2sink->device)
     g_free (v4l2sink->device);
 
@@ -1003,6 +1047,8 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   v4l2sink->frame_showed = 0;
   v4l2sink->min_buffers = gst_imx_v4l2_get_min_buffer_num (V4L2_BUF_TYPE_VIDEO_OUTPUT);
   v4l2sink->pool_activated = FALSE;
+  v4l2sink->use_userptr_mode = FALSE;
+  v4l2sink->v4l2buffer2buffer_table = g_hash_table_new(NULL, NULL);
 
   v4l2sink->imxoverlay = gst_imx_video_overlay_init ((GstElement *)v4l2sink,
                                               v4l2sink_update_video_geo,
