@@ -162,7 +162,10 @@ playlist_next(PlayEngine *engine,
                 {
                     if (options->play_times>0){
                       options->play_times--;
-                      if (options->play_times == 0) break;
+                      if (options->play_times == 0) {
+                        g_print("Repeat mode finished\n");
+                        return PLAYENGINE_FAILURE;
+                      }
                     }
                     options->current = getFirstItem(options->pl);
                     if(options->current)
@@ -247,7 +250,10 @@ playlist_previous(PlayEngine *engine,
                 {
                     if (options->play_times>0){
                       options->play_times--;
-                      if (options->play_times == 0) break;
+                      if (options->play_times == 0) {
+                        g_print("Repeat mode finished\n");
+                        return PLAYENGINE_FAILURE;
+                      }
                     }
 
                     options->current = getLastItem(options->pl);
