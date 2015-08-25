@@ -102,6 +102,16 @@ G_DEFINE_TYPE_WITH_CODE (GstOverlaySink, gst_overlay_sink, GST_TYPE_VIDEO_SINK,
 static gint
 gst_overlay_sink_output_config (GstOverlaySink *sink, gint idx) 
 {
+  if (sink->overlay[idx].rot != 0) {
+    if (sink->overlay[idx].x < 0 || sink->overlay[idx].y < 0
+        || (sink->overlay[idx].x + sink->overlay[idx].w) > sink->disp_info[idx].width
+        || (sink->overlay[idx].y + sink->overlay[idx].h) > sink->disp_info[idx].height) {
+      g_print ("not support video out of screen if orientation is not landscape.\n");
+      memcpy(&sink->overlay[idx], &sink->pre_overlay_info[idx], sizeof(OverlayInfo));
+      return -1;
+    }
+  }
+
   sink->surface_info.dst.left = sink->overlay[idx].x;
   sink->surface_info.dst.top = sink->overlay[idx].y;
   sink->surface_info.dst.right = sink->overlay[idx].w + sink->surface_info.dst.left;
@@ -110,6 +120,7 @@ gst_overlay_sink_output_config (GstOverlaySink *sink, gint idx)
   sink->surface_info.keep_ratio = sink->overlay[idx].keep_ratio;
   sink->surface_info.zorder = sink->overlay[idx].zorder;
 
+  memcpy(&sink->pre_overlay_info[idx], &sink->overlay[idx], sizeof(OverlayInfo));
   return 0;
 }
 
@@ -135,42 +146,16 @@ gst_overlay_sink_set_property (GObject * object,
       sink->disp_on[idx] = g_value_get_boolean (value);
       break;
     case OVERLAY_SINK_PROP_DISPWIN_X_0:
-      val = g_value_get_int (value);
-      if (sink->disp_info[idx].width > 0 ) {
-        if (val < sink->disp_info[idx].width)
-          sink->overlay[idx].x = val;
-        else
-          GST_WARNING_OBJECT (sink, "overlay x out of screen (%d).", val);
-      } else {
-        sink->overlay[idx].x = val;
-      }
+      sink->overlay[idx].x = g_value_get_int (value);
       break;
     case OVERLAY_SINK_PROP_DISPWIN_Y_0:
-      val = g_value_get_int (value);
-      if (sink->disp_info[idx].height > 0) {
-        if(val < sink->disp_info[idx].height)
-          sink->overlay[idx].y = val;
-        else
-          GST_WARNING_OBJECT (sink, "overlay y out of screen (%d).", val);
-      } else {
-        sink->overlay[idx].y = val;
-      }
+      sink->overlay[idx].y = g_value_get_int (value);
       break;
     case OVERLAY_SINK_PROP_DISPWIN_W_0:
-      val = g_value_get_int (value);
-      if (sink->disp_info[idx].width > 0 &&
-          val + sink->overlay[idx].x >= sink->disp_info[idx].width)
-        sink->overlay[idx].w = sink->disp_info[idx].width - sink->overlay[idx].x;
-      else
-        sink->overlay[idx].w = val;
+      sink->overlay[idx].w = g_value_get_int (value);
       break;
     case OVERLAY_SINK_PROP_DISPWIN_H_0:
-      val = g_value_get_int (value);
-      if (sink->disp_info[idx].height > 0 &&
-          val + sink->overlay[idx].y >= sink->disp_info[idx].height)
-        sink->overlay[idx].h = sink->disp_info[idx].height - sink->overlay[idx].y;
-      else
-        sink->overlay[idx].h = val;
+      sink->overlay[idx].h = g_value_get_int (value);
       break;
     case OVERLAY_SINK_PROP_ROTATION_0:
       sink->overlay[idx].rot = g_value_get_int (value);
@@ -825,7 +810,7 @@ gst_overlay_sink_install_properties (GObjectClass *gobject_class)
 
     if (osink_object_get_display_info (osink_obj, &info, i) < 0) {
       name = "UNKNOWN";
-      info.width = info.height = G_MAXINT;
+      info.width = info.height = G_MAXINT32;
     } else {
       name = info.name;
     }
@@ -848,7 +833,7 @@ gst_overlay_sink_install_properties (GObjectClass *gobject_class)
         g_param_spec_int (prop_name,
           prop_name,
           "get/set the left position of the video to the display",
-          0, G_MAXINT, 0, G_PARAM_READWRITE));
+          G_MININT32, G_MAXINT32, 0, G_PARAM_READWRITE));
     g_free (prop_name);
     prop++;
 
@@ -860,7 +845,7 @@ gst_overlay_sink_install_properties (GObjectClass *gobject_class)
         g_param_spec_int (prop_name,
           prop_name,
           "get/set the right postion of the video to the display",
-          0, G_MAXINT, 0, G_PARAM_READWRITE));
+          G_MININT32, G_MAXINT32, 0, G_PARAM_READWRITE));
     g_free (prop_name);
     prop++;
 
@@ -872,7 +857,7 @@ gst_overlay_sink_install_properties (GObjectClass *gobject_class)
         g_param_spec_int (prop_name,
           prop_name,
           "get/set the width of the video to the display",
-          0, G_MAXINT, info.width, G_PARAM_READWRITE));
+          0, G_MAXINT32, info.width, G_PARAM_READWRITE));
     g_free (prop_name);
     prop++;
 
@@ -884,7 +869,7 @@ gst_overlay_sink_install_properties (GObjectClass *gobject_class)
         g_param_spec_int (prop_name,
           prop_name,
           "get/set the height of the video to the display",
-          0, G_MAXINT, info.height, G_PARAM_READWRITE));
+          0, G_MAXINT32, info.height, G_PARAM_READWRITE));
     g_free (prop_name);
     prop++;
 
@@ -1035,6 +1020,7 @@ gst_overlay_sink_init (GstOverlaySink * overlay_sink)
     overlay_sink->config[MAX_DISPLAY] = FALSE;
     memset(&overlay_sink->overlay[i], 0, sizeof (OverlayInfo));
     overlay_sink->overlay[i].keep_ratio = TRUE;
+    memset(&overlay_sink->pre_overlay_info[i], 0, sizeof (OverlayInfo));
   }
 
   overlay_sink->disp_on[0] = TRUE;

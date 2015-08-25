@@ -357,8 +357,24 @@ static gint imx_g2d_convert(Imx2DDevice *device,
   g2d->src.global_alpha = src->alpha;
   g2d->src.left = src->crop.x;
   g2d->src.top = src->crop.y;
-  g2d->src.right = src->crop.x + MIN(src->crop.w, g2d->src.width);
-  g2d->src.bottom = src->crop.y + MIN(src->crop.h, g2d->src.height);
+  g2d->src.right = src->crop.x + MIN(src->crop.w, g2d->src.width-src->crop.x);
+  g2d->src.bottom = src->crop.y + MIN(src->crop.h, g2d->src.height-src->crop.y);
+
+  if (g2d->src.left >= g2d->src.width || g2d->src.top >= g2d->src.height ||
+      g2d->src.right <= 0 || g2d->src.bottom <= 0) {
+    GST_WARNING("input crop outside of source");
+    return 0;
+  }
+
+  if (g2d->src.left < 0)
+    g2d->src.left = 0;
+  if (g2d->src.top < 0)
+    g2d->src.top = 0;
+  if (g2d->src.right > g2d->src.width)
+    g2d->src.right = g2d->src.width;
+  if (g2d->src.bottom - g2d->src.height)
+    g2d->src.bottom = g2d->src.height;
+
   if (imx_g2d_set_src_plane (&g2d->src, src->mem->paddr) < 0)
     return -1;
 
@@ -372,8 +388,37 @@ static gint imx_g2d_convert(Imx2DDevice *device,
   g2d->dst.planes[0] = (gint)(dst->mem->paddr);
   g2d->dst.left = dst->crop.x;
   g2d->dst.top = dst->crop.y;
-  g2d->dst.right = dst->crop.x + MIN(dst->crop.w, g2d->dst.width);
-  g2d->dst.bottom = dst->crop.y + MIN(dst->crop.h, g2d->dst.height);
+  g2d->dst.right = dst->crop.x + dst->crop.w;
+  g2d->dst.bottom = dst->crop.y + dst->crop.h;
+
+  if (g2d->dst.left >= g2d->dst.width || g2d->dst.top >= g2d->dst.height ||
+      g2d->dst.right <= 0 || g2d->dst.bottom <= 0) {
+    GST_WARNING("output crop outside of destination");
+    return 0;
+  }
+
+  if (g2d->dst.left < 0)
+    g2d->dst.left = 0;
+  if (g2d->dst.top < 0)
+    g2d->dst.top = 0;
+  if (g2d->dst.right > g2d->dst.width)
+    g2d->dst.right = g2d->dst.width;
+  if (g2d->dst.bottom > g2d->dst.height)
+    g2d->dst.bottom = g2d->dst.height;
+
+  //adjust incrop size by outcrop size and output resolution
+  guint src_w, src_h, dst_w, dst_h, org_src_left, org_src_top;
+  src_w = g2d->src.right-g2d->src.left;
+  src_h = g2d->src.bottom-g2d->src.top;
+  dst_w = dst->crop.w;
+  dst_h = dst->crop.h;
+  org_src_left = g2d->src.left;
+  org_src_top = g2d->src.top;
+
+  g2d->src.left = org_src_left + (g2d->dst.left-dst->crop.x) * src_w / dst_w;
+  g2d->src.top = org_src_top + (g2d->dst.top-dst->crop.y) * src_h / dst_h;
+  g2d->src.right = org_src_left + (g2d->dst.right-dst->crop.x) * src_w / dst_w;
+  g2d->src.bottom = org_src_top + (g2d->dst.bottom-dst->crop.y) * src_h / dst_h;
 
   GST_TRACE ("g2d dest : %dx%d,%d(%d,%d-%d,%d), alpha=%d, format=%d",
       g2d->dst.width, g2d->dst.height,g2d->dst.stride, g2d->dst.left,

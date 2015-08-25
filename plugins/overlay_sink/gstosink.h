@@ -58,6 +58,7 @@ struct _GstOverlaySink {
   gint h;
   SurfaceInfo surface_info;
   OverlayInfo overlay[MAX_DISPLAY];
+  OverlayInfo pre_overlay_info[MAX_DISPLAY];
   gpointer hoverlay[MAX_DISPLAY];
   gint disp_count;
   DisplayInfo disp_info[MAX_DISPLAY];
