@@ -970,6 +970,8 @@ gst_imx_v4l2sink_get_all_caps ()
     caps = gst_imx_v4l2sink_default_caps ();
   }
 
+  caps = gst_caps_simplify(caps);
+
   imx_video_overlay_composition_add_caps(caps);
 
   return caps;

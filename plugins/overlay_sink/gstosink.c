@@ -947,6 +947,8 @@ gst_overlay_sink_get_static_caps ()
     gst_caps_append_structure (caps, structure);
   }
 
+  caps = gst_caps_simplify(caps);
+
   imx_video_overlay_composition_add_caps(caps);
 
   return caps;

@@ -1599,6 +1599,8 @@ static GstCaps* imx_compositor_caps_from_fmt_list(GList* list)
     }
   }
 
+  caps = gst_caps_simplify(caps);
+
   imx_video_overlay_composition_add_caps(caps);
   return caps;
 }
