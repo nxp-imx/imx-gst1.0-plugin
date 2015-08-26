@@ -668,6 +668,9 @@ gst_vpu_enc_set_format (GstVideoEncoder * benc, GstVideoCodecState * state)
   enc->open_param.nLinear2TiledEnable = 0;
   enc->gop_count = 0;
 
+  if (enc->open_param.nFrameRate == 0)
+    enc->open_param.nFrameRate = 30;
+
   GST_DEBUG_OBJECT (enc, "input caps: %" GST_PTR_FORMAT, state->caps);
   s = gst_caps_get_structure(state->caps, 0);
   video_format_str = gst_structure_get_string(s, "format");
