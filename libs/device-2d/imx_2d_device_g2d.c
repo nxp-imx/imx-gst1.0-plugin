@@ -372,7 +372,7 @@ static gint imx_g2d_convert(Imx2DDevice *device,
     g2d->src.top = 0;
   if (g2d->src.right > g2d->src.width)
     g2d->src.right = g2d->src.width;
-  if (g2d->src.bottom - g2d->src.height)
+  if (g2d->src.bottom > g2d->src.height)
     g2d->src.bottom = g2d->src.height;
 
   if (imx_g2d_set_src_plane (&g2d->src, src->mem->paddr) < 0)
