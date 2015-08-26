@@ -1189,6 +1189,18 @@ main(int argc,char *argv[])
         }
         break;
 
+        case '*':// sleep 1 second
+        {
+          sleep(1);
+        }
+        break;
+
+        case '#':// sleep 10 seconds
+        {
+          sleep(10);
+        }
+        break;
+
         case 'q': // Query information
         {
             g_print("Input query type[v:has video?, e:seekable?, s:state, p:position, u:duration, z:size, t:rotation, c:play rate]:\n");
