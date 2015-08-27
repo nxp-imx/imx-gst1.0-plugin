@@ -327,7 +327,6 @@ get_metadata_tag( const GstTagList * list,
         strncpy(meta->year, dt_str, sizeof(meta->year));
         meta->year[sizeof(meta->year) - 1] = '\0';
         g_free(dt_str);
-        gst_date_time_unref(dt);
       } else if (strncmp(gst_tag_get_nick(tag), "date", 4) == 0) {
         strncpy(meta->year, str, sizeof(meta->year));
         meta->year[sizeof(meta->year) - 1] = '\0';
