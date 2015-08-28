@@ -277,6 +277,9 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
             v4l2sink->do_deinterlace, v4l2sink->deinterlace_motion);
       }
 
+      v4l2sink->min_buffers =
+          gst_imx_v4l2_get_min_buffer_num(v4l2sink->v4l2handle,
+                                          V4L2_BUF_TYPE_VIDEO_OUTPUT);
       gst_imx_video_overlay_start (v4l2sink->imxoverlay);
       break;
     default:
@@ -1047,7 +1050,7 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   memset (&v4l2sink->crop, 0, sizeof(IMXV4l2Rect));
   v4l2sink->keep_video_ratio = FALSE;
   v4l2sink->frame_showed = 0;
-  v4l2sink->min_buffers = gst_imx_v4l2_get_min_buffer_num (V4L2_BUF_TYPE_VIDEO_OUTPUT);
+  v4l2sink->min_buffers = 0;
   v4l2sink->pool_activated = FALSE;
   v4l2sink->use_userptr_mode = FALSE;
   v4l2sink->v4l2buffer2buffer_table = g_hash_table_new(NULL, NULL);

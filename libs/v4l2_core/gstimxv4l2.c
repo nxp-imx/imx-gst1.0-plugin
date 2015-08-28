@@ -100,6 +100,7 @@ typedef struct {
   gint invisible;
   gint streamon_count;
   gint queued_count;
+  guint v4l2_hold_buf_num;
   guint in_fmt;
   gint in_w;
   gint in_h;
@@ -560,16 +561,18 @@ gst_imx_v4l2_get_default_device_name (gint type)
 }
 
 gint
-gst_imx_v4l2_get_min_buffer_num (gint type)
+gst_imx_v4l2_get_min_buffer_num (gpointer *v4l2handle, gint type)
 {
-  gint num;
-  if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+  gint num = 0;
+  IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
+
+  if (handle && type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
     if (HAS_PXP())
-      num = MAX (V4L2_HOLDED_BUFFERS, MX60_STREAMON_COUNT);
+      num = MAX (handle->v4l2_hold_buf_num, MX60_STREAMON_COUNT);
     else if (HAS_IPU())
-      num = MAX (V4L2_HOLDED_BUFFERS, MX6Q_STREAMON_COUNT);
+      num = MAX (handle->v4l2_hold_buf_num, MX6Q_STREAMON_COUNT);
     else
-      num = V4L2_HOLDED_BUFFERS;
+      num = handle->v4l2_hold_buf_num;
 
     num += 1;
   }
@@ -1055,6 +1058,7 @@ gpointer gst_imx_v4l2_open_device (gchar *device, int type)
   handle->device = device;
   handle->type = type;
   handle->streamon = FALSE;
+  handle->v4l2_hold_buf_num = V4L2_HOLDED_BUFFERS;
 
   if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
     if (HAS_IPU()) {
@@ -1389,6 +1393,8 @@ gint gst_imx_v4l2_config_deinterlace (gpointer v4l2handle, gboolean do_deinterla
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
   struct v4l2_control ctrl;
 
+  handle->v4l2_hold_buf_num = V4L2_HOLDED_BUFFERS;
+
   if (gst_imx_v4l2_support_deinterlace(V4L2_BUF_TYPE_VIDEO_OUTPUT)) {
     if (do_deinterlace) {
       ctrl.id = V4L2_CID_MXC_MOTION;
@@ -1397,6 +1403,9 @@ gint gst_imx_v4l2_config_deinterlace (gpointer v4l2handle, gboolean do_deinterla
         GST_WARNING ("Set ctrl motion failed\n");
         return -1;
       }
+
+      if (motion < 2)
+        handle->v4l2_hold_buf_num = V4L2_HOLDED_BUFFERS + 2;
     }
 
     handle->do_deinterlace = do_deinterlace;
@@ -1779,7 +1788,7 @@ gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk,
   struct v4l2_buffer v4l2buf;
   gint trycnt = 0;
 
-  if (handle->queued_count <= MAX(V4L2_HOLDED_BUFFERS, handle->streamon_count)) {
+  if (handle->queued_count <= MAX(handle->v4l2_hold_buf_num, handle->streamon_count)) {
     GST_DEBUG ("current queued %d", handle->queued_count);
     *memblk = NULL;
     return 0;

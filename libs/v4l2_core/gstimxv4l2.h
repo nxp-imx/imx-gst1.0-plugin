@@ -34,7 +34,7 @@ GstCaps *gst_imx_v4l2_get_caps (gpointer v4l2handle);
 guint gst_imx_v4l2_fmt_gst2v4l2 (GstVideoFormat gstfmt);
 guint gst_imx_v4l2_get_bits_per_pixel (guint v4l2fmt);
 gboolean gst_imx_v4l2_support_deinterlace (gint type);
-
+gint gst_imx_v4l2_get_min_buffer_num (gpointer *v4l2handle, gint type);
 void gst_imx_v4l2_get_display_resolution (gchar *device, gint *w, gint *h);
 gpointer gst_imx_v4l2_open_device (gchar *device, gint type);
 gint gst_imx_v4l2_reset_device (gpointer v4l2handle);
