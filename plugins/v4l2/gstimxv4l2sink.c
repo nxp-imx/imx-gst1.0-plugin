@@ -23,6 +23,7 @@
 #include "gstimxv4l2allocator.h"
 #include "imx_2d_device.h"
 #include "gstimxvideooverlay.h"
+#include "allocator/gstphymemmeta.h"
 
 #define ALIGNMENT_8 (8)
 #define ALIGNMENT_2 (2)
@@ -670,6 +671,25 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     if (!v4l2sink->pool && gst_imx_v4l2sink_setup_buffer_pool (v4l2sink, caps) < 0) {
       gst_caps_unref (caps);
       return GST_FLOW_ERROR;
+    }
+
+    GstPhyMemMeta *phymemmeta = NULL;
+    if (v4l2sink->pool_activated == FALSE) {
+      phymemmeta = GST_PHY_MEM_META_GET (buffer);
+      if (phymemmeta) {
+        v4l2sink->video_align.padding_right = phymemmeta->x_padding;
+        v4l2sink->video_align.padding_bottom = phymemmeta->y_padding;
+        GST_DEBUG_OBJECT (v4l2sink,
+            "physical memory meta x_padding: %d y_padding: %d",
+            phymemmeta->x_padding, phymemmeta->y_padding);
+
+        GstStructure *config = gst_buffer_pool_get_config (v4l2sink->pool);
+        if (!gst_buffer_pool_config_has_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
+          gst_buffer_pool_config_add_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
+        }
+        gst_buffer_pool_config_set_video_alignment (config, &v4l2sink->video_align);
+        gst_buffer_pool_set_config (v4l2sink->pool, config);
+      }
     }
 
     if (gst_buffer_pool_set_active (v4l2sink->pool, TRUE) != TRUE) {

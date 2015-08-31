@@ -973,7 +973,7 @@ static gint gst_imxcompositor_config_dst(GstImxCompositor *imxcomp,
   }
 
   if (!gst_video_frame_map (&out_frame, &((GstVideoAggregator*)imxcomp)->info,
-      outbuf, GST_MAP_WRITE)) {
+      outbuf, GST_MAP_WRITE|GST_VIDEO_FRAME_MAP_FLAG_NO_REF)) {
     return -1;
   }
 
