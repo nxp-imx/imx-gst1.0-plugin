@@ -802,7 +802,6 @@ playengine_play(PlayEngineHandle handle)
       }
     }
 
-    engine_data->play_rate = 1.0;
     g_mutex_unlock(&engine_data->mutex);
   }else
   {
@@ -839,6 +838,7 @@ playengine_stop(PlayEngineHandle handle)
       }
     }
     
+    engine_data->play_rate = 1.0;
     g_mutex_unlock(&engine_data->mutex);
   }else
   {
@@ -926,7 +926,6 @@ playengine_seek(PlayEngineHandle handle,
     g_error("Error:%s Invalid pointer is used\n", __FUNCTION__);
     return PLAYENGINE_ERROR_BAD_PARAM;
   }
-
   return PLAYENGINE_SUCCESS;
 }
 
@@ -2520,6 +2519,7 @@ play_engine_create()
 
   engine_data->bmute = FALSE;
   engine_data->volume = 1.0;
+  engine_data->play_rate = 1.0;
   engine_data->timeout_second = PLAYENGINE_DEFAULT_TIME_OUT;//default 20s
   engine_data->stop_wait = FALSE;
   engine_data->rotation = 0;
