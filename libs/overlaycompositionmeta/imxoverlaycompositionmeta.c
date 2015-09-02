@@ -29,6 +29,9 @@
 #include "imxoverlaycompositionmeta.h"
 #include "../allocator/gstphymemmeta.h"
 
+GST_DEBUG_CATEGORY_STATIC(overlay_composition_meta);
+#define GST_CAT_DEFAULT overlay_composition_meta
+
 static gboolean
 is_input_fmt_support(Imx2DDevice *device, GstVideoFormat fmt)
 {
@@ -178,6 +181,13 @@ gboolean imx_video_overlay_composition_is_out_fmt_support(Imx2DDevice *device,
 void imx_video_overlay_composition_init(GstImxVideoOverlayComposition *vcomp,
                                         Imx2DDevice *device)
 {
+  static gint debug_init = 0;
+  if (debug_init == 0) {
+    GST_DEBUG_CATEGORY_INIT (overlay_composition_meta, "overlaycompometa", 0,
+                           "Freescale video overlay composition meta");
+    debug_init = 1;
+  }
+
   vcomp->device = device;
   vcomp->allocator = NULL;
   vcomp->tmp_buf = NULL;
@@ -326,7 +336,7 @@ gint imx_video_overlay_composition_remove_meta(GstBuffer *buffer)
     while(compmeta = gst_buffer_get_video_overlay_composition_meta(buffer))
       gst_buffer_remove_video_overlay_composition_meta(buffer, compmeta);
   } else {
-    g_print("remove video composition meta failed: buffer not writable\n");
+    GST_WARNING("remove video composition meta failed: buffer not writable\n");
     ret = -1;
   }
 
@@ -434,7 +444,7 @@ gint imx_video_overlay_composition_composite(
                  gst_imx_2d_device_allocator_new((gpointer)(vcomp->device));
 
         if (!vcomp->allocator) {
-          g_print("create allocator for overlay buffer failed\n");
+          GST_WARNING("create allocator for overlay buffer failed\n");
           continue;
         }
 
@@ -445,7 +455,7 @@ gint imx_video_overlay_composition_composite(
             vcomp->tmp_buf_size = IMX_OVERLAY_COMPOSITION_INIT_BUFFER_SIZE;
           else {
             vcomp->tmp_buf_size = 0;
-            g_print("allocate buffer by allocator failed, size=%d\n",
+            GST_WARNING("allocate buffer by allocator failed, size=%d\n",
                 IMX_OVERLAY_COMPOSITION_INIT_BUFFER_SIZE);
           }
         }
@@ -461,7 +471,7 @@ gint imx_video_overlay_composition_composite(
         }
 
         if (!vcomp->tmp_buf) {
-          g_print ("!!!allocate buffer for overlay [%d] failed, "
+          GST_WARNING ("!!!allocate buffer for overlay [%d] failed, "
            "this video overlay buffer size is out of hardware capability\n", n);
           continue;
         }

@@ -74,8 +74,13 @@ static const Imx2DDeviceInfo Imx2DDevices[] = {
 
 const Imx2DDeviceInfo * imx_get_2d_devices(void)
 {
-  GST_DEBUG_CATEGORY_INIT (imx2ddevice_debug, "imx2ddevice", 0,
+  static gint debug_init = 0;
+  if (debug_init == 0) {
+    GST_DEBUG_CATEGORY_INIT (imx2ddevice_debug, "imx2ddevice", 0,
                            "Freescale IMX 2D Devices");
+    debug_init = 1;
+  }
+
   return &Imx2DDevices[0];
 }
 

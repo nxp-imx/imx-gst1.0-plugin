@@ -82,6 +82,8 @@ gst_phy_mem_meta_get_info (void)
       gst_meta_register (GST_PHY_MEM_META_API_TYPE, "GstPhyMemMeta",
           sizeof (GstPhyMemMeta), (GstMetaInitFunction) NULL,
           (GstMetaFreeFunction) NULL, gst_phy_mem_meta_transform);
+    GST_DEBUG_CATEGORY_INIT (phy_mem_meta_debug, "phymemmeta", 0,
+                               "Freescale physical memory meta");
     g_once_init_leave (&phy_mem_meta_info, meta);
   }
   return phy_mem_meta_info;
