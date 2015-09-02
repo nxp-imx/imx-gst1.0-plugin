@@ -40,6 +40,11 @@ gst_phymem_map (GstMemory * mem, gsize maxsize, GstMapFlags flags)
 {
   GstMemoryPhy *phymem = (GstMemoryPhy*) mem;
 
+  if (GST_MEMORY_IS_READONLY(mem) && (flags & GST_MAP_WRITE)) {
+    GST_ERROR("memory is read only");
+    return NULL;
+  }
+
   return phymem->vaddr;
 }
 
@@ -79,7 +84,8 @@ gst_phymem_copy (GstMemory * mem, gssize offset, gssize size)
   dst_mem->vaddr = dst_mem->block.vaddr;
   dst_mem->paddr = dst_mem->block.paddr;
 
-  gst_memory_init (GST_MEMORY_CAST (dst_mem), mem->mini_object.flags,
+  gst_memory_init (GST_MEMORY_CAST (dst_mem),
+                   mem->mini_object.flags&(~GST_MEMORY_FLAG_READONLY),
                    mem->allocator, NULL, mem->maxsize, mem->align,
                    mem->offset, mem->size);
 

@@ -97,6 +97,39 @@ gst_vpu_free_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock *
 	return (ret == VPU_DEC_RET_SUCCESS) ? 0 : -1;
 }
 
+static int
+gst_vpu_copy_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock *dest_mem,
+    PhyMemBlock *src_mem, guint offset, guint size)
+{
+  VpuDecRetCode ret;
+  VpuMemDesc mem_desc;
+
+  GST_DEBUG_OBJECT(allocator, "vpu allocator copy size: %d\n", src_mem->size);
+  memset(&mem_desc, 0, sizeof(VpuMemDesc));
+
+  if (size > src_mem->size - offset)
+    size = src_mem->size - offset;
+
+  mem_desc.nSize = PAGE_ALIGN(size);
+  ret = VPU_DecGetMem(&mem_desc);
+
+  if (ret == VPU_DEC_RET_SUCCESS) {
+    dest_mem->size         = mem_desc.nSize;
+    dest_mem->paddr        = (guint8 *)(mem_desc.nPhyAddr);
+    dest_mem->vaddr         = (guint8 *)(mem_desc.nVirtAddr);
+    dest_mem->caddr         = (guint8 *)(mem_desc.nCpuAddr);
+    GST_DEBUG_OBJECT(allocator, "vpu allocator malloc paddr: %x vaddr: %x\n", \
+        dest_mem->paddr, dest_mem->vaddr);
+
+    memcpy(dest_mem->vaddr, src_mem->vaddr+offset, size);
+    GST_WARNING("TODO: use relevant hardware to accelerate memory copying!");
+
+    return 0;
+  } else {
+    return -1;
+  }
+}
+
 static void 
 gst_vpu_allocator_class_init(GstVpuAllocatorClass *klass)
 {
@@ -106,6 +139,7 @@ gst_vpu_allocator_class_init(GstVpuAllocatorClass *klass)
 	object_class->finalize       = GST_DEBUG_FUNCPTR(gst_vpu_allocator_finalize);
 	parent_class->alloc_phymem = GST_DEBUG_FUNCPTR(gst_vpu_alloc_phys_mem);
 	parent_class->free_phymem  = GST_DEBUG_FUNCPTR(gst_vpu_free_phys_mem);
+	parent_class->copy_phymem = GST_DEBUG_FUNCPTR(gst_vpu_copy_phys_mem);
 
 	GST_DEBUG_CATEGORY_INIT(vpu_allocator_debug, "vpuallocator", 0, "VPU physical memory allocator");
 }
