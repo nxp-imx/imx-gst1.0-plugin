@@ -255,7 +255,7 @@ static gint imx_ipu_frame_copy(Imx2DDevice *device,
   if (!device || !device->priv || !from || !to)
     return -1;
 
-  memcpy(to->vaddr, from->vaddr, from->size);
+  memcpy(to->vaddr, from->vaddr, (from->size > to->size) ? to->size:from->size);
   GST_LOG("IPU frame memory (%p)->(%p)", from->paddr, to->paddr);
 
   return 0;
