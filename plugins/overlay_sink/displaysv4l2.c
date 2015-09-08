@@ -65,6 +65,7 @@ typedef struct {
   gpointer v4l2handle;
   PhyMemBlock memblk[DISPLAY_NUM_BUFFERS];
   gint first_request;
+  gint clear_cnt;
 } DisplayHandle;
 
 static guint string_to_fmt (char *value)
@@ -252,6 +253,7 @@ gint init_display (gpointer display)
   rect.left = rect.top = 0;
   rect.width = hdisplay->w;
   rect.height = hdisplay->h;
+  hdisplay->clear_cnt = 0;
 
   guint fmt = display_fmt_to_v4l2_fmt(hdisplay->fmt);
   if (0 == fmt) {
@@ -284,10 +286,10 @@ gint init_display (gpointer display)
     if (gst_imx_v4l2_allocate_buffer (hdisplay->v4l2handle, &hdisplay->memblk[i]) < 0) {
       GST_ERROR ("allocate memory from v4l2 device %s failed.", hdisplay->device);
       goto err;
+    } else {
+      memset (hdisplay->memblk[i].vaddr, 0, hdisplay->memblk[i].size);
     }
   }
-
-  clear_display (display);
 
   return 0;
 
@@ -319,12 +321,7 @@ void deinit_display (gpointer display)
 gint clear_display (gpointer display)
 {
   DisplayHandle *hdisplay = (DisplayHandle*) display;
-  gint i;
-
-  for (i=0; i<DISPLAY_NUM_BUFFERS; i++) {
-    memset (hdisplay->memblk[i].vaddr, 0, hdisplay->memblk[i].size);
-  }
-
+  hdisplay->clear_cnt = DISPLAY_NUM_BUFFERS;
   return 0;
 }
 
@@ -352,6 +349,11 @@ gint get_next_display_buffer (gpointer display, SurfaceBuffer *buffer)
   }
 
   memcpy (&(buffer->mem), memblk, sizeof (PhyMemBlock));
+
+  if (hdisplay->clear_cnt > 0) {
+    memset (buffer->mem.vaddr, 0, buffer->mem.size);
+    hdisplay->clear_cnt--;
+  }
 
   //GST_DEBUG ("get display buffer, vaddr (%p) paddr (%p).", buffer->vaddr, buffer->paddr);
 
