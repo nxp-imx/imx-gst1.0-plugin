@@ -62,10 +62,10 @@ typedef enum{
 
 typedef struct{
 
-    gchar video_sink_name[50];
-    gchar audio_sink_name[50];
-    gchar text_sink_name[50];
-    gchar suburi[1024];
+    gchar *video_sink_name;
+    gchar *audio_sink_name;
+    gchar *text_sink_name;
+    gchar *suburi;
 
     PlayListHandle pl;
     const gchar *current;
@@ -440,28 +440,28 @@ parse_pconfigions(gplay_pconfigions *pconfig,
 
                 if ((strncmp(argv[i], "--video-sink", 12)==0)){
                   if (argv[i][12]=='='){
-                    strcpy(pconfig->video_sink_name, &(argv[i][13]));
+                    pconfig->video_sink_name = &(argv[i][13]);
                   }
                   continue;
                 }
 
                 if ((strncmp(argv[i], "--audio-sink", 12)==0)){
                   if (argv[i][12]=='='){
-                    strcpy(pconfig->audio_sink_name, &(argv[i][13]));
+                    pconfig->audio_sink_name = &(argv[i][13]);
                   }
                   continue;
                 }
 
                 if ((strncmp(argv[i], "--text-sink", 11)==0)) {
                   if (argv[i][11]=='=') {
-                    strcpy(pconfig->text_sink_name, &(argv[i][12]));
+                    pconfig->text_sink_name = &(argv[i][12]);
                   }
                   continue;
                 }
 
                 if ((strncmp(argv[i], "--suburi", 8)==0)) {
                   if (argv[i][8]=='=') {
-                    strcpy(pconfig->suburi, &(argv[i][9]));
+                    pconfig->suburi = &(argv[i][9]);
                   }
                   continue;
                 }
@@ -808,26 +808,26 @@ main(int argc,char *argv[])
     playengine->set_state_change_timeout((PlayEngineHandle)playengine, options.timeout);
   }
 
-  if (strlen(options.video_sink_name) == 0)
+  if (!options.video_sink_name)
     if(HAS_G2D()) {
-      strcpy(options.video_sink_name,"overlaysink");
+      options.video_sink_name = "overlaysink";
     }else {
-      strcpy(options.video_sink_name,"imxv4l2sink");
+      options.video_sink_name = "imxv4l2sink";
     }
 
   g_print("Set VideoSink %s\n", options.video_sink_name);
   playengine->set_video_sink((PlayEngineHandle)playengine, options.video_sink_name);
 
-  if (strlen(options.audio_sink_name) != 0){
+  if (options.audio_sink_name){
       g_print("Set AudioSink %s\n", options.audio_sink_name);
       playengine->set_audio_sink((PlayEngineHandle)playengine, options.audio_sink_name);
   }
 
-  if (strlen(options.text_sink_name) != 0) {
+  if (options.text_sink_name) {
       g_print("Set TextSink %s\n", options.text_sink_name);
       playengine->set_text_sink((PlayEngineHandle)playengine, options.text_sink_name);
   }
-  if (strlen(options.suburi) != 0) 
+  if (options.suburi)
   {
     /* load usr define subtitle uri */
     g_print("Load subtitle: %s\n",options.suburi);
