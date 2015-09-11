@@ -505,7 +505,6 @@ gst_imx_v4l2src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
   if (pool == NULL || v4l2src->use_v4l2_memory == TRUE) {
     if (pool) {
       gst_object_unref (pool);
-      min = max = 0;
     }
     /* no pool, we can make our own */
     GST_DEBUG_OBJECT (v4l2src, "no pool, making new pool");
