@@ -3603,16 +3603,16 @@ aiurdemux_do_push_seek (GstAiurDemux * demux, GstPad * pad,
 
   flush = flags & GST_SEEK_FLAG_FLUSH;
 
-  /* stop streaming, either by flushing or by pausing the task */
-  if (flush) {
-    gst_aiurdemux_push_event (demux, gst_event_new_flush_start ());
-  }
-
   demux->loop_push = FALSE;
   gst_aiur_stream_cache_close (demux->stream_cache);
 
   /* wait for streaming to finish */
   g_mutex_lock (&demux->runmutex);
+
+  /* stop streaming, either by flushing or by pausing the task */
+  if (flush) {
+    gst_aiurdemux_push_event (demux, gst_event_new_flush_start ());
+  }
 
   gst_aiur_stream_cache_open (demux->stream_cache);
 
