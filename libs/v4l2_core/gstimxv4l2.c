@@ -1687,6 +1687,10 @@ gint gst_imx_v4l2_free_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
     handle->allocated = 0;
   }
 
+  if (handle->memory_mode == V4L2_MEMORY_USERPTR) {
+    handle->allocated = 0;
+  }
+
   if (handle->allocated == 0 && handle->pending_close) {
     handle->pending_close = FALSE;
     if (handle->v4l2_fd) {

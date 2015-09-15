@@ -311,6 +311,7 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
           gst_object_unref (v4l2sink->allocator);
           v4l2sink->allocator = NULL;
         }
+        g_hash_table_remove_all (v4l2sink->v4l2buffer2buffer_table);
       }
       break;
     case GST_STATE_CHANGE_READY_TO_NULL:
@@ -845,9 +846,7 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     if (v4l2_buffer) {
       PhyMemBlock *memblk;
       memblk = gst_buffer_query_phymem_block (v4l2_buffer);
-      buffer = g_hash_table_lookup(v4l2sink->v4l2buffer2buffer_table, memblk->vaddr);
-      if (buffer)
-        gst_buffer_unref (buffer);
+      g_hash_table_remove (v4l2sink->v4l2buffer2buffer_table, memblk->vaddr);
     }
   }
   if (v4l2_buffer)
@@ -1083,7 +1082,8 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   v4l2sink->min_buffers = 0;
   v4l2sink->pool_activated = FALSE;
   v4l2sink->use_userptr_mode = FALSE;
-  v4l2sink->v4l2buffer2buffer_table = g_hash_table_new(NULL, NULL);
+  v4l2sink->v4l2buffer2buffer_table = g_hash_table_new_full (NULL, NULL, NULL, 
+      (GDestroyNotify) gst_buffer_unref);
 
   v4l2sink->imxoverlay = gst_imx_video_overlay_init ((GstElement *)v4l2sink,
                                               v4l2sink_update_video_geo,
