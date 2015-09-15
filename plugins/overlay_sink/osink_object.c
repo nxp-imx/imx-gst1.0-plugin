@@ -451,9 +451,12 @@ int osink_object_enable_display (gpointer osink_handle, gint display_idx)
     GstVideoFormat gst_fmt;
     if (fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'P'))
       gst_fmt = GST_VIDEO_FORMAT_RGB16;
-    else if (fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'x'))
-      gst_fmt = GST_VIDEO_FORMAT_RGBx;
-    else {
+    else if (fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'x')) {
+      if (HAS_PXP())
+        gst_fmt = GST_VIDEO_FORMAT_BGRx;
+      else
+        gst_fmt = GST_VIDEO_FORMAT_RGBx;
+    } else {
       UNLOCK (glock);
       return -1;
     }

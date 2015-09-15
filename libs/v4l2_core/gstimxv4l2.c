@@ -145,15 +145,11 @@ typedef struct {
     "height = " GST_VIDEO_SIZE_RANGE ", "                               \
     "framerate = " GST_VIDEO_FPS_RANGE
 
-static IMXV4l2FmtMap g_imxv4l2fmt_maps[] = {
+static IMXV4l2FmtMap g_imxv4l2fmt_maps_IPU[] = {
   {GST_VIDEO_CAPS_MAKE("I420"), V4L2_PIX_FMT_YUV420, GST_VIDEO_FORMAT_I420, 12, 0},
   {GST_VIDEO_CAPS_MAKE("YV12"), V4L2_PIX_FMT_YVU420, GST_VIDEO_FORMAT_YV12, 12, 0},
   {GST_VIDEO_CAPS_MAKE("NV12"), V4L2_PIX_FMT_NV12, GST_VIDEO_FORMAT_NV12, 12, 0},
   {GST_VIDEO_CAPS_MAKE("Y42B"), V4L2_PIX_FMT_YUV422P, GST_VIDEO_FORMAT_Y42B, 16, 0},
-  /* GST_VIDEO_FORMAT_AYUV is packed 4:4:4 YUV with alpha channel (A0-Y0-U0-V0 ...)
-   * V4L2_PIX_FMT_YUV32 is 32  YUV-8-8-8-8
-   * V4L2 capture output on SX TV In and PXP output on Kernel 3.14 is 32 bits
-   * packed AYUV444 with 4 bytes reversed (V0-U0-Y0-A0...). A is 0 */
   {GST_VIDEO_CAPS_MAKE("AYUV"), V4L2_PIX_FMT_YUV32, GST_VIDEO_FORMAT_AYUV, 32, 0},
   {GST_VIDEO_CAPS_MAKE("Y444"), IPU_PIX_FMT_YUV444P, GST_VIDEO_FORMAT_Y444, 24, 0},
   {GST_VIDEO_CAPS_MAKE("TNVP"), IPU_PIX_FMT_TILED_NV12, GST_VIDEO_FORMAT_UNKNOWN, 12, 0},
@@ -164,6 +160,23 @@ static IMXV4l2FmtMap g_imxv4l2fmt_maps[] = {
   {GST_VIDEO_CAPS_MAKE("BGRx"), V4L2_PIX_FMT_BGR32, GST_VIDEO_FORMAT_BGRx, 32, 0},
   {GST_VIDEO_CAPS_MAKE("RGB"), V4L2_PIX_FMT_RGB24, GST_VIDEO_FORMAT_RGB, 24, 0},
   {GST_VIDEO_CAPS_MAKE("BGR"), V4L2_PIX_FMT_BGR24, GST_VIDEO_FORMAT_BGR, 24, 0},
+  {GST_VIDEO_CAPS_MAKE("RGB16"), V4L2_PIX_FMT_RGB565, GST_VIDEO_FORMAT_RGB16, 16, 0},
+};
+
+static IMXV4l2FmtMap g_imxv4l2fmt_maps_PXP[] = {
+  {GST_VIDEO_CAPS_MAKE("I420"), V4L2_PIX_FMT_YUV420, GST_VIDEO_FORMAT_I420, 12, 0},
+  {GST_VIDEO_CAPS_MAKE("YV12"), V4L2_PIX_FMT_YVU420, GST_VIDEO_FORMAT_YV12, 12, 0},
+  {GST_VIDEO_CAPS_MAKE("NV12"), V4L2_PIX_FMT_NV12, GST_VIDEO_FORMAT_NV12, 12, 0},
+  {GST_VIDEO_CAPS_MAKE("Y42B"), V4L2_PIX_FMT_YUV422P, GST_VIDEO_FORMAT_Y42B, 16, 0},
+  /* GST_VIDEO_FORMAT_AYUV is packed 4:4:4 YUV with alpha channel (A0-Y0-U0-V0 ...)
+   * V4L2_PIX_FMT_YUV32 is 32  YUV-8-8-8-8
+   * V4L2 capture output on SX TV In and PXP output on Kernel 3.14 is 32 bits
+   * packed AYUV444 with 4 bytes reversed (V0-U0-Y0-A0...). A is 0 */
+  {GST_VIDEO_CAPS_MAKE("AYUV"), V4L2_PIX_FMT_YUV32, GST_VIDEO_FORMAT_AYUV, 32, 0},
+  {GST_VIDEO_CAPS_MAKE("UYVY"), V4L2_PIX_FMT_UYVY, GST_VIDEO_FORMAT_UYVY, 16, 0},
+  {GST_VIDEO_CAPS_MAKE("YUY2"), V4L2_PIX_FMT_YUYV, GST_VIDEO_FORMAT_YUY2, 16, 0},
+  {GST_VIDEO_CAPS_MAKE("BGRx"), V4L2_PIX_FMT_RGB32, GST_VIDEO_FORMAT_BGRx, 32, 0},
+  //{GST_VIDEO_CAPS_MAKE("BGR"), V4L2_PIX_FMT_RGB24, GST_VIDEO_FORMAT_BGR, 24, 0},
   {GST_VIDEO_CAPS_MAKE("RGB16"), V4L2_PIX_FMT_RGB565, GST_VIDEO_FORMAT_RGB16, 16, 0},
   {GST_VIDEO_CAPS_MAKE_BAYER("bggr"), V4L2_PIX_FMT_SBGGR8, GST_VIDEO_FORMAT_UNKNOWN, 8, 0},
   {GST_VIDEO_CAPS_MAKE_BAYER("gbrg"), V4L2_PIX_FMT_SGBRG8, GST_VIDEO_FORMAT_UNKNOWN, 8, 0},
@@ -202,6 +215,21 @@ static IMXV4l2DeviceMap g_device_maps[] = {
   {"/dev/video20", TRUE, "/dev/fb4"}
 };
 
+static IMXV4l2FmtMap * imx_v4l2_get_fmt_map(guint *map_size)
+{
+  IMXV4l2FmtMap *fmt_map = NULL;
+  *map_size = 0;
+
+  if (HAS_IPU()) {
+    fmt_map = g_imxv4l2fmt_maps_IPU;
+    *map_size = sizeof(g_imxv4l2fmt_maps_IPU)/sizeof(IMXV4l2FmtMap);
+  } else if (HAS_PXP()){
+    fmt_map = g_imxv4l2fmt_maps_PXP;
+    *map_size = sizeof(g_imxv4l2fmt_maps_PXP)/sizeof(IMXV4l2FmtMap);
+  }
+
+  return fmt_map;
+}
 
 //ipu device iterfaces
 static gint
@@ -603,12 +631,14 @@ gst_imx_v4l2_get_device_caps (gint type)
   fmtdesc.type = type;
   fmtdesc.index = 0;
   while (!(ioctl (fd, VIDIOC_ENUM_FMT, &fmtdesc))) {
-    for (i=0; i<sizeof(g_imxv4l2fmt_maps)/sizeof(IMXV4l2FmtMap); i++) {
-      if (fmtdesc.pixelformat == g_imxv4l2fmt_maps[i].v4l2fmt) {
+    guint map_size;
+    IMXV4l2FmtMap *fmt_map = imx_v4l2_get_fmt_map(&map_size);
+    for (i=0; i<map_size; i++) {
+      if (fmtdesc.pixelformat == fmt_map[i].v4l2fmt) {
         if (!caps)
           caps = gst_caps_new_empty ();
         if (caps) {
-          GstStructure * structure = gst_structure_from_string(g_imxv4l2fmt_maps[i].caps_str, NULL);
+          GstStructure * structure = gst_structure_from_string(fmt_map[i].caps_str, NULL);
           gst_caps_append_structure (caps, structure);
         }
         break;
@@ -659,13 +689,16 @@ gst_imx_v4l2_get_caps (gpointer v4l2handle)
               // Add hard code format.
               index = 0;
               while (handle->support_format_table[index]) {
-                for (i=0; i<sizeof(g_imxv4l2fmt_maps)/sizeof(IMXV4l2FmtMap); i++) {
-                  if (handle->support_format_table[index] == g_imxv4l2fmt_maps[i].v4l2fmt) {
+                guint map_size;
+                IMXV4l2FmtMap *fmt_map = imx_v4l2_get_fmt_map(&map_size);
+
+                for (i=0; i<map_size; i++) {
+                  if (handle->support_format_table[index] == fmt_map[i].v4l2fmt) {
                     if (!caps)
                       caps = gst_caps_new_empty ();
                     if (caps) {
                       GstStructure * structure = gst_structure_from_string( \
-                          g_imxv4l2fmt_maps[i].caps_str, NULL);
+                          fmt_map[i].caps_str, NULL);
                       gst_structure_set (structure, "width", G_TYPE_INT, frmsize.discrete.width, NULL);
                       gst_structure_set (structure, "height", G_TYPE_INT, frmsize.discrete.height, NULL);
                       gst_structure_set (structure, "framerate", GST_TYPE_FRACTION, \
@@ -703,13 +736,16 @@ gst_imx_v4l2_get_caps (gpointer v4l2handle)
             frmival.height = frmsize.discrete.height;
             while (ioctl(handle->v4l2_fd, VIDIOC_ENUM_FRAMEINTERVALS, &frmival) >= 0) {
               GST_INFO ("frame rate: %d/%d", frmival.discrete.denominator, frmival.discrete.numerator);
-              for (i=0; i<sizeof(g_imxv4l2fmt_maps)/sizeof(IMXV4l2FmtMap); i++) {
-                if (fmt.pixelformat == g_imxv4l2fmt_maps[i].v4l2fmt) {
+              guint map_size;
+              IMXV4l2FmtMap *fmt_map = imx_v4l2_get_fmt_map(&map_size);
+
+              for (i=0; i<map_size; i++) {
+                if (fmt.pixelformat == fmt_map[i].v4l2fmt) {
                   if (!caps)
                     caps = gst_caps_new_empty ();
                   if (caps) {
                     GstStructure * structure = gst_structure_from_string( \
-                        g_imxv4l2fmt_maps[i].caps_str, NULL);
+                        fmt_map[i].caps_str, NULL);
                     gst_structure_set (structure, "width", G_TYPE_INT, frmsize.discrete.width, NULL);
                     gst_structure_set (structure, "height", G_TYPE_INT, frmsize.discrete.height, NULL);
                     gst_structure_set (structure, "framerate", GST_TYPE_FRACTION, \
@@ -741,10 +777,12 @@ gst_imx_v4l2_fmt_gst2v4l2 (GstVideoFormat gstfmt)
 {
   guint v4l2fmt = 0;
   int i;
+  guint map_size;
+  IMXV4l2FmtMap *fmt_map = imx_v4l2_get_fmt_map(&map_size);
 
-  for(i=0; i<sizeof(g_imxv4l2fmt_maps)/sizeof(IMXV4l2FmtMap); i++) {
-    if (gstfmt == g_imxv4l2fmt_maps[i].gstfmt) {
-      v4l2fmt = g_imxv4l2fmt_maps[i].v4l2fmt;
+  for(i=0; i<map_size; i++) {
+    if (gstfmt == fmt_map[i].gstfmt) {
+      v4l2fmt = fmt_map[i].v4l2fmt;
       break;
     }
   }
@@ -757,9 +795,12 @@ gst_imx_v4l2_get_bits_per_pixel (guint v4l2fmt)
 {
   guint bits_per_pixel = 0;
   int i;
-  for(i=0; i<sizeof(g_imxv4l2fmt_maps)/sizeof(IMXV4l2FmtMap); i++) {
-    if (v4l2fmt == g_imxv4l2fmt_maps[i].v4l2fmt) {
-      bits_per_pixel = g_imxv4l2fmt_maps[i].bits_per_pixel;
+  guint map_size;
+  IMXV4l2FmtMap *fmt_map = imx_v4l2_get_fmt_map(&map_size);
+
+  for(i=0; i<map_size; i++) {
+    if (v4l2fmt == fmt_map[i].v4l2fmt) {
+      bits_per_pixel = fmt_map[i].bits_per_pixel;
       break;
     }
   }
