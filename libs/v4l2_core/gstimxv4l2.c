@@ -28,7 +28,7 @@
 #include <linux/mxcfb.h>
 #include <linux/ipu.h>
 #include <linux/mxc_v4l2.h>
-
+#include <linux/version.h>
 #include <gst/video/gstvideosink.h>
 
 #include "gstimxcommon.h"
@@ -236,7 +236,6 @@ static gint
 imx_ipu_v4l2out_config_input (IMXV4l2Handle *handle, guint fmt, guint w, guint h, IMXV4l2Rect *crop)
 {
   struct v4l2_format v4l2fmt;
-  struct v4l2_rect icrop;
 
   if (gst_imx_v4l2_reset_device ((gpointer)handle) < 0)
     return -1;
@@ -259,11 +258,32 @@ imx_ipu_v4l2out_config_input (IMXV4l2Handle *handle, guint fmt, guint w, guint h
   v4l2fmt.fmt.pix.width = handle->in_w = w;
   v4l2fmt.fmt.pix.height = handle->in_h = h;
   v4l2fmt.fmt.pix.pixelformat = handle->in_fmt = fmt;
+
+  /* v4l2 driver add VIDIOC_S_INPUT_CROP since 4.1 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 1, 0)
+  struct v4l2_rect icrop;
   icrop.left = crop->left;
   icrop.top = crop->top;
   icrop.width = crop->width;
   icrop.height = crop->height;
   v4l2fmt.fmt.pix.priv = (unsigned int)&icrop;
+#else
+  struct v4l2_crop icrop;
+  icrop.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+  icrop.c.top = crop->top;
+  icrop.c.left = crop->left;
+  if (crop->width && crop->height) {
+    icrop.c.width = crop->width;
+    icrop.c.height = crop->height;
+  } else {
+    icrop.c.width = w;
+    icrop.c.height = h;
+  }
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_INPUT_CROP, &icrop) < 0) {
+    GST_ERROR("set icrop failed");
+    return -1;
+  }
+#endif
 
   if (ioctl(handle->v4l2_fd, VIDIOC_S_FMT, &v4l2fmt) < 0) {
     GST_ERROR ("Set format failed.");
