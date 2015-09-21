@@ -976,10 +976,12 @@ gst_overlay_sink_class_init (GstOverlaySinkClass * klass)
   GObjectClass *gobject_class;
   GstElementClass *element_class;
   GstBaseSinkClass *basesink_class;
+  GstVideoSinkClass *videosink_class;
 
   gobject_class = G_OBJECT_CLASS (klass);
   element_class = GST_ELEMENT_CLASS (klass);
   basesink_class = GST_BASE_SINK_CLASS (klass);
+  videosink_class = GST_VIDEO_SINK_CLASS (klass);
 
   gobject_class->finalize = (GObjectFinalizeFunc) gst_overlay_sink_finalize;
   gobject_class->set_property = gst_overlay_sink_set_property;
@@ -995,7 +997,7 @@ gst_overlay_sink_class_init (GstOverlaySinkClass * klass)
   basesink_class->get_caps = GST_DEBUG_FUNCPTR (gst_overlay_sink_get_caps);
   basesink_class->set_caps = GST_DEBUG_FUNCPTR (gst_overlay_sink_set_caps);
   basesink_class->propose_allocation = GST_DEBUG_FUNCPTR (gst_overlay_sink_propose_allocation);
-  basesink_class->render = GST_DEBUG_FUNCPTR (gst_overlay_sink_show_frame);
+  videosink_class->show_frame = GST_DEBUG_FUNCPTR (gst_overlay_sink_show_frame);
 
   gst_element_class_set_static_metadata (element_class,
       "IMX Video (video compositor) Sink", "Sink/Video",
