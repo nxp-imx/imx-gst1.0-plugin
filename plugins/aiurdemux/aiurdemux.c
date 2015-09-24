@@ -2877,7 +2877,7 @@ static GstFlowReturn aiurdemux_parse_vorbis_codec_data(GstAiurDemux * demux, Aiu
 
 static gint aiurdemux_choose_next_stream (GstAiurDemux * demux)
 {
-  int n;
+  int n, i;
   gint track_index = 0;
   gint64 min_time = -1;
   AiurDemuxStream *stream;
@@ -2925,11 +2925,26 @@ static gint aiurdemux_choose_next_stream (GstAiurDemux * demux)
     }
 
     if (stream->last_stop == GST_CLOCK_TIME_NONE) {
-      track_index = stream->track_idx;
-      if (stream->buf_queue && !g_queue_is_empty(stream->buf_queue)) {
+      if (demux->read_mode==PARSER_READ_MODE_FILE_BASED) {
+        track_index = stream->track_idx;
+        if (stream->buf_queue && !g_queue_is_empty(stream->buf_queue)) {
+          break;
+        } else {
+          continue;
+        }
+      }else  {
+      /* in track mode we will check other tracks for -1 ts, if there is buf_queue, use that track, else use the first -1 ts track */
+        track_index = stream->track_idx;
+        for (i=n; i< demux->n_streams; i++) {
+          stream = demux->streams[i];
+          if (stream->last_stop == GST_CLOCK_TIME_NONE ){
+            if (stream->buf_queue && !g_queue_is_empty(stream->buf_queue)){
+              track_index = stream->track_idx;
+              break;
+            }
+          }
+        }
         break;
-      } else {
-        continue;
       }
     }
 
