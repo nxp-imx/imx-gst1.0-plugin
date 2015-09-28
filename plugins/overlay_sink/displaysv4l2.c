@@ -247,9 +247,6 @@ gint init_display (gpointer display)
     return -1;
   }
 
-  gst_imx_v4l2out_config_alpha (hdisplay->v4l2handle, hdisplay->alpha);
-  gst_imx_v4l2out_config_color_key (hdisplay->v4l2handle, hdisplay->enable_color_key, hdisplay->color_key);
-
   rect.left = rect.top = 0;
   rect.width = hdisplay->w;
   rect.height = hdisplay->h;
@@ -290,6 +287,9 @@ gint init_display (gpointer display)
       memset (hdisplay->memblk[i].vaddr, 0, hdisplay->memblk[i].size);
     }
   }
+
+  gst_imx_v4l2out_config_alpha (hdisplay->v4l2handle, hdisplay->alpha);
+  gst_imx_v4l2out_config_color_key (hdisplay->v4l2handle, hdisplay->enable_color_key, hdisplay->color_key);
 
   return 0;
 

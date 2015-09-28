@@ -1170,6 +1170,12 @@ gint gst_imx_v4l2_close_device (gpointer v4l2handle)
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
 
   if (handle) {
+    /*set global alpha to 255 when quit in case of overlay is already in use and
+     * part is transparent to UI*/
+    if (HAS_IPU() && handle->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+      gst_imx_v4l2out_config_alpha (handle, 255);
+    }
+
     if (handle->allocated) {
       handle->pending_close = TRUE;
     } else {
