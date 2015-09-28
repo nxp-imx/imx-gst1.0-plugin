@@ -25,6 +25,12 @@
 GST_DEBUG_CATEGORY_EXTERN (imx2ddevice_debug);
 #define GST_CAT_DEFAULT imx2ddevice_debug
 
+/* current PXP hardware has some problem on some video format when performing
+ * CSC. undefine following macro to disable those formats for now.
+ * if next PXP module solved those problem, we should enable them again
+ */
+//#define   ENABLE_ALL_PXP_FORMATS
+
 #define PXP_WAIT_COMPLETE_TIME    3
 #define ENABLE_PXP_ALPHA_OVERLAY
 #define PXP_OVERLAY_TMP_BUF_SIZE_INIT       (1280*720*2)
@@ -51,14 +57,11 @@ typedef struct {
 
 static PxpFmtMap pxp_in_fmts_map[] = {
     {GST_VIDEO_FORMAT_BGRx,   PXP_PIX_FMT_RGB32,    32},
-    {GST_VIDEO_FORMAT_BGRA,   PXP_PIX_FMT_BGRA32,   32},
     {GST_VIDEO_FORMAT_RGB16,  PXP_PIX_FMT_RGB565,   16},
     {GST_VIDEO_FORMAT_RGB15,  PXP_PIX_FMT_RGB555,   16},
 
     {GST_VIDEO_FORMAT_I420,   PXP_PIX_FMT_YUV420P,  12},
     {GST_VIDEO_FORMAT_YV12,   PXP_PIX_FMT_YVU420P,  12},
-    {GST_VIDEO_FORMAT_GRAY8,  PXP_PIX_FMT_GREY,     8},
-    {GST_VIDEO_FORMAT_AYUV,   PXP_PIX_FMT_VUY444,   32},
     {GST_VIDEO_FORMAT_Y42B,   PXP_PIX_FMT_YUV422P,  16},
     {GST_VIDEO_FORMAT_UYVY,   PXP_PIX_FMT_UYVY,     16},
     {GST_VIDEO_FORMAT_YUY2,   PXP_PIX_FMT_YUYV,     16},
@@ -66,6 +69,11 @@ static PxpFmtMap pxp_in_fmts_map[] = {
     {GST_VIDEO_FORMAT_NV12,   PXP_PIX_FMT_NV12,     12},
     {GST_VIDEO_FORMAT_NV21,   PXP_PIX_FMT_NV21,     12},
     {GST_VIDEO_FORMAT_NV16,   PXP_PIX_FMT_NV16,     16},
+#ifdef ENABLE_ALL_PXP_FORMATS
+    {GST_VIDEO_FORMAT_BGRA,   PXP_PIX_FMT_BGRA32,   32},
+    {GST_VIDEO_FORMAT_AYUV,   PXP_PIX_FMT_VUY444,   32},
+    {GST_VIDEO_FORMAT_GRAY8,  PXP_PIX_FMT_GREY,     8},
+#endif
 
     /* There is no corresponding GST Video format for those PXP input formats
     PXP_PIX_FMT_GY04
@@ -82,13 +90,14 @@ static PxpFmtMap pxp_out_fmts_map[] = {
     {GST_VIDEO_FORMAT_BGRA,   PXP_PIX_FMT_BGRA32,   32},
     {GST_VIDEO_FORMAT_BGR,    PXP_PIX_FMT_RGB24,    24},
     {GST_VIDEO_FORMAT_RGB16,  PXP_PIX_FMT_RGB565,   16},
-// not support    {GST_VIDEO_FORMAT_RGB15,  PXP_PIX_FMT_RGB555,   16},
-
     {GST_VIDEO_FORMAT_GRAY8,  PXP_PIX_FMT_GREY,     8},
+#ifdef ENABLE_ALL_PXP_FORMATS
+    {GST_VIDEO_FORMAT_RGB15,  PXP_PIX_FMT_RGB555,   16},
     {GST_VIDEO_FORMAT_UYVY,   PXP_PIX_FMT_UYVY,     16},
     {GST_VIDEO_FORMAT_NV12,   PXP_PIX_FMT_NV12,     12},
     {GST_VIDEO_FORMAT_NV21,   PXP_PIX_FMT_NV21,     12},
     {GST_VIDEO_FORMAT_NV16,   PXP_PIX_FMT_NV16,     16},
+#endif
 
     /* There is no corresponding GST Video format for those PXP output formats
     PXP_PIX_FMT_GY04
