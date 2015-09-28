@@ -1572,6 +1572,13 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
 
   g_list_free(pads);
 
+  if (imxcomp->background_enable &&
+      device->device_type == IMX_2D_DEVICE_PXP && aggregated == 0) {
+    /* PXP can't fill background without blending something */
+    /* fill the background color by software */
+    gst_imxcompositor_fill_background(&dst, imxcomp->background);
+  }
+
   GST_LOG("Aggregated %d frames", aggregated);
   if (aggregated > 0 && device->blend_finish(device) < 0) {
     GST_ERROR ("frame blend finish fail");
