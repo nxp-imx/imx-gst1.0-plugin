@@ -929,6 +929,7 @@ playengine_seek(PlayEngineHandle handle,
   return PLAYENGINE_SUCCESS;
 }
 
+#define EPSINON 0.00001
 static PlayEngineResult 
 playengine_set_play_rate(PlayEngineHandle handle,
                           double rate)
@@ -940,8 +941,9 @@ playengine_set_play_rate(PlayEngineHandle handle,
   PlayEngineData * engine_data = NULL;
   PlayEngine *engine = (PlayEngine *)handle;
 
-  if(rate > 16.0 || rate < -16.0) {
-    g_warning("Invalid rate=%f, should be between [-16.0, 16.0]!\n", rate);
+  if(rate > 16.0 || rate < -16.0 || (rate >= -EPSINON && rate <= EPSINON)) 
+  {
+    g_print("Invalid rate=%lf, should be between [-16.0, 16.0] and not be 0.0!\n", rate);
     return PLAYENGINE_ERROR_BAD_PARAM;
   }
   
