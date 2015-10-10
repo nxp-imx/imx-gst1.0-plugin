@@ -202,15 +202,15 @@ AC_CHECK_LIB(rt, clock_gettime)
 AC_SUBST(RT_CFLAGS)
 AC_SUBST(RT_LIBS)
 
-FSL_MM_CORE_CFLAGS=`$PKG_CONFIG --cflags libfslaudiocodec 2>/dev/null`
-FSL_MM_CORE_CFLAGS+=`$PKG_CONFIG --cflags libfslvideocodec 2>/dev/null`
-FSL_MM_CORE_CFLAGS+=`$PKG_CONFIG --cflags libfslparser 2>/dev/null`
-FSL_MM_CORE_CFLAGS+=`$PKG_CONFIG --cflags libfslvpuwrap 2>/dev/null`
+FSL_MM_CORE_CFLAGS="`$PKG_CONFIG --cflags libfslaudiocodec 2>/dev/null` \
+                    `$PKG_CONFIG --cflags libfslvideocodec 2>/dev/null` \
+                    `$PKG_CONFIG --cflags libfslparser 2>/dev/null` \
+                    `$PKG_CONFIG --cflags libfslvpuwrap 2>/dev/null`"
 AC_SUBST(FSL_MM_CORE_CFLAGS)
 
-FSL_MM_CORE_LIBS=`$PKG_CONFIG --libs libfslaudiocodec 2>/dev/null`
-FSL_MM_CORE_LIBS+=`$PKG_CONFIG --libs libfslvideocodec 2>/dev/null`
-FSL_MM_CORE_LIBS+=`$PKG_CONFIG --libs libfslparser 2>/dev/null`
+FSL_MM_CORE_LIBS="`$PKG_CONFIG --libs libfslaudiocodec 2>/dev/null` \
+                  `$PKG_CONFIG --libs libfslvideocodec 2>/dev/null` \
+                  `$PKG_CONFIG --libs libfslparser 2>/dev/null`"
 AC_SUBST(FSL_MM_CORE_LIBS)
 
 EXTRAPLATFORMCFLAGS="-DARM -D_GNUC_"
