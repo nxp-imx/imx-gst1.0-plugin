@@ -25,6 +25,7 @@
 #include <gst/gst.h>
 #include <gst/video/video.h>
 #include <gst/video/gstvideoaggregator.h>
+#include "gstimxcompositor.h"
 
 G_BEGIN_DECLS
 
@@ -50,6 +51,11 @@ struct _GstImxCompositorPad
   GstBufferPool *sink_pool;
   gboolean sink_pool_update;
   GstVideoAlignment align;
+  GstBuffer *sink_tmp_buf;
+  guint sink_tmp_buf_size;
+  GstVideoInfo info;
+  GstVideoRectangle src_crop;
+  GstVideoRectangle dst_crop;
 
   /* properties */
   gint xpos;
@@ -57,7 +63,6 @@ struct _GstImxCompositorPad
   gint width;
   gint height;
   gint rotate;
-  guint zorder;
   gdouble alpha;
   gboolean keep_ratio;
 };
@@ -68,6 +73,8 @@ struct _GstImxCompositorPadClass
 };
 
 GType gst_imxcompositor_pad_get_type (void);
+void gst_imxcompositor_pad_get_output_size (GstVideoAggregator * comp,
+                  GstImxCompositorPad * comp_pad, gint * width, gint * height);
 
 G_END_DECLS
 

@@ -61,6 +61,10 @@
  * "keep-ratio": Keep the aspect ratio of the picture after resize
  * (#gboolean)
  * </listitem>
+ * <listitem>
+ * "zorder": The z-order position of the picture in the composition
+ * (#guint)
+ * </listitem>
  * </itemizedlist>
  *
  * <refsect2>
@@ -131,7 +135,6 @@
 #define IMX_COMPOSITOR_CSC_COMPLEX_FACTOR (10 - IMX_COMPOSITOR_CSC_LOSS_FACTOR)
 
 #define DEFAULT_IMXCOMPOSITOR_BACKGROUND        0x00000000
-#define SINK_TEMP_BUFFER_INIT_SIZE              (1920*1088*2)
 
 #define GST_IMX_COMPOSITOR_PARAMS_QDATA   \
           g_quark_from_static_string("imxcompositor-params")
@@ -179,7 +182,6 @@ static void gst_imxcompositor_finalize (GObject * object)
 
   imx_video_overlay_composition_deinit(&imxcomp->video_comp);
 
-  GST_IMX_COMPOSITOR_UNREF_BUFFER (imxcomp->sink_tmp_buf);
   GST_IMX_COMPOSITOR_UNREF_POOL (imxcomp->out_pool);
   if (imxcomp->allocator) {
     gst_object_unref (imxcomp->allocator);
@@ -310,8 +312,6 @@ gst_imxcompositor_create_bufferpool(GstImxCompositor *imxcomp,
       return NULL;
     }
 
-    gst_imxcompositor_set_pool_alignment(caps, pool);
-
     config = gst_buffer_pool_get_config(pool);
     gst_buffer_pool_config_set_params(config, caps, size, min, max);
     gst_buffer_pool_config_set_allocator(config, imxcomp->allocator, NULL);
@@ -323,6 +323,8 @@ gst_imxcompositor_create_bufferpool(GstImxCompositor *imxcomp,
       return NULL;
     }
   }
+
+  gst_imxcompositor_set_pool_alignment(caps, pool);
 
   GST_LOG ("created a buffer pool (%p).", pool);
   return pool;
@@ -340,15 +342,6 @@ gst_imxcompositor_sink_query (GstAggregator * agg, GstAggregatorPad * bpad,
   switch (GST_QUERY_TYPE (query)) {
     case GST_QUERY_ALLOCATION:
     {
-      GST_OBJECT_LOCK (imxcomp);
-      if (G_UNLIKELY (!(imxcomp->negotiated))) {
-        GST_DEBUG_OBJECT (bpad,
-            "not negotiated yet, can't answer ALLOCATION query");
-        GST_OBJECT_UNLOCK (imxcomp);
-        return FALSE;
-      }
-      GST_OBJECT_UNLOCK (imxcomp);
-
       GstImxCompositorPad *imxcompo_pad = GST_IMXCOMPOSITOR_PAD (bpad);
       GstCaps *pool_caps = NULL;
       GstStructure *config = NULL;
@@ -360,7 +353,7 @@ gst_imxcompositor_sink_query (GstAggregator * agg, GstAggregatorPad * bpad,
 
       gst_query_parse_allocation (query, &caps, &need_pool);
       if (caps == NULL) {
-        GST_DEBUG_OBJECT (bpad, "no caps specified");
+        GST_WARNING_OBJECT (bpad, "no caps specified");
         return FALSE;
       }
 
@@ -380,8 +373,7 @@ gst_imxcompositor_sink_query (GstAggregator * agg, GstAggregatorPad * bpad,
         if (!gst_video_info_from_caps (&info, caps))
           return FALSE;
 
-        size = PAGE_ALIGN(GST_VIDEO_INFO_SIZE (&info));
-
+        size = GST_VIDEO_INFO_SIZE (&info);
         pool = gst_imxcompositor_create_bufferpool(imxcomp, caps, size,
             IMX_COMPOSITOR_INPUT_POOL_MIN_BUFFERS,
             IMX_COMPOSITOR_INPUT_POOL_MAX_BUFFERS);
@@ -439,7 +431,7 @@ gst_imxcompositor_sink_query (GstAggregator * agg, GstAggregatorPad * bpad,
             "height", GST_TYPE_INT_RANGE, 64, G_MAXINT32,
             "framerate", GST_TYPE_FRACTION_RANGE, 0, 1, G_MAXINT32, 1, NULL);
         gst_structure_remove_fields (s, "colorimetry", "chroma-site", "format",
-            NULL);
+            "pixel-aspect-ratio", NULL);
       }
 
       sink_template = gst_pad_get_pad_template_caps (GST_PAD (bpad));
@@ -497,7 +489,7 @@ gst_imxcompositor_sink_query (GstAggregator * agg, GstAggregatorPad * bpad,
             "framerate", GST_TYPE_FRACTION_RANGE, 0, 1, G_MAXINT32, 1, NULL);
 
         gst_structure_remove_fields (s, "colorimetry", "chroma-site", "format",
-                NULL);
+            "pixel-aspect-ratio", NULL);
       }
 
       sink_template = gst_pad_get_pad_template_caps (GST_PAD (bpad));
@@ -901,26 +893,66 @@ gst_imxcompositor_get_output_buffer (GstVideoAggregator * vagg,
   return ret;
 }
 
-static gboolean
-gst_imxcompositor_update_info (GstVideoAggregator * vagg, GstVideoInfo * info)
+static void
+gst_imxcompositor_find_best_format (
+    GstVideoAggregator * vagg, GstCaps * downstream_caps,
+    GstVideoInfo * best_info, gboolean * at_least_one_alpha)
+{
+#if 0
+  GstVideoInfo tmp_info;
+
+  GstVideoFormat best_fmt =
+      find_best_src_format(GST_AGGREGATOR(vagg), downstream_caps);
+
+  gst_video_info_set_format (&tmp_info, best_fmt, best_info->width,
+      best_info->height);
+  tmp_info.par_n = best_info->par_n;
+  tmp_info.par_d = best_info->par_d;
+  tmp_info.fps_n = best_info->fps_n;
+  tmp_info.fps_d = best_info->fps_d;
+  tmp_info.flags = best_info->flags;
+  tmp_info.interlace_mode = best_info->interlace_mode;
+  *best_info = tmp_info;
+#endif
+}
+
+static GstCaps *
+gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps)
 {
   GList *l;
   gint best_width = -1, best_height = -1;
-  gboolean ret = TRUE;
-
-  GstCaps *caps, *peer_caps;
-
+  GstVideoInfo info;
+  GstCaps *ret = caps;
   GstAggregator *agg = (GstAggregator*)vagg;
-  caps = gst_pad_get_pad_template_caps (agg->srcpad);
+
+  gst_video_info_from_caps (&info, caps);
+
+  GstCaps *downstream_caps = gst_pad_get_allowed_caps (agg->srcpad);
+  if (!downstream_caps || gst_caps_is_empty (downstream_caps)) {
+    GST_INFO_OBJECT (vagg, "No downstream caps found %"
+        GST_PTR_FORMAT, downstream_caps);
+    if (downstream_caps)
+      gst_caps_unref (downstream_caps);
+    return ret;
+  }
+
+  GstVideoFormat best_fmt = find_best_src_format(agg, downstream_caps);
+  gst_caps_unref (downstream_caps);
+
+/*
+  GstCaps *src_caps, *peer_caps;
+  src_caps = gst_pad_get_pad_template_caps (agg->srcpad);
   peer_caps = gst_pad_peer_query_caps(agg->srcpad, NULL);
-  caps = gst_caps_intersect_full(peer_caps, caps, GST_CAPS_INTERSECT_FIRST);
+  src_caps = gst_caps_intersect_full(peer_caps, src_caps, GST_CAPS_INTERSECT_FIRST);
   gst_caps_unref (peer_caps);
 
-  GstVideoFormat best_fmt = find_best_src_format(agg, caps);
-  gst_caps_unref (caps);
+  GstVideoFormat best_fmt = find_best_src_format(agg, src_caps);
+  gst_caps_unref (src_caps);
+*/
+
   if (best_fmt != GST_VIDEO_FORMAT_UNKNOWN) {
-    gst_video_info_set_format (info, best_fmt, GST_VIDEO_INFO_WIDTH(info),
-                                GST_VIDEO_INFO_HEIGHT(info));
+    gst_video_info_set_format (&info, best_fmt, GST_VIDEO_INFO_WIDTH(&info),
+                                GST_VIDEO_INFO_HEIGHT(&info));
     GST_DEBUG("Set best format %s", gst_video_format_to_string(best_fmt));
   }
 
@@ -931,8 +963,7 @@ gst_imxcompositor_update_info (GstVideoAggregator * vagg, GstVideoInfo * info)
     gint this_width, this_height;
     gint width, height;
 
-    width = GST_VIDEO_INFO_WIDTH (&vaggpad->info);
-    height = GST_VIDEO_INFO_HEIGHT (&vaggpad->info);
+    gst_imxcompositor_pad_get_output_size(vagg, pad, &width, &height);
 
     if (width == 0 || height == 0)
       continue;
@@ -953,9 +984,13 @@ gst_imxcompositor_update_info (GstVideoAggregator * vagg, GstVideoInfo * info)
   GST_OBJECT_UNLOCK (vagg);
 
   if (best_width > 0 && best_height > 0) {
-    gst_video_info_set_format (info, GST_VIDEO_INFO_FORMAT (info),
+    gst_video_info_set_format (&info, GST_VIDEO_INFO_FORMAT (&info),
         best_width, best_height);
+    ret = gst_video_info_to_caps (&info);
     GST_DEBUG("update output info %dx%d", best_width, best_height);
+
+    gst_caps_set_simple (ret, "pixel-aspect-ratio", GST_TYPE_FRACTION_RANGE,
+        1, G_MAXINT32, G_MAXINT32, 1, NULL);
   }
 
   return ret;
@@ -974,6 +1009,7 @@ static gint gst_imxcompositor_config_dst(GstImxCompositor *imxcomp,
 
   if (!gst_video_frame_map (&out_frame, &((GstVideoAggregator*)imxcomp)->info,
       outbuf, GST_MAP_WRITE|GST_VIDEO_FRAME_MAP_FLAG_NO_REF)) {
+    GST_WARNING_OBJECT (imxcomp, "Could not map output buffer");
     return -1;
   }
 
@@ -1055,127 +1091,33 @@ static gint gst_imxcompositor_config_dst(GstImxCompositor *imxcomp,
 static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
     GstImxCompositorPad *pad, Imx2DFrame *src)
 {
-  GstPhyMemMeta *phymemmeta = NULL;
-  GstVideoFrame temp_in_frame, frame;
-  GstVideoCropMeta *in_crop = NULL;
   GstVideoAggregatorPad *ppad = (GstVideoAggregatorPad *)pad;
 
-  if (!gst_video_frame_map (&frame, &ppad->buffer_vinfo, ppad->buffer,
-          GST_MAP_READ)) {
-    GST_WARNING_OBJECT (pad, "Could not map input buffer");
-    return -1;
-  }
-
-  GstVideoFrame *inframe = &frame;
-  /* Check if need copy input frame */
-  if (!gst_buffer_is_phymem(ppad->buffer)) {
-    GST_DEBUG_OBJECT (pad, "copy input frame to phy memory");
-    if (!imxcomp->allocator)
-      imxcomp->allocator =
-               gst_imx_2d_device_allocator_new((gpointer)(imxcomp->device));
-
-    if (!imxcomp->sink_tmp_buf) {
-      imxcomp->sink_tmp_buf = gst_buffer_new_allocate(imxcomp->allocator,
-          SINK_TEMP_BUFFER_INIT_SIZE, NULL);
-      imxcomp->sink_tmp_buf_size = SINK_TEMP_BUFFER_INIT_SIZE;
-    }
-
-    if (imxcomp->sink_tmp_buf &&
-        ppad->buffer_vinfo.size > SINK_TEMP_BUFFER_INIT_SIZE) {
-      GST_IMX_COMPOSITOR_UNREF_BUFFER(imxcomp->sink_tmp_buf);
-      imxcomp->sink_tmp_buf = gst_buffer_new_allocate(imxcomp->allocator,
-          ppad->buffer_vinfo.size, NULL);
-      imxcomp->sink_tmp_buf_size = ppad->buffer_vinfo.size;
-    }
-
-    if (imxcomp->sink_tmp_buf) {
-      gst_video_frame_map(&temp_in_frame, &(ppad->buffer_vinfo),
-          imxcomp->sink_tmp_buf, GST_MAP_WRITE);
-      gst_video_frame_copy(&temp_in_frame, &frame);
-      inframe = &temp_in_frame;
-      gst_video_frame_unmap(&temp_in_frame);
-
-      if (imxcomp->composition_meta_enable
-              && imx_video_overlay_composition_has_meta(ppad->buffer)) {
-        imx_video_overlay_composition_remove_meta(imxcomp->sink_tmp_buf);
-        imx_video_overlay_composition_copy_meta(imxcomp->sink_tmp_buf,
-            ppad->buffer,
-            inframe->info.width, inframe->info.height,
-            inframe->info.width, inframe->info.height);
-      }
-    } else {
-      GST_ERROR_OBJECT (pad,
-          "Can't get input buffer,ignore this frame,continue next");
-      gst_video_frame_unmap (&frame);
-      return -1;
-    }
-  }
-
-  gst_video_frame_unmap (&frame);
-
-  if (pad->sink_pool_update) {
-    memset (&pad->align, 0, sizeof(GstVideoAlignment));
-    if (pad->sink_pool && gst_buffer_pool_is_active (pad->sink_pool)) {
-      GstStructure *config = gst_buffer_pool_get_config (pad->sink_pool);
-
-      if (gst_buffer_pool_config_has_option (config,
-          GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
-        gst_buffer_pool_config_get_video_alignment (config, &pad->align);
-        GST_DEBUG_OBJECT (pad, "input pool has alignment (%d, %d) , (%d, %d)",
-            pad->align.padding_left, pad->align.padding_top,
-            pad->align.padding_right, pad->align.padding_bottom);
-      }
-      gst_structure_free (config);
-    } else {
-      phymemmeta = GST_PHY_MEM_META_GET (ppad->buffer);
-      if (phymemmeta) {
-        pad->align.padding_right = phymemmeta->x_padding;
-        pad->align.padding_bottom = phymemmeta->y_padding;
-        GST_DEBUG_OBJECT (pad, "physical memory meta x_padding: %d "
-            "y_padding: %d",phymemmeta->x_padding, phymemmeta->y_padding);
-      }
-    }
-    pad->sink_pool_update = FALSE;
-  }
-
-  src->info.fmt = GST_VIDEO_INFO_FORMAT(&(inframe->info));
-  src->info.w = inframe->info.width +
+  src->info.fmt = GST_VIDEO_INFO_FORMAT(&(ppad->aggregated_frame->info));
+  src->info.w = ppad->aggregated_frame->info.width +
                 pad->align.padding_left + pad->align.padding_right;
-  src->info.h = inframe->info.height +
+  src->info.h = ppad->aggregated_frame->info.height +
                 pad->align.padding_top + pad->align.padding_bottom;
-  src->info.stride = inframe->info.stride[0];
+  src->info.stride = ppad->aggregated_frame->info.stride[0];
 
-  GST_LOG_OBJECT (pad, "Input: %s, %dx%d",
-      GST_VIDEO_FORMAT_INFO_NAME(inframe->info.finfo),
-      inframe->info.width, inframe->info.height);
+  GST_LOG_OBJECT (pad, "Input: %s, %dx%d, crop(%d,%d,%d,%d)",
+      GST_VIDEO_FORMAT_INFO_NAME(ppad->aggregated_frame->info.finfo),
+      ppad->aggregated_frame->info.width, ppad->aggregated_frame->info.height,
+      pad->src_crop.x, pad->src_crop.y, pad->src_crop.w, pad->src_crop.h);
 
   if (imxcomp->device->config_input(imxcomp->device, &src->info) < 0) {
     GST_ERROR_OBJECT (pad, "config input failed");
     return -1;
   }
 
-  src->mem = gst_buffer_query_phymem_block (inframe->buffer);
+  src->mem = gst_buffer_query_phymem_block (ppad->aggregated_frame->buffer);
   src->alpha = (gint)(pad->alpha * 255);
   src->rotate = pad->rotate;
   src->interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
-  src->crop.x = 0;
-  src->crop.y = 0;
-  src->crop.w = inframe->info.width;
-  src->crop.h = inframe->info.height;
-
-  in_crop = gst_buffer_get_video_crop_meta(ppad->buffer);
-  if (in_crop != NULL) {
-    GST_LOG_OBJECT (pad, "input crop meta: (%d, %d, %d, %d)",
-        in_crop->x, in_crop->y, in_crop->width, in_crop->height);
-    if ((in_crop->x >= inframe->info.width)
-        || (in_crop->y >= inframe->info.height))
-      return -1;
-
-    src->crop.x += in_crop->x;
-    src->crop.y += in_crop->y;
-    src->crop.w = MIN(in_crop->width, (inframe->info.width - in_crop->x));
-    src->crop.h = MIN(in_crop->height, (inframe->info.height - in_crop->y));
-  }
+  src->crop.x = pad->src_crop.x;
+  src->crop.y = pad->src_crop.y;
+  src->crop.w = pad->src_crop.w;
+  src->crop.h = pad->src_crop.h;
 
   return 0;
 }
@@ -1401,8 +1343,8 @@ gst_imxcompositor_fill_background(Imx2DFrame *dst, guint RGBA8888)
 static gint imxcompositor_pad_zorder_compare (gconstpointer a, gconstpointer b)
 {
   if (a && b) {
-    GstImxCompositorPad *pad_a = GST_IMXCOMPOSITOR_PAD (a);
-    GstImxCompositorPad *pad_b = GST_IMXCOMPOSITOR_PAD (b);
+    GstVideoAggregatorPad *pad_a = GST_VIDEO_AGGREGATOR_PAD (a);
+    GstVideoAggregatorPad *pad_b = GST_VIDEO_AGGREGATOR_PAD (b);
     return (pad_a->zorder - pad_b->zorder);
   } else {
     return 0;
@@ -1429,6 +1371,8 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
 
   GST_OBJECT_LOCK (vagg);
 
+  /* TODO: If the frames to be composited completely obscure the background,
+   * don't bother drawing the background at all. */
   if (imxcomp->background_enable) {
     if (device->fill) {
       if(device->fill (device, &dst, imxcomp->background) < 0) {
@@ -1451,23 +1395,11 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
     GstVideoAggregatorPad *ppad = l->data;
     GstImxCompositorPad *pad = GST_IMXCOMPOSITOR_PAD (ppad);
 
-    if (ppad->buffer != NULL) {
-      GstSegment *seg = &((GstAggregatorPad*)pad)->segment;
-      GstClockTime timestamp = GST_BUFFER_TIMESTAMP (ppad->buffer);
-      gint64 stream_time =
-          gst_segment_to_stream_time (seg, GST_FORMAT_TIME, timestamp);
-      /* sync object properties on stream time */
-      if (GST_CLOCK_TIME_IS_VALID (stream_time))
-        gst_object_sync_values (GST_OBJECT (pad), stream_time);
-
-      if (pad->alpha == 0.0)  {
-        //transparent completely, do nothing
-        continue;
-      }
-
+    if (ppad->aggregated_frame != NULL) {
       if (gst_imxcompositor_config_src(imxcomp, pad, &src) < 0) {
         continue;
       }
+
       if (device->set_rotate(device, src.rotate) < 0) {
         GST_WARNING_OBJECT (pad, "set rotate failed");
         continue;
@@ -1478,50 +1410,10 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
       }
 
       //update destination location and size
-      dst.crop.x = pad->xpos;
-      dst.crop.y = pad->ypos;
-      dst.crop.w = pad->width ? pad->width : ppad->buffer_vinfo.width;
-      dst.crop.h = pad->height ? pad->height : ppad->buffer_vinfo.height;
-
-      if (dst.crop.x >= ((GstVideoAggregator*)imxcomp)->info.width ||
-          dst.crop.y >= ((GstVideoAggregator*)imxcomp)->info.height)
-        continue;
-
-      dst.crop.w = MIN(dst.crop.w,
-          ((GstVideoAggregator*)imxcomp)->info.width - dst.crop.x);
-      dst.crop.h = MIN(dst.crop.h,
-          ((GstVideoAggregator*)imxcomp)->info.height - dst.crop.y);
-
-      if (pad->keep_ratio) {
-        GstVideoRectangle s_rect, d_rect, result;
-        s_rect.x = s_rect.y = 0;
-        s_rect.w = src.crop.w;
-        s_rect.h = src.crop.h;
-        d_rect.x = d_rect.y = 0;
-        d_rect.w = dst.crop.w;
-        d_rect.h = dst.crop.h;
-        if (src.rotate == IMX_2D_ROTATION_90 ||
-            src.rotate == IMX_2D_ROTATION_270) {
-          gint tmp = d_rect.w;
-          d_rect.w = d_rect.h;
-          d_rect.h = tmp;
-        }
-
-        gst_video_sink_center_rect (s_rect, d_rect, &result, TRUE);
-
-        if (src.rotate == IMX_2D_ROTATION_90 ||
-            src.rotate == IMX_2D_ROTATION_270) {
-          dst.crop.x += result.y;
-          dst.crop.y += result.x;
-          dst.crop.w = result.h;
-          dst.crop.h = result.w;
-        } else {
-          dst.crop.x += result.x;
-          dst.crop.y += result.y;
-          dst.crop.w = result.w;
-          dst.crop.h = result.h;
-        }
-      }
+      dst.crop.x = pad->dst_crop.x;
+      dst.crop.y = pad->dst_crop.y;
+      dst.crop.w = pad->dst_crop.w;
+      dst.crop.h = pad->dst_crop.h;
 
       if (device->blend(device, &dst, &src) < 0) {
         GST_WARNING_OBJECT (pad, "frame blend fail");
@@ -1670,8 +1562,8 @@ gst_imxcompositor_class_init (GstImxCompositorClass * klass)
   agg_class->sink_query = gst_imxcompositor_sink_query;
   agg_class->src_query = gst_imxcompositor_src_query;
 
-  videoaggregator_class->disable_frame_conversion = TRUE;
-  videoaggregator_class->update_info = gst_imxcompositor_update_info;
+  videoaggregator_class->find_best_format = gst_imxcompositor_find_best_format;
+  videoaggregator_class->update_caps = gst_imxcompositor_update_caps;
   videoaggregator_class->aggregate_frames = gst_imxcompositor_aggregate_frames;
   videoaggregator_class->negotiated_caps = gst_imxcompositor_negotiated_caps;
   videoaggregator_class->get_output_buffer=gst_imxcompositor_get_output_buffer;
@@ -1724,8 +1616,6 @@ gst_imxcompositor_init (GstImxCompositor * imxcomp)
     if (imxcomp->device->open(imxcomp->device) < 0) {
       GST_ERROR ("Open 2D device failed.");
     } else {
-      imxcomp->sink_tmp_buf = NULL;
-      imxcomp->sink_tmp_buf_size = 0;
       imxcomp->out_pool = NULL;
       imxcomp->self_out_pool = NULL;
       imxcomp->out_pool_update = TRUE;

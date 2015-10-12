@@ -26,7 +26,9 @@ AVBDIRS = plugins/avb
 
 VIDEO_CONVERT_DIRS = plugins/videoconvert
 
+if HAVE_GST_CHECK
 COMPOSITOR_DIRS = plugins/compositor
+endif
 
 TOOLDIRS =    tools/                      \
               tools/gplay                 \

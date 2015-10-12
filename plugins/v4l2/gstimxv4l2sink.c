@@ -467,7 +467,7 @@ gst_imx_v4l2sink_setup_buffer_pool (GstImxV4l2Sink *v4l2sink, GstCaps *caps)
     gst_buffer_pool_config_set_video_alignment (structure, &alignment);
   }
 
-  size = v4l2sink->w * v4l2sink->h * gst_imx_v4l2_get_bits_per_pixel (v4l2sink->v4l2fmt) / 8;
+  size = (ALIGNTO (w, ALIGNMENT_8)) * (ALIGNTO (h, ALIGNMENT_2)) * gst_imx_v4l2_get_bits_per_pixel (v4l2sink->v4l2fmt) / 8;
   gst_buffer_pool_config_set_params (structure, caps, size, v4l2sink->min_buffers, v4l2sink->min_buffers);
   gst_buffer_pool_config_set_allocator (structure, v4l2sink->allocator, NULL);
   if (!gst_buffer_pool_set_config (v4l2sink->pool, structure)) {
