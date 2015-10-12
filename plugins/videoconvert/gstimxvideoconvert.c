@@ -1491,8 +1491,9 @@ imx_video_convert_transform_frame_ip(GstVideoFilter *filter, GstVideoFrame *in)
       GstMeta *meta;
       GstVideoOverlayCompositionMeta *compmeta;
 
-      while ((meta = gst_buffer_iterate_meta (in, &state))) {
-        if (meta->info->api == GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE) {
+      while ((meta = gst_buffer_iterate_meta (in->buffer, &state))) {
+        if (meta->info &&
+            meta->info->api == GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE) {
           compmeta = (GstVideoOverlayCompositionMeta*)meta;
           if (GST_IS_VIDEO_OVERLAY_COMPOSITION (compmeta->overlay)) {
             gst_video_overlay_composition_blend (compmeta->overlay, in);
