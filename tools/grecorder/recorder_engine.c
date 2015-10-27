@@ -2072,12 +2072,6 @@ static REresult close(RecorderEngineHandle handle)
 
   g_mutex_lock (&recorder->lock);
 
-  if (recorder->state != RE_STATE_PREPARED) {
-    GST_WARNING ("wrong state.");
-    g_mutex_unlock (&recorder->lock);
-    return RE_RESULT_WRONG_STATE;
-  }
-
   GST_DEBUG ("closing.");
   cleanup_pipeline (recorder);
   if (ret != RE_RESULT_SUCCESS) {
