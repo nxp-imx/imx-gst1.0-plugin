@@ -34,6 +34,8 @@ GST_DEBUG_CATEGORY_STATIC(vpu_dec_object_debug);
 #define DROP_RESUME (200 * GST_MSECOND)
 #define MAX_RATE_FOR_NORMAL_PLAYBACK (2)
 #define MIN_RATE_FOR_NORMAL_PLAYBACK (0)
+#define VPU_FIRMWARE_CODE_DIVX_FLAG (1<<18)
+#define VPU_FIRMWARE_CODE_RV_FLAG (1<<19)
 
 enum
 {
@@ -83,25 +85,56 @@ G_DEFINE_TYPE(GstVpuDecObject, gst_vpu_dec_object, GST_TYPE_OBJECT)
 
 static void gst_vpu_dec_object_finalize(GObject *object);
 
+gint gst_vpu_dec_object_get_vpu_fwcode (void)
+{
+  VpuDecRetCode ret;
+  VpuVersionInfo version;
+
+  ret = VPU_DecLoad();
+  if (ret != VPU_DEC_RET_SUCCESS) {
+    return 0;
+  }
+
+  ret = VPU_DecGetVersionInfo(&version);
+  if (ret != VPU_DEC_RET_SUCCESS) {
+    version.nFwCode = 0;
+  }
+
+  ret = VPU_DecUnLoad();
+  if (ret != VPU_DEC_RET_SUCCESS) {
+    return 0;
+  }
+
+  return version.nFwCode;
+}
+
 GstCaps *
 gst_vpu_dec_object_get_sink_caps (void)
 {
   static GstCaps *caps = NULL;
+  gint vpu_fwcode = gst_vpu_dec_object_get_vpu_fwcode ();
 
   if (caps == NULL) {
     VPUMapper *map = vpu_mappers;
     while ((map) && (map->mime)) {
-      if (caps) {
-        GstCaps *newcaps = gst_caps_from_string (map->mime);
-        if (newcaps) {
-          if (!gst_caps_is_subset (newcaps, caps)) {
-            gst_caps_append (caps, newcaps);
-          } else {
-            gst_caps_unref (newcaps);
+      if ((map->std != VPU_V_RV && map->std != VPU_V_DIVX3
+            && map->std != VPU_V_DIVX4 && map->std != VPU_V_DIVX56)
+          || ((vpu_fwcode & VPU_FIRMWARE_CODE_RV_FLAG) && map->std == VPU_V_RV)
+          || ((vpu_fwcode & VPU_FIRMWARE_CODE_DIVX_FLAG) 
+            && (map->std == VPU_V_DIVX3 || map->std == VPU_V_DIVX4
+              || map->std == VPU_V_DIVX56))) {
+        if (caps) {
+          GstCaps *newcaps = gst_caps_from_string (map->mime);
+          if (newcaps) {
+            if (!gst_caps_is_subset (newcaps, caps)) {
+              gst_caps_append (caps, newcaps);
+            } else {
+              gst_caps_unref (newcaps);
+            }
           }
+        } else {
+          caps = gst_caps_from_string (map->mime);
         }
-      } else {
-        caps = gst_caps_from_string (map->mime);
       }
       map++;
     }

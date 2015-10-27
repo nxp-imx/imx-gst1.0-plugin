@@ -45,6 +45,9 @@ static VPUMapper vpu_mappers[] = {
   {VPU_V_MJPG, "image/jpeg"},
   {VPU_V_VP8, "video/x-vp8"},
   {VPU_V_RV, "video/x-pn-realvideo"},
+  {VPU_V_DIVX3, "video/x-divx, divxversion=(int)3"},
+  {VPU_V_DIVX4, "video/x-divx, divxversion=(int)4"},
+  {VPU_V_DIVX56, "video/x-divx, divxversion=(int){5,6}"},
   {-1, NULL}
 };
 
