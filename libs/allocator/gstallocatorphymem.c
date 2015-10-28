@@ -253,14 +253,14 @@ gst_buffer_is_phymem (GstBuffer *buffer)
     return FALSE;
   }
 
-  if (NULL == ((GstMemoryPhy*)mem)->block.paddr) {
-    GST_WARNING("physical address in memory block is invalid");
-    gst_memory_unref (mem);
-    return FALSE;
+  if(GST_IS_ALLOCATOR_PHYMEM(mem->allocator)) {
+    if (NULL == ((GstMemoryPhy*)mem)->block.paddr) {
+      GST_WARNING("physical address in memory block is invalid");
+      ret = FALSE;
+    } else {
+      ret = TRUE;
+    }
   }
-
-  if(GST_IS_ALLOCATOR_PHYMEM(mem->allocator))
-    ret = TRUE;
 
   gst_memory_unref (mem);
 
