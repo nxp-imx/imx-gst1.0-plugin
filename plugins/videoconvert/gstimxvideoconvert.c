@@ -938,8 +938,6 @@ gst_imx_video_convert_create_bufferpool(GstImxVideoConvert *imxvct,
       return NULL;
     }
 
-    imx_video_convert_set_pool_alignment(caps, pool);
-
     config = gst_buffer_pool_get_config(pool);
     gst_buffer_pool_config_set_params(config, caps, size, min, max);
     gst_buffer_pool_config_set_allocator(config, imxvct->allocator, NULL);
@@ -952,6 +950,8 @@ gst_imx_video_convert_create_bufferpool(GstImxVideoConvert *imxvct,
       return NULL;
     }
   }
+
+  imx_video_convert_set_pool_alignment(caps, pool);
 
   GST_LOG ("created a buffer pool (%p).", pool);
   return pool;
@@ -1000,8 +1000,6 @@ imx_video_convert_propose_allocation(GstBaseTransform *transform,
       return FALSE;
 
     size = GST_VIDEO_INFO_SIZE (&info);
-    size = PAGE_ALIGN(size);
-
     GST_IMX_CONVERT_UNREF_BUFFER (imxvct->in_buf);
     GST_IMX_CONVERT_UNREF_POOL(imxvct->in_pool);
     GST_DEBUG_OBJECT(imxvct, "creating new input pool");
