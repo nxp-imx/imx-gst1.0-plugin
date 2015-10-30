@@ -685,9 +685,13 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
         GstStructure *config = gst_buffer_pool_get_config (v4l2sink->pool);
         if (!gst_buffer_pool_config_has_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
+          gst_buffer_pool_config_add_option (config, GST_BUFFER_POOL_OPTION_VIDEO_META);
           gst_buffer_pool_config_add_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
         }
+        gint size = (v4l2sink->w + phymemmeta->x_padding) * (v4l2sink->h + phymemmeta->y_padding)
+            * gst_imx_v4l2_get_bits_per_pixel (v4l2sink->v4l2fmt) / 8;
         gst_buffer_pool_config_set_video_alignment (config, &v4l2sink->video_align);
+        gst_buffer_pool_config_set_params (config, caps, size, v4l2sink->min_buffers, v4l2sink->min_buffers);
         gst_buffer_pool_set_config (v4l2sink->pool, config);
       }
     }
