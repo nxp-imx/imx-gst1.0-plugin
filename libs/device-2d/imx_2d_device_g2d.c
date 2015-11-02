@@ -336,8 +336,8 @@ static gboolean is_format_has_alpha(enum g2d_format fmt) {
   return FALSE;
 }
 
-static gint imx_g2d_convert(Imx2DDevice *device,
-                            Imx2DFrame *dst, Imx2DFrame *src)
+static gint imx_g2d_blit(Imx2DDevice *device,
+                            Imx2DFrame *dst, Imx2DFrame *src, gboolean alpha_en)
 {
   gint ret = 0;
   void *g2d_handle = NULL;
@@ -426,23 +426,30 @@ static gint imx_g2d_convert(Imx2DDevice *device,
       g2d->dst.format);
 
   // Final blending
-  if (g2d->src.global_alpha < 0xFF || is_format_has_alpha(g2d->src.format)) {
+  if (alpha_en &&
+      (g2d->src.global_alpha < 0xFF || is_format_has_alpha(g2d->src.format))) {
     g2d->src.blendfunc = G2D_ONE;
     g2d->dst.blendfunc = G2D_ONE_MINUS_SRC_ALPHA;
     g2d_enable(g2d_handle, G2D_BLEND);
     g2d_enable(g2d_handle, G2D_GLOBAL_ALPHA);
-  }
 
-  ret = g2d_blit(g2d_handle, &g2d->src, &g2d->dst);
+    ret = g2d_blit(g2d_handle, &g2d->src, &g2d->dst);
 
-  if (g2d->src.global_alpha < 0xFF || is_format_has_alpha(g2d->src.format)) {
     g2d_disable(g2d_handle, G2D_GLOBAL_ALPHA);
     g2d_disable(g2d_handle, G2D_BLEND);
+  } else {
+    ret = g2d_blit(g2d_handle, &g2d->src, &g2d->dst);
   }
 
   ret |= g2d_finish(g2d_handle);
 
   return ret;
+}
+
+static gint imx_g2d_convert(Imx2DDevice *device,
+                            Imx2DFrame *dst, Imx2DFrame *src)
+{
+  return imx_g2d_blit(device, dst, src, FALSE);
 }
 
 static gint imx_g2d_set_rotate(Imx2DDevice *device, Imx2DRotationMode rot)
@@ -534,7 +541,7 @@ static GList* imx_g2d_get_supported_out_fmts(Imx2DDevice* device)
 
 static gint imx_g2d_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
 {
-  return imx_g2d_convert(device, dst, src);
+  return imx_g2d_blit(device, dst, src, TRUE);
 }
 
 static gint imx_g2d_blend_finish(Imx2DDevice *device)
