@@ -24,7 +24,7 @@
 
 #include <gst/gst.h>
 #include <gst/video/video.h>
-#include <gst/video/gstvideoaggregator.h>
+#include "base/gstvideoaggregator.h"
 #include "gstimxcompositor.h"
 
 G_BEGIN_DECLS

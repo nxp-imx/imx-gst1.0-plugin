@@ -1,6 +1,8 @@
 plugin_LTLIBRARIES = libgstimxcompositor.la
 
-libgstimxcompositor_la_SOURCES = gstimxcompositor.c \
+libgstimxcompositor_la_SOURCES = base/gstaggregator.c \
+                                 base/gstvideoaggregator.c \
+                                 gstimxcompositor.c \
                                  gstimxcompositorpad.c
 
 libgstimxcompositor_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
@@ -12,8 +14,6 @@ libgstimxcompositor_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
 				 -I$(top_srcdir)/libs/overlaycompositionmeta
 				 
 libgstimxcompositor_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
-				 -lgstbadbase-$(GST_API_VERSION) \
-				 -lgstbadvideo-$(GST_API_VERSION) \
 				 $(GST_BASE_LIBS) \
 				 $(GST_PLUGINS_BASE_LIBS) \
 				 -lgstvideo-$(GST_API_VERSION) \
@@ -23,4 +23,6 @@ libgstimxcompositor_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 libgstimxcompositor_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstimxcompositor_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 
-noinst_HEADERS = gstimxcompositor.h gstimxcompositorpad.h
+noinst_HEADERS = gstimxcompositor.h gstimxcompositorpad.h \
+                 base/gstaggregator.h base/gstvideoaggregator.h \
+                 base/gstvideoaggregatorpad.h
