@@ -1003,13 +1003,19 @@ gst_imx_v4l2sink_get_all_caps ()
 static GstCaps *gst_imx_v4l2sink_get_caps (GstBaseSink *sink, GstCaps* filter)
 {
   GstImxV4l2Sink *v4l2sink = GST_IMX_V4L2SINK (sink);
+  GstCaps *tmp;
 
-  GstCaps *caps = gst_caps_copy(gst_pad_get_pad_template_caps(sink->sinkpad));
+  GstCaps *temp_caps = gst_pad_get_pad_template_caps(sink->sinkpad);
+  GstCaps *caps = gst_caps_copy(temp_caps);
+  gst_caps_unref(temp_caps);
   if (!v4l2sink->composition_meta_enable)
     imx_video_overlay_composition_remove_caps(caps);
 
-  if (filter)
-    caps = gst_caps_intersect (caps, filter);
+  if (filter) {
+    tmp = gst_caps_intersect (caps, filter);
+    gst_caps_unref(caps);
+    caps = tmp;
+  }
 
   return caps;
 }

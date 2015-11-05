@@ -712,7 +712,7 @@ gst_imxcompositor_src_query (GstAggregator * agg, GstQuery * query)
   switch (GST_QUERY_TYPE (query)) {
     case GST_QUERY_CAPS:
     {
-      GstCaps *filter, *caps;
+      GstCaps *filter, *caps, *tmp;
       GstStructure *s;
       gint n;
 
@@ -737,8 +737,11 @@ gst_imxcompositor_src_query (GstAggregator * agg, GstQuery * query)
         }
       }
 
-      if (filter)
-        caps = gst_caps_intersect_full (filter, caps, GST_CAPS_INTERSECT_FIRST);
+      if (filter) {
+        tmp = gst_caps_intersect_full (filter, caps, GST_CAPS_INTERSECT_FIRST);
+        gst_caps_unref(caps);
+        caps = tmp;
+      }
 
       gst_query_set_caps_result (query, caps);
       GST_DEBUG ("query src caps: %" GST_PTR_FORMAT, caps);

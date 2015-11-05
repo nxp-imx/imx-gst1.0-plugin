@@ -957,13 +957,17 @@ gst_overlay_sink_get_static_caps ()
 static GstCaps *gst_overlay_sink_get_caps (GstBaseSink *sink, GstCaps* filter)
 {
   GstOverlaySink *overlay_sink = GST_OVERLAY_SINK (sink);
+  GstCaps *tmp;
 
   GstCaps *caps = gst_overlay_sink_get_static_caps();
   if (!overlay_sink->composition_meta_enable)
     imx_video_overlay_composition_remove_caps(caps);
 
-  if (filter)
-    caps = gst_caps_intersect (caps, filter);
+  if (filter) {
+    tmp = gst_caps_intersect (caps, filter);
+    gst_caps_unref(caps);
+    caps = tmp;
+  }
 
   return caps;
 }
