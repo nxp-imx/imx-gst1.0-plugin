@@ -1,5 +1,8 @@
 lib_LTLIBRARIES = libgstfsl-@GST_API_VERSION@.la
 
+libgstfsl_@GST_API_VERSION@includedir = $(includedir)/gstreamer-@GST_MAJORMINOR@/gst/imx-mm/
+libgstfsl_@GST_API_VERSION@include_HEADERS = allocator/gstallocatorphymem.h
+
 libgstfsl_@GST_API_VERSION@_la_SOURCES = allocator/gstallocatorphymem.c \
 	allocator/gstphymemmeta.c \
 	video-tsm/mfw_gst_ts.c \
