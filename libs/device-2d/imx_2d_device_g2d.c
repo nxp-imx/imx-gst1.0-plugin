@@ -363,6 +363,7 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   if (g2d->src.left >= g2d->src.width || g2d->src.top >= g2d->src.height ||
       g2d->src.right <= 0 || g2d->src.bottom <= 0) {
     GST_WARNING("input crop outside of source");
+    g2d_close (g2d_handle);
     return 0;
   }
 
@@ -375,8 +376,10 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   if (g2d->src.bottom > g2d->src.height)
     g2d->src.bottom = g2d->src.height;
 
-  if (imx_g2d_set_src_plane (&g2d->src, src->mem->paddr) < 0)
+  if (imx_g2d_set_src_plane (&g2d->src, src->mem->paddr) < 0) {
+    g2d_close (g2d_handle);
     return -1;
+  }
 
   GST_TRACE ("g2d src : %dx%d,%d(%d,%d-%d,%d), alpha=%d, format=%d",
       g2d->src.width, g2d->src.height,g2d->src.stride, g2d->src.left,
@@ -394,6 +397,7 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   if (g2d->dst.left >= g2d->dst.width || g2d->dst.top >= g2d->dst.height ||
       g2d->dst.right <= 0 || g2d->dst.bottom <= 0) {
     GST_WARNING("output crop outside of destination");
+    g2d_close (g2d_handle);
     return 0;
   }
 
@@ -442,6 +446,7 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   }
 
   ret |= g2d_finish(g2d_handle);
+  g2d_close (g2d_handle);
 
   return ret;
 }

@@ -203,7 +203,7 @@ gint scan_displays(gpointer **phandle, gint *pcount)
       GST_DEBUG ("No background device for %s.", name);
     }
     if(!gstsutils_get_value_by_key(group, KEY_FMT, &fmt)) {
-      fmt = "RGBP"; //default rgb565
+      fmt = g_strdup("RGBP"); //default rgb565
     }
     if(!gstsutils_get_value_by_key(group, KEY_WIDTH, &w) && !bg_device) {
       GST_ERROR ("can't find display %s width.", name);
@@ -215,7 +215,7 @@ gint scan_displays(gpointer **phandle, gint *pcount)
     }
 
     if(!gstsutils_get_value_by_key(group, KEY_ALPHA, &alpha))
-      alpha = "0";
+      alpha = g_strdup("0");
 
     gstsutils_get_value_by_key(group, KEY_COLOR_KEY, &color_key);
 
@@ -231,9 +231,12 @@ gint scan_displays(gpointer **phandle, gint *pcount)
     hdisplay->bg_device = bg_device;
     hdisplay->fmt = string_to_fmt (fmt);
     hdisplay->alpha = atoi (alpha);
+    g_free(fmt);
+    g_free(alpha);
     if (color_key) {
       hdisplay->enable_color_key = TRUE;
       hdisplay->color_key = atoi (color_key);
+      g_free(color_key);
     }
     else {
       hdisplay->enable_color_key = FALSE;
@@ -248,6 +251,8 @@ gint scan_displays(gpointer **phandle, gint *pcount)
     else {
       hdisplay->w = atoi (w);
       hdisplay->h = atoi (h);
+      g_free(w);
+      g_free(h);
     }
 
     GST_DEBUG ("display(%s), device(%s), fmt(%d), res(%dx%d), ckey(%x), alpha(%d)",

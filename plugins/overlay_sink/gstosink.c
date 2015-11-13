@@ -668,6 +668,7 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
   if(!buffer)
   {
     GST_ERROR_OBJECT (sink, "Invalid buffer pointer.");
+    gst_caps_unref (caps);
     return GST_FLOW_ERROR;
   }
 
