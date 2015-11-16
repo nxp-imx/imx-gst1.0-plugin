@@ -1683,7 +1683,7 @@ gint gst_imx_v4l2_free_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
 
   handle->allocated --;
   if (handle->allocated < 0) {
-    GST_ERROR ("freed buffer more than allocated.");
+    GST_WARNING ("freed buffer more than allocated.");
     handle->allocated = 0;
   }
 
