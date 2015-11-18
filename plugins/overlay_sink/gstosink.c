@@ -295,6 +295,7 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
           }
 
           sink->frame_showed = 0;
+          sink->run_time = 0;
 
           gst_imx_video_overlay_start (sink->imxoverlay);
         }
@@ -306,6 +307,9 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
   ret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
 
   switch (transition) {
+    case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
+      sink->run_time = gst_element_get_start_time (GST_ELEMENT (sink));
+      break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       {
         gint i;
@@ -319,12 +323,11 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
 
         for (i=0; i<sink->disp_count; i++) {
           if (sink->hoverlay[i]) {
-            GstClockTime run_time = gst_element_get_start_time (GST_ELEMENT (sink));
-            if (run_time > 0) {
+            if (sink->run_time > 0) {
               gint64 blited = osink_object_get_overlay_showed_frames (sink->osink_obj, sink->hoverlay[i]);
               g_print ("Total showed frames (%lld), display %s blited (%lld), playing for (%"GST_TIME_FORMAT"), fps (%.3f).\n",
-                  sink->frame_showed, sink->disp_info[i].name, blited, GST_TIME_ARGS (run_time),
-                  (gfloat)GST_SECOND * blited / run_time);
+                  sink->frame_showed, sink->disp_info[i].name, blited, GST_TIME_ARGS (sink->run_time),
+                  (gfloat)GST_SECOND * blited / sink->run_time);
             }
             osink_object_destroy_overlay (sink->osink_obj, sink->hoverlay[i]);
             sink->hoverlay[i] = NULL;
@@ -353,6 +356,8 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
         if (sink->osink_obj)
           osink_object_unref (sink->osink_obj);
         sink->osink_obj = NULL;
+        sink->frame_showed = 0;
+        sink->run_time = 0;
       }
       break;
     default:

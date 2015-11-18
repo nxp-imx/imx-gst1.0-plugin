@@ -60,6 +60,7 @@ struct _GstImxV4l2Sink {
   GstVideoAlignment video_align;
   gboolean keep_video_ratio;
   guint64 frame_showed;
+  GstClockTime run_time;
   guint min_buffers;
   gboolean self_pool_configed;
   gboolean pool_activated;

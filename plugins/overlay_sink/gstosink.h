@@ -70,6 +70,7 @@ struct _GstOverlaySink {
   gboolean no_phy_buffer;
   gboolean pool_activated;
   guint64 frame_showed;
+  GstClockTime run_time;
   gint min_buffers;
   gint max_buffers;
   GstBuffer *prv_buffer;

@@ -290,6 +290,9 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
   ret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
 
   switch (transition) {
+    case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
+      v4l2sink->run_time = gst_element_get_start_time (GST_ELEMENT (v4l2sink));
+      break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       if (v4l2sink->v4l2handle) {
         gst_imx_video_overlay_stop (v4l2sink->imxoverlay);
@@ -323,12 +326,13 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
       }
 
       {
-        GstClockTime run_time = gst_element_get_start_time (GST_ELEMENT (v4l2sink));
-        if (run_time > 0) {
+        if (v4l2sink->run_time > 0) {
           g_print ("Total showed frames (%lld), playing for (%"GST_TIME_FORMAT"), fps (%.3f).\n",
-              v4l2sink->frame_showed, GST_TIME_ARGS (run_time),
-              (gfloat)GST_SECOND * v4l2sink->frame_showed / run_time);
+              v4l2sink->frame_showed, GST_TIME_ARGS (v4l2sink->run_time),
+              (gfloat)GST_SECOND * v4l2sink->frame_showed / v4l2sink->run_time);
         }
+        v4l2sink->frame_showed = 0;
+        v4l2sink->run_time = 0;
       }
 
       memset (&v4l2sink->crop, 0, sizeof(IMXV4l2Rect));
@@ -1079,6 +1083,7 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   memset (&v4l2sink->crop, 0, sizeof(IMXV4l2Rect));
   v4l2sink->keep_video_ratio = FALSE;
   v4l2sink->frame_showed = 0;
+  v4l2sink->run_time = 0;
   v4l2sink->min_buffers = 0;
   v4l2sink->pool_activated = FALSE;
   v4l2sink->use_userptr_mode = FALSE;
