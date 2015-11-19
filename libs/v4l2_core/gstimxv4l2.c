@@ -1348,6 +1348,7 @@ gint gst_imx_v4l2out_config_output (gpointer v4l2handle, IMXV4l2Rect *overlay, g
   IMXV4l2Rect *rect = &crop.c;;
   GstVideoRectangle src, dest, result;
   gboolean brotate;
+  gint ret;
 
   memcpy (rect, overlay, sizeof(IMXV4l2Rect));
 
@@ -1393,16 +1394,17 @@ gint gst_imx_v4l2out_config_output (gpointer v4l2handle, IMXV4l2Rect *overlay, g
     // only support video out of screen in landscape mode
     IMXV4l2Rect rect_crop;
     if (gst_imx_v4l2out_calc_crop (handle, rect, &result, &rect_crop)) {
-      gint ret = (*handle->dev_itf.v4l2out_config_input) (handle, handle->in_fmt, handle->in_w, handle->in_h, &rect_crop);
+      ret = (*handle->dev_itf.v4l2out_config_input) (handle, handle->in_fmt, handle->in_w, handle->in_h, &rect_crop);
       if (ret == 1) {
         handle->invisible |= INVISIBLE_OUT;
         GST_DEBUG ("Video is invisible as out of display.");
-        return 0;
+        return 1;
       }
       else if (ret < 0)
         return ret;
       else
         handle->invisible &= ~INVISIBLE_OUT;
+      ret = 2;
     }
   }
   else {
@@ -1429,7 +1431,12 @@ gint gst_imx_v4l2out_config_output (gpointer v4l2handle, IMXV4l2Rect *overlay, g
 
   GST_DEBUG ("rect, (%d, %d) -> (%d, %d).", rect->left, rect->top, rect->width, rect->height);
 
-  return (*handle->dev_itf.v4l2out_config_output) (handle, &crop);
+  if ((*handle->dev_itf.v4l2out_config_output) (handle, &crop) < 0) {
+    GST_ERROR ("v4l2out_config_output failed.");
+    return -1;
+  }
+
+  return ret;
 }
 
 gint gst_imx_v4l2_config_rotate (gpointer v4l2handle, gint rotate)

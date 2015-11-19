@@ -70,6 +70,7 @@ struct _GstImxV4l2Sink {
   GstImxVideoOverlayComposition video_comp;
   gboolean composition_meta_enable;
   Imx2DDevice *blend_dev;
+  gboolean invisible;
 };
 
 struct _GstImxV4l2SinkClass {

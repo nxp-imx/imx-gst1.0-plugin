@@ -639,6 +639,12 @@ gst_imx_v4l2sink_incrop_changed_and_set (GstVideoCropMeta *src, GstVideoCropMeta
   return FALSE;
 }
 
+static gboolean
+remove_list_item (gpointer key, gpointer value, gpointer user_data)
+{
+  return value != user_data;
+}
+
 static GstFlowReturn
 gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 {
@@ -782,11 +788,22 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     }
 
     if (v4l2sink->config_flag & CONFIG_OVERLAY) {
-      if (gst_imx_v4l2out_config_output (v4l2sink->v4l2handle, &v4l2sink->overlay, v4l2sink->keep_video_ratio) < 0) {
+      gint ret = gst_imx_v4l2out_config_output (v4l2sink->v4l2handle,
+          &v4l2sink->overlay, v4l2sink->keep_video_ratio);
+      if (ret < 0) {
         GST_WARNING_OBJECT (v4l2sink, "configure output failed.");
         memcpy(&v4l2sink->overlay, &v4l2sink->prev_overlay, sizeof(IMXV4l2Rect));
       } else {
         memcpy(&v4l2sink->prev_overlay, &v4l2sink->overlay, sizeof(IMXV4l2Rect));
+      }
+      if (ret == 1) {
+        v4l2sink->invisible = TRUE;
+      } else {
+        if (ret == 2) {
+          g_hash_table_foreach_remove (v4l2sink->v4l2buffer2buffer_table,
+              remove_list_item, in_buffer);
+        }
+        v4l2sink->invisible = FALSE;
       }
       v4l2sink->config_flag &= ~CONFIG_OVERLAY;
     }
@@ -851,7 +868,11 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
       PhyMemBlock *memblk;
       memblk = gst_buffer_query_phymem_block (v4l2_buffer);
       g_hash_table_remove (v4l2sink->v4l2buffer2buffer_table, memblk->vaddr);
+      GST_DEBUG_OBJECT (v4l2sink, "Reserved count: %d\n.", 
+          g_hash_table_size (v4l2sink->v4l2buffer2buffer_table));
     }
+    if (v4l2sink->invisible)
+      g_hash_table_remove_all (v4l2sink->v4l2buffer2buffer_table);
   }
   if (v4l2_buffer)
     gst_buffer_unref (v4l2_buffer);
@@ -1087,6 +1108,7 @@ gst_imx_v4l2sink_init (GstImxV4l2Sink * v4l2sink)
   v4l2sink->min_buffers = 0;
   v4l2sink->pool_activated = FALSE;
   v4l2sink->use_userptr_mode = FALSE;
+  v4l2sink->invisible = FALSE;
   v4l2sink->v4l2buffer2buffer_table = g_hash_table_new_full (NULL, NULL, NULL, 
       (GDestroyNotify) gst_buffer_unref);
 
