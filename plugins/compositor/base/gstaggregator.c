@@ -94,7 +94,7 @@ gst_aggregator_start_time_selection_get_type (void)
       {0, NULL, NULL}
     };
 
-    gtype = g_enum_register_static ("GstAggregatorStartTimeSelection", values);
+    gtype = g_enum_register_static ("GstImxAggregatorStartTimeSelection", values);
   }
   return gtype;
 }
@@ -1922,8 +1922,8 @@ gst_aggregator_class_init (GstAggregatorClass * klass)
   aggregator_parent_class = g_type_class_peek_parent (klass);
   g_type_class_add_private (klass, sizeof (GstAggregatorPrivate));
 
-  GST_DEBUG_CATEGORY_INIT (aggregator_debug, "aggregator",
-      GST_DEBUG_FG_MAGENTA, "GstAggregator");
+  GST_DEBUG_CATEGORY_INIT (aggregator_debug, "imxaggregator",
+      GST_DEBUG_FG_MAGENTA, "GstImxAggregator");
 
   klass->sinkpads_type = GST_TYPE_AGGREGATOR_PAD;
 
@@ -2037,7 +2037,7 @@ gst_aggregator_get_type (void)
     };
 
     _type = g_type_register_static (GST_TYPE_ELEMENT,
-        "GstAggregator", &info, G_TYPE_FLAG_ABSTRACT);
+        "GstImxAggregator", &info, G_TYPE_FLAG_ABSTRACT);
     g_once_init_leave (&type, _type);
   }
   return type;
@@ -2354,7 +2354,38 @@ gst_aggregator_pad_activate_mode_func (GstPad * pad,
 /***********************************
  * GstAggregatorPad implementation  *
  ************************************/
-G_DEFINE_TYPE (GstAggregatorPad, gst_aggregator_pad, GST_TYPE_PAD);
+static void     gst_aggregator_pad_init         (GstAggregatorPad      *self);
+static void     gst_aggregator_pad_class_init   (GstAggregatorPadClass *klass);
+static gpointer gst_aggregator_pad_parent_class = NULL;
+static gint     GstAggregatorPad_private_offset;
+
+_G_DEFINE_TYPE_EXTENDED_CLASS_INIT(GstAggregatorPad, gst_aggregator_pad)
+
+G_GNUC_UNUSED
+static inline gpointer
+gst_aggregator_pad_get_instance_private (GstAggregatorPad *self)
+{
+  return (G_STRUCT_MEMBER_P (self, GstAggregatorPad_private_offset));
+}
+
+GType
+gst_aggregator_pad_get_type (void)
+{
+  static volatile gsize g_define_type_id__volatile = 0;
+  if (g_once_init_enter (&g_define_type_id__volatile))
+    {
+      GType g_define_type_id =
+        g_type_register_static_simple (GST_TYPE_PAD,
+            g_intern_static_string ("GstImxAggregatorPad"),
+            sizeof (GstAggregatorPadClass),
+            (GClassInitFunc) gst_aggregator_pad_class_intern_init,
+            sizeof (GstAggregatorPad),
+            (GInstanceInitFunc) gst_aggregator_pad_init,
+            (GTypeFlags) 0);
+      g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+    }
+  return g_define_type_id__volatile;
+}
 
 static void
 gst_aggregator_pad_constructed (GObject * object)

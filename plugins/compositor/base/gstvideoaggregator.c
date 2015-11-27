@@ -76,9 +76,41 @@ struct _GstVideoAggregatorPadPrivate
   GstClockTime end_time;
 };
 
+static void     gst_videoaggregator_pad_init         \
+                  (GstVideoAggregatorPad      *self);
+static void     gst_videoaggregator_pad_class_init   \
+                  (GstVideoAggregatorPadClass *klass);
+static gpointer gst_videoaggregator_pad_parent_class = NULL;
+static gint     GstVideoAggregatorPad_private_offset;
 
-G_DEFINE_TYPE (GstVideoAggregatorPad, gst_videoaggregator_pad,
-    GST_TYPE_AGGREGATOR_PAD);
+_G_DEFINE_TYPE_EXTENDED_CLASS_INIT(GstVideoAggregatorPad, \
+                                   gst_videoaggregator_pad)
+
+G_GNUC_UNUSED
+static inline gpointer
+gst_videoaggregator_pad_get_instance_private (GstVideoAggregatorPad *self)
+{
+  return (G_STRUCT_MEMBER_P (self, GstVideoAggregatorPad_private_offset));
+}
+
+GType
+gst_videoaggregator_pad_get_type (void)
+{
+  static volatile gsize g_define_type_id__volatile = 0;
+  if (g_once_init_enter (&g_define_type_id__volatile))
+    {
+      GType g_define_type_id =
+        g_type_register_static_simple (GST_TYPE_AGGREGATOR_PAD,
+            g_intern_static_string ("GstImxVideoAggregatorPad"),
+            sizeof (GstVideoAggregatorPadClass),
+            (GClassInitFunc) gst_videoaggregator_pad_class_intern_init,
+            sizeof (GstVideoAggregatorPad),
+            (GInstanceInitFunc) gst_videoaggregator_pad_init,
+            (GTypeFlags) 0);
+      g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+    }
+  return g_define_type_id__volatile;
+}
 
 static void
 gst_videoaggregator_pad_get_property (GObject * object, guint prop_id,
@@ -454,7 +486,7 @@ gst_videoaggregator_get_type (void)
   static volatile gsize g_define_type_id_volatile = 0;
   if (g_once_init_enter (&g_define_type_id_volatile)) {
     GType g_define_type_id = g_type_register_static_simple (GST_TYPE_AGGREGATOR,
-        g_intern_static_string ("GstVideoAggregator"),
+        g_intern_static_string ("GstImxVideoAggregator"),
         sizeof (GstVideoAggregatorClass),
         (GClassInitFunc) gst_videoaggregator_class_intern_init,
         sizeof (GstVideoAggregator),
@@ -2076,8 +2108,8 @@ gst_videoaggregator_class_init (GstVideoAggregatorClass * klass)
   GstElementClass *gstelement_class = (GstElementClass *) klass;
   GstAggregatorClass *agg_class = (GstAggregatorClass *) klass;
 
-  GST_DEBUG_CATEGORY_INIT (gst_videoaggregator_debug, "videoaggregator", 0,
-      "base video aggregator");
+  GST_DEBUG_CATEGORY_INIT (gst_videoaggregator_debug, "imxvideoaggregator", 0,
+      "IMX base video aggregator");
 
   g_type_class_add_private (klass, sizeof (GstVideoAggregatorPrivate));
 
