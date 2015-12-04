@@ -2004,6 +2004,11 @@ static void aiurdemux_parse_video (GstAiurDemux * demux, AiurDemuxStream * strea
     stream->info.video.fps_d = AIURDEMUX_FRAME_D_DEFAULT;
   }
 
+  if ((stream->info.video.width == 0) || (stream->info.video.height == 0)) {
+    stream->info.video.width = AIURDEMUX_VIDEO_WIDTH_DEFAULT;
+    stream->info.video.height = AIURDEMUX_VIDEO_HEIGHT_DEFAULT;
+  }
+
   stream->send_codec_data = TRUE;
 
   for(i = 0; i < sizeof(aiurdemux_videocodec_tab)/sizeof(AiurdemuxCodecStruct); i++){
