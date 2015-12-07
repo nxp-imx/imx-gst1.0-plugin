@@ -1666,6 +1666,19 @@ static REresult add_video_effect(RecorderEngineHandle handle, REuint32 videoEffe
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
   CHECK_PARAM (videoEffect, RE_VIDEO_EFFECT_LIST_END);
 
+/* check gstreamer version, pipeline is different in 1.4.5 and 1.6.0 */
+#if GST_CHECK_VERSION(1, 6, 0)
+  static KeyMap kKeyMap[] = {
+    { RE_VIDEO_EFFECT_DEFAULT, NULL },
+    { RE_VIDEO_EFFECT_CUBE, (REchar *)"glupload ! glfiltercube ! gldownload" },
+    { RE_VIDEO_EFFECT_MIRROR, (REchar *)"glupload ! gleffects effect=1 ! gldownload" },
+    { RE_VIDEO_EFFECT_SQUEEZE, (REchar *)"glupload ! gleffects effect=2 ! gldownload" },
+    { RE_VIDEO_EFFECT_FISHEYE, (REchar *)"glupload ! gleffects effect=5 ! gldownload" },
+    { RE_VIDEO_EFFECT_GRAY, (REchar *)"glupload ! glshader location=/usr/share/gray_shader.fs ! gldownload" },
+    { RE_VIDEO_EFFECT_TUNNEL, (REchar *)"glupload ! gleffects effect=4 ! gldownload" },
+    { RE_VIDEO_EFFECT_TWIRL, (REchar *)"glupload ! gleffects effect=6 ! gldownload" },
+  };
+#else
   static KeyMap kKeyMap[] = {
     { RE_VIDEO_EFFECT_DEFAULT, NULL },
     { RE_VIDEO_EFFECT_CUBE, (REchar *)"glfiltercube" },
@@ -1676,6 +1689,7 @@ static REresult add_video_effect(RecorderEngineHandle handle, REuint32 videoEffe
     { RE_VIDEO_EFFECT_TUNNEL, (REchar *)"glshader location=/usr/share/tunnel_shader.fs" },
     { RE_VIDEO_EFFECT_TWIRL, (REchar *)"glshader location=/usr/share/twirl_shader.fs" },
   };
+#endif
 
   recorder->video_effect_name = key_value_pair (videoEffect, kKeyMap, sizeof(kKeyMap));
 
