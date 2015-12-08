@@ -74,7 +74,7 @@ gst_phymem_copy (GstMemory * mem, gssize offset, gssize size)
 
   if(klass->copy_phymem((GstAllocatorPhyMem*)mem->allocator,
                          &dst_mem->block, &src_mem->block, offset, size) < 0) {
-    GST_ERROR("Copy phymem %d failed.\n", size);
+    GST_WARNING ("Copy phymem %d failed.\n", size);
     return NULL;
   }
 
