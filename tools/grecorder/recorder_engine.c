@@ -1186,8 +1186,8 @@ run_pipeline (gRecorderEngine *recorder)
   timing->start_capture = gst_util_get_timestamp ();
   g_signal_emit_by_name (recorder->camerabin, "start-capture", 0);
 
-  if (recorder->mode == MODE_VIDEO) {
-    g_timeout_add ((recorder->capture_time * 1000), (GSourceFunc) stop_capture, NULL);
+  if (recorder->mode == MODE_VIDEO && recorder->capture_time) {
+    g_timeout_add ((recorder->capture_time * 1000), (GSourceFunc) stop_capture, recorder);
   }
 
   return ret;
@@ -1896,7 +1896,7 @@ static REresult init(RecorderEngineHandle handle)
   recorder->mode = MODE_VIDEO;
   recorder->zoom = 100;
 
-  recorder->capture_time = 10;
+  recorder->capture_time = 0;
   recorder->capture_count = 0;
   recorder->capture_total = 1;
   recorder->stop_capture_cb_id = 0;

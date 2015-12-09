@@ -503,6 +503,7 @@ gst_imx_v4l2src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
   }
 
   if (pool == NULL || v4l2src->use_v4l2_memory == TRUE) {
+    GstVideoInfo info;
     if (pool) {
       gst_object_unref (pool);
     }
@@ -510,6 +511,12 @@ gst_imx_v4l2src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
     GST_DEBUG_OBJECT (v4l2src, "no pool, making new pool");
 
     structure = gst_caps_get_structure (v4l2src->old_caps, 0);
+
+    if (!gst_video_info_from_caps (&info, v4l2src->old_caps)) {
+      GST_ERROR_OBJECT (v4l2src, "invalid caps.");
+      return FALSE;
+    }
+    size = GST_VIDEO_INFO_SIZE (&info);
 
     if (gst_structure_has_name (structure, "video/x-bayer")) {
       size = GST_ROUND_UP_4 (v4l2src->w) * v4l2src->h;
