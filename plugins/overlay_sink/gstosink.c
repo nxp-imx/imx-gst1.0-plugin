@@ -367,6 +367,23 @@ gst_overlay_sink_change_state (GstElement * element, GstStateChange transition)
   return ret;
 }
 
+static gboolean
+gst_overlay_sink_buffer_pool_is_ok (GstBufferPool * pool, GstCaps * newcaps,
+    gint size)
+{
+  GstCaps *oldcaps;
+  GstStructure *config;
+  guint bsize;
+  gboolean ret;
+
+  config = gst_buffer_pool_get_config (pool);
+  gst_buffer_pool_config_get_params (config, &oldcaps, &bsize, NULL, NULL);
+  ret = (size <= bsize) && gst_caps_is_equal (newcaps, oldcaps);
+  gst_structure_free (config);
+
+  return ret;
+}
+
 static gint
 gst_overlay_sink_setup_buffer_pool (GstOverlaySink *sink, GstCaps *caps)
 {
@@ -625,6 +642,16 @@ gst_overlay_sink_check_alignment (GstOverlaySink *sink, GstBuffer *buffer)
               sink->video_align.padding_right, sink->video_align.padding_bottom);
         }
         gst_structure_free (config);
+      } else {
+        GstVideoMeta *meta = gst_buffer_get_video_meta(buffer);
+        if (meta) {
+          if (meta->width > sink->w)
+            sink->video_align.padding_right = meta->width - sink->w;
+          if (meta->height > sink->h)
+            sink->video_align.padding_bottom = meta->height - sink->h;
+          GST_DEBUG_OBJECT(sink, "video align right %d, bottom %d",
+            sink->video_align.padding_right, sink->video_align.padding_bottom);
+        }
       }
     }
 
@@ -677,6 +704,9 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     return GST_FLOW_ERROR;
   }
 
+  cropmeta = gst_buffer_get_video_crop_meta (buffer);
+  gst_overlay_sink_check_alignment (sink, buffer);
+
   if (!gst_buffer_is_phymem (buffer)) {
     // check if physical buffer
     GstBuffer *buffer2 = NULL;
@@ -684,9 +714,28 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
     GST_DEBUG_OBJECT (sink, "not physical buffer.");
 
-    if (!sink->pool && gst_overlay_sink_setup_buffer_pool (sink, caps) < 0) {
-      gst_caps_unref (caps);
-      return GST_FLOW_ERROR;
+    gst_video_frame_map (&frame1, &info, buffer, GST_MAP_READ);
+
+    GstCaps *new_caps = gst_video_info_to_caps(&frame1.info);
+    gst_video_info_from_caps(&info, new_caps); //update the size info
+
+    if (!sink->pool ||
+        !gst_overlay_sink_buffer_pool_is_ok(sink->pool, new_caps,info.size))
+    {
+      if (sink->pool) {
+        gst_object_unref(sink->pool);
+        sink->pool = NULL;
+      }
+      gst_overlay_sink_setup_buffer_pool (sink, new_caps);
+      GST_DEBUG_OBJECT(sink, "creating new input pool");
+      gst_caps_unref (new_caps);
+
+      if (!sink->pool) {
+        gst_caps_unref (caps);
+        return GST_FLOW_ERROR;
+      }
+    } else {
+      gst_caps_unref (new_caps);
     }
 
     if (gst_buffer_pool_set_active (sink->pool, TRUE) != TRUE) {
@@ -703,11 +752,8 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
       return GST_FLOW_ERROR;
     }
 
-    gst_video_frame_map (&frame1, &info, buffer, GST_MAP_READ);
     gst_video_frame_map (&frame2, &info, buffer2, GST_MAP_WRITE);
-
     gst_video_frame_copy (&frame2, &frame1);
-
     gst_video_frame_unmap (&frame1);
     gst_video_frame_unmap (&frame2);
 
@@ -744,9 +790,6 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
   GST_DEBUG_OBJECT (sink, "show gstbuffer (%p), surface_buffer vaddr (%p) paddr (%p).",
       buffer, surface_buffer.mem.vaddr, surface_buffer.mem.paddr);
 
-  gst_overlay_sink_check_alignment (sink, buffer);
-
-  cropmeta = gst_buffer_get_video_crop_meta (buffer);
   if ((cropmeta && gst_overlay_sink_incrop_changed_and_set (cropmeta, &sink->cropmeta))) {
     gst_overlay_sink_input_config (sink);
   }

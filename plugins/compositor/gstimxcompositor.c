@@ -1103,9 +1103,9 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
                 pad->align.padding_top + pad->align.padding_bottom;
   src->info.stride = ppad->aggregated_frame->info.stride[0];
 
-  GST_LOG_OBJECT (pad, "Input: %s, %dx%d, crop(%d,%d,%d,%d)",
+  GST_LOG_OBJECT (pad, "Input: %s, %dx%d(%d), crop(%d,%d,%d,%d)",
       GST_VIDEO_FORMAT_INFO_NAME(ppad->aggregated_frame->info.finfo),
-      ppad->aggregated_frame->info.width, ppad->aggregated_frame->info.height,
+      src->info.w, src->info.h, src->info.stride,
       pad->src_crop.x, pad->src_crop.y, pad->src_crop.w, pad->src_crop.h);
 
   if (imxcomp->device->config_input(imxcomp->device, &src->info) < 0) {

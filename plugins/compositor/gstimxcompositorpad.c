@@ -479,6 +479,10 @@ gst_imxcompositor_pad_prepare_frame (GstVideoAggregatorPad * pad,
   /* Check if need copy input frame */
   if (!gst_buffer_is_phymem(pad->buffer)) {
     GST_DEBUG_OBJECT (pad, "copy input frame to phy memory");
+    GstVideoInfo info;
+    GstCaps *caps = gst_video_info_to_caps(&frame->info);
+    gst_video_info_from_caps(&info, caps); //update the size info
+    gst_caps_unref(caps);
 
     if (!imxcomp->allocator)
       imxcomp->allocator =
@@ -490,19 +494,17 @@ gst_imxcompositor_pad_prepare_frame (GstVideoAggregatorPad * pad,
       cpad->sink_tmp_buf_size = SINK_TEMP_BUFFER_INIT_SIZE;
     }
 
-    if (cpad->sink_tmp_buf &&
-        pad->buffer_vinfo.size > SINK_TEMP_BUFFER_INIT_SIZE) {
+    if (cpad->sink_tmp_buf && info.size > SINK_TEMP_BUFFER_INIT_SIZE) {
       if (cpad->sink_tmp_buf)
         gst_buffer_unref(cpad->sink_tmp_buf);
       cpad->sink_tmp_buf = gst_buffer_new_allocate(imxcomp->allocator,
-          pad->buffer_vinfo.size, NULL);
-      cpad->sink_tmp_buf_size = pad->buffer_vinfo.size;
+          info.size, NULL);
+      cpad->sink_tmp_buf_size = info.size;
     }
 
     if (cpad->sink_tmp_buf) {
       GstVideoFrame *copy_frame = g_slice_new0 (GstVideoFrame);
-      gst_video_frame_map(copy_frame, &(pad->buffer_vinfo),
-          cpad->sink_tmp_buf, GST_MAP_WRITE);
+      gst_video_frame_map(copy_frame, &info, cpad->sink_tmp_buf, GST_MAP_WRITE);
       gst_video_frame_copy(copy_frame, frame);
       gst_video_frame_unmap (frame);
       g_slice_free (GstVideoFrame, frame);
