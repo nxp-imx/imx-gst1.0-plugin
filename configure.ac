@@ -6,7 +6,7 @@ dnl use a three digit version number for releases, and four for git/prerelease
 AC_INIT(GStreamer i.MX Plug-ins, 4.0.9, http://www.freescale.com)
 
 dnl initialize automake
-AM_INIT_AUTOMAKE(gst1.0-fsl-plugins, 4.0.9)
+AM_INIT_AUTOMAKE(imx-gst1.0-plugin, 4.0.9)
 
 
 dnl our libraries and install dirs use GST_API_VERSION in the filename
