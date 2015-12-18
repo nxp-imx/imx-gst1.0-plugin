@@ -151,7 +151,9 @@ gint scan_displays(gpointer **phandle, gint *pcount)
     if(!gstsutils_get_value_by_key(group, KEY_ALPHA, &alpha))
       alpha = g_strdup("0");
 
-    gstsutils_get_value_by_key(group, KEY_COLOR_KEY, &color_key);
+    if(!gstsutils_get_value_by_key(group, KEY_COLOR_KEY, &color_key)) {
+      /* do nothing */
+    }
 
     hdisplay = g_slice_alloc (sizeof(DisplayHandle));
     if (!hdisplay) {
@@ -171,8 +173,7 @@ gint scan_displays(gpointer **phandle, gint *pcount)
       hdisplay->enable_color_key = TRUE;
       hdisplay->color_key = atoi (color_key);
       g_free(color_key);
-    }
-    else {
+    } else {
       hdisplay->enable_color_key = FALSE;
     }
 

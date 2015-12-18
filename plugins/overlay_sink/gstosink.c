@@ -1031,7 +1031,7 @@ gst_overlay_sink_init (GstOverlaySink * overlay_sink)
   for (i=0; i<MAX_DISPLAY; i++) {
     overlay_sink->hoverlay[i] = NULL;
     overlay_sink->disp_on[i] = FALSE;
-    overlay_sink->config[MAX_DISPLAY] = FALSE;
+    overlay_sink->config[i] = FALSE;
     memset(&overlay_sink->overlay[i], 0, sizeof (OverlayInfo));
     overlay_sink->overlay[i].keep_ratio = TRUE;
     memset(&overlay_sink->pre_overlay_info[i], 0, sizeof (OverlayInfo));
