@@ -308,16 +308,18 @@ void imx_video_overlay_composition_copy_meta(GstBuffer *dst, GstBuffer *src,
             gint render_x, render_y;
             guint render_w, render_h;
 
-            rect = gst_video_overlay_composition_get_rectangle(comp_copy, n);
-            gst_video_overlay_rectangle_get_render_rectangle (rect,
-                &render_x, &render_y, &render_w, &render_h);
+            for (n = 0; n < num; n++) {
+              rect = gst_video_overlay_composition_get_rectangle(comp_copy, n);
+              gst_video_overlay_rectangle_get_render_rectangle (rect,
+                  &render_x, &render_y, &render_w, &render_h);
 
-            render_x = render_x * out_width / in_width;
-            render_w = render_w * out_width / in_width;
-            render_y = render_y * out_height / in_height;
-            render_h = render_h * out_height / in_height;
-            gst_video_overlay_rectangle_set_render_rectangle(rect,
-                render_x, render_y, render_w, render_h);
+              render_x = render_x * out_width / in_width;
+              render_w = render_w * out_width / in_width;
+              render_y = render_y * out_height / in_height;
+              render_h = render_h * out_height / in_height;
+              gst_video_overlay_rectangle_set_render_rectangle(rect,
+                  render_x, render_y, render_w, render_h);
+            }
           }
 
           gst_buffer_add_video_overlay_composition_meta(dst, comp_copy);

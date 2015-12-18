@@ -187,7 +187,7 @@ static gint imx_g2d_copy_mem(Imx2DDevice* device, PhyMemBlock *dst_mem,
   dst.buf_paddr = (gint)(dst_mem->paddr);
   dst.buf_size = dst_mem->size;
 
-  if (size < 0)
+  if (size > dst.buf_size)
     size = dst.buf_size;
 
   g2d_copy (g2d_handle, &dst, &src, size);
