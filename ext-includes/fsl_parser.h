@@ -1,25 +1,9 @@
 
 /***********************************************************************
- * Copyright (c) 2009-2014, Freescale Semiconductor, Inc.
+ * Copyright (C) 2009-2015 Freescale Semiconductor, Inc.
  * All modifications are confidential and proprietary information
  * of Freescale Semiconductor, Inc. 
  ***********************************************************************/
-/*
-* This library is free software; you can redistribute it and/or
-* modify it under the terms of the GNU Lesser General Public
-* License as published by the Free Software Foundation; either
-* version 2.1 of the License, or (at your option) any later version.
-*
-* This library is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-* Lesser General Public License for more details.
-*
-* You should have received a copy of the GNU Lesser General Public
-* License along with this library; if not, write to the Free Software
-* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-*/
-
 
 /*
  *
@@ -195,6 +179,8 @@ enum
 
 #define FLAG_SAMPLE_NEWSEG       0x20 /* A new segment of new sample */
 
+#define FLAG_SAMPLE_CODEC_DATA   0x40 /* This is a sample of codec data */
+
 /*********************************************************************
  * seeking flags :
  when to seek, must set one of the following flags
@@ -263,7 +249,7 @@ typedef enum FSL_PARSER_USER_DATA_TYPE
     USER_DATA_DESCRIPTION,    /* movie description */
     USER_DATA_TRACKNUMBER,    /* track number */
     USER_DATA_TOTALTRACKNUMBER,    /* total track number */
-    USER_DATA_LOCATION,       /* geographic location */  
+    USER_DATA_LOCATION,       /* geographic location */
 
     /* add more? */
     USER_DATA_CHAPTER_MENU,     /* Chapter Menu information */
@@ -529,7 +515,7 @@ typedef struct _TrackInfo
     uint32 m_dwTrackNo; //global track No
     uint32 m_dwPID;     //PID(packet ID)
     uint8 m_byLan[3];   //language
-    uint32 m_dwReserved[16];    
+    uint32 m_dwReserved[16];
 }TrackInfo;
 
 //single program map table
@@ -538,7 +524,7 @@ typedef struct _PMTInfo
     uint32 m_dwChannel; //program_number in spec, for a broadcast channel.
     uint32 m_dwPID;     //PID(packet ID)
     uint32 m_dwReserved[8];
-    uint32 m_dwTrackNum;    
+    uint32 m_dwTrackNum;
     TrackInfo *m_ptTrackInfo;
 }PMTInfo;
 

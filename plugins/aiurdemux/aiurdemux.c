@@ -2749,6 +2749,23 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
         gst_buffer_set_size(gstbuf,buffer_size);
     }
   
+    if ((sampleFlags & FLAG_SAMPLE_CODEC_DATA) && (stream->send_codec_data) && (buffer_size)) {
+        GstCaps *caps;
+
+       caps = gst_caps_copy(stream->caps);
+      if(caps){
+        gst_caps_set_simple (caps, "codec_data", GST_TYPE_BUFFER, gstbuf, NULL);
+      }
+
+      gst_buffer_unref (gstbuf);
+
+      gst_caps_unref(stream->caps);
+      stream->caps = caps;
+
+      gst_pad_set_caps (stream->pad, stream->caps);
+
+      return ret;
+    }
 
     AIUR_UPDATE_SAMPLE_STAT (stream->sample_stat,
       AIUR_CORETS_2_GSTTS (usStartTime),
