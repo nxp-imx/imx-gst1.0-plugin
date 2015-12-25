@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -192,12 +192,15 @@ int32
 aiurcontent_callback_seek_pull (FslFileHandle handle, int64 offset,
     int32 whence, void *context)
 {
-  AiurDemuxContentDesc *content = (AiurDemuxContentDesc *) handle;
-  int64 newoffset = content->offset;
+  AiurDemuxContentDesc *content;
+  int64 newoffset;
   int32 ret = 0;
 
-  if (content == NULL)
+  if (handle == NULL)
     return -1;
+
+  content = (AiurDemuxContentDesc *) handle;
+  newoffset = content->offset;
 
   switch (whence) {
     case SEEK_SET:
@@ -280,7 +283,7 @@ aiurcontent_callback_open_push (const uint8 * fileName, const uint8 * mode,
 
   content = g_new0 (AiurDemuxContentDesc, 1);
   if (content) {
-    content->cache = 
+    content->cache =
         gst_mini_object_ref (GST_MINI_OBJECT_CAST (pContent->stream_cache));
     content->length = pContent->length;
     content->seekable = pContent->seekable;
@@ -484,15 +487,15 @@ static gchar* aiurcontent_generate_idx_file(AiurContent * pContent,char * prefix
     gchar * protocal = NULL;
     if(!pContent || !pContent->uri)
         goto bail;
-    
+
     location = g_strdup (pContent->uri);
     protocal = gst_uri_get_protocol (location);
     if (strcmp(protocal, "file")) {
       goto bail;
     }
-    
+
     buf = gst_uri_get_location (location);
-    
+
     if (buf) {
       g_free (location);
       location = buf;
@@ -502,7 +505,7 @@ static gchar* aiurcontent_generate_idx_file(AiurContent * pContent,char * prefix
         }
         buf++;
       }
-    
+
       buf = g_strdup_printf ("%s/%s.%s", prefix, location, "aidx");
     }
 
@@ -524,7 +527,7 @@ static void aiurcontent_query_content_info (AiurContent *pContent)
   GstPad *pad = pContent->sinkpad;
 
   gst_object_ref (GST_OBJECT_CAST (pad));
-  
+
   q = gst_query_new_uri ();
   if (gst_pad_peer_query (pad, q)) {
     gchar *uri;
@@ -535,14 +538,14 @@ static void aiurcontent_query_content_info (AiurContent *pContent)
     }
   }
   gst_query_unref (q);
-  
+
   q = gst_query_new_seeking (GST_FORMAT_BYTES);
   if (gst_pad_peer_query (pad, q)) {
     gst_query_parse_seeking (q, &fmt, &(pContent->seekable), NULL,
         NULL);
   }
   gst_query_unref (q);
-  
+
   pContent->length = -1;
   q = gst_query_new_duration (GST_FORMAT_BYTES);
   if (gst_pad_peer_query (pad, q)) {
@@ -565,7 +568,8 @@ static void aiurcontent_query_content_info (AiurContent *pContent)
 
     if (pContent->index_file) {
       umask (0);
-      mkdir (prefix, 0777);
+      if (mkdir (prefix, 0777))
+        GST_DEBUG("can not mkdir %s ", prefix);
     }
   g_free (prefix);
 
@@ -583,7 +587,7 @@ static void aiurcontent_set_flag (AiurContent *pContent)
   pContent->flags = 0;
 
   if(uri_protocal){
-  for(i = 0; i < sizeof(aiurdemux_protocol_table); i++){
+  for(i = 0; i < sizeof(aiurdemux_protocol_table)/sizeof(AiurdemuxProtocalEntry); i++){
     protocol = &aiurdemux_protocol_table[i];
     if (protocol->protocol != NULL && (strcmp (uri_protocal, protocol->protocol) == 0)){
         pContent->flags = protocol->flags;
@@ -633,7 +637,7 @@ void aiurcontent_release(AiurContent *pContent)
 
     if(pContent->index_file)
         g_free (pContent->index_file);
-    
+
     if(pContent)
         g_free(pContent);
 }
@@ -678,7 +682,7 @@ int aiurcontent_get_memory_callback(AiurContent * pContent,ParserMemoryOps *mem_
 {
     if(!pContent || mem_cbks == NULL)
         return -1;
-    
+
     mem_cbks->Calloc = aiurcontent_callback_calloc;
     mem_cbks->Malloc = aiurcontent_callback_malloc;
     mem_cbks->Free = aiurcontent_callback_free;

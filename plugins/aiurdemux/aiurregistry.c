@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2012, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2010-2012,2014-2015 Freescale Semiconductor, Inc. All rights reserved.
  *
  */
 
@@ -29,7 +29,7 @@
  */
 
 /*
- * Changelog: 
+ * Changelog:
  *
  */
 
@@ -165,11 +165,6 @@ _aiur_core_create_interface_from_entry (gchar * dl_name)
 
   return inf;
 fail:
-  if (inf) {
-    g_free (inf);
-    inf = NULL;
-  }
-
   if (dl_handle) {
     dlclose (dl_handle);
   }
@@ -205,12 +200,12 @@ static GstCaps * aiur_get_caps_from_entry(GstsutilsEntry * entry)
     if (caps) {
       GstCaps *newcaps = gst_caps_from_string (mime);
       if (newcaps) {
-        if (!gst_caps_is_subset (newcaps, caps)) { 
+        if (!gst_caps_is_subset (newcaps, caps)) {
           gst_caps_append (caps, newcaps);
         } else {
-          gst_caps_unref (newcaps); 
-        }     
-      }      
+          gst_caps_unref (newcaps);
+        }
+      }
     } else {
       caps = gst_caps_from_string (mime);
     }
@@ -292,9 +287,12 @@ aiur_core_create_interface_from_caps (GstCaps * caps)
       }
     }
     if(libname == NULL)
-      gstsutils_get_value_by_key(group,FSL_KEY_LIB,&libname);
-    
-    inf = _aiur_core_create_interface_from_entry (libname);
+      find = gstsutils_get_value_by_key(group,FSL_KEY_LIB,&libname);
+
+    if (find)
+      inf = _aiur_core_create_interface_from_entry (libname);
+    else
+      return inf;
 
     if(libname)
       g_free(libname);

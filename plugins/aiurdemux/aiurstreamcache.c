@@ -17,7 +17,7 @@
   */
 
 /*
- * Copyright (C) 2010-2011 Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (C) 2010-2011, 2014-2015 Freescale Semiconductor, Inc. All rights reserved.
  *
  */
 
@@ -30,7 +30,7 @@
  */
 
 /*
- * Changelog: 
+ * Changelog:
  *
  */
 
@@ -387,9 +387,6 @@ trysendseek:
   }
   return r;
 #endif
-fail:
-  g_mutex_unlock (&cache->mutex);
-  return -1;
 }
 
 

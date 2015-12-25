@@ -15,7 +15,7 @@
 */
 
 /*
- * Copyright (c) 2013, Freescale Semiconductor, Inc. 
+ * Copyright (c) 2013-2015, Freescale Semiconductor, Inc.
 
  */
 
@@ -36,7 +36,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-     
+
 #include "aiurdemux.h"
 
 
@@ -426,7 +426,7 @@ static void gst_aiurdemux_class_init (GstAiurDemuxClass * klass)
       gst_static_pad_template_get (&gst_aiurdemux_audiosrc_template));
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&gst_aiurdemux_subsrc_template));
-  
+
   gst_element_class_set_static_metadata (gstelement_class, "Aiur universal demuxer",
       "Codec/Demuxer",
       "demux container file to video, audio, and subtitle",
@@ -497,7 +497,7 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
 {
   GstAiurDemux *demux = GST_AIURDEMUX (element);
   GstStateChangeReturn result = GST_STATE_CHANGE_FAILURE;
-  
+
   switch (transition) {
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       GST_DEBUG_OBJECT(demux,"change_state READY_TO_PAUSED");
@@ -514,9 +514,9 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
       GST_LOG_OBJECT(demux,"change_state transition=%x",transition);
       break;
   }
-  
+
   result = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
-  
+
   switch (transition) {
     case GST_STATE_CHANGE_PAUSED_TO_READY:
     {
@@ -526,13 +526,13 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
 
       if (demux->tag_list)
         gst_tag_list_unref (demux->tag_list);
-      
+
       aiurdemux_release_resource (demux);
-      
+
       gst_aiurdemux_close_core (demux);
       aiurcontent_release(demux->content_info);
       demux->content_info = NULL;
-      
+
       gst_segment_init (&demux->segment, GST_FORMAT_TIME);
 
       demux->play_mode = AIUR_PLAY_MODE_NORMAL;
@@ -546,11 +546,11 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
 
       break;
     }
-  
+
     default:
       break;
   }
-  
+
   return result;
 
 }
@@ -559,7 +559,7 @@ static GstFlowReturn gst_aiurdemux_chain (GstPad * sinkpad, GstObject * parent,
     GstBuffer * inbuf)
 {
   GstAiurDemux *demux;
-  
+
   demux = GST_AIURDEMUX (parent);
   if (inbuf) {
     gst_aiur_stream_cache_add_buffer (demux->stream_cache, inbuf);
@@ -572,9 +572,9 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
     GstEvent * event)
 {
   GstAiurDemux *demux = GST_AIURDEMUX (parent);
-  gboolean res;
-  
-  
+  gboolean res = TRUE;
+
+
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_SEGMENT:
     {
@@ -843,7 +843,7 @@ gst_aiurdemux_push_event (GstAiurDemux * demux, GstEvent * event)
 
   }
 
-  
+
   gst_event_unref (event);
 }
 
@@ -881,7 +881,7 @@ static gboolean aiurdemux_sink_activate (GstPad * sinkpad,GstObject * parent)
 
   if (!pull_mode)
     goto activate_push;
-  
+
   GST_LOG_OBJECT (sinkpad, "activating pull");
   return gst_pad_activate_mode (sinkpad, GST_PAD_MODE_PULL, TRUE);
 
@@ -895,7 +895,7 @@ static gboolean aiurdemux_sink_activate_mode (GstPad * sinkpad,
     GstObject * parent, GstPadMode mode, gboolean active)
 {
   gboolean res = FALSE;
-  
+
   switch (mode) {
     case GST_PAD_MODE_PUSH:
       return aiurdemux_sink_activate_push(sinkpad, parent, active);
@@ -960,7 +960,7 @@ static gboolean aiurdemux_sink_activate_push (GstPad * sinkpad, GstObject * pare
 static void aiurdemux_pull_task (GstPad * pad)
 {
   GstAiurDemux *demux;
-  GstFlowReturn ret;
+  GstFlowReturn ret = GST_FLOW_OK;
 
   demux = GST_AIURDEMUX (gst_pad_get_parent (pad));
 
@@ -1013,7 +1013,7 @@ pause:
 
 static void aiurdemux_push_task (GstAiurDemux * demux)
 {
-  GstFlowReturn ret;
+  GstFlowReturn ret = GST_FLOW_OK;
 
   switch (demux->state) {
     case AIURDEMUX_STATE_PROBE:
@@ -1119,7 +1119,7 @@ aiurdemux_loop_state_init (GstAiurDemux * demux)
 {
   GstFlowReturn ret = GST_FLOW_ERROR;
   int32 parser_result = PARSER_SUCCESS;
-  FslParserHandle core_handle;
+  FslParserHandle core_handle=NULL;
   gboolean isLive = FALSE;
   AiurCoreInterface *IParser = demux->core_interface;
   FslFileStream *file_cbks;
@@ -1245,7 +1245,7 @@ static GstFlowReturn aiurdemux_loop_state_header (GstAiurDemux * demux)
       }
       aiurdemux_destroy_idx_table (idxtable);
     }
-    
+
   }
 
     if (need_init_index && IParser->initializeIndex != NULL) {
@@ -1316,7 +1316,7 @@ static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
 
   GST_LOG_OBJECT(demux,"aiurdemux_loop_state_movie BEGIN");
 
-  
+
   if (demux->pending_event) {
     aiurdemux_send_pending_events (demux);
     demux->pending_event = FALSE;
@@ -1342,14 +1342,14 @@ static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
         goto bail;
       }
   }
-    
+
   //read stream buffer
   ret = aiurdemux_read_buffer(demux,&track_idx,&stream);
 
   GST_LOG_OBJECT(demux,"aiurdemux_loop_state_movie read buffer ret=%d",ret);
   if(ret != GST_FLOW_OK)
       goto beach;
-  
+
   //update time
   if (!stream || !stream->buffer)
     goto bail;
@@ -1368,7 +1368,7 @@ static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
       GST_BUFFER_FLAG_SET (stream->buffer, GST_BUFFER_FLAG_DISCONT);
       aiurdemux_send_stream_newsegment (demux, stream);
     }
-     
+
     gst_aiurdemux_push_tags (demux, stream);
 
     //for vorbis codec data
@@ -1400,7 +1400,7 @@ static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
 
   GST_LOG_OBJECT (demux, "STATE MOVIE END ret=%d",ret);
 
-bail:    
+bail:
   return ret;
 
 
@@ -1421,11 +1421,12 @@ beach:
 static void
 aiurdemux_print_track_info (AiurDemuxStream * stream)
 {
-
-  if ((stream) && (stream->pad) && (stream->caps)) {
+  if (NULL == stream)
+    return;
+  if ((stream->pad) && (stream->caps)) {
     gchar *mime = gst_caps_to_string (stream->caps);
     gchar *padname = gst_pad_get_name (stream->pad);
-    g_print("------------------------\n");  
+    g_print("------------------------\n");
     g_print ("    Track %02d [%s] Enabled\n", stream->track_idx,
             padname ? padname : "");
 
@@ -1468,7 +1469,7 @@ static gboolean aiurdemux_set_readmode (GstAiurDemux * demux)
     g_free(format);
     format = NULL;
   }
-  
+
   //use track mode for local file and file mode for streaming file.
   if(aiurcontent_is_random_access(demux->content_info) && !demux->isMPEG){
       readmode = PARSER_READ_MODE_TRACK_BASED;
@@ -1487,14 +1488,14 @@ static gboolean aiurdemux_set_readmode (GstAiurDemux * demux)
           if (parser_result != PARSER_SUCCESS)
               break;
       }
-  
+
       //check readmode API
       if ((readmode == PARSER_READ_MODE_TRACK_BASED) && (IParser->getNextSample == NULL))
           break;
 
       if((readmode == PARSER_READ_MODE_FILE_BASED) && (IParser->getFileNextSample == NULL))
           break;
-  
+
       demux->read_mode = readmode;
 
       if (readmode == PARSER_READ_MODE_FILE_BASED &&
@@ -1505,7 +1506,7 @@ static gboolean aiurdemux_set_readmode (GstAiurDemux * demux)
           demux->interleave_queue_size = 0;
           GST_DEBUG_OBJECT(demux,"read mode = track mode");
       }
-       
+
       return TRUE;
 
   }while(0);
@@ -1749,7 +1750,7 @@ aiurdemux_add_user_tags (GstAiurDemux * demux)
                 g_user_data_entry[i].gst_tag_name, sample, NULL);
 
             GST_INFO_OBJECT (demux, g_user_data_entry[i].print_string, format,userDataSize);
-            
+
             gst_sample_unref (sample);
           }
         }
@@ -1798,7 +1799,7 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
   int ret = PARSER_SUCCESS;
   uint32 i = 0;
   AiurDemuxStream *stream = NULL;
-  
+
 
   demux->n_streams = 0;
   demux->n_video_streams = 0;
@@ -1851,7 +1852,7 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
         &stream->codec_data.codec_data, &stream->codec_data.length);
 
     ret = PARSER_SUCCESS;
-    
+
 
     int m, n;
     gboolean track_enable = TRUE;
@@ -1886,7 +1887,7 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
         default:
             break;
     }
-    
+
     if ((stream->send_codec_data) && (stream->codec_data.length)
         && (stream->codec_data.length < AIURDEMUX_CODEC_DATA_MAX_LEN)) {
       GstBuffer *gstbuf;
@@ -1900,9 +1901,9 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
       }
       gst_buffer_unref (gstbuf);
     }
-    
+
     aiurdemux_print_track_info (stream);
-    
+
     if (stream->pad) {
       //gboolean padRet = TRUE;
       gchar *stream_id;
@@ -1939,7 +1940,7 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
       if (demux->interleave_queue_size) {
         stream->buf_queue = g_queue_new ();
       }
-      
+
       demux->streams[demux->n_streams] = stream;
       demux->n_streams++;
       stream->discont = TRUE;
@@ -2104,7 +2105,7 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
   const gchar *codec_mime = NULL;
   const gchar *stream_type = NULL;
   gchar *padname;
-  
+
   int32 parser_ret = PARSER_SUCCESS;
   AiurCoreInterface *IParser = demux->core_interface;
   FslParserHandle handle = demux->core_handle;
@@ -2139,7 +2140,7 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
   }
 
   stream->send_codec_data = TRUE;
-    
+
  switch (stream->codec_type) {
       case AUDIO_AAC:
         codec_mime = "audio/mpeg, mpegversion=(int)4";
@@ -2330,7 +2331,7 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
           }
             break;
         }
-  
+
         break;
       case AUDIO_VORBIS:
         codec = "VORBIS";
@@ -2414,34 +2415,34 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
 
     stream->caps = gst_caps_from_string (mime);
     g_free (mime);
-  
+
     if (stream->pid < 0) {
       stream->pid = demux->n_audio_streams;
     }
-  
+
     padname = g_strdup_printf ("audio_%u", stream->pid);
-  
+
     GST_INFO ("Create audio pad %s", padname);
-  
+
     stream->pad =
         gst_pad_new_from_static_template (&gst_aiurdemux_audiosrc_template,
         padname);
     g_free (padname);
-  
+
     demux->n_audio_streams++;
-  
+
     stream->pending_tags = gst_tag_list_new (GST_TAG_CODEC, codec, NULL);
 
     if (stream->lang[0] != '\0') {
       gst_tag_list_add (stream->pending_tags, GST_TAG_MERGE_REPLACE,
           GST_TAG_LANGUAGE_CODE, stream->lang, NULL);
     }
-  
+
     if (stream->bitrate) {
       gst_tag_list_add (stream->pending_tags, GST_TAG_MERGE_REPLACE,
           GST_TAG_BITRATE, stream->bitrate, NULL);
     }
-    
+
     if (demux->tag_list) {
         gst_tag_list_add (demux->tag_list,
             GST_TAG_MERGE_REPLACE, GST_TAG_AUDIO_CODEC, codec, NULL);
@@ -2462,7 +2463,7 @@ static void aiurdemux_parse_text (GstAiurDemux * demux, AiurDemuxStream * stream
   gchar *mime = NULL;
   const gchar *codec_mime = NULL;
   gchar *padname;
-  
+
   int32 parser_ret = PARSER_SUCCESS;
   AiurCoreInterface *IParser = demux->core_interface;
   FslParserHandle handle = demux->core_handle;
@@ -2472,7 +2473,7 @@ static void aiurdemux_parse_text (GstAiurDemux * demux, AiurDemuxStream * stream
 
   if(parser_ret != PARSER_SUCCESS)
       goto bail;
-  
+
   parser_ret = IParser->getTextTrackHeight(handle,track_index,&stream->info.subtitle.height);
 
   if(parser_ret != PARSER_SUCCESS)
@@ -2523,23 +2524,23 @@ static void aiurdemux_parse_text (GstAiurDemux * demux, AiurDemuxStream * stream
               stream->codec_type, stream->codec_sub_type);
       goto bail;
     }
-    
+
     stream->caps = gst_caps_from_string (mime);
     g_free (mime);
 
     if (stream->pid < 0) {
       stream->pid = demux->n_sub_streams;
     }
-  
+
     padname = g_strdup_printf ("subtitle_%u", stream->pid);
-  
+
     GST_INFO ("Create text pad %s", padname);
 
     stream->pad =
         gst_pad_new_from_static_template (&gst_aiurdemux_subsrc_template,
         padname);
     g_free (padname);
-  
+
     stream->pending_tags = gst_tag_list_new (GST_TAG_CODEC, codec_mime, NULL);
     if (stream->lang[0] != '\0') {
       gst_tag_list_add (stream->pending_tags, GST_TAG_MERGE_REPLACE,
@@ -2550,9 +2551,9 @@ static void aiurdemux_parse_text (GstAiurDemux * demux, AiurDemuxStream * stream
         gst_tag_list_add (demux->tag_list,
             GST_TAG_MERGE_REPLACE, GST_TAG_SUBTITLE_CODEC, codec_mime, NULL);
     }
-  
+
     demux->n_sub_streams++;
-  
+
   bail:
     return;
 }
@@ -2608,7 +2609,7 @@ _gst_buffer_copy_into_mem (GstBuffer * dest, gsize offset, const guint8 * src,
   gst_buffer_fill (dest, offset, src, size);
 }
 
-static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_idx, AiurDemuxStream** stream_out) 
+static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_idx, AiurDemuxStream** stream_out)
 {
   GstFlowReturn ret = GST_FLOW_OK;
   int32 parser_ret = PARSER_ERR_UNKNOWN;
@@ -2643,12 +2644,12 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
     }
 
     if (demux->read_mode == PARSER_READ_MODE_FILE_BASED) {
-        
+
         if (demux->play_mode == AIUR_PLAY_MODE_NORMAL) {
 
             parser_ret = IParser->getFileNextSample(handle,track_idx,&buffer,(void *) (&gstbuf),
                 &buffer_size,&usStartTime, &usDuration, &sampleFlags);
-            
+
         }else {
 
             parser_ret = IParser->getFileNextSyncSample(handle, direction, track_idx, &buffer,
@@ -2656,7 +2657,7 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
         }
 
     }else{
-    
+
         if (demux->play_mode == AIUR_PLAY_MODE_NORMAL) {
             parser_ret = IParser->getNextSample(handle,(uint32)(*track_idx),&buffer,(void *) (&gstbuf),
                             &buffer_size,&usStartTime, &usDuration, &sampleFlags);
@@ -2667,7 +2668,7 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
 
         }
     }
-    
+
     GST_LOG_OBJECT(demux,"aiurdemux_read_buffer ret=%d,track=%d,size=%d,time=%lld,duration=%lld,flag=%x",
         parser_ret,*track_idx,buffer_size,usStartTime,usDuration,sampleFlags);
     stream = aiurdemux_trackidx_to_stream (demux, *track_idx);
@@ -2767,6 +2768,7 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
       return ret;
     }
 
+
     AIUR_UPDATE_SAMPLE_STAT (stream->sample_stat,
       AIUR_CORETS_2_GSTTS (usStartTime),
       AIUR_COREDURATION_2_GSTDURATION (usDuration), sampleFlags);
@@ -2795,11 +2797,11 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
         gst_adapter_clear (stream->adapter);
             GST_LOG_OBJECT(demux,"get stream buffer 2");
         }
-      
+
         }
-        
+
       }
-  
+
 readend:
   ;
   }while(sampleFlags & FLAG_SAMPLE_NOT_FINISHED);
@@ -2812,7 +2814,7 @@ readend:
       GST_BUFFER_FLAG_SET (stream->buffer, GST_BUFFER_FLAG_DISCONT);
     }
   }
-  
+
   if (stream->sample_stat.start == stream->last_start
       && !(stream->type == MEDIA_VIDEO && stream->codec_type == VIDEO_ON2_VP)) {
     stream->sample_stat.start = GST_CLOCK_TIME_NONE;
@@ -2826,9 +2828,9 @@ beach:
       gst_buffer_unref (stream->buffer);
       stream->buffer = NULL;
     }
-  
+
       gst_adapter_clear (stream->adapter);
-  
+
       stream->sample_stat.duration = 0;
       stream->sample_stat.start = GST_CLOCK_TIME_NONE;
       stream->sample_stat.flag = 0;
@@ -2939,7 +2941,7 @@ static gint aiurdemux_choose_next_stream (GstAiurDemux * demux)
       track_index = stream->track_idx;
       break;
     }
-  
+
     if ((demux->interleave_queue_size)
         && (stream->buf_queue_size > demux->interleave_queue_size)) {
       track_index = stream->track_idx;
@@ -2979,7 +2981,7 @@ static gint aiurdemux_choose_next_stream (GstAiurDemux * demux)
       min_time = stream->last_stop;
       track_index = stream->track_idx;
     }
-  
+
   }
 
   for (n = 0; n < demux->n_streams; n++) {
@@ -3403,21 +3405,21 @@ static void aiurdemux_reset_stream (GstAiurDemux * demux, AiurDemuxStream * stre
       gst_buffer_unref (stream->buffer);
       stream->buffer = NULL;
     }
-    
+
     stream->adapter_buffer_size = 0;
     if (stream->adapter) {
       gst_adapter_clear (stream->adapter);
     }
-    
+
     if (stream->buf_queue) {
-        GstBuffer * gbuf; 
+        GstBuffer * gbuf;
         while ((gbuf = g_queue_pop_head ((stream)->buf_queue))) {
             gst_buffer_unref (gbuf);
         };
     }
-      
+
     stream->buf_queue_size = 0;
-    
+
     AIUR_RESET_SAMPLE_STAT(stream->sample_stat);
 
     demux->valid_mask |= stream->mask;
@@ -3533,7 +3535,7 @@ gst_aiurdemux_perform_seek (GstAiurDemux * demux, GstSegment * segment,
     AiurDemuxStream *stream = NULL;
     guint64 usSeekTime = AIUR_GSTTS_2_CORETS (desired_offset);
     core_ret = PARSER_SUCCESS;
-    
+
     for (n = 0; n < demux->n_streams; n++) {
       if (demux->streams[n]->type == MEDIA_VIDEO) {
         stream = demux->streams[n];
@@ -3548,13 +3550,15 @@ gst_aiurdemux_perform_seek (GstAiurDemux * demux, GstSegment * segment,
           &usSeekTime, SEEK_FLAG_NO_LATER);
       GST_INFO ("Video seek return %d time %" GST_TIME_FORMAT, core_ret,
           GST_TIME_ARGS (AIUR_CORETS_2_GSTTS (usSeekTime)));
+
+      if (core_ret != PARSER_SUCCESS) {
+        MARK_STREAM_EOS (demux, stream);
+      } else {
+        desired_offset = AIUR_CORETS_2_GSTTS (usSeekTime);
+      }
+      stream->time_position = desired_offset;
+
     }
-    if (core_ret != PARSER_SUCCESS) {
-      MARK_STREAM_EOS (demux, stream);
-    } else {
-      desired_offset = AIUR_CORETS_2_GSTTS (usSeekTime);
-    }
-    stream->time_position = desired_offset;
 
     for (n = 0; n < demux->n_streams; n++) {
       stream = demux->streams[n];
@@ -3564,7 +3568,7 @@ gst_aiurdemux_perform_seek (GstAiurDemux * demux, GstSegment * segment,
       if (stream->type != MEDIA_VIDEO) {
         aiurdemux_reset_stream (demux, stream);
         if (core_ret == PARSER_SUCCESS) {
-            
+
             IParser->seek(handle, stream->track_idx,
                 &usSeekTime, SEEK_FLAG_NO_LATER);
 
@@ -3852,7 +3856,7 @@ aiurdemux_release_resource (GstAiurDemux * demux)
         }
 
         if (stream->buf_queue) {
-            GstBuffer * gbuf; 
+            GstBuffer * gbuf;
             while ((gbuf = g_queue_pop_head ((stream)->buf_queue))) {
                 gst_buffer_unref (gbuf);
             };
@@ -3897,7 +3901,7 @@ gst_aiurdemux_close_core (GstAiurDemux * demux)
         if (IParser->exportIndex) {
           core_ret = IParser->exportIndex( handle, NULL, &size);
 
-          if (((core_ret != PARSER_SUCCESS) && (size < 0))
+          if (((core_ret != PARSER_SUCCESS) && (size <= 0))
               || (size > AIUR_IDX_TABLE_MAX_SIZE)) {
             size = 0;
           }

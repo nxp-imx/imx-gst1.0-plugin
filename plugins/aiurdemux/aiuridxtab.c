@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2012, Freescale Semiconductor, Inc. 
+ * Copyright (c) 2010-2012,2014-2015 Freescale Semiconductor, Inc.
  *
  */
 
@@ -29,7 +29,7 @@
  */
 
 /*
- * Changelog: 
+ * Changelog:
  *
  */
 
@@ -183,8 +183,7 @@ aiurdemux_import_idx_table (gchar * filename)
     goto fail;
   }
 
-  if ((idxtable->info.size > AIUR_IDX_TABLE_MAX_SIZE)
-      || (idxtable->info.size < 0)) {
+  if ((idxtable->info.size > AIUR_IDX_TABLE_MAX_SIZE)) {
     goto fail;
   }
 
