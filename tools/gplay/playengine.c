@@ -90,26 +90,23 @@ bus_sync_cb(GstBus * bus,
 }
 #endif
 
+/* return a new allocate string, need be freed after use */
 static gchar * 
-filename2uri( gchar* uri,
-              const gchar* fn)
+filename2uri(const gchar* fn)
 {
   char * tmp;
   if (strstr(fn, "://")){
-      sprintf(uri, "%s", fn);
+      tmp = g_strdup_printf("%s", fn);
   }else if( fn[0] == '/' ){
-      sprintf(uri, "file://%s", fn);
+      tmp = g_strdup_printf("file://%s", fn);
   }
   else
   {
       gchar* pwd = getenv("PWD");
-      sprintf(uri, "file://%s/%s", pwd, fn);
+      tmp = g_strdup_printf("file://%s/%s", pwd, fn);
   }
 
-  tmp = strstr(uri, "|");
-  if (tmp)
-     *tmp = '\0';
-  return uri;
+  return tmp;
 }
 
 static PlayEngineResult
@@ -129,6 +126,7 @@ get_fullscreen_size(gint32 * pfullscreen_width,
     if (ioctl(fb, FBIOGET_VSCREENINFO, &scrinfo) < 0)
     {
         g_warning("Get var of fb0 failed\n");
+        close(fb);
         return PLAYENGINE_FAILURE;
     }
     *pfullscreen_width = scrinfo.xres;
@@ -143,7 +141,10 @@ malloc_image( imx_image_info *image,
               gsize size)
 {
   imx_image_info *image_info = image;
-  
+
+  if( !image_info )
+    return PLAYENGINE_ERROR_BAD_PARAM;
+
   if (image_info->image) {
       g_free(image_info->image);
       image_info->image = NULL;
@@ -151,7 +152,12 @@ malloc_image( imx_image_info *image,
   }
   
   image_info->image = (guint8 *)g_malloc(size);
+  if(!image_info->image)
+    return PLAYENGINE_FAILURE;
+
   image_info->size = size;
+
+  return PLAYENGINE_SUCCESS;
 }
 
 static GstElement *
@@ -758,14 +764,15 @@ playengine_get_duration(PlayEngineHandle handle,
 static PlayEngineResult 
 playengine_set_file(PlayEngineHandle handle,const gchar *filename)
 {
-  gchar uri[512] = {0};
+  gchar *uri = NULL;
   PlayEngine *engine = (PlayEngine *)handle;
   PlayEngineData *engine_data = NULL;
 
   if (engine && filename && engine->priv) {
     engine_data = (PlayEngineData *)engine->priv;
-    filename2uri(uri, filename);
+    uri = filename2uri (filename);
     g_object_set(G_OBJECT(engine_data->bin), "uri", uri, NULL);
+    g_free(uri);
   }else
   {
     g_error("Error:%s Invalid pointer is used\n", __FUNCTION__);
@@ -1726,7 +1733,7 @@ static PlayEngineResult
 playengine_set_subtitle_uri(PlayEngineHandle handle,
                             const gchar *filename)
 {
-  gchar uri_buffer[512];
+  gchar *uri_buffer = NULL;
   PlayEngine *engine = (PlayEngine *)handle;
   PlayEngineData *engine_data = NULL;
 
@@ -1734,9 +1741,10 @@ playengine_set_subtitle_uri(PlayEngineHandle handle,
     engine_data = (PlayEngineData *)engine->priv;
     if(filename)
     {
-      filename2uri(uri_buffer, filename);
+      uri_buffer = filename2uri (filename);
       g_object_set(G_OBJECT(engine_data->bin), "suburi", uri_buffer, NULL);
       g_message("%s(): suburi=%s\n", __FUNCTION__, uri_buffer);
+      g_free(uri_buffer);
     }else
     {
       g_object_set(G_OBJECT(engine_data->bin), "suburi", NULL, NULL);
@@ -2473,6 +2481,7 @@ play_engine_create()
   if(!engine_data)
   {
     g_warning("malloc play engine data failed\n");
+    free (engine);
     return NULL;
   }else
   {
@@ -2490,6 +2499,13 @@ play_engine_create()
   if(!engine_data->pipeline || !engine_data->bin)
   {
     g_warning("%s create pipeline failed", __FUNCTION__);
+    if(engine_data->pipeline)
+      gst_object_unref(GST_OBJECT(engine_data->pipeline));
+    if(engine_data->bin)
+      gst_object_unref(GST_OBJECT(engine_data->bin));
+
+    free (engine_data);
+    free (engine);
     return NULL;
   }
   gst_bin_add(GST_BIN(engine_data->pipeline), engine_data->bin);
