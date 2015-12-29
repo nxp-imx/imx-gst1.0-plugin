@@ -699,8 +699,7 @@ print_metadata(PlayEngine *engine)
 void 
 print_menu()
 {
-    gchar* str_version = (gchar *)FSL_PLAYENGINE_VERSION_STR;
-    g_print("\n%s\n", (str_version?str_version:"FSL_PLAYENGINE_UNKNOWN_VERSION"));
+    g_print("\n%s\n", FSL_PLAYENGINE_VERSION_STR);
     g_print("\t[h]display the operation Help\n");
     g_print("\t[p]Play\n");
     g_print("\t[s]Stop\n");
@@ -882,7 +881,9 @@ main(int argc,char *argv[])
   while(gexit_main == FALSE){    
     sCommand[0] = ' ';
     errno = 0;
-    scanf("%s", sCommand);
+    if(scanf("%256s", sCommand) != 1){
+      continue;
+    }
 
     switch( sCommand[0] )
     {
@@ -945,7 +946,12 @@ main(int argc,char *argv[])
           //kb_restore_term(STDIN_FILENO);
 
           g_print("Select seek mode[Fast seek:0,Accurate seek:1]:");
-          scanf("%d",&input_mode);
+          if(scanf("%d",&input_mode) != 1)
+          {
+            gDisable_display = FALSE;
+            break;
+          }
+
           if( input_mode != 0 && input_mode != 1  )
           {
               g_print("Invalid seek mode!\n");
@@ -956,13 +962,17 @@ main(int argc,char *argv[])
           }
 
           g_print("%s seek to percentage[0:100] or second [t?]:", accurate_seek?"Accurate":"Normal");
-          scanf("%s",sCommand);
+          if(scanf("%256s",sCommand) != 1)
+          {
+            gDisable_display = FALSE;
+            break;
+          }
           if (sCommand[0]=='t'){
               seek_point_sec = atoi(&sCommand[1]);
           }else{
               seek_portion = atoi(sCommand);
               
-              if( seek_portion<0 || seek_portion>100  )
+              if( seek_portion>100 )
               {
                   g_print("Invalid seek point!\n");
                   gDisable_display = FALSE;
@@ -983,7 +993,11 @@ main(int argc,char *argv[])
           g_print("Set volume[0-1.0]:");
           //kb_restore_term(STDIN_FILENO);
           gDisable_display = TRUE;
-          scanf("%lf",&volume);
+          if(scanf("%lf",&volume) != 1)
+          {
+            gDisable_display = FALSE;
+            break;
+          }
           gDisable_display = FALSE;
           //kb_set_raw_term(STDIN_FILENO);
           playengine->set_volume((PlayEngineHandle)playengine, volume);
@@ -1010,7 +1024,11 @@ main(int argc,char *argv[])
             g_print("Set playing speed[-8,-4,-2,0.125,0.25,0.5,1,2,4,8]:");
             //kb_restore_term(STDIN_FILENO);
             gDisable_display = TRUE;
-            scanf("%lf",&playback_rate);
+            if(scanf("%lf",&playback_rate) != 1)
+            {
+              gDisable_display = FALSE;
+              break;
+            }
             gDisable_display = FALSE;
             //kb_set_raw_term(STDIN_FILENO);
             playengine->set_play_rate((PlayEngineHandle)playengine, playback_rate);
@@ -1036,7 +1054,11 @@ main(int argc,char *argv[])
           g_print("input repeated mode[0 for no repeated,1 for play list repeated, 2 for current file repeated]:");
           //kb_restore_term(STDIN_FILENO);
           gDisable_display = TRUE;
-          scanf("%d",&setrepeat);
+          if(scanf("%d",&setrepeat) != 1)
+          {
+            gDisable_display = FALSE;
+            break;
+          }
           if( setrepeat<0 || setrepeat>2  )
           {
               g_print("Invalid repeated mode!\n");
@@ -1078,10 +1100,13 @@ main(int argc,char *argv[])
             g_print("Set rotation between 0, 90, 180, 270: ");
             //kb_restore_term(STDIN_FILENO);
             gDisable_display = TRUE;
-            scanf("%s",sCommand);
+            if(scanf("%d",&rotate_value) != 1)
+            {
+              gDisable_display = FALSE;
+              break;
+            }
             gDisable_display = FALSE;
             //kb_set_raw_term(STDIN_FILENO);
-            rotate_value = (gint32)atoi(sCommand);
             if(rotate_value != 0  && rotate_value != 90 && rotate_value != 180 && rotate_value != 270 )
             {
                 g_print("Invalid rotation value=%d, should input [0, 90, 180, 270]\n", rotate_value);
@@ -1094,20 +1119,24 @@ main(int argc,char *argv[])
         case 'z': // resize the width and height
         {
             DisplayArea area;
-            gchar sCommand_x[128];
-            gchar sCommand_y[128];
-            gchar sCommand_width[128];
-            gchar sCommand_height[128];
+            guint x = 0;
+            guint y = 0;
+            guint width = 0;
+            guint height = 0;
             g_print("Input [x y width height]:");
             //kb_restore_term(STDIN_FILENO);
             gDisable_display = TRUE;
-            scanf("%s %s %s %s",sCommand_x,sCommand_y,sCommand_width,sCommand_height);
+            if(scanf("%d %d %d %d", &x, &y, &width, &height) != 4)
+            {
+              gDisable_display = FALSE;
+              break;
+            }
             gDisable_display = FALSE;
             //kb_set_raw_term(STDIN_FILENO);
-            area.offsetx = atoi(sCommand_x);
-            area.offsety = atoi(sCommand_y);
-            area.width = atoi(sCommand_width);
-            area.height = atoi(sCommand_height);
+            area.offsetx = x;
+            area.offsety = y;
+            area.width = width;
+            area.height = height;
 
             playengine->set_render_rect((PlayEngineHandle)playengine, area);
             playengine->expose_video((PlayEngineHandle)playengine);
@@ -1130,7 +1159,11 @@ main(int argc,char *argv[])
             g_print("input video track number[0,%d]:",total_video_no-1);
             //kb_restore_term(STDIN_FILENO);
             gDisable_display = TRUE;
-            scanf("%d",&video_track_no);
+            if(scanf("%d",&video_track_no) != 1)
+            {
+              gDisable_display = FALSE;
+              break;
+            }
             if( video_track_no < 0 || video_track_no > total_video_no-1 )
             {
                 g_print("Invalid video track!\n");
@@ -1153,7 +1186,11 @@ main(int argc,char *argv[])
             g_print("input audio track number[0,%d]:",total_audio_no-1);
             //kb_restore_term(STDIN_FILENO);
             gDisable_display = TRUE;
-            scanf("%d",&audio_track_no);
+            if(scanf("%d",&audio_track_no) != 1)
+            {
+              gDisable_display = FALSE;
+              break;
+            }
             if( audio_track_no < 0 || audio_track_no > total_audio_no-1 )
             {
                 g_print("Invalid audio track!\n");
@@ -1175,7 +1212,11 @@ main(int argc,char *argv[])
             g_print("input subtitle number[0,%d]:",total_subtitle_no-1);
             //kb_restore_term(STDIN_FILENO);
             gDisable_display = TRUE;
-            scanf("%d",&subtitle_no);
+            if(scanf("%d",&subtitle_no) != 1)
+            {
+              gDisable_display = FALSE;
+              break;
+            }
             if( subtitle_no < 0 || subtitle_no > total_subtitle_no-1 )
             {
                 g_print("Invalid subtitle track!\n");
@@ -1207,7 +1248,11 @@ main(int argc,char *argv[])
 
             //kb_restore_term(STDIN_FILENO);
             gDisable_display = TRUE;
-            scanf("%s",sCommand);
+            if(scanf("%256s",sCommand) != 1)
+            {
+              gDisable_display = FALSE;
+              break;
+            }
             gDisable_display = FALSE;
             //kb_set_raw_term(STDIN_FILENO);
 
