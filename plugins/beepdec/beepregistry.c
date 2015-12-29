@@ -15,7 +15,7 @@
 */
 
 /*
- * Copyright (c) 2011-2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2011-2016, Freescale Semiconductor, Inc. All rights reserved.
  *
  */
 
@@ -30,7 +30,7 @@
  */
 
 /*
- * Changelog: 
+ * Changelog:
  *
  */
 
@@ -119,11 +119,6 @@ _beep_core_create_interface_from_entry (gchar * dl_name)
 
   return inf;
 fail:
-  if (inf) {
-    g_free (inf);
-    inf = NULL;
-  }
-
   if (dl_handle) {
     dlclose (dl_handle);
   }
@@ -142,10 +137,10 @@ static GstCaps * beep_get_caps_from_entry(GstsutilsEntry * entry)
   group_count = gstsutils_get_group_count(entry);
 
   for(index = 1; index <= group_count; index++){
-    
+
     if(!gstsutils_get_group_by_index(entry,index,&group))
       continue;
-    
+
     if(!gstsutils_get_value_by_key(group,FSL_KEY_MIME,&mime)){
       continue;
     }
@@ -160,20 +155,20 @@ static GstCaps * beep_get_caps_from_entry(GstsutilsEntry * entry)
       g_free(libname);
       continue;
     }
-    
+
     if (caps) {
       GstCaps *newcaps = gst_caps_from_string (mime);
       if (newcaps) {
-        if (!gst_caps_is_subset (newcaps, caps)) { 
+        if (!gst_caps_is_subset (newcaps, caps)) {
           gst_caps_append (caps, newcaps);
         } else {
-          gst_caps_unref (newcaps); 
-        }     
-      }      
+          gst_caps_unref (newcaps);
+        }
+      }
     } else {
       caps = gst_caps_from_string (mime);
     }
-    
+
     dlclose (dlhandle);
     g_free(mime);
     g_free(libname);
@@ -190,18 +185,18 @@ static GstsutilsGroup * beep_core_find_caps_group(GstsutilsEntry *entry,GstCaps 
   void *dlhandle = NULL;
   GstCaps * super_caps = NULL;
   gboolean found = FALSE;
-  
+
   group_count = gstsutils_get_group_count(entry);
 
   for(index = 1; index <= group_count; index++){
 
     if(found)
       break;
-    
+
     if(!gstsutils_get_group_by_index(entry,index,&group))
       continue;
 
-    
+
     if(!gstsutils_get_value_by_key(group,FSL_KEY_MIME,&mime)){
       continue;
     }
@@ -210,14 +205,14 @@ static GstsutilsGroup * beep_core_find_caps_group(GstsutilsEntry *entry,GstCaps 
     if ((super_caps) && (gst_caps_is_subset (caps, super_caps))) {
       found = TRUE;
     }
-    
+
     if(super_caps)
       gst_caps_unref (super_caps);
 
     g_free(mime);
 
   }
-  
+
   return group;
 }
 
@@ -265,9 +260,12 @@ beep_core_create_interface_from_caps (GstCaps * caps)
     }
 
     if(libname == NULL)
-      gstsutils_get_value_by_key(group,FSL_KEY_LIB,&libname);
-    
-    inf = _beep_core_create_interface_from_entry (libname);
+      find = gstsutils_get_value_by_key(group,FSL_KEY_LIB,&libname);
+
+    if (find )
+      inf = _beep_core_create_interface_from_entry (libname);
+    else
+      return inf;
 
     if(libname)
       g_free(libname);

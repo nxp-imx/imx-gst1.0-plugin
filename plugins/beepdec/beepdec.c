@@ -15,7 +15,7 @@
 */
 
 /*
- * Copyright (c) 2011-2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2011-2016, Freescale Semiconductor, Inc. All rights reserved.
  *
  */
 
@@ -421,10 +421,11 @@ static gboolean beep_dec_set_format(GstAudioDecoder *dec, GstCaps *caps)
 
     }while(0);
 
-    if (ret == FALSE && beepdec->handle) {
+    if (ret == FALSE && beepdec->handle && beepdec->beep_interface) {
         beepdec->beep_interface->deleteDecoder (beepdec->handle);
         beepdec->handle = NULL;
     }
+
 
     GST_LOG_OBJECT (beepdec,"beep_dec_set_format called ret=%d", ret);
     return ret;
@@ -442,7 +443,7 @@ static gboolean beep_dec_start (GstAudioDecoder * dec)
     memset (&beepdec->audio_info, 0, sizeof(GstAudioInfo));
     beepdec->adapter = gst_adapter_new ();
     beepdec->core_layout = NULL;
-    beepdec->core_layout = NULL;
+    beepdec->out_layout = NULL;
     beepdec->output_changed = FALSE;
     beepdec->frame_cnt = 0;
     beepdec->set_codec_data = FALSE;
@@ -492,12 +493,14 @@ static gboolean beep_dec_map_channel_layout(UniAcodecOutputPCMFormat * outputVal
 {
     uint32 i = 0;
 
-    uint32 nChannels = outputValue->channels;
+    uint32 nChannels;
 
 
     if(outputValue == NULL || pos == NULL){
         return FALSE;
     }
+
+    nChannels = outputValue->channels;
 
     if(nChannels == 1){
         pos[0] = GST_AUDIO_CHANNEL_POSITION_MONO;
@@ -613,6 +616,8 @@ static void beep_dec_handle_output_changed(GstBeepDec *beepdec)
             beep_dec_map_channel_layout(&beepdec->outputformat,beepdec->core_layout);
             memcpy (beepdec->out_layout,beepdec->core_layout,
                 sizeof (GstAudioChannelPosition) * beepdec->outputformat.channels);
+        } else {
+            break;   /* core_layout  or out_layout is NULL */
         }
 
         GST_DEBUG_OBJECT(beepdec,"output changed after convert num=%d,core layout=%d,%d,%d,%d,%d,%d,%d,%d",
