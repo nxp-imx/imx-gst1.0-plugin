@@ -862,7 +862,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   if (out_frame && vpu_dec_object->frame_drop)
     gst_vpu_dec_object_process_qos (vpu_dec_object, bdec, out_frame);
  
-  if (drop == FALSE) {
+  if (drop != TRUE) {
     dec_ret = VPU_DecGetOutputFrame(vpu_dec_object->handle, &out_frame_info);
     if (dec_ret != VPU_DEC_RET_SUCCESS) {
       GST_ERROR_OBJECT(vpu_dec_object, "could not get decoded output frame: %s", \

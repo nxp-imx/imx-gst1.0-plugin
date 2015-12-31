@@ -384,11 +384,12 @@ imx_ipu_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint colo
     } else if (fbVar.bits_per_pixel == 24 || fbVar.bits_per_pixel == 32) {
       colorKey.color_key = color_key;
     }
+    GST_DEBUG ("set colorKey to (%x) for display (%s)", colorKey.color_key, device);
   }
 
   if (enable) {
     colorKey.enable = 1;
-    GST_DEBUG ("set colorKey to (%x) for display (%s)", colorKey.color_key, device);
+    GST_DEBUG ("enable colorKey for display (%s)", device);
   }
   else {
     colorKey.enable = 0;
@@ -643,7 +644,7 @@ gst_imx_v4l2_get_device_caps (gint type)
 
   devname = gst_imx_v4l2_get_default_device_name (type);
   fd = open(devname, O_RDWR | O_NONBLOCK, 0);
-  if (fd <= 0) {
+  if (fd < 0) {
     GST_ERROR ("Can't open %s\n", devname);
     return NULL;
   }
@@ -1018,7 +1019,7 @@ gst_imx_v4l2capture_set_function (IMXV4l2Handle *handle)
       handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_pxp;
       handle->support_format_table = g_camera_format_PXP;
     } else if (!strncmp (chip.match.name, MXC_V4L2_CAPTURE_TVIN_VADC_NAME, 3)) {
-      handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_camera;
+      handle->dev_itf.v4l2capture_config = (V4l2captureConfig)gst_imx_v4l2capture_config_pxp;
       handle->support_format_table = g_camera_format_PXP;
       handle->is_tvin = TRUE;
       if (gst_imx_v4l2capture_config_tvin_std (handle)) {
@@ -1042,7 +1043,7 @@ gst_imx_v4l2capture_set_function (IMXV4l2Handle *handle)
 void gst_imx_v4l2_get_display_resolution (gchar *device, gint *w, gint *h)
 {
   struct fb_var_screeninfo fb_var;
-  gint i, device_map_id;
+  gint i, device_map_id = -1;
   int fd;
 
   *w = DEFAULTW;
@@ -1053,6 +1054,10 @@ void gst_imx_v4l2_get_display_resolution (gchar *device, gint *w, gint *h)
       device_map_id = i;
       break;
     }
+  }
+  if (device_map_id < 0) {
+    g_print ("ERROR: Can't find %s.\n", device);
+    return;
   }
 
   fd = open (g_device_maps[device_map_id].bg_fb_name, O_RDWR, 0);
@@ -1297,8 +1302,6 @@ gst_imx_v4l2out_calc_crop (IMXV4l2Handle *handle,
       rect_crop->width = 0;
     rect_out->left = rect_out->left + result->x;
     rect_out->width = handle->disp_w - rect_out->left;
-    if (rect_out->width < 0)
-      rect_out->width = 0;
     need_crop = TRUE;
   }
   else {
@@ -1322,8 +1325,6 @@ gst_imx_v4l2out_calc_crop (IMXV4l2Handle *handle,
       rect_crop->height = 0;
     rect_out->top = rect_out->top + result->y;
     rect_out->height = handle->disp_h - rect_out->top;
-    if (rect_out->height < 0)
-      rect_out->height = 0;
     need_crop = TRUE;
   }
   else {

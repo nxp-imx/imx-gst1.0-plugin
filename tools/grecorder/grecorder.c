@@ -738,7 +738,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
           pOpt->file_size = atoll (optarg);
         break;
       case 'o':
-        if (optarg)
+        if (optarg && strlen (optarg) < 32)
           strcpy (pOpt->host, optarg);
         break;
       case 'r':
@@ -847,7 +847,7 @@ int main(int argc, char* argv[])
     {
       if (read_input){
         recorder_main_menu();
-        scanf("%s", rep);
+        scanf("%128s", rep);
       }
       read_input=RE_BOOLEAN_TRUE;
       if (quit_flag) {

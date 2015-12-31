@@ -106,7 +106,7 @@ getChipCodeFromCpuinfo (void)
   char buf[100], *p, *rev;
   char chip_name[3];
   int len = 0, i;
-  int chip_num;
+  int chip_num = -1;
   CHIP_CODE cc = CC_UNKN;
   fp = fopen ("/proc/cpuinfo", "r");
   if (fp == NULL) {
@@ -127,6 +127,10 @@ getChipCodeFromCpuinfo (void)
   }
 
   fclose (fp);
+
+  if (chip_num < 0) {
+    return cc;
+  }
 
   int num = sizeof(cpu_info) / sizeof(CPU_INFO);
   for(i=0; i<num; i++) {
@@ -177,7 +181,7 @@ getChipCodeFromSocid (void)
     return  CC_UNKN;
   }
 
-  if (fscanf(fp, "%s", soc_name) != 1) {
+  if (fscanf(fp, "%100s", soc_name) != 1) {
     g_print("fscanf soc_id failed.\n");
     fclose(fp);
     return CC_UNKN;

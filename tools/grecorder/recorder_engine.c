@@ -246,7 +246,7 @@ static REresult get_media_time(RecorderEngineHandle handle, REtime *pMediaTimeUs
 static GstEncodingProfile *
 create_encording_profile (gRecorderEngine *recorder)
 {
-  GstEncodingContainerProfile *container;
+  GstEncodingContainerProfile *container = NULL;
   GstEncodingProfile *sprof = NULL;
   GstCaps *caps = NULL;
 
