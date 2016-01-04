@@ -1348,7 +1348,7 @@ gint gst_imx_v4l2out_config_output (gpointer v4l2handle, IMXV4l2Rect *overlay, g
   IMXV4l2Rect *rect = &crop.c;;
   GstVideoRectangle src, dest, result;
   gboolean brotate;
-  gint ret;
+  gint ret = 0;
 
   memcpy (rect, overlay, sizeof(IMXV4l2Rect));
 
