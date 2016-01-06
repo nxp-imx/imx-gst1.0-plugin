@@ -16,7 +16,7 @@
  */
 
 /*
- * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved. 
+ * Copyright (c) 2014,2016 Freescale Semiconductor, Inc. All rights reserved.
  *
  */
 
@@ -24,8 +24,8 @@
 /**
  * SECTION:element-gstimxmp3enc
  *
- * MP3 audio encoder based on fsl mp3 encoder library 
- * 
+ * MP3 audio encoder based on fsl mp3 encoder library
+ *
  * <refsect2>
  * <title>Example launch line</title>
  * |[
@@ -61,7 +61,7 @@ enum
 };
 
 #define SAMPLE_RATES " 32000, " "44100, " "48000"
- 
+
 
 static GstStaticPadTemplate sink_template = GST_STATIC_PAD_TEMPLATE ("sink",
     GST_PAD_SINK,
@@ -109,7 +109,7 @@ gst_imx_mp3enc_set_property (GObject * object, guint prop_id,
       break;
     case PROP_QUALITY:
       self->quality = g_value_get_int (value);
-      break;      
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -158,8 +158,8 @@ gst_imx_mp3enc_class_init (GstImxMp3EncClass * klass)
           "Target Audio Bitrate in kbit/sec (only valid if bitrate is one of "
           "32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320)",
           32, 320, IMX_MP3ENC_DEFAULT_BITRATE,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));          
-          
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (G_OBJECT_CLASS (klass), PROP_QUALITY,
       g_param_spec_int ("quality", "Quality",
           "MP3 Encoder Quality (0-low quality, 1-high quality) ",
@@ -233,14 +233,14 @@ gst_imx_mp3enc_set_format (GstAudioEncoder * benc, GstAudioInfo * info)
   /* parameters already parsed for us */
   imx_mp3enc->channels = GST_AUDIO_INFO_CHANNELS (info);
   imx_mp3enc->rate = GST_AUDIO_INFO_RATE (info);
-  imx_mp3enc->interleave = GST_AUDIO_INFO_LAYOUT(info); /* 0 - interleave, 1 - noninterleave */ 
+  imx_mp3enc->interleave = GST_AUDIO_INFO_LAYOUT(info); /* 0 - interleave, 1 - noninterleave */
 
 
   imx_mp3enc->enc_param.app_bit_rate = imx_mp3enc->bitrate;
   imx_mp3enc->enc_param.app_sampling_rate = imx_mp3enc->rate;
-  
-  imx_mp3enc->enc_param.app_mode = ((imx_mp3enc->channels % 2) & 0x3) + 
-                                   ((imx_mp3enc->interleave & 0x3) << 8) + 
+
+  imx_mp3enc->enc_param.app_mode = ((imx_mp3enc->channels % 2) & 0x3) +
+                                   ((imx_mp3enc->interleave & 0x3) << 8) +
 	                                 ((imx_mp3enc->quality & 0x3) << 16);
 
   rc = mp3e_encode_init (&imx_mp3enc->enc_param, &imx_mp3enc->enc_config);
@@ -322,16 +322,9 @@ gst_imx_mp3enc_handle_frame (GstAudioEncoder * benc, GstBuffer * buf)
 exit:
   return ret;
 
-  /* ERRORS */
-encode_failed:
-  {
-    GST_ELEMENT_ERROR (imx_mp3enc, STREAM, ENCODE, (NULL), ("encode failed"));
-    ret = GST_FLOW_ERROR;
-    goto exit;
-  }
 }
 
-static void 
+static void
 gst_imx_mp3enc_flush(GstAudioEncoder *benc)
 {
   GstImxMp3Enc *imx_mp3enc;
@@ -341,7 +334,7 @@ gst_imx_mp3enc_flush(GstAudioEncoder *benc)
   MP3E_Encoder_Config *pEnc_config;
 
   GST_DEBUG_OBJECT (benc, "flush");
-  
+
   imx_mp3enc = GST_IMX_MP3ENC (benc);
 
   pEnc_config = &imx_mp3enc->enc_config;
@@ -350,7 +343,7 @@ gst_imx_mp3enc_flush(GstAudioEncoder *benc)
   gst_buffer_map (out, &omap, GST_MAP_WRITE);
 
   mp3e_flush_bitstream(pEnc_config, omap.data);
-  
+
   GST_LOG_OBJECT (imx_mp3enc, "mp3e flush %lu bytes", pEnc_config->num_bytes);
   gst_buffer_unmap (out, &omap);
   gst_buffer_resize (out, 0, pEnc_config->num_bytes);
@@ -389,21 +382,21 @@ imx_mp3enc_core_prepare (GstImxMp3Enc * imx_mp3enc)
   MP3E_RET_VAL rc;
 
   GST_INFO_OBJECT(imx_mp3enc, "%s", MP3ECodecVersionInfo());
-  
+
   imx_mp3enc->enc_config.instance_id = 0;
-  
+
   /* memory setup */
   rc = mp3e_query_mem (&imx_mp3enc->enc_config);
   if (rc != MP3E_SUCCESS) {
     GST_ERROR("MP3 Encoder query memory failed");
     return FALSE;
   }
-  
+
   if (imx_mp3enc_alloc_mem(imx_mp3enc) == FALSE ) {
     GST_ERROR("mp3 enc alloc mem failed");
     return FALSE;
   }
-  
+
   return TRUE;
 }
 
