@@ -243,7 +243,7 @@ beep_core_create_interface_from_caps (GstCaps * caps)
   gchar * libname = NULL;
   gchar * libname2 = NULL;
   gchar * temp_name;
-  gboolean find = FALSE;
+  gboolean find = TRUE;
   void *dlhandle = NULL;
 
   group = beep_core_find_caps_group(g_beep_caps_entry,caps);

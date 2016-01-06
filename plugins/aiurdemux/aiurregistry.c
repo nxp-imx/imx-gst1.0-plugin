@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2012,2014-2015 Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2010-2012,2014-2016 Freescale Semiconductor, Inc. All rights reserved.
  *
  */
 
@@ -271,7 +271,7 @@ aiur_core_create_interface_from_caps (GstCaps * caps)
   gchar * libname = NULL;
   gchar * libname2 = NULL;
   gchar * temp_name;
-  gboolean find = FALSE;
+  gboolean find = TRUE;
   void *dlhandle = NULL;
 
   group = aiur_core_find_caps_group(g_aiur_caps_entry,caps);
