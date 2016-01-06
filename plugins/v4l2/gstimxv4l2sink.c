@@ -562,29 +562,28 @@ gst_imx_v4l2sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
   GstVideoInfo info;
 
   gst_query_parse_allocation (query, &caps, &need_pool);
+  if (caps == NULL) {
+    GST_ERROR_OBJECT (v4l2sink, "no caps specified.");
+    return FALSE;
+  }
+
+  if (gst_video_info_from_caps(&info, caps)) {
+    return FALSE;
+  }
 
   if (need_pool) {
-    if (caps == NULL) {
-      GST_ERROR_OBJECT (v4l2sink, "no caps specified.");
-      return FALSE;
+    guint v4l2fmt = gst_imx_v4l2_fmt_gst2v4l2 (GST_VIDEO_INFO_FORMAT (&info));
+    if (!v4l2fmt) {
+      v4l2fmt = gst_imx_v4l2_special_fmt (caps);
     }
 
-    if (gst_video_info_from_caps(&info, caps)) {
-      return FALSE;
-    } else {
-      guint v4l2fmt = gst_imx_v4l2_fmt_gst2v4l2 (GST_VIDEO_INFO_FORMAT (&info));
-      if (!v4l2fmt) {
-        v4l2fmt = gst_imx_v4l2_special_fmt (caps);
-      }
-
-      v4l2sink->v4l2fmt = v4l2fmt;
-      v4l2sink->w = GST_VIDEO_INFO_WIDTH (&info);
-      v4l2sink->h = GST_VIDEO_INFO_HEIGHT (&info);
-      v4l2sink->cropmeta.x = 0;
-      v4l2sink->cropmeta.y = 0;
-      v4l2sink->cropmeta.width = v4l2sink->w;
-      v4l2sink->cropmeta.height = v4l2sink->h;
-    }
+    v4l2sink->v4l2fmt = v4l2fmt;
+    v4l2sink->w = GST_VIDEO_INFO_WIDTH (&info);
+    v4l2sink->h = GST_VIDEO_INFO_HEIGHT (&info);
+    v4l2sink->cropmeta.x = 0;
+    v4l2sink->cropmeta.y = 0;
+    v4l2sink->cropmeta.width = v4l2sink->w;
+    v4l2sink->cropmeta.height = v4l2sink->h;
 
     if (v4l2sink->pool) {
       if (!gst_imx_v4l2sink_buffer_pool_is_ok(v4l2sink->pool, caps, info.size)){
