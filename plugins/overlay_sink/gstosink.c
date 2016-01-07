@@ -705,7 +705,6 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
   }
 
   cropmeta = gst_buffer_get_video_crop_meta (buffer);
-  gst_overlay_sink_check_alignment (sink, buffer);
 
   if (!gst_buffer_is_phymem (buffer)) {
     // check if physical buffer
@@ -757,6 +756,12 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     gst_video_frame_unmap (&frame1);
     gst_video_frame_unmap (&frame2);
 
+    GstVideoMeta *meta = gst_buffer_get_video_meta(buffer);
+    if (meta) {
+      gst_buffer_add_video_meta(buffer2, meta->flags,
+                                meta->format, meta->width, meta->height);
+    }
+
     if (sink->composition_meta_enable
         && imx_video_overlay_composition_has_meta(buffer)) {
       imx_video_overlay_composition_copy_meta(buffer2, buffer,
@@ -789,6 +794,8 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
   GST_DEBUG_OBJECT (sink, "show gstbuffer (%p), surface_buffer vaddr (%p) paddr (%p).",
       buffer, surface_buffer.mem.vaddr, surface_buffer.mem.paddr);
+
+  gst_overlay_sink_check_alignment (sink, buffer);
 
   if ((cropmeta && gst_overlay_sink_incrop_changed_and_set (cropmeta, &sink->cropmeta))) {
     gst_overlay_sink_input_config (sink);
