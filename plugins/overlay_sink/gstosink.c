@@ -640,6 +640,16 @@ gst_overlay_sink_check_alignment (GstOverlaySink *sink, GstBuffer *buffer)
           GST_DEBUG_OBJECT (sink, "pool has alignment (%d, %d) , (%d, %d)",
               sink->video_align.padding_left, sink->video_align.padding_top,
               sink->video_align.padding_right, sink->video_align.padding_bottom);
+        } else {
+          GstCaps *caps = NULL;
+          GstVideoInfo info;
+          gst_buffer_pool_config_get_params(config, &caps, NULL, NULL, NULL);
+          if (gst_video_info_from_caps(&info, caps)) {
+            if (info.width > sink->w)
+              sink->video_align.padding_right = info.width - sink->w;
+            if (info.height > sink->h)
+              sink->video_align.padding_bottom = info.height - sink->h;
+          }
         }
         gst_structure_free (config);
       } else {
