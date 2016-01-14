@@ -365,22 +365,6 @@ gst_imx_v4l2sink_configure_input (GstImxV4l2Sink *v4l2sink)
   crop.width = MIN (v4l2sink->cropmeta.width, v4l2sink->crop.width);
   crop.height = MIN (v4l2sink->cropmeta.height, v4l2sink->crop.height);
 
-  guint crop_w = v4l2sink->crop.width;
-  guint crop_h = v4l2sink->crop.height;
-  if (crop_w == 0) {
-    crop_w = v4l2sink->w;
-    if (v4l2sink->crop.left > 0)
-      crop_w -= v4l2sink->crop.left;
-  }
-  if (crop_h == 0) {
-    crop_h = v4l2sink->h;
-    if (v4l2sink->crop.top > 0)
-      crop_h -= v4l2sink->crop.top;
-  }
-
-  crop.width = MIN (v4l2sink->cropmeta.width, crop_w);
-  crop.height = MIN (v4l2sink->cropmeta.height, crop_h);
-
   GST_DEBUG_OBJECT (v4l2sink, "crop: (%d,%d) -> (%d, %d)", 
       v4l2sink->crop.left, v4l2sink->crop.top, v4l2sink->crop.width, v4l2sink->crop.height);
   GST_DEBUG_OBJECT (v4l2sink, "cropmeta: (%d,%d) -> (%d, %d)", 
@@ -404,8 +388,8 @@ gst_imx_v4l2_allocator_cb (gpointer user_data, gint *count)
 
     // check if has alignment option setted.
     // if yes, need to recheck the pool params for reconfigure v4l2 devicec.
-    memset (&v4l2sink->video_align, 0, sizeof(GstVideoAlignment));
     if (gst_buffer_pool_config_has_option (config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
+      memset (&v4l2sink->video_align, 0, sizeof(GstVideoAlignment));
       gst_buffer_pool_config_get_video_alignment (config, &v4l2sink->video_align);
       GST_DEBUG_OBJECT (v4l2sink, "pool has alignment (%d, %d) , (%d, %d)", 
           v4l2sink->video_align.padding_left, v4l2sink->video_align.padding_top,
@@ -547,6 +531,18 @@ gst_imx_v4l2sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
   v4l2sink->cropmeta.width = v4l2sink->w;
   v4l2sink->cropmeta.height = v4l2sink->h;
 
+  if (v4l2sink->crop.width <= 0) {
+    v4l2sink->crop.width = v4l2sink->w;
+    if (v4l2sink->crop.left > 0)
+      v4l2sink->crop.width -= v4l2sink->crop.left;
+  }
+
+  if (v4l2sink->crop.height <= 0) {
+    v4l2sink->crop.height = v4l2sink->h;
+    if (v4l2sink->crop.top > 0)
+      v4l2sink->crop.height -= v4l2sink->crop.top;
+  }
+
   gst_imx_video_overlay_prepare_window_handle (v4l2sink->imxoverlay, TRUE);
 
   return TRUE;
@@ -567,7 +563,8 @@ gst_imx_v4l2sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
     return FALSE;
   }
 
-  if (gst_video_info_from_caps(&info, caps)) {
+  if (!gst_video_info_from_caps(&info, caps)) {
+    GST_ERROR_OBJECT (v4l2sink, "can't get info from caps.");
     return FALSE;
   }
 
@@ -584,6 +581,18 @@ gst_imx_v4l2sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
     v4l2sink->cropmeta.y = 0;
     v4l2sink->cropmeta.width = v4l2sink->w;
     v4l2sink->cropmeta.height = v4l2sink->h;
+
+    if (v4l2sink->crop.width <= 0) {
+      v4l2sink->crop.width = v4l2sink->w;
+      if (v4l2sink->crop.left > 0)
+        v4l2sink->crop.width -= v4l2sink->crop.left;
+    }
+
+    if (v4l2sink->crop.height <= 0) {
+      v4l2sink->crop.height = v4l2sink->h;
+      if (v4l2sink->crop.top > 0)
+        v4l2sink->crop.height -= v4l2sink->crop.top;
+    }
 
     if (v4l2sink->pool) {
       if (!gst_imx_v4l2sink_buffer_pool_is_ok(v4l2sink->pool, caps, info.size)){
@@ -715,19 +724,6 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
       gst_caps_unref (new_caps);
     }
 
-    if (gst_buffer_pool_set_active (v4l2sink->pool, TRUE) != TRUE) {
-      GST_ERROR_OBJECT (v4l2sink, "active pool(%p) failed.", v4l2sink->pool);
-      gst_caps_unref (caps);
-      return GST_FLOW_ERROR;
-    }
-
-    gst_buffer_pool_acquire_buffer (v4l2sink->pool, &v4l2_buffer, NULL);
-    if (!v4l2_buffer) {
-      GST_ERROR_OBJECT (v4l2sink, "acquire buffer from pool(%p) failed.", v4l2sink->pool);
-      gst_caps_unref (caps);
-      return GST_FLOW_ERROR;
-    }
-
     GstPhyMemMeta *phymemmeta = NULL;
     if (v4l2sink->pool_activated == FALSE) {
       phymemmeta = GST_PHY_MEM_META_GET (buffer);
@@ -760,6 +756,19 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
           v4l2sink->config_flag |= CONFIG_CROP;
         }
       }
+    }
+
+    if (gst_buffer_pool_set_active (v4l2sink->pool, TRUE) != TRUE) {
+      GST_ERROR_OBJECT (v4l2sink, "active pool(%p) failed.", v4l2sink->pool);
+      gst_caps_unref (caps);
+      return GST_FLOW_ERROR;
+    }
+
+    gst_buffer_pool_acquire_buffer (v4l2sink->pool, &v4l2_buffer, NULL);
+    if (!v4l2_buffer) {
+      GST_ERROR_OBJECT (v4l2sink, "acquire buffer from pool(%p) failed.", v4l2sink->pool);
+      gst_caps_unref (caps);
+      return GST_FLOW_ERROR;
     }
 
     v4l2sink->pool_activated = TRUE;
@@ -1016,7 +1025,7 @@ gst_imx_v4l2sink_install_properties (GObjectClass *gobject_class)
   g_object_class_install_property (gobject_class, PROP_COMPOSITION_META_ENABLE,
       g_param_spec_boolean("composition-meta-enable", "Enable composition meta",
         "Enable overlay composition meta processing",
-        IMX_V4L2SINK_COMPOMETA_DEFAULT,
+        TRUE,
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   return;
