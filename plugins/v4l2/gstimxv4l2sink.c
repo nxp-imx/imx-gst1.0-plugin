@@ -791,15 +791,15 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
       gst_video_frame_unmap (&frame1);
       gst_video_frame_unmap (&frame2);
     }
-  }
 
-  if (v4l2sink->composition_meta_enable
-      && imx_video_overlay_composition_has_meta(buffer)) {
-    imx_video_overlay_composition_copy_meta(v4l2_buffer, buffer,
-        info.width, info.height, info.width, info.height);
-  }
+    if (v4l2sink->composition_meta_enable
+        && imx_video_overlay_composition_has_meta(buffer)) {
+      imx_video_overlay_composition_copy_meta(v4l2_buffer, buffer,
+          info.width, info.height, info.width, info.height);
+    }
 
-  buffer = v4l2_buffer;
+    buffer = v4l2_buffer;
+  }
 
   gst_caps_unref (caps);
 
