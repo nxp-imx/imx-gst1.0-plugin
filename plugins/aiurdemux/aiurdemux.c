@@ -78,7 +78,8 @@ static AiurdemuxCodecStruct aiurdemux_videocodec_tab[] ={
   {VIDEO_ON2_VP, VIDEO_VP6A, "VP6 Alpha", "video/x-vp6-alpha"},
   {VIDEO_ON2_VP, VIDEO_VP6, "VP6 Flash", "video/x-vp6-flash"},
   {VIDEO_ON2_VP, VIDEO_VP8, "VP8", "video/x-vp8"},
-  {VIDEO_ON2_VP, 0, NULL, NULL}
+  {VIDEO_ON2_VP, 0, NULL, NULL},
+  {VIDEO_HEVC, 0, "H.265/HEVC", "video/x-h265, parsed = (boolean)true, alignment=(string)au"},
 };
 
 static GstStaticPadTemplate gst_aiurdemux_videosrc_template =
@@ -2045,6 +2046,21 @@ static void aiurdemux_parse_video (GstAiurDemux * demux, AiurDemuxStream * strea
     stream->info.video.fps_n, stream->info.video.fps_d);
       stream->send_codec_data = FALSE;
     }
+  }else if (stream->codec_type == VIDEO_HEVC){
+    if(stream->codec_data.length > 0 && stream->codec_data.codec_data != NULL){
+      mime = g_strdup_printf
+      ("%s, stream-format=(string)hev1, width=(int)%ld, height=(int)%ld, framerate=(fraction)%ld/%ld",
+      mime, stream->info.video.width, stream->info.video.height,
+      stream->info.video.fps_n, stream->info.video.fps_d);
+      stream->send_codec_data = TRUE;
+    }else{
+      mime =
+      g_strdup_printf
+      ("%s, stream-format=(string)byte-stream, width=(int)%ld, height=(int)%ld, framerate=(fraction)%ld/%ld",
+      mime, stream->info.video.width, stream->info.video.height,
+      stream->info.video.fps_n, stream->info.video.fps_d);
+      stream->send_codec_data = FALSE;
+    }
   }else{
   mime =
     g_strdup_printf
@@ -2749,7 +2765,7 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
     if(gstbuf && gst_buffer_get_size(gstbuf) != buffer_size){
         gst_buffer_set_size(gstbuf,buffer_size);
     }
-  
+
     if ((sampleFlags & FLAG_SAMPLE_CODEC_DATA) && (stream->send_codec_data) && (buffer_size)) {
         GstCaps *caps;
 

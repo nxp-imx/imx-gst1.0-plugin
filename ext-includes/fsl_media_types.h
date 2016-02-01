@@ -74,7 +74,8 @@ typedef enum
     VIDEO_ON2_VP, /* True Motion video types by On2 */
     VIDEO_REAL, /* Real video types */
     VIDEO_JPEG, /* ISO JPEG still image */
-    VIDEO_SORENSON /* Sorenson video types, including Sorenson Spark, SVQ1, SVQ3 etc */ 
+    VIDEO_SORENSON, /* Sorenson video types, including Sorenson Spark, SVQ1, SVQ3 etc */
+    VIDEO_HEVC
 }VideoCodecType;
 
 
@@ -101,6 +102,8 @@ typedef enum
     AUIDO_SPEEX,
     AUDIO_REAL, /* Real audio types */
     AUDIO_EC3,
+    AUDIO_OPUS,
+    AUDIO_APE   /*Monkey's audio*/
 }AudioCodecType;
 
 
@@ -174,7 +177,8 @@ typedef enum
     VIDEO_VP6 = 1,
     VIDEO_VP6A,
     VIDEO_VP7,
-    VIDEO_VP8
+    VIDEO_VP8,
+    VIDEO_VP9
 }On2VideoTypes; /* On2 video types */
 
 
@@ -260,7 +264,8 @@ typedef enum
 typedef enum
 {
     AUDIO_IMA_ADPCM = 1,  /* IMA 4:1 */
-    AUDIO_ADPCM_MS = 2  /* Microsoft ADPCM audio */
+    AUDIO_ADPCM_MS = 2,  /* Microsoft ADPCM audio */
+    AUDIO_ADPCM_QT
 
 }ADPCMAudioTypes;
 
