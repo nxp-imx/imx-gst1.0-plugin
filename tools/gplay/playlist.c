@@ -65,6 +65,8 @@ typedef struct _PlayList{
 static void 
 destroyPlayItemCtl(PlayItemCtl * item)
 {
+    if (item->iName)
+      MEM_FREE(item->iName);
     MEM_FREE(item);
 }
 
