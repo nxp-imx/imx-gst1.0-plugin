@@ -267,7 +267,7 @@ TSManagerGetLastTimeStamp (TSMRecivedCtl * rctl, int size, int use)
         rctl->tail = NULL;
       } else {
 #if 0
-        //removed for rtp/rtsp streaming fix, 
+        //removed for rtp/rtsp streaming fix,
         //this will make same timestamp buffers output timestamp to -1.
         if (rctl->head->subentry) {
           rctl->head->used = e->used;
@@ -411,13 +411,15 @@ static TSM_TIMESTAMP
 _TSManagerSend2 (void *handle, void *key, int send)
 {
   TSManager *tsm = (TSManager *) handle;
-  int i = tsm->tx;
+  int i;
   int index = -1;
   TSM_TIMESTAMP ts0 = 0, tstmp = TSM_TIMESTAMP_NONE;
   unsigned long long age = 0;
-  TSM_TIMESTAMP half_interval = TSM_ADAPTIVE_INTERVAL (tsm) >> 1;
+  TSM_TIMESTAMP half_interval;
 
   if (tsm) {
+    i = tsm->tx;
+    half_interval = TSM_ADAPTIVE_INTERVAL (tsm) >> 1;
     if (send) {
       tsm->tx_cnt++;
     } else {
