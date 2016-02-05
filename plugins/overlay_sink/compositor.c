@@ -38,20 +38,6 @@ GST_DEBUG_CATEGORY_EXTERN (overlay_sink_debug);
   (((a)->right <= (b)->left) || ((a)->left >= (b)->right) \
    || ((a)->bottom <= (b)->top) || ((a)->top >= (b)->bottom))
 
-#define COMPOSITOR_WAIT_SURFACE(h) \
-  do { \
-    g_mutex_lock(&((h)->lock));  \
-    g_cond_wait (&((h)->cond), &((h)->lock)); \
-    g_mutex_unlock(&((h)->lock)); \
-  } while (0);
-
-#define COMPOSITOR_POST_SURFACE(h)  \
-  do { \
-    g_mutex_lock(&((h)->lock));  \
-    g_cond_signal (&((h)->cond)); \
-    g_mutex_unlock(&((h)->lock)); \
-  } while (0);
-
 typedef struct _Surface Surface;
 struct _Surface{
   SurfaceInfo info;
@@ -275,7 +261,7 @@ static void
 compositor_check_keep_ratio (CompositorHandle *hcompositor, Surface *hsurface, SurfaceInfo *surface_info)
 {
   GstVideoRectangle src, dest, result;
-  gboolean brotate = (surface_info->rot == 90 || surface_info->rot == 270) ? TRUE : FALSE; 
+  gboolean brotate = (surface_info->rot == 90 || surface_info->rot == 270) ? TRUE : FALSE;
 
   src.x = src.y = 0;
   src.w = surface_info->src.right - surface_info->src.left;
@@ -321,7 +307,7 @@ static void compositor_do_compositing_surface_list (CompositorHandle *hcomposito
   if (hcompositor->head != hcompositor->tail) {
     // need to back copy dest buffer for 2 more surfaces
     if (hcompositor->prvdst.mem.vaddr)
-      hcompositor->hdevice->frame_copy(hcompositor->hdevice, &hcompositor->prvdst.mem, &dstbuf);
+      hcompositor->hdevice->frame_copy(hcompositor->hdevice, &hcompositor->prvdst.mem, &dstbuf.mem);
   }
 
   upper = FALSE;
@@ -375,14 +361,32 @@ static gpointer compositor_compositing_thread (gpointer compositor)
   CompositorHandle *hcompositor = (CompositorHandle*) compositor;
 
   while (hcompositor->running) {
-    COMPOSITOR_WAIT_SURFACE (hcompositor);
+    g_mutex_lock(&hcompositor->lock);
+    g_cond_wait (&hcompositor->cond, &hcompositor->lock);
     compositor_do_compositing_surface_list (hcompositor);
+    g_mutex_unlock(&hcompositor->lock);
   }
 
   GST_DEBUG ("compositor thread exit");
   return compositor;
 }
 
+static gint compositor_do_config_surface (CompositorHandle *hcompositor, Surface *hsurface, SurfaceInfo *surface_info)
+{
+  DestRect prect;
+
+  memcpy (&prect, &hsurface->info.dst, sizeof(DestRect));
+  memcpy (&hsurface->info, surface_info, sizeof(SurfaceInfo));
+  if (surface_info->keep_ratio) {
+    compositor_check_keep_ratio (hcompositor, hsurface, surface_info);
+  }
+
+  if (!RECTA_EQUAL_RECTB (&prect, &hsurface->info.dst)) {
+    compositor_check_list_draw_area (hcompositor);
+  }
+
+  return 0;
+}
 
 // global functions
 
@@ -426,7 +430,9 @@ void destroy_compositor(gpointer compositor)
 
   if (hcompositor->thread) {
     hcompositor->running = FALSE;
-    COMPOSITOR_POST_SURFACE (hcompositor);
+    g_mutex_lock(&hcompositor->lock);
+    g_cond_signal(&hcompositor->cond);
+    g_mutex_unlock(&hcompositor->lock);
     g_thread_join (hcompositor->thread);
     hcompositor->thread = NULL;
   }
@@ -458,8 +464,13 @@ gpointer compositor_add_surface (gpointer compositor, SurfaceInfo *surface_info)
   memcpy (&hsurface->info, surface_info, sizeof(SurfaceInfo));
 
   GST_DEBUG ("add surface %p", hsurface);
+
+  g_mutex_lock(&hcompositor->lock);
+
   compositor_insert_surface (hcompositor, hsurface);
-  compositor_config_surface (hcompositor, hsurface, surface_info);
+  compositor_do_config_surface(hcompositor, hsurface, surface_info);
+
+  g_mutex_unlock(&hcompositor->lock);
 
   return hsurface;
 }
@@ -473,6 +484,8 @@ gint compositor_remove_surface (gpointer compositor, gpointer surface)
     GST_ERROR ("invalid parameter.");
     return -1;
   }
+
+  g_mutex_lock(&hcompositor->lock);
 
   if (hsurface == hcompositor->head && hsurface == hcompositor->tail) {
     hcompositor->head = hcompositor->tail = NULL;
@@ -499,6 +512,8 @@ gint compositor_remove_surface (gpointer compositor, gpointer surface)
   if (surface)
     g_slice_free1(sizeof(Surface), surface);
 
+  g_mutex_unlock(&hcompositor->lock);
+
   return 0;
 }
 
@@ -507,17 +522,10 @@ gint compositor_config_surface (gpointer compositor, gpointer surface, SurfaceIn
 {
   CompositorHandle *hcompositor = (CompositorHandle*) compositor;
   Surface *hsurface = (Surface *) surface;
-  DestRect prect;
 
-  memcpy (&prect, &hsurface->info.dst, sizeof(DestRect));
-  memcpy (&hsurface->info, surface_info, sizeof(SurfaceInfo));
-  if (surface_info->keep_ratio) {
-    compositor_check_keep_ratio (hcompositor, hsurface, surface_info);
-  }
-
-  if (!RECTA_EQUAL_RECTB (&prect, &hsurface->info.dst)) {
-    compositor_check_list_draw_area (hcompositor);
-  }
+  g_mutex_lock(&hcompositor->lock);
+  compositor_do_config_surface(hcompositor, hsurface, surface_info);
+  g_mutex_unlock(&hcompositor->lock);
 
   return 0;
 }
@@ -542,13 +550,17 @@ gint compositor_update_surface (gpointer compositor, gpointer surface, SurfaceBu
   GST_DEBUG ("update surface (%p), buffer vaddr (%p) paddr (%p)", 
       hsurface, buffer->mem.vaddr, buffer->mem.paddr);
 
+  g_mutex_lock(&hcompositor->lock);
+
   memcpy (&hsurface->buffer, buffer, sizeof(SurfaceBuffer));
   hsurface->update = TRUE;
 
   if (hcompositor->head == hcompositor->tail)
     compositor_do_compositing_surface_list (hcompositor);
   else
-    COMPOSITOR_POST_SURFACE (hcompositor);
+    g_cond_signal(&hcompositor->cond);
+
+  g_mutex_unlock(&hcompositor->lock);
 
   return 0;
 }
