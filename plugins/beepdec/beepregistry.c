@@ -46,8 +46,10 @@
 #define BEEP_REGISTRY_FILE_DEFAULT "/usr/share/beep_registry_1.0.arm11.cf"
 #elif defined (_ARM9)
 #define BEEP_REGISTRY_FILE_DEFAULT "/usr/share/beep_registry_1.0.arm9.cf"
-#else
+#elif defined (_ARM12)
 #define BEEP_REGISTRY_FILE_DEFAULT "/usr/share/beep_registry_1.0.arm12.cf"
+#else
+#define BEEP_REGISTRY_FILE_DEFAULT "/usr/share/beep_registry_1.0.arm.cf"
 #endif
 
 

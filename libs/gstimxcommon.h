@@ -74,6 +74,7 @@ typedef enum
   CC_MX6SX = CHIPCODE ('M', 'X', '6', '2'),
   CC_MX6UL = CHIPCODE ('M', 'X', '6', '3'),
   CC_MX7D = CHIPCODE ('M', 'X', '7', 'D'),
+  CC_MX8 = CHIPCODE ('M', 'X', '8', '0'),
   CC_UNKN = CHIPCODE ('U', 'N', 'K', 'N'),
 
 } CHIP_CODE;
@@ -166,6 +167,7 @@ static SOC_INFO soc_info[] = {
   {CC_MX6SX, "i.MX6SX"},
   {CC_MX6UL, "i.MX6UL"},
   {CC_MX7D, "i.MX7D"},
+  {CC_MX8, "i.MX8"},
 };
 
 static CHIP_CODE
@@ -262,6 +264,7 @@ static IMXV4l2FeatureMap g_imxv4l2feature_maps[] = {
   {CC_MX6SX, TRUE, TRUE, FALSE, TRUE, FALSE},
   {CC_MX6UL, FALSE, FALSE, FALSE, TRUE, FALSE},
   {CC_MX7D, FALSE, FALSE, FALSE, TRUE, FALSE},
+  {CC_MX8, TRUE, TRUE, FALSE, FALSE, FALSE},
 };
 
 

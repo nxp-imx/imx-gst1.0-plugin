@@ -3,10 +3,10 @@ AC_PREREQ(2.59)
 dnl initialize autoconf
 dnl releases only do -Wall, git and prerelease does -Werror too
 dnl use a three digit version number for releases, and four for git/prerelease
-AC_INIT(GStreamer i.MX Plug-ins, 4.0.10, http://www.freescale.com)
+AC_INIT(GStreamer i.MX Plug-ins, 4.1.0, http://www.freescale.com)
 
 dnl initialize automake
-AM_INIT_AUTOMAKE(imx-gst1.0-plugin, 4.0.10)
+AM_INIT_AUTOMAKE(imx-gst1.0-plugin, 4.1.0)
 
 
 dnl our libraries and install dirs use GST_API_VERSION in the filename
@@ -127,7 +127,7 @@ if test "x$HAVE_PKGCONFIG" = "xno"; then
 fi
 
 dnl check target type
-if  test "$PLATFORM" = "MX6" || test "$PLATFORM" = "MX6SL" || test "$PLATFORM" = "MX6SX" || test "$PLATFORM" = "MX7D" || test "$PLATFORM" = "MX6UL" || test "$PLATFORM" = "MX6QP" ;
+if  test "$PLATFORM" = "MX6" || test "$PLATFORM" = "MX6SL" || test "$PLATFORM" = "MX6SX" || test "$PLATFORM" = "MX7D" || test "$PLATFORM" = "MX6UL" || test "$PLATFORM" = "MX6QP" || test "$PLATFORM" = "MX8" ;
 then
   AC_MSG_NOTICE(build for $PLATFORM)
 else
@@ -279,6 +279,8 @@ AM_CONDITIONAL(PLATFORM_IS_MX6SX, test "x$PLATFORM" = "xMX6SX")
 AM_CONDITIONAL(PLATFORM_IS_MX6UL, test "x$PLATFORM" = "xMX6UL")
 AM_CONDITIONAL(PLATFORM_IS_MX6QP, test "x$PLATFORM" = "xMX6QP")
 AM_CONDITIONAL(PLATFORM_IS_MX7D, test "x$PLATFORM" = "xMX7D")
+AM_CONDITIONAL(PLATFORM_IS_ARCH32, test "x$PLATFORM" = "xMX7D" || test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6SL" || test "x$PLATFORM" = "xMX6SX" || test "x$PLATFORM" = "xMX6UL" || test "x$PLATFORM" = "xMX6QP")
+AM_CONDITIONAL(PLATFORM_IS_MX8, test "x$PLATFORM" = "xMX8")
 
 if test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6QP"; then
 	 HAVE_DEVICE_IPU=yes
@@ -292,6 +294,10 @@ fi
 
 if test "x$PLATFORM" = "xMX6UL" || test "x$PLATFORM" = "xMX7D"; then
 	 HAVE_DEVICE_PXP=yes
+fi
+
+if test "x$PLATFORM" = "xMX8" || test "x$PLATFORM" = "xMX8"; then
+	 HAVE_DEVICE_G2D=yes
 fi
 
 CHECK_DISABLE_FEATURE(mp3enc, [Disable mp3 encoder plugin], [MP3_ENC], [mp3_enc_interface.h], [plugin: imxmp3enc])
@@ -324,8 +330,10 @@ gstreamer-fsl.pc
 libs/Makefile
 plugins/aiurdemux/Makefile
 plugins/aiurdemux/aiur_registry_1.0.arm11.cf
+plugins/aiurdemux/aiur_registry_1.0.arm.cf
 plugins/beepdec/Makefile
 plugins/beepdec/beep_registry_1.0.arm12.cf
+plugins/beepdec/beep_registry_1.0.arm.cf
 plugins/v4l2/Makefile
 plugins/overlay_sink/Makefile
 plugins/vpu/Makefile

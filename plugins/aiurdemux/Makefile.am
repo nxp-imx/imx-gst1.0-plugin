@@ -14,9 +14,14 @@ libgstaiurdemux_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 
 # flags used to compile this plugin
 # we use the GST_LIBS flags because we might be using plug-in libs
+if PLATFORM_IS_ARCH32
 libgstaiurdemux_la_CFLAGS += -D_ARM11
 registry_file=aiur_registry_1.0.arm11.cf.in
 reg_inst_file=aiur_registry_1.0.arm11.cf
+else
+registry_file=aiur_registry_1.0.arm.cf.in
+reg_inst_file=aiur_registry_1.0.arm.cf
+endif
 
 # headers we need but don't want installed
 noinst_HEADERS =  aiurregistry.h aiurdemux.h aiurstreamcache.h aiuridxtab.h aiurcontent.h

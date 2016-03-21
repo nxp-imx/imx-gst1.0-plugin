@@ -10,10 +10,6 @@ if USE_BEEP
 BEEPDIRS = plugins/beepdec
 endif
 
-if USE_V4L_SINK
-V4LSINKDIRS = plugins/v4l2
-endif
-
 if USE_MP3_ENC
 MP3ENC_DIR =  plugins/mp3enc
 endif
@@ -34,9 +30,13 @@ TOOLDIRS =    tools/                      \
               tools/gplay                 \
               tools/grecorder
 
-BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(V4LSINKDIRS) $(VIDEO_CONVERT_DIRS) $(COMPOSITOR_DIRS)
+BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(VIDEO_CONVERT_DIRS) $(COMPOSITOR_DIRS)
               
 if PLATFORM_IS_MX6
+
+if USE_V4L_SINK
+V4LSINKDIRS = plugins/v4l2
+endif
 
 if USE_OVERLAY_SINK
 OVERLAYSINKDIRS = plugins/overlay_sink
@@ -50,6 +50,10 @@ endif
 
 if PLATFORM_IS_MX6QP
 
+if USE_V4L_SINK
+V4LSINKDIRS = plugins/v4l2
+endif
+
 if USE_OVERLAY_SINK
 OVERLAYSINKDIRS = plugins/overlay_sink
 endif
@@ -62,6 +66,10 @@ endif
 
 if PLATFORM_IS_MX6SL
 
+if USE_V4L_SINK
+V4LSINKDIRS = plugins/v4l2
+endif
+
 if USE_OVERLAY_SINK
 OVERLAYSINKDIRS = plugins/overlay_sink
 endif
@@ -71,6 +79,10 @@ VPUWRAPDIRS =
 endif
 
 if PLATFORM_IS_MX6SX
+
+if USE_V4L_SINK
+V4LSINKDIRS = plugins/v4l2
+endif
 
 if USE_OVERLAY_SINK
 OVERLAYSINKDIRS = plugins/overlay_sink
@@ -82,6 +94,10 @@ endif
 
 if PLATFORM_IS_MX7D
 
+if USE_V4L_SINK
+V4LSINKDIRS = plugins/v4l2
+endif
+
 OVERLAYSINKDIRS =
 
 VPUWRAPDIRS =
@@ -90,13 +106,29 @@ endif
 
 if PLATFORM_IS_MX6UL
 
+if USE_V4L_SINK
+V4LSINKDIRS = plugins/v4l2
+endif
+
 OVERLAYSINKDIRS =
 
 VPUWRAPDIRS =
 
 endif
 
-SUBDIRS =  $(LIBSDIRS) $(BASEDIRS) $(OVERLAYSINKDIRS) $(VPUWRAPDIRS) $(WMA8ENC_DIR) $(MP3ENC_DIR) $(TOOLDIRS)
+if PLATFORM_IS_MX8
+
+V4LSINKDIRS =
+
+if USE_OVERLAY_SINK
+OVERLAYSINKDIRS = plugins/overlay_sink
+endif
+
+VPUWRAPDIRS =
+
+endif
+
+SUBDIRS =  $(LIBSDIRS) $(BASEDIRS) $(V4LSINKDIRS) $(OVERLAYSINKDIRS) $(VPUWRAPDIRS) $(WMA8ENC_DIR) $(MP3ENC_DIR) $(TOOLDIRS)
 
 
 
