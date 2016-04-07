@@ -312,6 +312,8 @@ CHECK_DISABLE_FEATURE_EX(imx2ddevice_g2d, [Disable fsl imx2ddevice_g2d], [IMX_2D
 CHECK_DISABLE_FEATURE_EX(imx2ddevice_ipu, [Disable fsl imx2ddevice_ipu], [IMX_2DDEVICE_IPU], [ipu.h], [imx2ddevice: ipu], [$HAVE_DEVICE_IPU])
 CHECK_DISABLE_FEATURE_EX(imx2ddevice_pxp, [Disable fsl imx2ddevice_pxp], [IMX_2DDEVICE_PXP], [pxp_lib.h], [imx2ddevice: pxp], [$HAVE_DEVICE_PXP])
 
+CHECK_DISABLE_FEATURE(v4l2_core, [Disable lib v4l2_core], [V4L2_CORE], [linux/mxcfb.h uapi/mxcfb.h], [libs: v4l2core])
+
 # Allow headers to be inside include/uapi and include/linux
 #saved_CFLAGS="$CFLAGS"
 #CFLAGS="$CFLAGS $IPU_CFLAGS"

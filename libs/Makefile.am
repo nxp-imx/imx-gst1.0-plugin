@@ -3,16 +3,19 @@ lib_LTLIBRARIES = libgstfsl-@GST_API_VERSION@.la
 libgstfsl_@GST_API_VERSION@includedir = $(includedir)/gstreamer-@GST_MAJORMINOR@/gst/imx-mm/
 libgstfsl_@GST_API_VERSION@include_HEADERS = allocator/gstallocatorphymem.h
 
+if USE_V4L2_CORE
+V4L2_CORE_SOURCE = v4l2_core/gstimxv4l2.c
+endif
 libgstfsl_@GST_API_VERSION@_la_SOURCES = allocator/gstallocatorphymem.c \
 	allocator/gstphymemmeta.c \
 	video-tsm/mfw_gst_ts.c \
   gstsutils/gstsutils.c \
-	v4l2_core/gstimxv4l2.c \
 	device-2d/imx_2d_device.c \
 	device-2d/imx_2d_device_allocator.c \
 	overlaycompositionmeta/imxoverlaycompositionmeta.c \
 	video-overlay/gstimxvideooverlay.c \
-  gstimxcommon.h
+  gstimxcommon.h \
+  $(V4L2_CORE_SOURCE)
 
 libgstfsl_@GST_API_VERSION@_la_CFLAGS = $(GST_BASE_CFLAGS) $(GST_CFLAGS)
 libgstfsl_@GST_API_VERSION@_la_LIBADD = $(GST_BASE_LIBS)
