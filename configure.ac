@@ -32,7 +32,7 @@ AC_SUBST(ACLOCAL_AMFLAGS, "-I m4")
 AC_DEFUN([FIND_PARSER_SONAME],
 [
     AC_MSG_CHECKING([for lib_$1_parser_$2_elinux.3.0.so soname])
-    path=`$PKG_CONFIG --variable=libdir libfslparser`
+    path=`$PKG_CONFIG --variable=libdir imx-parser`
     SONAME=$( $CC -print-file-name=$PKG_CONFIG_SYSROOT_DIR$path/lib_$1_parser_$2_elinux.so | \
 	    while read output; do objdump -p $output | \
 	    grep "SONAME" | \
@@ -212,13 +212,13 @@ AC_SUBST(RT_LIBS)
 
 FSL_MM_CORE_CFLAGS="`$PKG_CONFIG --cflags libfslaudiocodec 2>/dev/null` \
                     `$PKG_CONFIG --cflags libfslvideocodec 2>/dev/null` \
-                    `$PKG_CONFIG --cflags libfslparser 2>/dev/null` \
+                    `$PKG_CONFIG --cflags imx-parser 2>/dev/null` \
                     `$PKG_CONFIG --cflags libfslvpuwrap 2>/dev/null`"
 AC_SUBST(FSL_MM_CORE_CFLAGS)
 
 FSL_MM_CORE_LIBS="`$PKG_CONFIG --libs libfslaudiocodec 2>/dev/null` \
                   `$PKG_CONFIG --libs libfslvideocodec 2>/dev/null` \
-                  `$PKG_CONFIG --libs libfslparser 2>/dev/null`"
+                  `$PKG_CONFIG --libs imx-parser 2>/dev/null`"
 AC_SUBST(FSL_MM_CORE_LIBS)
 
 EXTRAPLATFORMCFLAGS="-DARM -D_GNUC_"
