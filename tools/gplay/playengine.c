@@ -17,6 +17,7 @@
 #include <gst/video/videooverlay.h>
 #include <gst/app/gstappsink.h>
 #include "playengine.h"
+#include "../../libs/gstimxcommon.h"
 
 #define PLAYENGINE_DEFAULT_TIME_OUT 20 //default state change wait time :20s
 #define FB_DEIVCE "/dev/fb0"
@@ -2110,7 +2111,6 @@ reg_event_handler(PlayEngineHandle handle,
   return PLAYENGINE_SUCCESS;
 }
 
-
 static PlayEngineResult 
 playengine_set_subtitle_font (PlayEngineHandle handle,
                               gchar *font_desc)
@@ -2638,4 +2638,33 @@ play_engine_destroy( PlayEngine *engine )
     free( engine );
     g_message("playengine destroyed");
   }
+}
+
+gboolean
+play_engine_checkfeature(FeatureType type)
+{
+  gboolean ret = FALSE;
+
+  switch(type){
+    case PLAYENGINE_G2D:
+      ret = HAS_G2D();
+      break;
+    case PLAYENGINE_G3D:
+      ret = HAS_G3D();
+      break;
+    case PLAYENGINE_PXP:
+      ret = HAS_PXP();
+      break;
+    case PLAYENGINE_IPU:
+      ret = HAS_IPU();
+      break;
+    case PLAYENGINE_VPU:
+      ret = HAS_VPU();
+      break;
+    default:
+      ret = FALSE;
+      break;
+  }
+
+  return ret;
 }

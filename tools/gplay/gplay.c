@@ -43,7 +43,6 @@
 
 #include "playengine.h"
 #include "playlist.h"
-#include "../../libs/gstimxcommon.h"
 
 
 /* version information of gplay */
@@ -808,7 +807,7 @@ main(int argc,char *argv[])
   }
 
   if (!options.video_sink_name)
-    if(HAS_G2D()) {
+    if(play_engine_checkfeature(PLAYENGINE_G2D)) {
       options.video_sink_name = "overlaysink";
     }else {
       options.video_sink_name = "imxv4l2sink";

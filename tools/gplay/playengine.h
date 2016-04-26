@@ -34,6 +34,15 @@ extern "C" {
 
 typedef enum
 {
+  PLAYENGINE_G2D,
+  PLAYENGINE_G3D,
+  PLAYENGINE_IPU,
+  PLAYENGINE_PXP,
+  PLAYENGINE_VPU
+}FeatureType;
+
+typedef enum
+{
   PLAYENGINE_FAILURE = -1,
   PLAYENGINE_SUCCESS = 0,
   PLAYENGINE_ERROR_BAD_PARAM,
@@ -240,6 +249,8 @@ typedef struct _PlayEngine
 
 PlayEngine * play_engine_create();
 void play_engine_destroy(PlayEngine *engine);
+/* unify the soc_id usage in gstremaer plugin and imx player */
+gboolean play_engine_checkfeature (FeatureType type);
 
 #ifdef __cplusplus
 }
