@@ -822,7 +822,13 @@ setup_pipeline (gRecorderEngine *recorder)
     else
       wrapper = gst_element_factory_make ("wrappercamerabinsrc", NULL);
 
-    camerasrc = gst_element_factory_make (recorder->videosrc_name, NULL);
+    if (g_strcmp0(recorder->videosrc_name, "imxv4l2src") == 0
+        || g_strcmp0(recorder->videosrc_name, "videotestsrc") == 0) {
+      camerasrc = gst_element_factory_make (recorder->videosrc_name, NULL);
+    } else {
+      camerasrc = gst_parse_bin_from_description (recorder->videosrc_name, TRUE,
+          NULL);
+    }
     if (g_strcmp0(recorder->videosrc_name, "videotestsrc") == 0) {
       g_object_set (camerasrc, "is-live", TRUE, NULL);
     }
@@ -1434,7 +1440,7 @@ static REresult set_video_source(RecorderEngineHandle handle, REuint32 vs)
   static KeyMap kKeyMap[] = {
     { RE_VIDEO_SOURCE_DEFAULT, (REchar *)"imxv4l2src" },
     { RE_VIDEO_SOURCE_CAMERA, (REchar *)"imxv4l2src" },
-    { RE_VIDEO_SOURCE_SCREEN, (REchar *)"ximagesrc" },
+    { RE_VIDEO_SOURCE_SCREEN, (REchar *)"ximagesrc ! queue ! imxcompositor_ipu" },
     { RE_VIDEO_SOURCE_TEST, (REchar *)"videotestsrc" },
   };
 
