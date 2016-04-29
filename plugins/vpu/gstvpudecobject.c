@@ -202,6 +202,7 @@ gst_vpu_dec_object_init(GstVpuDecObject *vpu_dec_object)
   vpu_dec_object->system_frame_number_in_vpu = NULL;
   vpu_dec_object->dropping = FALSE;
   vpu_dec_object->vpu_report_resolution_change = FALSE; 
+  vpu_dec_object->vpu_need_reconfig = FALSE;
 }
 
 static void 
@@ -1202,10 +1203,12 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
         || buf_ret & VPU_DEC_RESOLUTION_CHANGED) {
       if (buf_ret & VPU_DEC_RESOLUTION_CHANGED)
         vpu_dec_object->vpu_report_resolution_change = TRUE; 
+      vpu_dec_object->vpu_need_reconfig = TRUE;
       ret = gst_vpu_dec_object_handle_reconfig(vpu_dec_object, bdec);
       /* workaround for VPU will discard decoded video frame when resolution change. */
       gst_vpu_dec_object_clear_decoded_frame_ts (vpu_dec_object);
       vpu_dec_object->vpu_report_resolution_change = FALSE; 
+      vpu_dec_object->vpu_need_reconfig = FALSE;
       if (ret != GST_FLOW_OK) {
         GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_handle_reconfig fail: %s\n", \
             gst_flow_get_name (ret));

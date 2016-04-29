@@ -354,7 +354,9 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     update_pool = FALSE;
   }
 
-  if (dec->vpu_dec_object->use_my_pool && dec->vpu_dec_object->use_my_allocator) {
+  if (dec->vpu_dec_object->vpu_need_reconfig == FALSE
+    && dec->vpu_dec_object->use_my_pool
+    && dec->vpu_dec_object->use_my_allocator) {
     /* video track selection case. don't change pool for smoothly video track
      * selection */
     GstStructure *config;

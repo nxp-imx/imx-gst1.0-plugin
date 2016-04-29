@@ -101,6 +101,7 @@ struct _GstVpuDecObject {
   gboolean new_segment;
   gboolean dropping;
   gboolean vpu_report_resolution_change; 
+  gboolean vpu_need_reconfig;
   void *tsm;
   TSMGR_MODE tsm_mode;
   GstClockTime last_valid_ts;
