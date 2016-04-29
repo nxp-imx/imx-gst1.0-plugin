@@ -2001,7 +2001,8 @@ static void aiurdemux_parse_video (GstAiurDemux * demux, AiurDemuxStream * strea
   if(parser_ret != PARSER_SUCCESS)
       goto bail;
 
-  if ((stream->info.video.fps_n == 0) || (stream->info.video.fps_d == 0)) {
+  if ((stream->info.video.fps_n == 0) || (stream->info.video.fps_d == 0) 
+      || (stream->info.video.fps_n /stream->info.video.fps_d) > 250) {
     stream->info.video.fps_n = AIURDEMUX_FRAME_N_DEFAULT;
     stream->info.video.fps_d = AIURDEMUX_FRAME_D_DEFAULT;
   }
