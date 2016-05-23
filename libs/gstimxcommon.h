@@ -166,6 +166,7 @@ static SOC_INFO soc_info[] = {
   {CC_MX6SL, "i.MX6SL"},
   {CC_MX6SX, "i.MX6SX"},
   {CC_MX6UL, "i.MX6UL"},
+  {CC_MX6UL, "i.MX6ULL"},
   {CC_MX7D, "i.MX7D"},
   {CC_MX8, "i.MX8"},
 };
