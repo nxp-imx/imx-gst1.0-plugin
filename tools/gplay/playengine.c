@@ -251,7 +251,7 @@ wait_for_state_change(PlayEngine *engine,
               return PLAYENGINE_FAILURE;
           }
       }
-      usleep(1000000);
+      usleep(400000);
       g_message("Wait status change from %s to %s ",
                 gst_element_state_get_name (current),
                 gst_element_state_get_name (pending_st));
