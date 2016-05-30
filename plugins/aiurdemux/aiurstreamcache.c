@@ -246,6 +246,9 @@ gst_aiur_stream_cache_add_buffer (GstAiurStreamCache * cache,
 
       gst_adapter_push (cache->adapter, newBuffer);
       newBuffer = NULL;
+      if (buffer) {
+        gst_buffer_unref (buffer);
+      }
     }
 
   }else{

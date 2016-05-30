@@ -464,6 +464,7 @@ static void gst_aiurdemux_init (GstAiurDemux * demux)
   demux->pullbased = FALSE;
   demux->core_interface = NULL;
   demux->core_handle = NULL;
+  demux->thread = NULL;
 
   demux->stream_cache = gst_aiur_stream_cache_new (AIUR_STREAM_CACHE_SIZE,
     AIUR_STREAM_CACHE_SIZE_MAX, demux);
@@ -944,7 +945,7 @@ static gboolean aiurdemux_sink_activate_push (GstPad * sinkpad, GstObject * pare
 
   if (active) {
     demux->loop_push = TRUE;
-    g_thread_new ("aiur_push",(GThreadFunc) aiurdemux_loop_push, (gpointer) demux);
+    demux->thread = g_thread_new ("aiur_push",(GThreadFunc) aiurdemux_loop_push, (gpointer) demux);
 
     return TRUE;
 
@@ -954,6 +955,12 @@ static gboolean aiurdemux_sink_activate_push (GstPad * sinkpad, GstObject * pare
     /* make sure task is closed */
     g_mutex_lock (&demux->runmutex);
     g_mutex_unlock (&demux->runmutex);
+
+    if (demux->thread) {
+      g_thread_unref(demux->thread);
+      demux->thread = NULL;
+    }
+
     return gst_pad_stop_task (sinkpad);
   }
 }
@@ -3694,6 +3701,10 @@ aiurdemux_do_push_seek (GstAiurDemux * demux, GstPad * pad,
   /* commit the new segment */
   memcpy (&demux->segment, &seeksegment, sizeof (GstSegment));
 
+  if (demux->thread) {
+    g_thread_unref(demux->thread);
+    demux->thread = NULL;
+  }
 
   demux->loop_push = TRUE;
   gst_aiur_stream_cache_open (demux->stream_cache);
@@ -3701,7 +3712,7 @@ aiurdemux_do_push_seek (GstAiurDemux * demux, GstPad * pad,
     demux->streams[i]->last_ret = GST_FLOW_OK;
 
 
-  g_thread_new ("aiur_push",(GThreadFunc) aiurdemux_loop_push, (gpointer) demux);
+  demux->thread = g_thread_new ("aiur_push",(GThreadFunc) aiurdemux_loop_push, (gpointer) demux);
   g_mutex_unlock (&demux->runmutex);
 
   return ret;
