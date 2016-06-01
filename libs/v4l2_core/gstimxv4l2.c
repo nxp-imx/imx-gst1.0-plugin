@@ -1205,6 +1205,7 @@ gint gst_imx_v4l2_close_device (gpointer v4l2handle)
       handle->pending_close = TRUE;
     } else {
       if (handle->v4l2_fd) {
+        GST_DEBUG ("close V4L2 device.");
         close (handle->v4l2_fd);
         handle->v4l2_fd = 0;
       }

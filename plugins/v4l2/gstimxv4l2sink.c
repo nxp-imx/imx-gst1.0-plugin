@@ -243,6 +243,9 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
       {
         guint w,h;
 
+        memset (&v4l2sink->crop, 0, sizeof(IMXV4l2Rect));
+        memset (&v4l2sink->video_align, 0, sizeof(GstVideoAlignment));
+
         v4l2sink->v4l2handle = gst_imx_v4l2_open_device (v4l2sink->device, V4L2_BUF_TYPE_VIDEO_OUTPUT);
         if (!v4l2sink->v4l2handle) {
           return GST_STATE_CHANGE_FAILURE;
@@ -334,8 +337,6 @@ gst_imx_v4l2sink_change_state (GstElement * element, GstStateChange transition)
         v4l2sink->frame_showed = 0;
         v4l2sink->run_time = 0;
       }
-
-      memset (&v4l2sink->crop, 0, sizeof(IMXV4l2Rect));
 
       break;
     default:
