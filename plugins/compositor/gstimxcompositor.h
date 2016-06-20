@@ -24,7 +24,11 @@
 
 #include <gst/gst.h>
 #include <gst/video/video.h>
+#ifdef USE_BAD_GIT
+#include <gst/video/gstvideoaggregator.h>
+#else
 #include "base/gstvideoaggregator.h"
+#endif
 #include "gstimxcommon.h"
 #include "imx_2d_device.h"
 #include "imxoverlaycompositionmeta.h"
