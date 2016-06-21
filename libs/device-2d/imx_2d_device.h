@@ -1,5 +1,5 @@
 /* GStreamer IMX Video 2D Device Abstract
- * Copyright (c) 2014-2015, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2014-2016, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -91,6 +91,7 @@ typedef struct _Imx2DVideoInfo {
 
 typedef struct _Imx2DFrame {
   PhyMemBlock           *mem;
+  gint                  fd[4];
   Imx2DVideoInfo        info;
   Imx2DCrop             crop;
   Imx2DRotationMode     rotate;

@@ -1,5 +1,5 @@
 /* GStreamer IMX video compositor plugin
- * Copyright (c) 2015, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2015-2016, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -302,8 +302,12 @@ gst_imxcompositor_create_bufferpool(GstImxCompositor *imxcomp,
   pool = gst_video_buffer_pool_new ();
   if (pool) {
     if (!imxcomp->allocator)
+#ifdef USE_DMA_FD
+      imxcomp->allocator = gst_ion_allocator_obtain ();
+#else
       imxcomp->allocator =
           gst_imx_2d_device_allocator_new((gpointer)(imxcomp->device));
+#endif
 
     if (!imxcomp->allocator) {
       GST_ERROR ("new imx compositor allocator failed.");
@@ -1034,9 +1038,12 @@ static gint gst_imxcompositor_config_dst(GstImxCompositor *imxcomp,
 {
   GstVideoFrame out_frame;
   GstPhyMemMeta *phymemmeta = NULL;
+  PhyMemBlock dst_mem = {0};
+  guint i, n_mem;
 
-  if (!gst_buffer_is_phymem(outbuf)) {
-    GST_ERROR("out buffer is not phy memory");
+  if (!(gst_buffer_is_phymem(outbuf)
+        || gst_is_dmabuf_memory (gst_buffer_peek_memory (outbuf, 0)))) {
+    GST_ERROR ("out buffer is not phy memory or DMA Buf");
     return -1;
   }
 
@@ -1091,7 +1098,13 @@ static gint gst_imxcompositor_config_dst(GstImxCompositor *imxcomp,
     return -1;
   }
 
-  dst->mem = gst_buffer_query_phymem_block (out_frame.buffer);
+  if (gst_is_dmabuf_memory (gst_buffer_peek_memory (out_frame.buffer, 0))) {
+    dst->mem = &dst_mem;
+    n_mem = gst_buffer_n_memory (out_frame.buffer);
+    for (i = 0; i < n_mem; i++)
+      dst->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (out_frame.buffer, i));
+  } else 
+    dst->mem = gst_buffer_query_phymem_block (out_frame.buffer);
   dst->alpha = 0xFF; //TODO how to use destination alpha?
   dst->rotate = IMX_2D_ROTATION_0;
   dst->interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
@@ -1125,6 +1138,8 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
     GstImxCompositorPad *pad, Imx2DFrame *src)
 {
   GstVideoAggregatorPad *ppad = (GstVideoAggregatorPad *)pad;
+  PhyMemBlock src_mem = {0};
+  guint i, n_mem;
 
   src->info.fmt = GST_VIDEO_INFO_FORMAT(&(ppad->aggregated_frame->info));
   src->info.w = ppad->aggregated_frame->info.width +
@@ -1143,7 +1158,13 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
     return -1;
   }
 
-  src->mem = gst_buffer_query_phymem_block (ppad->aggregated_frame->buffer);
+  if (gst_is_dmabuf_memory (gst_buffer_peek_memory (ppad->aggregated_frame->buffer, 0))) {
+    src->mem = &src_mem;
+    n_mem = gst_buffer_n_memory (ppad->aggregated_frame->buffer);
+    for (i = 0; i < n_mem; i++)
+      src->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (ppad->aggregated_frame->buffer, i));
+  } else 
+    src->mem = gst_buffer_query_phymem_block (ppad->aggregated_frame->buffer);
   src->alpha = (gint)(pad->alpha * 255);
   src->rotate = pad->rotate;
   src->interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
@@ -1392,8 +1413,7 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
   GstImxCompositor *imxcomp = (GstImxCompositor *) (vagg);
   Imx2DDevice *device = imxcomp->device;
   GstFlowReturn ret;
-
-  Imx2DFrame src, dst;
+  Imx2DFrame src = {0}, dst = {0};
   guint aggregated = 0;
 
   if (!device)

@@ -18,6 +18,10 @@ libgstoverlaysinkplugins_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
          -I$(top_srcdir)/ext-includes \
          -I$(top_srcdir)/libs/video-overlay
 
+if PLATFORM_IS_MX8
+libgstoverlaysinkplugins_la_CFLAGS += -DUSE_DMA_FD
+endif
+
 libgstoverlaysinkplugins_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 				 $(GST_BASE_LIBS) \
 				 $(GST_PLUGINS_BASE_LIBS) \

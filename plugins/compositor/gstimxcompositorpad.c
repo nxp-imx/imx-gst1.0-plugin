@@ -1,5 +1,5 @@
 /* GStreamer IMX video compositor plugin
- * Copyright (c) 2015, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2015-2016, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -477,16 +477,21 @@ gst_imxcompositor_pad_prepare_frame (GstVideoAggregatorPad * pad,
   }
 
   /* Check if need copy input frame */
-  if (!gst_buffer_is_phymem(pad->buffer)) {
-    GST_DEBUG_OBJECT (pad, "copy input frame to phy memory");
+  if (!(gst_buffer_is_phymem(pad->buffer)
+        || gst_is_dmabuf_memory (gst_buffer_peek_memory (pad->buffer, 0)))) {
+    GST_DEBUG_OBJECT (pad, "copy input frame to physical continues memory");
     GstVideoInfo info;
     GstCaps *caps = gst_video_info_to_caps(&frame->info);
     gst_video_info_from_caps(&info, caps); //update the size info
     gst_caps_unref(caps);
 
     if (!imxcomp->allocator)
+#ifdef USE_DMA_FD
+      imxcomp->allocator = gst_ion_allocator_obtain ();
+#else
       imxcomp->allocator =
-               gst_imx_2d_device_allocator_new((gpointer)(imxcomp->device));
+          gst_imx_2d_device_allocator_new((gpointer)(imxcomp->device));
+#endif
 
     if (!cpad->sink_tmp_buf) {
       cpad->sink_tmp_buf = gst_buffer_new_allocate(imxcomp->allocator,

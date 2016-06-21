@@ -1,5 +1,5 @@
 /* Process video overlay composition meta by IMX 2D devices
- * Copyright (c) 2015, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2015-2016, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -45,6 +45,7 @@ typedef struct _VideoCompositionVideoInfo {
   Imx2DRotationMode rotate;
   GstVideoAlignment align;
   PhyMemBlock *mem;
+  int fd[4];
   GstBuffer *buf;
 } VideoCompositionVideoInfo;
 

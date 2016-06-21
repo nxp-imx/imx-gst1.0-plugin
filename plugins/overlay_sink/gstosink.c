@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2014-2016, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -23,7 +23,9 @@
 
 #include <gst/video/gstvideopool.h>
 #include "gstosink.h"
+#include "osink_object.h"
 #include "gstosinkallocator.h"
+#include <gst/ion/gstionmemory.h>
 #include "allocator/gstphymemmeta.h"
 #include "gstimxvideooverlay.h"
 #include "imxoverlaycompositionmeta.h"
@@ -408,7 +410,11 @@ gst_overlay_sink_setup_buffer_pool (GstOverlaySink *sink, GstCaps *caps)
   GST_DEBUG_OBJECT (sink, "create buffer pool(%p).", sink->pool);
 
   if (!sink->allocator) {
+#ifdef USE_DMA_FD
+    sink->allocator = gst_ion_allocator_obtain ();
+#else
     sink->allocator = gst_osink_allocator_new (sink->osink_obj);
+#endif
     if (!sink->allocator) {
       GST_ERROR_OBJECT (sink, "New osink allocator failed.\n");
       return -1;
@@ -676,20 +682,28 @@ static gint
 gst_overlay_sink_get_surface_buffer (GstBuffer *gstbuffer, SurfaceBuffer *surface_buffer)
 {
   PhyMemBlock * memblk;
+  guint i, n_mem;
 
   if (!gstbuffer || ! surface_buffer)
     return -1;
 
-  memblk = gst_buffer_query_phymem_block (gstbuffer);
-  if (!memblk) {
-    GST_ERROR ("Can't get physical memory block from gstbuffer (%p).", gstbuffer);
-    return -1;
-  }
+  if (gst_is_dmabuf_memory (gst_buffer_peek_memory (gstbuffer, 0))) {
+    memset (&surface_buffer->mem, 0, sizeof(PhyMemBlock));
+    n_mem = gst_buffer_n_memory (gstbuffer);
+    for (i = 0; i < n_mem; i++)
+      surface_buffer->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (gstbuffer, i));
+  } else {
+    memblk = gst_buffer_query_phymem_block (gstbuffer);
+    if (!memblk) {
+      GST_ERROR ("Can't get physical memory block from gstbuffer (%p).", gstbuffer);
+      return -1;
+    }
 
-  surface_buffer->mem.size = memblk->size;
-  surface_buffer->mem.vaddr = memblk->vaddr;
-  surface_buffer->mem.paddr = memblk->paddr;
-  surface_buffer->buf = NULL;
+    surface_buffer->mem.size = memblk->size;
+    surface_buffer->mem.vaddr = memblk->vaddr;
+    surface_buffer->mem.paddr = memblk->paddr;
+    surface_buffer->buf = NULL;
+  }
 
   return 0;
 }
@@ -701,7 +715,7 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
   gboolean not_overlay_buffer = FALSE;
   GstVideoCropMeta *cropmeta = NULL;
   GstVideoFrameFlags flags = GST_VIDEO_FRAME_FLAG_NONE;
-  SurfaceBuffer surface_buffer;
+  SurfaceBuffer surface_buffer = {0};
   gint i;
   GstVideoInfo info;
   GstCaps *caps = gst_pad_get_current_caps (GST_VIDEO_SINK_PAD (sink));
@@ -715,9 +729,12 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
   }
 
   cropmeta = gst_buffer_get_video_crop_meta (buffer);
+  surface_buffer.fd[0] = -1;
 
-  if (!gst_buffer_is_phymem (buffer)) {
-    // check if physical buffer
+  if (!(gst_buffer_is_phymem (buffer)
+        || gst_is_dmabuf_memory (gst_buffer_peek_memory (buffer, 0)))) {
+    GST_DEBUG ("copy input frame to physical continues memory");
+    // check if physical continues buffer
     GstBuffer *buffer2 = NULL;
     GstVideoFrame frame1, frame2;
 

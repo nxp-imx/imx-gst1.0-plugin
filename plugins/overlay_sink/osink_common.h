@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2014-2016, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -60,6 +60,7 @@ typedef struct {
 
 typedef struct {
   PhyMemBlock mem;
+  int fd[4];
   GstBuffer *buf;
 } SurfaceBuffer;
 

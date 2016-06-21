@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2016, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -69,6 +69,7 @@ static gint
 compositor_do_composite_surface (CompositorHandle *hcompositor, Surface *surface, SurfaceBuffer *dest)
 {
   Imx2DFrame src, dst;
+  guint i;
 
   dst.mem = &dest->mem;
   dst.alpha = 0xFF;
@@ -84,6 +85,10 @@ compositor_do_composite_surface (CompositorHandle *hcompositor, Surface *surface
   src.info.h = surface->info.src.height;
   src.info.stride = src.info.w;
   src.mem = &surface->buffer.mem;
+  if (!surface->buffer.mem.paddr) {
+    for (i = 0; i < 4; i++)
+      src.fd[i] = surface->buffer.fd[i];
+  }
   src.alpha = surface->info.alpha;
   src.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
   src.crop.x = surface->info.src.left;
@@ -316,7 +321,7 @@ static void compositor_do_compositing_surface_list (CompositorHandle *hcomposito
     surface = list;
     list = list->next;
 
-    if (NULL == surface->buffer.mem.paddr) {
+    if (NULL == surface->buffer.mem.paddr && 0 > surface->buffer.fd[0]) {
       GST_WARNING ("Surface is empty, don't need update.");
       continue;
     }

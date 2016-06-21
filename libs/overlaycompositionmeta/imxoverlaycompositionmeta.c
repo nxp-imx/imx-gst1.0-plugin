@@ -1,5 +1,5 @@
 /* Process video overlay composition meta by IMX 2D devices
- * Copyright (c) 2015, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2015-2016, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -383,7 +383,9 @@ gint imx_video_overlay_composition_composite(
       gint render_x, render_y;
       guint render_w, render_h;
       guint aligned_w, aligned_h;
-      Imx2DFrame src, dst;
+      Imx2DFrame src = {0}, dst = {0};
+      PhyMemBlock src_mem = {0}, dst_mem = {0};
+      guint i, n_mem;
       GstVideoCropMeta *in_crop = NULL;
       GstBuffer *in_buf;
 
@@ -442,8 +444,12 @@ gint imx_video_overlay_composition_composite(
       if (t_fmt != vmeta->format || !gst_buffer_is_phymem(ovbuf)) {
         // need copy buffer
         if (!vcomp->allocator)
+#ifdef USE_DMA_FD
+          vcomp->allocator = gst_ion_allocator_obtain ();
+#else
           vcomp->allocator =
                  gst_imx_2d_device_allocator_new((gpointer)(vcomp->device));
+#endif
 
         if (!vcomp->allocator) {
           GST_WARNING("create allocator for overlay buffer failed\n");
@@ -552,7 +558,13 @@ gint imx_video_overlay_composition_composite(
       GST_LOG ("overlay input: %s, %dx%d", gst_video_format_to_string(t_fmt),
           src.info.w, src.info.h);
 
-      src.mem = gst_buffer_query_phymem_block (in_buf);
+      if (gst_is_dmabuf_memory (gst_buffer_peek_memory (in_buf, 0))) {
+        src.mem = &src_mem;
+        n_mem = gst_buffer_n_memory (in_buf);
+        for (i = 0; i < n_mem; i++)
+          src.fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (in_buf, i));
+      } else
+        src.mem = gst_buffer_query_phymem_block (in_buf);
       src.alpha = 0xFF;
       src.crop.x = 0;
       src.crop.y = 0;

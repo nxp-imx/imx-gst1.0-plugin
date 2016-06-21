@@ -32,6 +32,12 @@ noinst_HEADERS = allocator/gstallocatorphymem.h \
     overlaycompositionmeta/imxoverlaycompositionmeta.h \
     video-overlay/gstimxvideooverlay.h
 
+if PLATFORM_IS_MX8
+libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_DMA_FD
+libgstfsl_@GST_API_VERSION@_la_LIBADD += -lgstbadion-$(GST_API_VERSION) \
+                                         -lgstallocators-$(GST_API_VERSION)
+endif
+
 if USE_X11
 libgstfsl_@GST_API_VERSION@_la_SOURCES += video-overlay/gstimxxoverlay.c
 libgstfsl_@GST_API_VERSION@_la_LIBADD += -lX11

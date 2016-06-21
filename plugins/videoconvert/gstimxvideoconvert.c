@@ -1,5 +1,5 @@
 /* GStreamer IMX video convert plugin
- * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2014-2016, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -946,8 +946,12 @@ gst_imx_video_convert_create_bufferpool(GstImxVideoConvert *imxvct,
   pool = gst_video_buffer_pool_new ();
   if (pool) {
     if (!imxvct->allocator)
+#ifdef USE_DMA_FD
+      imxvct->allocator = gst_ion_allocator_obtain ();
+#else
       imxvct->allocator =
           gst_imx_2d_device_allocator_new((gpointer)(imxvct->device));
+#endif
 
     if (!imxvct->allocator) {
       GST_ERROR ("new imx video convert allocator failed.");
@@ -1218,21 +1222,25 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   GstPhyMemMeta *phymemmeta = NULL;
   GstCaps *caps;
   GstVideoFrame temp_in_frame;
-  Imx2DFrame src, dst;
+  Imx2DFrame src = {0}, dst = {0};
+  PhyMemBlock src_mem = {0}, dst_mem = {0};
+  guint i, n_mem;
   GstVideoCropMeta *in_crop = NULL, *out_crop = NULL;
   GstVideoInfo info;
 
   if (!device)
     return GST_FLOW_ERROR;
 
-  if (!gst_buffer_is_phymem(out->buffer)) {
-    GST_ERROR("out buffer is not phy memory");
+  if (!(gst_buffer_is_phymem(out->buffer)
+        || gst_is_dmabuf_memory (gst_buffer_peek_memory (out->buffer, 0)))) {
+    GST_ERROR ("out buffer is not phy memory or DMA Buf");
     return GST_FLOW_ERROR;
   }
 
   /* Check if need copy input frame */
-  if (!gst_buffer_is_phymem(in->buffer)) {
-    GST_DEBUG ("copy input frame to phy memory");
+  if (!(gst_buffer_is_phymem(in->buffer)
+        || gst_is_dmabuf_memory (gst_buffer_peek_memory (in->buffer, 0)))) {
+    GST_DEBUG ("copy input frame to physical continues memory");
     caps = gst_video_info_to_caps(&in->info);
     gst_video_info_from_caps(&info, caps); //update the size info
 
@@ -1362,7 +1370,13 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   if (ret != 0)
     return GST_FLOW_ERROR;
 
-  src.mem = gst_buffer_query_phymem_block (input_frame->buffer);
+  if (gst_is_dmabuf_memory (gst_buffer_peek_memory (input_frame->buffer, 0))) {
+    src.mem = &src_mem;
+    n_mem = gst_buffer_n_memory (input_frame->buffer);
+    for (i = 0; i < n_mem; i++)
+      src.fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (input_frame->buffer, i));
+  } else
+    src.mem = gst_buffer_query_phymem_block (input_frame->buffer);
   src.alpha = 0xFF;
   src.crop.x = 0;
   src.crop.y = 0;
@@ -1423,7 +1437,13 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
       break;
   }
 
-  dst.mem = gst_buffer_query_phymem_block (out->buffer);
+  if (gst_is_dmabuf_memory (gst_buffer_peek_memory (out->buffer, 0))) {
+    dst.mem = &dst_mem;
+    n_mem = gst_buffer_n_memory (out->buffer);
+    for (i = 0; i < n_mem; i++)
+      dst.fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (out->buffer, i));
+  } else 
+    dst.mem = gst_buffer_query_phymem_block (out->buffer);
   dst.alpha = 0xFF;
   dst.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
   dst.crop.x = 0;
@@ -1509,7 +1529,8 @@ imx_video_convert_transform_frame_ip(GstVideoFilter *filter, GstVideoFrame *in)
   GstPhyMemMeta *phymemmeta = NULL;
 
   if (imxvct->composition_meta_enable) {
-    if (!gst_buffer_is_phymem(in->buffer)) {
+  if (!(gst_buffer_is_phymem(in->buffer)
+        || gst_is_dmabuf_memory (gst_buffer_peek_memory (in->buffer, 0)))) {
       gpointer state = NULL;
       GstMeta *meta;
       GstVideoOverlayCompositionMeta *compmeta;
@@ -1566,6 +1587,9 @@ imx_video_convert_transform_frame_ip(GstVideoFilter *filter, GstVideoFrame *in)
       }
 
       VideoCompositionVideoInfo in_v, out_v;
+      PhyMemBlock src_mem = {0};
+      guint i, n_mem;
+
       memset (&in_v, 0, sizeof(VideoCompositionVideoInfo));
       memset (&out_v, 0, sizeof(VideoCompositionVideoInfo));
       in_v.buf = in->buffer;
@@ -1579,7 +1603,13 @@ imx_video_convert_transform_frame_ip(GstVideoFilter *filter, GstVideoFrame *in)
       in_v.crop_w = out_v.crop_w = crop_w;
       in_v.crop_h = out_v.crop_h = crop_h;
 
-      out_v.mem = gst_buffer_query_phymem_block (in->buffer);
+      if (gst_is_dmabuf_memory (gst_buffer_peek_memory (in->buffer, 0))) {
+        out_v.mem = &src_mem;
+        n_mem = gst_buffer_n_memory (in->buffer);
+        for (i = 0; i < n_mem; i++)
+          out_v.fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (in->buffer, i));
+      } else
+        out_v.mem = gst_buffer_query_phymem_block (in->buffer);
       memcpy(&out_v.align, &(imxvct->in_video_align),sizeof(GstVideoAlignment));
 
       gint cnt = imx_video_overlay_composition_composite(&imxvct->video_comp,

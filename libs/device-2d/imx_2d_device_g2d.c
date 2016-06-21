@@ -1,5 +1,5 @@
 /* GStreamer IMX G2D Device
- * Copyright (c) 2014-2015, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2014-2016, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -341,6 +341,7 @@ static gint imx_g2d_blit(Imx2DDevice *device,
 {
   gint ret = 0;
   void *g2d_handle = NULL;
+  struct g2d_buf *pbuf = NULL;
 
   if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
     return -1;
@@ -352,6 +353,25 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   }
 
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
+
+  GST_DEBUG ("src paddr: %p dst paddr: %p: fd: %d fd1: %d",
+      src->mem->paddr, dst->mem->paddr, src->fd[0], dst->fd[0]);
+  if (!src->mem->paddr) {
+    pbuf = g2d_buf_from_fd(src->fd[0]);
+    if (pbuf) {
+      src->mem->paddr = pbuf->buf_paddr;
+      g2d_free(pbuf);
+    }
+  }
+  if (!dst->mem->paddr) {
+    pbuf = g2d_buf_from_fd(dst->fd[0]);
+    if (pbuf) {
+      dst->mem->paddr = pbuf->buf_paddr;
+      g2d_free(pbuf);
+    }
+  }
+  GST_DEBUG ("src paddr: %p dst paddr: %p",
+      src->mem->paddr, dst->mem->paddr);
 
   // Set input
   g2d->src.global_alpha = src->alpha;

@@ -19,7 +19,7 @@ libgstimxcompositor_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
 				 -I$(top_srcdir)/libs/overlaycompositionmeta
 				 
 if PLATFORM_IS_MX8
-libgstimxcompositor_la_CFLAGS += -DUSE_BAD_GIT 
+libgstimxcompositor_la_CFLAGS += -DUSE_BAD_GIT -DUSE_DMA_FD 
 
 libgstimxcompositor_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 				 $(GST_BASE_LIBS) \
