@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2016, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -456,6 +456,8 @@ int osink_object_enable_display (gpointer osink_handle, gint display_idx)
         gst_fmt = GST_VIDEO_FORMAT_BGRx;
       else
         gst_fmt = GST_VIDEO_FORMAT_RGBx;
+    } else if (fmt == GST_MAKE_FOURCC('B', 'G', 'R', 'x')) {
+      gst_fmt = GST_VIDEO_FORMAT_BGRx;
     } else {
       UNLOCK (glock);
       return -1;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (c) 2013-2016, Freescale Semiconductor, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -26,7 +26,9 @@
 #include <string.h>
 
 #include <linux/fb.h>
+#ifndef USE_FB_API
 #include <linux/mxcfb.h>
+#endif
 
 #include "displays.h"
 #include "gstsutils.h"
@@ -54,7 +56,11 @@ GST_DEBUG_CATEGORY_EXTERN (overlay_sink_debug);
 #define DEFAULTW (320)
 #define DEFAULTH (240)
 
+#ifndef USE_FB_API
+#define DISPLAY_NUM_BUFFERS (1)
+#else
 #define DISPLAY_NUM_BUFFERS (3)
+#endif
 
 #define PAGE_SHIFT      12
 #ifndef PAGE_SIZE
@@ -120,6 +126,7 @@ static gint get_display_resolution (gchar *device, gint *w, gint *h)
 
 static void set_display_alpha (gchar *device, gint alpha)
 {
+#ifndef USE_FB_API
   struct mxcfb_gbl_alpha galpha;
   int fd = open (device, O_RDWR, 0);
   if (fd) {
@@ -129,12 +136,13 @@ static void set_display_alpha (gchar *device, gint alpha)
     ioctl(fd, MXCFB_SET_GBL_ALPHA, &galpha);
     close (fd);
   }
-
+#endif
   return;
 }
 
 static void set_display_color_key (gchar *device, gboolean enable, gint color_key)
 {
+#ifndef USE_FB_API
   struct mxcfb_color_key colorKey;
   struct fb_var_screeninfo fbVar;
 
@@ -161,11 +169,16 @@ static void set_display_color_key (gchar *device, gboolean enable, gint color_ke
     ioctl (fd, MXCFB_SET_CLR_KEY, &colorKey);
     close (fd);
   }
+#endif
 }
 
 gint scan_displays(gpointer **phandle, gint *pcount)
 {
+#ifdef USE_FB_API
+  GstsutilsEntry *entry =  gstsutils_init_entry ("/usr/share/imx_8dv_display_config");
+#else
   GstsutilsEntry *entry =  gstsutils_init_entry ("/usr/share/imx_displays_config");
+#endif
   gint group_count;
   gint i;
   gint count = 0;
@@ -336,7 +349,8 @@ gint init_display (gpointer display)
   fb_var.activate |= FB_ACTIVATE_FORCE;
   fb_var.nonstd = hdisplay->fmt;
 
-  if (hdisplay->fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'x')) {
+  if (hdisplay->fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'x')
+      || hdisplay->fmt == GST_MAKE_FOURCC('B', 'G', 'R', 'x')) {
     fb_var.bits_per_pixel = 32;
   } else if (hdisplay->fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'P')) {
     fb_var.bits_per_pixel = 16;

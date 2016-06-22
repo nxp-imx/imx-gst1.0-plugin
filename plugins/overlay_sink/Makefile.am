@@ -1,10 +1,18 @@
 plugin_LTLIBRARIES = libgstoverlaysinkplugins.la
 
+if PLATFORM_IS_MX8
+libgstoverlaysinkplugins_la_SOURCES = gstosink.c \
+              gstosinkallocator.c \
+				      osink_object.c \
+				      compositor.c \
+				      displaysfb.c
+else
 libgstoverlaysinkplugins_la_SOURCES = gstosink.c \
               gstosinkallocator.c \
 				      osink_object.c \
 				      compositor.c \
 				      displaysv4l2.c
+endif
 
 libgstoverlaysinkplugins_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
 				 $(GST_BASE_CFLAGS) \
@@ -19,7 +27,7 @@ libgstoverlaysinkplugins_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
          -I$(top_srcdir)/libs/video-overlay
 
 if PLATFORM_IS_MX8
-libgstoverlaysinkplugins_la_CFLAGS += -DUSE_DMA_FD
+libgstoverlaysinkplugins_la_CFLAGS += -DUSE_DMA_FD -DUSE_FB_API
 endif
 
 libgstoverlaysinkplugins_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
@@ -37,6 +45,7 @@ noinst_HEADERS = osink_common.h gstosink.h gstosinkallocator.h osink_object.h co
 
 registry_file1 = imx_6q_display_config
 registry_file2 = imx_6sx_display_config
+registry_file3 = imx_8dv_display_config
 
-data_DATA = $(registry_file1) $(registry_file2)
-EXTRA_DIST = $(registry_file1) $(registry_file2)
+data_DATA = $(registry_file1) $(registry_file2) $(registry_file3)
+EXTRA_DIST = $(registry_file1) $(registry_file2) $(registry_file3)
