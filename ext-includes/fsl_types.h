@@ -1,6 +1,6 @@
 
 /*
-* Copyright (c) 2009-2010, 2013, Freescale Semiconductor, Inc. 
+* Copyright (c) 2009-2010, 2013,2016 Freescale Semiconductor, Inc. 
  */
 
 /*
@@ -50,10 +50,10 @@
 #endif
 #endif /*int64*/
 
-typedef unsigned long uint32;
+typedef unsigned int uint32;
 typedef unsigned short uint16;
 typedef unsigned char uint8;
-typedef long int32;
+typedef int int32;
 typedef short int16;
 typedef char int8;
 

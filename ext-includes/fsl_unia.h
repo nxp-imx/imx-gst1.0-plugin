@@ -1,6 +1,6 @@
 
 /*
-* Copyright (c) 2011-2014, Freescale Semiconductor, Inc. 
+* Copyright (c) 2011-2014,2016, Freescale Semiconductor, Inc. 
  */
 
 /*
@@ -68,6 +68,7 @@ typedef enum
     ACODEC_ERR_UNKNOWN,
     ACODEC_PROFILE_NOT_SUPPORT,
     ACODEC_INIT_ERR,
+    ACODEC_NO_OUTPUT,
     
     ACODEC_NOT_ENOUGH_DATA = 0x100,
     ACODEC_CAPIBILITY_CHANGE = 0x200, /* output format changes, caller should reget format from getparameter API */
@@ -82,7 +83,7 @@ typedef enum
 /* common  */
     UNIA_SAMPLERATE= 0,
     UNIA_CHANNEL,
-    UNIA_FRAMED,
+    UNIA_FRAMED,        /* one whole frame input */
     UNIA_DEPTH,
     UNIA_CODEC_DATA,
     UNIA_BITRATE,
@@ -96,9 +97,9 @@ typedef enum
     UNIA_WMA_VERSION,
 
 /*dedicate for RealAudio */
-	UNIA_RA_FLAVOR_INDEX = 0x110,
-	UNIA_RA_FRAME_BITS,
-	
+    UNIA_RA_FLAVOR_INDEX = 0x110,
+    UNIA_RA_FRAME_BITS,
+    
 /* Get parmameters */
     UNIA_CODEC_DESCRIPTION= 0x200, 
     UNIA_OUTPUT_PCM_FORMAT,
@@ -133,13 +134,29 @@ typedef enum
   
 }UA_CHANNEL_LAYOUT;
 
+#define STREAM_NBAMR_BASE  0x10
+#define STREAM_WBAMR_BASE  0x20
 typedef enum
 {
+    /* AAC/AACPLUS file format */
     STREAM_UNKNOW = 0,
     STREAM_ADTS,
     STREAM_ADIF,
     STREAM_RAW,  
-	
+
+    /* NB-AMR file format */
+    STREAM_NBAMR_ETSI = STREAM_NBAMR_BASE,
+    STREAM_NBAMR_MMSIO,
+    STREAM_NBAMR_IF1IO,
+    STREAM_NBAMR_IF2IO,
+
+    /* WB-AMR file format */
+    STREAM_WBAMR_DEFT = STREAM_WBAMR_BASE,
+    STREAM_WBAMR_ITU,
+    STREAM_WBAMR_MIME,
+    STREAM_WBAMR_IF2,
+    STREAM_WBAMR_IF1,
+
 } STREAM_TYPE;
 
 /*********************************************************************
@@ -193,10 +210,10 @@ typedef struct
         UniACodecParameterBuffer codecData;
         STREAM_TYPE stream_type;
         CHAN_TABLE chan_map_tab;
-		
-		/* for real audio decoder */
+
+        /* for real audio decoder */
         uint32 frame_bits;
-		uint32 flavor_index;
+        uint32 flavor_index;
 		
         char ** codecDesc;
         UniAcodecOutputPCMFormat outputFormat;

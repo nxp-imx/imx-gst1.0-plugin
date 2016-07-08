@@ -1,9 +1,24 @@
 
-/***********************************************************************
- * Copyright (C) 2009-2015 Freescale Semiconductor, Inc.
- * All modifications are confidential and proprietary information
- * of Freescale Semiconductor, Inc. 
- ***********************************************************************/
+
+/*
+* Copyright (c) 2009-2016, Freescale Semiconductor, Inc. 
+ */
+
+/*
+* This library is free software; you can redistribute it and/or
+* modify it under the terms of the GNU Lesser General Public
+* License as published by the Free Software Foundation; either
+* version 2.1 of the License, or (at your option) any later version.
+*
+* This library is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+* Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public
+* License along with this library; if not, write to the Free Software
+* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
 
 /*
  *
@@ -216,7 +231,10 @@ enum
  ********************************************************************/
 //if set the flag, stream format was avc if codec data is presented, and format is bytestream if codec data is not found.
 #define FLAG_H264_NO_CONVERT 0x04
-
+//output pts if it exists
+#define FLAG_OUTPUT_PTS 0x08
+//if set the flag, do not convert id3 data to utf8 in parser, other components will do it. 
+#define FLAG_ID3_FORMAT_NON_UTF8  0x10
 
 /*********************************************************************
  * User data ID
@@ -273,7 +291,7 @@ typedef enum FSL_PARSER_USER_DATA_TYPE
     USER_DATA_COMPILATION,
     USER_DATA_ANDROID_VERSION,
     USER_DATA_CAPTURE_FPS,
-
+    USER_DATA_PSSH,
     USER_DATA_MAX
 } UserDataID;
 
