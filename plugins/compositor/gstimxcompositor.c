@@ -919,11 +919,19 @@ gst_imxcompositor_find_best_format (
 #endif
 }
 
+#ifdef USE_BAD_GIT
+static GstCaps *
+gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps,
+    GstCaps * filter)
+#else
 static GstCaps *
 gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps)
+#endif
 {
   GList *l;
   gint best_width = -1, best_height = -1;
+  gdouble best_fps = -1, cur_fps;
+  gint best_fps_n = -1, best_fps_d = -1;
   GstVideoInfo info;
   GstCaps *ret = caps;
   GstAggregator *agg = (GstAggregator*)vagg;
@@ -964,8 +972,11 @@ gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps)
     GstVideoAggregatorPad *vaggpad = l->data;
     GstImxCompositorPad *pad = GST_IMXCOMPOSITOR_PAD (vaggpad);
     gint this_width, this_height;
+    gint fps_n, fps_d;
     gint width, height;
 
+    fps_n = GST_VIDEO_INFO_FPS_N (&vaggpad->info);
+    fps_d = GST_VIDEO_INFO_FPS_D (&vaggpad->info);
     gst_imxcompositor_pad_get_output_size(vagg, pad, &width, &height);
 
     if (width == 0 || height == 0)
@@ -983,12 +994,31 @@ gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps)
       best_width = this_width;
     if (best_height < this_height)
       best_height = this_height;
+
+    if (fps_d == 0)
+      cur_fps = 0.0;
+    else
+      gst_util_fraction_to_double (fps_n, fps_d, &cur_fps);
+
+    if (best_fps < cur_fps) {
+      best_fps = cur_fps;
+      best_fps_n = fps_n;
+      best_fps_d = fps_d;
+    }
   }
   GST_OBJECT_UNLOCK (vagg);
 
-  if (best_width > 0 && best_height > 0) {
+  if (best_fps_n <= 0 || best_fps_d <= 0 || best_fps == 0.0) {
+    best_fps_n = 25;
+    best_fps_d = 1;
+    best_fps = 25.0;
+  }
+
+  if (best_width > 0 && best_height > 0 && best_fps > 0) {
     gst_video_info_set_format (&info, GST_VIDEO_INFO_FORMAT (&info),
         best_width, best_height);
+    info.fps_n = best_fps_n;
+    info.fps_d = best_fps_d;
     ret = gst_video_info_to_caps (&info);
     GST_DEBUG("update output info %dx%d", best_width, best_height);
 
