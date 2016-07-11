@@ -42,14 +42,14 @@ typedef struct
 {
   gchar *name;
   AiurTypeFindFunc func;
-  gchar **exts;
+  gchar *exts;
   gchar *mime;
 } AiurExternalTypeFind;
 
 static void webm_type_find (GstTypeFind * tf, gpointer ununsed);
 static gboolean ebml_check_header (GstTypeFind * tf, const gchar * doctype,
     int doctype_len);
-static gchar *webm_exts[] = { "webm", NULL };
+static gchar webm_exts[] = "webm";
 
 static AiurExternalTypeFind g_aiurextypefinders[] = {
   {"webm", webm_type_find, webm_exts, "video/webm"},

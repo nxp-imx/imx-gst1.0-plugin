@@ -36,7 +36,7 @@ typedef struct
 {
   gchar *name;
   BeepTypeFindFunc func;
-  gchar **exts;
+  gchar *exts;
   gchar *mime;
 } BeepExternalTypeFind;
 
@@ -44,7 +44,7 @@ typedef struct
 static void ac3_typefind (GstTypeFind * tf, gpointer data);
 static void ac3_bigendian_typefind (GstTypeFind * tf, gpointer data);
 
-static gchar *ac3_exts[] = { "ac3", NULL };
+static gchar ac3_exts[] = "ac3";
 
 static BeepExternalTypeFind g_beepextypefinders[] = {
   {"ac3", ac3_typefind, ac3_exts, "video/x-ac3"},
