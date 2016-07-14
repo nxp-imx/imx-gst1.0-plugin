@@ -37,3 +37,21 @@ longname = DDplus decoder
 description = Decode Dobly Digital Plus audio to raw data
 mime = audio/eac3
 library = @ddpd_arm_SONAME@
+
+[amr-nb]
+longname = AMR nb decoder
+description = decode amr nb audio to raw data
+mime = audio/AMR;
+library = @nbamrd_arm_SONAME@
+
+[amr-wb]
+longname = AMR wb decoder
+description = decode amr wb audio to raw data
+mime = audio/AMR-WB
+library = @wbamrd_arm_SONAME@
+
+[realaudio]
+longname = Real Audio decoder
+description = decode real audio cook to raw data
+mime = audio/x-pn-realaudio, channels = (int)[ 1, 2 ]
+library = @realad_arm_SONAME@
