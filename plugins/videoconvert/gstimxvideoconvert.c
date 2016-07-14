@@ -1375,6 +1375,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
 
   if (gst_is_dmabuf_memory (gst_buffer_peek_memory (input_frame->buffer, 0))) {
     src.mem = &src_mem;
+    src.mem->paddr = gst_buffer_query_paddr (input_frame->buffer);
     n_mem = gst_buffer_n_memory (input_frame->buffer);
     for (i = 0; i < n_mem; i++)
       src.fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (input_frame->buffer, i));
@@ -1442,6 +1443,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
 
   if (gst_is_dmabuf_memory (gst_buffer_peek_memory (out->buffer, 0))) {
     dst.mem = &dst_mem;
+    dst.mem->paddr = gst_buffer_query_paddr (out->buffer);
     n_mem = gst_buffer_n_memory (out->buffer);
     for (i = 0; i < n_mem; i++)
       dst.fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (out->buffer, i));
@@ -1608,6 +1610,7 @@ imx_video_convert_transform_frame_ip(GstVideoFilter *filter, GstVideoFrame *in)
 
       if (gst_is_dmabuf_memory (gst_buffer_peek_memory (in->buffer, 0))) {
         out_v.mem = &src_mem;
+        out_v.mem->paddr = gst_buffer_query_paddr (in->buffer);
         n_mem = gst_buffer_n_memory (in->buffer);
         for (i = 0; i < n_mem; i++)
           out_v.fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (in->buffer, i));

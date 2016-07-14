@@ -563,6 +563,7 @@ gint imx_video_overlay_composition_composite(
 
       if (gst_is_dmabuf_memory (gst_buffer_peek_memory (in_buf, 0))) {
         src.mem = &src_mem;
+        src.mem->paddr = gst_buffer_query_paddr (in_buf);
         n_mem = gst_buffer_n_memory (in_buf);
         for (i = 0; i < n_mem; i++)
           src.fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (in_buf, i));
