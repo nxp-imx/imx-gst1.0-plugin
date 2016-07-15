@@ -26,7 +26,7 @@ gint scan_displays (gpointer **phandle, gint *pcount);
 void free_display (gpointer handle);
 gchar *get_display_name(gpointer display);
 gint get_display_format(gpointer display);
-gint get_display_res (gpointer display, gint *width, gint *height);
+gint get_display_res (gpointer display, gint *width, gint *height, gint *stride);
 gint init_display (gpointer display);
 void deinit_display (gpointer display);
 gint clear_display (gpointer display);

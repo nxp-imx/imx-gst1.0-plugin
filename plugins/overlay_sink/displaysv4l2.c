@@ -230,12 +230,13 @@ gint get_display_format(gpointer display)
   return hdisplay->fmt;
 }
 
-gint get_display_res(gpointer display, gint *width, gint *height)
+gint get_display_res(gpointer display, gint *width, gint *height, gint *stride)
 {
   DisplayHandle *hdisplay = (DisplayHandle*) display;
 
   *width = hdisplay->w;
   *height = hdisplay->h;
+  *stride = 0;
 
   return 0;
 }

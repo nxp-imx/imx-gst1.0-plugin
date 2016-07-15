@@ -326,7 +326,8 @@ static OSinkHandle *create_osink_object()
     handle->display_enabled[i] = FALSE;
     handle->disp_info[i].name = get_display_name (handle->hdisplay[i]);
     handle->disp_info[i].fmt = get_display_format (handle->hdisplay[i]);
-    get_display_res (handle->hdisplay[i], &handle->disp_info[i].width, &handle->disp_info[i].height);
+    get_display_res (handle->hdisplay[i], &handle->disp_info[i].width,
+        &handle->disp_info[i].height, &handle->disp_info[i].stride);
   }
 
   return handle;
@@ -489,7 +490,7 @@ int osink_object_enable_display (gpointer osink_handle, gint display_idx)
     out_info.fmt = gst_fmt;
     out_info.w = handle->disp_info[display_idx].width;
     out_info.h = handle->disp_info[display_idx].height;
-    out_info.stride = out_info.w;
+    out_info.stride = handle->disp_info[display_idx].stride;
     dev->config_output(dev, &out_info);
 
 

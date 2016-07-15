@@ -273,7 +273,11 @@ static gint imx_g2d_config_output(Imx2DDevice *device, Imx2DVideoInfo* out_info)
 
   g2d->dst.width = out_info->w;
   g2d->dst.height = out_info->h;
-  g2d->dst.stride = g2d->dst.width;//stride / (out_map->bpp / 8);
+  // G2D stride is pixel, not bytes.
+  if (out_info->stride < g2d->dst.width * (out_map->bpp / 8))
+    g2d->dst.stride = g2d->dst.width;
+  else
+    g2d->dst.stride = out_info->stride / (out_map->bpp / 8);
   g2d->dst.format = out_map->g2d_format;
   g2d->dst.left = 0;
   g2d->dst.top = 0;

@@ -56,7 +56,7 @@ GST_DEBUG_CATEGORY_EXTERN (overlay_sink_debug);
 #define DEFAULTW (320)
 #define DEFAULTH (240)
 
-#ifndef USE_FB_API
+#ifdef USE_FB_API
 #define DISPLAY_NUM_BUFFERS (1)
 #else
 #define DISPLAY_NUM_BUFFERS (3)
@@ -76,6 +76,7 @@ typedef struct {
   gint fmt;
   gint w;
   gint h;
+  gint s;
   guint alpha;
   gboolean enable_color_key;
   guint color_key;
@@ -101,9 +102,11 @@ static guint string_to_fmt (char *value)
   return fmt;
 }
 
-static gint get_display_resolution (gchar *device, gint *w, gint *h)
+static gint get_display_resolution (gchar *device, gint *w, gint *h, gint *s)
 {
   struct fb_var_screeninfo fb_var;
+  struct fb_fix_screeninfo fb_fix;
+
   int fd = open (device, O_RDWR, 0);
   if (fd < 0) {
     GST_ERROR ("Can't open %s.", device);
@@ -116,8 +119,16 @@ static gint get_display_resolution (gchar *device, gint *w, gint *h)
     return -1;
   }
 
+  if (ioctl(fd, FBIOGET_FSCREENINFO, &fb_fix) < 0) {
+    GST_ERROR ("FBIOGET_FSCREENINFO from %s failed.", device);
+    close (fd);
+    return -1;
+  }
+
+
   *w = fb_var.xres;
   *h = fb_var.yres;
+  *s = fb_fix.line_length;
 
   close (fd);
 
@@ -256,7 +267,8 @@ gint scan_displays(gpointer **phandle, gint *pcount)
     }
 
     if (bg_device && (!w || !h)) {
-      if (get_display_resolution (bg_device, &hdisplay->w, &hdisplay->h) < 0) {
+      if (get_display_resolution (bg_device, &hdisplay->w, &hdisplay->h,
+            &hdisplay->s) < 0) {
         hdisplay->w = DEFAULTW;
         hdisplay->h = DEFAULTH;
       }
@@ -268,9 +280,9 @@ gint scan_displays(gpointer **phandle, gint *pcount)
       g_free(h);
     }
 
-    GST_DEBUG ("display(%s), device(%s), fmt(%d), res(%dx%d), ckey(%x), alpha(%d)",
+    GST_DEBUG ("display(%s), device(%s), fmt(%d), res(%dx%d), stride(%d), ckey(%x), alpha(%d)",
         hdisplay->name, hdisplay->device, hdisplay->fmt, hdisplay->w, hdisplay->h, 
-        hdisplay->color_key, hdisplay->alpha);
+        hdisplay->s, hdisplay->color_key, hdisplay->alpha);
 
     phandle[count] = hdisplay;
     count ++;
@@ -313,12 +325,13 @@ gint get_display_format(gpointer display)
   return hdisplay->fmt;
 }
 
-gint get_display_res(gpointer display, gint *width, gint *height)
+gint get_display_res(gpointer display, gint *width, gint *height, gint *stride)
 {
   DisplayHandle *hdisplay = (DisplayHandle*) display;
 
   *width = hdisplay->w;
   *height = hdisplay->h;
+  *stride = hdisplay->s;
 
   return 0;
 }

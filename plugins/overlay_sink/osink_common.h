@@ -30,6 +30,7 @@ typedef struct {
   gint fmt;
   guint width;
   guint height;
+  guint stride;
 } DisplayInfo;
 
 typedef struct {
