@@ -23,6 +23,9 @@
 
 #include <gst/video/video.h>
 #include "gstallocatorphymem.h"
+#ifdef USE_DMA_FD
+#include <gst/ion/gstionmemory.h>
+#endif
 #include "gstphymemmeta.h"
 #include "gstimxvideoconvert.h"
 

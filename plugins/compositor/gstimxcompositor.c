@@ -120,6 +120,9 @@
 
 #include "gstallocatorphymem.h"
 #include "allocator/gstphymemmeta.h"
+#ifdef USE_DMA_FD
+#include <gst/ion/gstionmemory.h>
+#endif
 #include "gstimxcompositor.h"
 #include "gstimxcompositorpad.h"
 

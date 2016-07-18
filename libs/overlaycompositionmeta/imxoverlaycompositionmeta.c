@@ -28,6 +28,9 @@
 #include <gst/video/video-overlay-composition.h>
 #include "imxoverlaycompositionmeta.h"
 #include "../allocator/gstphymemmeta.h"
+#ifdef USE_DMA_FD
+#include <gst/ion/gstionmemory.h>
+#endif
 
 GST_DEBUG_CATEGORY_STATIC(overlay_composition_meta);
 #define GST_CAT_DEFAULT overlay_composition_meta

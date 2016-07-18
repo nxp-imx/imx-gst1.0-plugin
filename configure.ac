@@ -193,6 +193,7 @@ if test "x$HAVE_GST_BAD_BASE" = "xno"; then
   AC_MSG_ERROR(no GStreamer bad-base found)
 fi
 
+if test "x$PLATFORM" = "xMX8" || test "x$PLATFORM" = "xMX8"; then
 dnl make GST_BAD_BASE_CFLAGS and GST_BAD_BASE_LIBS available
 AC_SUBST(GST_BAD_BASE_CFLAGS)
 AC_SUBST(GST_BAD_BASE_LIBS)
@@ -209,6 +210,7 @@ fi
 dnl make GST_BAD_VIDEO_CFLAGS and GST_BAD_VIDEO_LIBS available
 AC_SUBST(GST_BAD_VIDEO_CFLAGS)
 AC_SUBST(GST_BAD_VIDEO_LIBS)
+fi
 
 AC_CHECK_HEADERS([vpu_lib.h], [HAVE_VPU_LIB=yes], [HAVE_VPU_LIB=no])
 if test "x$HAVE_VPU_LIB" = "xyes"; then

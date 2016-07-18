@@ -23,6 +23,9 @@
 
 #include <string.h>
 #include "allocator/gstphymemmeta.h"
+#ifdef USE_DMA_FD
+#include <gst/ion/gstionmemory.h>
+#endif
 #include "gstimxcompositorpad.h"
 #include "gstimxcompositor.h"
 #include "imx_2d_device.h"
