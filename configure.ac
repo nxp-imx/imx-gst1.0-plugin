@@ -184,6 +184,7 @@ dnl make GST_PLUGINS_BASE_CFLAGS and GST_PLUGINS_BASE_LIBS available
 AC_SUBST(GST_PLUGINS_BASE_CFLAGS)
 AC_SUBST(GST_PLUGINS_BASE_LIBS)
 
+if test "x$PLATFORM" = "xMX8" || test "x$PLATFORM" = "xMX8"; then
 dnl If we need them, we can also use the plugin libraries
 PKG_CHECK_MODULES(GST_BAD_BASE, gstreamer-bad-base-$GST_MAJORMINOR >= $GST_REQUIRED,
                   HAVE_GST_BAD_BASE=yes, HAVE_GST_BAD_BASE=no)
@@ -193,7 +194,6 @@ if test "x$HAVE_GST_BAD_BASE" = "xno"; then
   AC_MSG_ERROR(no GStreamer bad-base found)
 fi
 
-if test "x$PLATFORM" = "xMX8" || test "x$PLATFORM" = "xMX8"; then
 dnl make GST_BAD_BASE_CFLAGS and GST_BAD_BASE_LIBS available
 AC_SUBST(GST_BAD_BASE_CFLAGS)
 AC_SUBST(GST_BAD_BASE_LIBS)
