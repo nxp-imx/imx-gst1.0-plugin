@@ -354,6 +354,8 @@ static gint imx_g2d_blit(Imx2DDevice *device,
 
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
 
+  //FIXME: refine it
+#ifdef G2D_VERSION_MAJOR
   GST_DEBUG ("src paddr: %p dst paddr: %p: fd: %d fd1: %d",
       src->mem->paddr, dst->mem->paddr, src->fd[0], dst->fd[0]);
   if (!src->mem->paddr) {
@@ -372,6 +374,7 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   }
   GST_DEBUG ("src paddr: %p dst paddr: %p",
       src->mem->paddr, dst->mem->paddr);
+#endif
 
   // Set input
   g2d->src.global_alpha = src->alpha;
