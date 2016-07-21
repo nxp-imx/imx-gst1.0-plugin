@@ -48,18 +48,25 @@ static G2dFmtMap g2d_fmts_map[] = {
     {GST_VIDEO_FORMAT_ABGR,   G2D_ABGR8888, 32},
     {GST_VIDEO_FORMAT_xRGB,   G2D_XRGB8888, 32},
     {GST_VIDEO_FORMAT_xBGR,   G2D_XBGR8888, 32},
+#ifdef HAS_DPU
+    {GST_VIDEO_FORMAT_UYVY,   G2D_UYVY,     16},
+    {GST_VIDEO_FORMAT_YUY2,   G2D_YUYV,     16},
+    {GST_VIDEO_FORMAT_YVYU,   G2D_YVYU,     16},
+#endif
 
     //this only for separate YUV format and RGB format
     {GST_VIDEO_FORMAT_UNKNOWN, -1,          1},
 
     {GST_VIDEO_FORMAT_I420,   G2D_I420,     12},
     {GST_VIDEO_FORMAT_NV12,   G2D_NV12,     12},
+#ifndef HAS_DPU
     {GST_VIDEO_FORMAT_UYVY,   G2D_UYVY,     16},
-    {GST_VIDEO_FORMAT_YV12,   G2D_YV12,     12},
     {GST_VIDEO_FORMAT_YUY2,   G2D_YUYV,     16},
+    {GST_VIDEO_FORMAT_YVYU,   G2D_YVYU,     16},
+#endif
+    {GST_VIDEO_FORMAT_YV12,   G2D_YV12,     12},
     {GST_VIDEO_FORMAT_NV16,   G2D_NV16,     16},
     {GST_VIDEO_FORMAT_NV21,   G2D_NV21,     12},
-    {GST_VIDEO_FORMAT_YVYU,   G2D_YVYU,     16},
 
 /* There is no corresponding GST Video format for those G2D formats
     {GST_VIDEO_FORMAT_VYUY,   G2D_VYUY,     16},
@@ -358,8 +365,7 @@ static gint imx_g2d_blit(Imx2DDevice *device,
 
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
 
-  //FIXME: refine it
-#ifdef G2D_VERSION_MAJOR
+#ifdef USE_DMA_FD
   GST_DEBUG ("src paddr: %p dst paddr: %p: fd: %d fd1: %d",
       src->mem->paddr, dst->mem->paddr, src->fd[0], dst->fd[0]);
   if (!src->mem->paddr) {
