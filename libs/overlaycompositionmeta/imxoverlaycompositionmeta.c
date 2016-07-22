@@ -26,6 +26,7 @@
  */
 
 #include <gst/video/video-overlay-composition.h>
+#include <gst/allocators/gstdmabuf.h>
 #include "imxoverlaycompositionmeta.h"
 #include "../allocator/gstphymemmeta.h"
 #ifdef USE_DMA_FD

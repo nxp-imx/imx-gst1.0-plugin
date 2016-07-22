@@ -22,6 +22,7 @@
 #endif
 
 #include <gst/video/video.h>
+#include <gst/allocators/gstdmabuf.h>
 #include "gstallocatorphymem.h"
 #ifdef USE_DMA_FD
 #include <gst/ion/gstionmemory.h>

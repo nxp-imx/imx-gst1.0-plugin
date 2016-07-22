@@ -35,6 +35,7 @@
   * Portability:    This code is written for Linux OS and Gstreamer
   */
 #include <gst/gst.h>
+#include <string.h>
 
 typedef void (*AiurTypeFindFunc) (GstTypeFind *, gpointer);
 

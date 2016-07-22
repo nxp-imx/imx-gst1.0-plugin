@@ -32,6 +32,7 @@
 *
 */
 
+#include <string.h>
 #include "gstsutils.h"
 
 typedef struct _GstsutilsData

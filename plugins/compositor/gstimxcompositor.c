@@ -118,6 +118,7 @@
 
 #include <string.h>
 
+#include <gst/allocators/gstdmabuf.h>
 #include "gstallocatorphymem.h"
 #include "allocator/gstphymemmeta.h"
 #ifdef USE_DMA_FD

@@ -23,6 +23,7 @@
 #include <sys/mman.h>
 #include <signal.h>
 
+#include "displays.h"
 #include "osink_object.h"
 #include "imx_2d_device.h"
 #include "compositor.h"

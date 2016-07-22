@@ -21,6 +21,7 @@
 #define __IMX_COMMON_H__
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/utsname.h>
 #include <gst/gst.h>
 #include <string.h>

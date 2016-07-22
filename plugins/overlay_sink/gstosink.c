@@ -22,6 +22,7 @@
 #endif
 
 #include <gst/video/gstvideopool.h>
+#include <gst/allocators/gstdmabuf.h>
 #include "gstosink.h"
 #include "osink_object.h"
 #include "gstosinkallocator.h"

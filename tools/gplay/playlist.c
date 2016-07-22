@@ -41,6 +41,8 @@
  * =====================================================================================
  */
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "playlist.h"
 
 #define MEM_ALLOC(size) malloc((size))

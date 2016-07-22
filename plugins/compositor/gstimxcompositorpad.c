@@ -23,6 +23,7 @@
 
 #include <string.h>
 #include "allocator/gstphymemmeta.h"
+#include <gst/allocators/gstdmabuf.h>
 #ifdef USE_DMA_FD
 #include <gst/ion/gstionmemory.h>
 #endif
