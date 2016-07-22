@@ -18,7 +18,7 @@ libgstfsl_@GST_API_VERSION@_la_SOURCES = allocator/gstallocatorphymem.c \
   $(V4L2_CORE_SOURCE)
 
 libgstfsl_@GST_API_VERSION@_la_CFLAGS = $(GST_BASE_CFLAGS) $(GST_CFLAGS)
-libgstfsl_@GST_API_VERSION@_la_LIBADD = $(GST_BASE_LIBS)
+libgstfsl_@GST_API_VERSION@_la_LIBADD = $(GST_BASE_LIBS) -lgstallocators-$(GST_API_VERSION)
 libgstfsl_@GST_API_VERSION@_la_LDFLAGS = -lgstvideo-$(GST_API_VERSION)
 libgstfsl_@GST_API_VERSION@_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 
@@ -34,8 +34,7 @@ noinst_HEADERS = allocator/gstallocatorphymem.h \
 
 if PLATFORM_IS_MX8
 libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_DMA_FD -DHAS_DPU
-libgstfsl_@GST_API_VERSION@_la_LIBADD += -lgstbadion-$(GST_API_VERSION) \
-                                         -lgstallocators-$(GST_API_VERSION)
+libgstfsl_@GST_API_VERSION@_la_LIBADD += -lgstbadion-$(GST_API_VERSION)
 endif
 
 if USE_X11
