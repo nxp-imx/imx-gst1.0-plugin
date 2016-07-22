@@ -1104,7 +1104,9 @@ static gint gst_imxcompositor_config_dst(GstImxCompositor *imxcomp,
 
   if (gst_is_dmabuf_memory (gst_buffer_peek_memory (out_frame.buffer, 0))) {
     dst->mem = &dst_mem;
+#ifdef USE_DMA_FD
     dst->mem->paddr = gst_buffer_query_paddr (out_frame.buffer);
+#endif
     n_mem = gst_buffer_n_memory (out_frame.buffer);
     for (i = 0; i < n_mem; i++)
       dst->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (out_frame.buffer, i));
@@ -1165,7 +1167,9 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
 
   if (gst_is_dmabuf_memory (gst_buffer_peek_memory (ppad->aggregated_frame->buffer, 0))) {
     src->mem = &src_mem;
+#ifdef USE_DMA_FD
     src->mem->paddr = gst_buffer_query_paddr (ppad->aggregated_frame->buffer);
+#endif
     n_mem = gst_buffer_n_memory (ppad->aggregated_frame->buffer);
     for (i = 0; i < n_mem; i++)
       src->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (ppad->aggregated_frame->buffer, i));
