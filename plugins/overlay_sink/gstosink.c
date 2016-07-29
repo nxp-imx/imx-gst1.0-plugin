@@ -692,9 +692,7 @@ gst_overlay_sink_get_surface_buffer (GstBuffer *gstbuffer, SurfaceBuffer *surfac
 
   if (gst_is_dmabuf_memory (gst_buffer_peek_memory (gstbuffer, 0))) {
     memset (&surface_buffer->mem, 0, sizeof(PhyMemBlock));
-#ifdef USE_DMA_FD
     surface_buffer->mem.paddr = gst_buffer_query_paddr (gstbuffer);
-#endif
     n_mem = gst_buffer_n_memory (gstbuffer);
     for (i = 0; i < n_mem; i++)
       surface_buffer->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (gstbuffer, i));
