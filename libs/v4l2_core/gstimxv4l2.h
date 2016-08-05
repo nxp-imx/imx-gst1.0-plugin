@@ -24,7 +24,7 @@
 #include <gst/video/video-format.h>
 #include <gst/video/video-frame.h>
 #include <linux/videodev2.h>
-#include "../allocator/gstallocatorphymem.h"
+#include <gst/allocators/gstallocatorphymem.h>
 
 typedef struct v4l2_rect IMXV4l2Rect;
 

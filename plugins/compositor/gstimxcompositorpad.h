@@ -24,11 +24,7 @@
 
 #include <gst/gst.h>
 #include <gst/video/video.h>
-#ifdef USE_BAD_GIT
 #include <gst/video/gstvideoaggregator.h>
-#else
-#include "base/gstvideoaggregator.h"
-#endif
 #include "gstimxcompositor.h"
 
 G_BEGIN_DECLS

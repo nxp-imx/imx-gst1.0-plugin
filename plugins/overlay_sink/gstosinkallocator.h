@@ -20,7 +20,7 @@
 #ifndef __OSINK_ALLOCATOR_H__
 #define __OSINK_ALLOCATOR_H__
 
-#include "gstallocatorphymem.h"
+#include <gst/allocators/gstallocatorphymem.h>
 #include "osink_common.h"
 
 #define GST_TYPE_ALLOCATOR_OSINK             (gst_allocator_osink_get_type())

@@ -21,7 +21,7 @@
 #define __OSINK_OBJECT_H__
 
 #include "osink_common.h"
-#include "gstallocatorphymem.h"
+#include <gst/allocators/gstallocatorphymem.h>
 
 #define IMX_2D_DEVICE_TYPE_USED     IMX_2D_DEVICE_G2D
 

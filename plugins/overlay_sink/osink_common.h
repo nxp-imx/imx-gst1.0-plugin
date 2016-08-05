@@ -21,7 +21,7 @@
 #define __OSINK_COMMON_H__
 
 #include <gst/gst.h>
-#include "gstallocatorphymem.h"
+#include <gst/allocators/gstallocatorphymem.h>
 
 #define MAX_DISPLAY (4)
 

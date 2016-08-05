@@ -119,7 +119,7 @@
 #include <string.h>
 
 #include <gst/allocators/gstdmabuf.h>
-#include "gstallocatorphymem.h"
+#include <gst/allocators/gstallocatorphymem.h>
 #include "allocator/gstphymemmeta.h"
 #ifdef USE_DMA_FD
 #include <gst/ion/gstionmemory.h>
@@ -927,14 +927,9 @@ gst_imxcompositor_find_best_format (
 #endif
 }
 
-#ifdef USE_BAD_GIT
 static GstCaps *
 gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps,
     GstCaps * filter)
-#else
-static GstCaps *
-gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps)
-#endif
 {
   GList *l;
   gint best_width = -1, best_height = -1;

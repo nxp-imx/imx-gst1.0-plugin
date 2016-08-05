@@ -20,7 +20,7 @@
 #ifndef __IMX_V4L2_ALLOCATOR_H__
 #define __IMX_V4L2_ALLOCATOR_H__
 
-#include "gstallocatorphymem.h"
+#include <gst/allocators/gstallocatorphymem.h>
 
 #define GST_TYPE_ALLOCATOR_IMXV4L2             (gst_allocator_imxv4l2_get_type())
 #define GST_ALLOCATOR_IMXV4L2(obj)             (G_TYPE_CHECK_INSTANCE_CAST((obj), GST_TYPE_ALLOCATOR_IMXV4L2, GstAllocatorImxV4l2))

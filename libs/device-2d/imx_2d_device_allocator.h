@@ -21,7 +21,7 @@
 #define __GST_IMX_2D_DEVICE_ALLOCATOR_H__
 
 #include <gst/gst.h>
-#include "../allocator/gstallocatorphymem.h"
+#include <gst/allocators/gstallocatorphymem.h>
 
 #define GST_TYPE_IMX_2D_DEVICE_ALLOCATOR             \
                                   (gst_imx_2d_device_allocator_get_type())

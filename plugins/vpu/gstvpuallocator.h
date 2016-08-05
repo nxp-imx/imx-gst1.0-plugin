@@ -20,7 +20,7 @@
 #ifndef __GST_VPU_ALLOCATOR_H__
 #define __GST_VPU_ALLOCATOR_H__
 
-#include "allocator/gstallocatorphymem.h"
+#include <gst/allocators/gstallocatorphymem.h>
 
 G_BEGIN_DECLS
 
