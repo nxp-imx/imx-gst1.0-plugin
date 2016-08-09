@@ -1037,7 +1037,6 @@ static gint gst_imxcompositor_config_dst(GstImxCompositor *imxcomp,
 {
   GstVideoFrame out_frame;
   GstPhyMemMeta *phymemmeta = NULL;
-  PhyMemBlock dst_mem = {0};
   guint i, n_mem;
 
   if (!(gst_buffer_is_phymem(outbuf)
@@ -1098,7 +1097,6 @@ static gint gst_imxcompositor_config_dst(GstImxCompositor *imxcomp,
   }
 
   if (gst_is_dmabuf_memory (gst_buffer_peek_memory (out_frame.buffer, 0))) {
-    dst->mem = &dst_mem;
     n_mem = gst_buffer_n_memory (out_frame.buffer);
     for (i = 0; i < n_mem; i++)
       dst->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (out_frame.buffer, i));
@@ -1137,7 +1135,6 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
     GstImxCompositorPad *pad, Imx2DFrame *src)
 {
   GstVideoAggregatorPad *ppad = (GstVideoAggregatorPad *)pad;
-  PhyMemBlock src_mem = {0};
   guint i, n_mem;
 
   src->info.fmt = GST_VIDEO_INFO_FORMAT(&(ppad->aggregated_frame->info));
@@ -1158,7 +1155,6 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
   }
 
   if (gst_is_dmabuf_memory (gst_buffer_peek_memory (ppad->aggregated_frame->buffer, 0))) {
-    src->mem = &src_mem;
     n_mem = gst_buffer_n_memory (ppad->aggregated_frame->buffer);
     for (i = 0; i < n_mem; i++)
       src->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (ppad->aggregated_frame->buffer, i));
@@ -1413,11 +1409,13 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
   Imx2DDevice *device = imxcomp->device;
   GstFlowReturn ret;
   Imx2DFrame src = {0}, dst = {0};
+  PhyMemBlock src_mem = {0}, dst_mem = {0};
   guint aggregated = 0;
 
   if (!device)
     return GST_FLOW_ERROR;
 
+  dst.mem = &dst_mem;
   if (gst_imxcompositor_config_dst(imxcomp, outbuf, &dst) < 0)
     return GST_FLOW_ERROR;
 
@@ -1448,6 +1446,7 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
     GstImxCompositorPad *pad = GST_IMXCOMPOSITOR_PAD (ppad);
 
     if (ppad->aggregated_frame != NULL) {
+      src.mem = &src_mem;
       if (gst_imxcompositor_config_src(imxcomp, pad, &src) < 0) {
         continue;
       }
