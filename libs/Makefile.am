@@ -33,7 +33,7 @@ noinst_HEADERS = allocator/gstallocatorphymem.h \
     video-overlay/gstimxvideooverlay.h
 
 if PLATFORM_IS_MX8
-libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_DMA_FD -DHAS_DPU
+libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_DMA_FD
 libgstfsl_@GST_API_VERSION@_la_LIBADD += -lgstbadion-$(GST_API_VERSION)
 endif
 

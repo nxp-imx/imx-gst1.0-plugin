@@ -48,22 +48,50 @@ static G2dFmtMap g2d_fmts_map[] = {
     {GST_VIDEO_FORMAT_ABGR,   G2D_ABGR8888, 32},
     {GST_VIDEO_FORMAT_xRGB,   G2D_XRGB8888, 32},
     {GST_VIDEO_FORMAT_xBGR,   G2D_XBGR8888, 32},
-#ifdef HAS_DPU
-    {GST_VIDEO_FORMAT_UYVY,   G2D_UYVY,     16},
-    {GST_VIDEO_FORMAT_YUY2,   G2D_YUYV,     16},
-    {GST_VIDEO_FORMAT_YVYU,   G2D_YVYU,     16},
-#endif
 
     //this only for separate YUV format and RGB format
     {GST_VIDEO_FORMAT_UNKNOWN, -1,          1},
 
     {GST_VIDEO_FORMAT_I420,   G2D_I420,     12},
     {GST_VIDEO_FORMAT_NV12,   G2D_NV12,     12},
-#ifndef HAS_DPU
+    // no dpu
     {GST_VIDEO_FORMAT_UYVY,   G2D_UYVY,     16},
     {GST_VIDEO_FORMAT_YUY2,   G2D_YUYV,     16},
     {GST_VIDEO_FORMAT_YVYU,   G2D_YVYU,     16},
-#endif
+
+    {GST_VIDEO_FORMAT_YV12,   G2D_YV12,     12},
+    {GST_VIDEO_FORMAT_NV16,   G2D_NV16,     16},
+    {GST_VIDEO_FORMAT_NV21,   G2D_NV21,     12},
+
+/* There is no corresponding GST Video format for those G2D formats
+    {GST_VIDEO_FORMAT_VYUY,   G2D_VYUY,     16},
+    {GST_VIDEO_FORMAT_NV61,   G2D_NV61,     16},
+*/
+    {GST_VIDEO_FORMAT_UNKNOWN, -1,          0}
+};
+
+static G2dFmtMap g2d_fmts_map_dpu[] = {
+    {GST_VIDEO_FORMAT_RGB16,  G2D_RGB565,   16},
+    {GST_VIDEO_FORMAT_RGBx,   G2D_RGBX8888, 32},
+    {GST_VIDEO_FORMAT_RGBA,   G2D_RGBA8888, 32},
+    {GST_VIDEO_FORMAT_BGRA,   G2D_BGRA8888, 32},
+    {GST_VIDEO_FORMAT_BGRx,   G2D_BGRX8888, 32},
+    {GST_VIDEO_FORMAT_BGR16,  G2D_BGR565,   16},
+    {GST_VIDEO_FORMAT_ARGB,   G2D_ARGB8888, 32},
+    {GST_VIDEO_FORMAT_ABGR,   G2D_ABGR8888, 32},
+    {GST_VIDEO_FORMAT_xRGB,   G2D_XRGB8888, 32},
+    {GST_VIDEO_FORMAT_xBGR,   G2D_XBGR8888, 32},
+    //HAS_DPU
+    {GST_VIDEO_FORMAT_UYVY,   G2D_UYVY,     16},
+    {GST_VIDEO_FORMAT_YUY2,   G2D_YUYV,     16},
+    {GST_VIDEO_FORMAT_YVYU,   G2D_YVYU,     16},
+
+    //this only for separate YUV format and RGB format
+    {GST_VIDEO_FORMAT_UNKNOWN, -1,          1},
+
+    {GST_VIDEO_FORMAT_I420,   G2D_I420,     12},
+    {GST_VIDEO_FORMAT_NV12,   G2D_NV12,     12},
+
     {GST_VIDEO_FORMAT_YV12,   G2D_YV12,     12},
     {GST_VIDEO_FORMAT_NV16,   G2D_NV16,     16},
     {GST_VIDEO_FORMAT_NV21,   G2D_NV21,     12},
@@ -77,7 +105,12 @@ static G2dFmtMap g2d_fmts_map[] = {
 
 static const G2dFmtMap * imx_g2d_get_format(GstVideoFormat format)
 {
-  const G2dFmtMap *map = g2d_fmts_map;
+  const G2dFmtMap *map;
+  if (HAS_DPU()) {
+    map = g2d_fmts_map_dpu;
+  } else {
+    map = g2d_fmts_map;
+  }
   while(map->bpp > 0) {
     if (map->gst_video_format == format)
       return map;
@@ -554,7 +587,12 @@ static gint imx_g2d_get_capabilities (Imx2DDevice* device)
 static GList* imx_g2d_get_supported_in_fmts(Imx2DDevice* device)
 {
   GList* list = NULL;
-  const G2dFmtMap *map = g2d_fmts_map;
+  const G2dFmtMap *map;
+  if (HAS_DPU()) {
+    map = g2d_fmts_map_dpu;
+  } else {
+    map = g2d_fmts_map;
+  }
   while (map->bpp > 0) {
     if (map->gst_video_format != GST_VIDEO_FORMAT_UNKNOWN)
       list = g_list_append(list, (gpointer)(map->gst_video_format));
@@ -567,7 +605,12 @@ static GList* imx_g2d_get_supported_in_fmts(Imx2DDevice* device)
 static GList* imx_g2d_get_supported_out_fmts(Imx2DDevice* device)
 {
   GList* list = NULL;
-  const G2dFmtMap *map = g2d_fmts_map;
+  const G2dFmtMap *map;
+  if (HAS_DPU()) {
+    map = g2d_fmts_map_dpu;
+  } else {
+    map = g2d_fmts_map;
+  }
 
   while (map->gst_video_format != GST_VIDEO_FORMAT_UNKNOWN) {
     list = g_list_append(list, (gpointer)(map->gst_video_format));
