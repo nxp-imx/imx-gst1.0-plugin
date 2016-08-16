@@ -939,7 +939,12 @@ gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps,
   GstCaps *ret = caps;
   GstAggregator *agg = (GstAggregator*)vagg;
 
-  gst_video_info_from_caps (&info, caps);
+  if (!gst_caps_is_fixed (caps)) {
+    GstCaps *tmp = gst_caps_fixate (gst_caps_ref (caps));
+    gst_video_info_from_caps (&info, tmp);
+    gst_caps_unref (tmp);
+  } else
+    gst_video_info_from_caps (&info, caps);
 
   GstCaps *downstream_caps = gst_pad_get_allowed_caps (agg->srcpad);
   if (!downstream_caps || gst_caps_is_empty (downstream_caps)) {
