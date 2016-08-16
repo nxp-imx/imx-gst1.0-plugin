@@ -410,6 +410,11 @@ void deinit_display (gpointer display)
 {
   DisplayHandle *hdisplay = (DisplayHandle*) display;
 
+  // FIXME: set alpha to 0 to workaround for can't close overlay.
+  if(hdisplay->fmt == GST_MAKE_FOURCC('A', 'R', 'G', 'B')) {
+    memset (hdisplay->vaddr, 0, hdisplay->fb_size);
+  }
+
   if (hdisplay->fd) {
     ioctl(hdisplay->fd, FBIOBLANK, FB_BLANK_NORMAL);
     munmap(hdisplay->vaddr, hdisplay->fb_size);
