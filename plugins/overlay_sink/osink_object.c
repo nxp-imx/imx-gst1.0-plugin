@@ -460,6 +460,8 @@ int osink_object_enable_display (gpointer osink_handle, gint display_idx)
         gst_fmt = GST_VIDEO_FORMAT_RGBx;
     } else if (fmt == GST_MAKE_FOURCC('B', 'G', 'R', 'x')) {
       gst_fmt = GST_VIDEO_FORMAT_BGRx;
+    } else if (fmt == GST_MAKE_FOURCC('A', 'R', 'G', 'B')) {
+      gst_fmt = GST_VIDEO_FORMAT_ARGB;
     } else {
       UNLOCK (glock);
       return -1;

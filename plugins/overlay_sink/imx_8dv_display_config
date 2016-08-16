@@ -1,5 +1,5 @@
 [master]
-device = /dev/fb0
+device = /dev/fb4
 bg_device = /dev/fb0
-fmt = BGRx
+fmt = ARGB
 

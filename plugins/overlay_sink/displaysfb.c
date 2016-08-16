@@ -363,7 +363,8 @@ gint init_display (gpointer display)
   fb_var.nonstd = hdisplay->fmt;
 
   if (hdisplay->fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'x')
-      || hdisplay->fmt == GST_MAKE_FOURCC('B', 'G', 'R', 'x')) {
+      || hdisplay->fmt == GST_MAKE_FOURCC('B', 'G', 'R', 'x')
+      || hdisplay->fmt == GST_MAKE_FOURCC('A', 'R', 'G', 'B')) {
     fb_var.bits_per_pixel = 32;
   } else if (hdisplay->fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'P')) {
     fb_var.bits_per_pixel = 16;
@@ -422,8 +423,15 @@ void deinit_display (gpointer display)
 gint clear_display (gpointer display)
 {
   DisplayHandle *hdisplay = (DisplayHandle*) display;
+  gchar *framebuffer = hdisplay->vaddr;
+  gint i;
 
   memset (hdisplay->vaddr, 0, hdisplay->fb_size);
+  if(hdisplay->fmt == GST_MAKE_FOURCC('A', 'R', 'G', 'B')) {
+    for (i=0; i<hdisplay->fb_size; i+=4) {
+      framebuffer[i] = 0xff;
+    }
+  }
 
   return 0;
 }
