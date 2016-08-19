@@ -189,6 +189,7 @@ gst_vpu_dec_object_init(GstVpuDecObject *vpu_dec_object)
   vpu_dec_object->state = STATE_NULL;
   vpu_dec_object->input_state = NULL;
   vpu_dec_object->output_state = NULL;
+  vpu_dec_object->handle = NULL;
   vpu_dec_object->vpuframebuffers = NULL;
   vpu_dec_object->new_segment = TRUE;
   vpu_dec_object->mosaic_cnt = 0;
@@ -417,6 +418,7 @@ gst_vpu_dec_object_stop (GstVpuDecObject * vpu_dec_object)
           gst_vpu_dec_object_strerror(dec_ret));
       return FALSE;
     }
+    vpu_dec_object->handle = NULL;
   }
 
   if (!gst_vpu_dec_object_free_mv_buffer(vpu_dec_object)) {
@@ -581,6 +583,7 @@ gst_vpu_dec_object_config (GstVpuDecObject * vpu_dec_object, \
           gst_vpu_dec_object_strerror(dec_ret));
       return FALSE;
     }
+    vpu_dec_object->handle = NULL;
 
     vpu_dec_object->new_segment = TRUE;
     g_list_free (vpu_dec_object->system_frame_number_in_vpu);
