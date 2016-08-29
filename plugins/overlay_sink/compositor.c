@@ -467,6 +467,7 @@ gpointer compositor_add_surface (gpointer compositor, SurfaceInfo *surface_info)
 
   memset (hsurface, 0, sizeof(Surface));
   memcpy (&hsurface->info, surface_info, sizeof(SurfaceInfo));
+  hsurface->buffer.fd[0] = -1;
 
   GST_DEBUG ("add surface %p", hsurface);
 
