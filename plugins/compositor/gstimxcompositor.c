@@ -1452,6 +1452,7 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
 
     if (ppad->aggregated_frame != NULL) {
       src.mem = &src_mem;
+      memset (src.mem, 0, sizeof(PhyMemBlock));
       if (gst_imxcompositor_config_src(imxcomp, pad, &src) < 0) {
         continue;
       }
