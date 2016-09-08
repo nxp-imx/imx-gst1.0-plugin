@@ -364,6 +364,7 @@ gint init_display (gpointer display)
 
   if (hdisplay->fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'x')
       || hdisplay->fmt == GST_MAKE_FOURCC('B', 'G', 'R', 'x')
+      || hdisplay->fmt == GST_MAKE_FOURCC('B', 'G', 'R', 'A')
       || hdisplay->fmt == GST_MAKE_FOURCC('A', 'R', 'G', 'B')) {
     fb_var.bits_per_pixel = 32;
   } else if (hdisplay->fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'P')) {
