@@ -56,11 +56,7 @@ GST_DEBUG_CATEGORY_EXTERN (overlay_sink_debug);
 #define DEFAULTW (320)
 #define DEFAULTH (240)
 
-#ifdef USE_FB_API
-#define DISPLAY_NUM_BUFFERS (1)
-#else
 #define DISPLAY_NUM_BUFFERS (3)
-#endif
 
 #define PAGE_SHIFT      12
 #ifndef PAGE_SIZE
