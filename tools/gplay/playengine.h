@@ -220,6 +220,7 @@ typedef struct _PlayEngine
   /* playengine custom setting interfaces */
   PlayEngineResult (*set_text_sink)           (PlayEngineHandle handle, const gchar *sink_name);
   PlayEngineResult (*set_video_sink)          (PlayEngineHandle handle, const gchar *sink_name);
+  PlayEngineResult (*set_video_sink_element)  (PlayEngineHandle handle, GstElement *sink);
   PlayEngineResult (*set_audio_sink)          (PlayEngineHandle handle, const gchar *sink_name);
   PlayEngineResult (*set_visual)              (PlayEngineHandle handle, const gchar *visual_name);
 

@@ -1710,6 +1710,28 @@ playengine_set_video_sink(PlayEngineHandle handle,
 }
 
 static PlayEngineResult
+playengine_set_video_sink_element(PlayEngineHandle handle,
+                          GstElement* sink)
+{
+  PlayEngine *engine = (PlayEngine *)handle;
+  PlayEngineData *engine_data = NULL;
+
+  if(!engine || !engine->priv || !sink)
+  {
+    g_error("Error:%s Invalid pointer is used\n", __FUNCTION__);
+    return PLAYENGINE_ERROR_BAD_PARAM;
+  }
+  g_print("set sink element %p\n",sink);
+
+  engine_data = (PlayEngineData *)engine->priv;
+
+  engine_data->video_sink = sink;
+  g_object_set(G_OBJECT(engine_data->bin), "video-sink", sink, NULL);
+
+  return PLAYENGINE_SUCCESS;
+}
+
+static PlayEngineResult
 playengine_set_visual(PlayEngineHandle handle,
                       const gchar *visual_name)
 {
@@ -2592,6 +2614,7 @@ play_engine_create()
   engine->set_text_sink = playengine_set_text_sink;
   engine->set_audio_sink = playengine_set_audio_sink;
   engine->set_video_sink = playengine_set_video_sink;
+  engine->set_video_sink_element = playengine_set_video_sink_element;
   engine->set_visual = playengine_set_visual;
   engine->set_subtitle_font = playengine_set_subtitle_font;
   engine->set_subtitle_color = playengine_set_subtitle_color;
