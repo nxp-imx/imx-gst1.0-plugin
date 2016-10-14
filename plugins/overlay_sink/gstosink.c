@@ -846,6 +846,10 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     }
   }
 
+  if (sink->no_phy_buffer && sink->prv_buffer && sink->composition_meta_enable
+      && imx_video_overlay_composition_has_meta(sink->prv_buffer)) {
+    imx_video_overlay_composition_remove_meta(sink->prv_buffer);
+  }
   if (sink->prv_buffer)
     gst_buffer_unref (sink->prv_buffer);
 

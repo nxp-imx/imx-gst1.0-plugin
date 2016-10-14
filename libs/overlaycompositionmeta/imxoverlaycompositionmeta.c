@@ -327,6 +327,7 @@ void imx_video_overlay_composition_copy_meta(GstBuffer *dst, GstBuffer *src,
           }
 
           gst_buffer_add_video_overlay_composition_meta(dst, comp_copy);
+          gst_video_overlay_composition_unref (comp_copy);
         }
       }
     }
