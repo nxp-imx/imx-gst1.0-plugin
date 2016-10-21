@@ -321,7 +321,9 @@ static void compositor_do_compositing_surface_list (CompositorHandle *hcomposito
     surface = list;
     list = list->next;
 
-    if (NULL == surface->buffer.mem.paddr && 0 > surface->buffer.fd[0]) {
+    if (NULL == surface->buffer.mem.paddr
+        && NULL == surface->buffer.mem.vaddr
+        && 0 > surface->buffer.fd[0]) {
       GST_WARNING ("Surface is empty, don't need update.");
       continue;
     }

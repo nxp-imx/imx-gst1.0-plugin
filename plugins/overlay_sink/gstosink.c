@@ -695,7 +695,7 @@ gst_overlay_sink_get_surface_buffer (GstBuffer *gstbuffer, SurfaceBuffer *surfac
     n_mem = gst_buffer_n_memory (gstbuffer);
     for (i = 0; i < n_mem; i++)
       surface_buffer->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (gstbuffer, i));
-  } else {
+  } else if (gst_buffer_is_phymem (gstbuffer)) {
     memblk = gst_buffer_query_phymem_block (gstbuffer);
     if (!memblk) {
       GST_ERROR ("Can't get physical memory block from gstbuffer (%p).", gstbuffer);
@@ -706,6 +706,16 @@ gst_overlay_sink_get_surface_buffer (GstBuffer *gstbuffer, SurfaceBuffer *surfac
     surface_buffer->mem.vaddr = memblk->vaddr;
     surface_buffer->mem.paddr = memblk->paddr;
     surface_buffer->buf = NULL;
+  } else if (GST_MEMORY_IS_PHYSICALLY_CONTIGUOUS(gst_buffer_peek_memory (gstbuffer, 0))) {
+    GstMapInfo minfo;
+    gst_buffer_map (gstbuffer, &minfo, GST_MAP_READ);
+    memset (&surface_buffer->mem, 0, sizeof(PhyMemBlock));
+    surface_buffer->mem.vaddr = minfo.data;
+    surface_buffer->mem.size = minfo.size;
+    gst_buffer_unmap (gstbuffer, &minfo);
+  } else {
+    GST_ERROR ("Shouldn't be here");
+    return -1;
   }
 
   return 0;
@@ -735,7 +745,8 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
   surface_buffer.fd[0] = -1;
 
   if (!(gst_buffer_is_phymem (buffer)
-        || gst_is_dmabuf_memory (gst_buffer_peek_memory (buffer, 0)))) {
+        || gst_is_dmabuf_memory (gst_buffer_peek_memory (buffer, 0))
+        || GST_MEMORY_IS_PHYSICALLY_CONTIGUOUS(gst_buffer_peek_memory (buffer, 0)))) {
     GST_DEBUG ("copy input frame to physical continues memory");
     // check if physical continues buffer
     GstBuffer *buffer2 = NULL;

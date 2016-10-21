@@ -399,10 +399,18 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
 
 #ifdef USE_DMA_FD
-  GST_DEBUG ("src paddr: %p dst paddr: %p: fd: %d fd1: %d",
-      src->mem->paddr, dst->mem->paddr, src->fd[0], dst->fd[0]);
+  GST_DEBUG ("src paddr fd vaddr: %p %d %p dst paddr fd vaddr: %p %d %p",
+      src->mem->paddr, src->fd[0], src->mem->vaddr, dst->mem->paddr,
+      dst->fd[0], dst->mem->vaddr);
   if (!src->mem->paddr) {
-    pbuf = g2d_buf_from_fd(src->fd[0]);
+    if (src->fd[0] >= 0) {
+      pbuf = g2d_buf_from_fd (src->fd[0]);
+    } else if (src->mem->vaddr) {
+      pbuf = g2d_buf_from_virt_addr (src->mem->vaddr, src->mem->size);
+    } else {
+      GST_ERROR ("Invalid parameters.");
+      return -1;
+    }
     if (pbuf) {
       src->mem->paddr = pbuf->buf_paddr;
       g2d_free(pbuf);
@@ -412,7 +420,7 @@ static gint imx_g2d_blit(Imx2DDevice *device,
     }
   }
   if (!dst->mem->paddr) {
-    pbuf = g2d_buf_from_fd(dst->fd[0]);
+    pbuf = g2d_buf_from_fd (dst->fd[0]);
     if (pbuf) {
       dst->mem->paddr = pbuf->buf_paddr;
       g2d_free(pbuf);
@@ -421,8 +429,7 @@ static gint imx_g2d_blit(Imx2DDevice *device,
       return -1;
     }
   }
-  GST_DEBUG ("src paddr: %p dst paddr: %p",
-      src->mem->paddr, dst->mem->paddr);
+  GST_DEBUG ("src paddr: %p dst paddr: %p", src->mem->paddr, dst->mem->paddr);
 #endif
 
   // Set input
@@ -657,7 +664,7 @@ static gint imx_g2d_fill_color(Imx2DDevice *device, Imx2DFrame *dst,
 #ifdef USE_DMA_FD
   GST_DEBUG ("dst paddr: %p fd: %d", dst->mem->paddr, dst->fd[0]);
   if (!dst->mem->paddr) {
-    pbuf = g2d_buf_from_fd(dst->fd[0]);
+    pbuf = g2d_buf_from_fd (dst->fd[0]);
     if (pbuf) {
       dst->mem->paddr = pbuf->buf_paddr;
       g2d_free(pbuf);

@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2013-2014 Freescale Semiconductor, Inc.
+ *  Copyright (C) 2013-2016 Freescale Semiconductor, Inc.
  *
  */
 /*
@@ -43,7 +43,7 @@ extern "C"  {
 #endif
 
 #define G2D_VERSION_MAJOR   1
-#define G2D_VERSION_MINOR   1
+#define G2D_VERSION_MINOR   2
 #define G2D_VERSION_PATCH   0
 
 enum g2d_format
@@ -60,6 +60,7 @@ enum g2d_format
      G2D_ABGR8888             = 7,
      G2D_XRGB8888             = 8,
      G2D_XBGR8888             = 9,
+     G2D_RGB888               = 10,
 
 //yuv formats
      G2D_NV12                 = 20,
@@ -204,8 +205,9 @@ int g2d_disable(void *handle, enum g2d_cap_mode cap);
 
 int g2d_cache_op(struct g2d_buf *buf, enum g2d_cache_mode op);
 struct g2d_buf *g2d_alloc(int size, int cacheable);
+struct g2d_buf *g2d_buf_from_fd(int fd);
+struct g2d_buf *g2d_buf_from_virt_addr(void *vaddr, int size);
 int g2d_free(struct g2d_buf *buf);
-struct g2d_buf * g2d_buf_from_fd(int fd);
 
 int g2d_flush(void *handle);
 int g2d_finish(void *handle);
