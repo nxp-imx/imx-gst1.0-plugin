@@ -84,7 +84,6 @@ static G2dFmtMap g2d_fmts_map_dpu[] = {
     //HAS_DPU
     {GST_VIDEO_FORMAT_UYVY,   G2D_UYVY,     16},
     {GST_VIDEO_FORMAT_YUY2,   G2D_YUYV,     16},
-    {GST_VIDEO_FORMAT_YVYU,   G2D_YVYU,     16},
 
     //this only for separate YUV format and RGB format
     {GST_VIDEO_FORMAT_UNKNOWN, -1,          1},
