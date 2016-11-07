@@ -156,6 +156,7 @@ static IMXV4l2FmtMap g_imxv4l2fmt_maps_IPU[] = {
   {GST_VIDEO_CAPS_MAKE("TNVF"), IPU_PIX_FMT_TILED_NV12F, GST_VIDEO_FORMAT_UNKNOWN, 12, 0},
   {GST_VIDEO_CAPS_MAKE("UYVY"), V4L2_PIX_FMT_UYVY, GST_VIDEO_FORMAT_UYVY, 16, 0},
   {GST_VIDEO_CAPS_MAKE("YUY2"), V4L2_PIX_FMT_YUYV, GST_VIDEO_FORMAT_YUY2, 16, 0},
+  {GST_VIDEO_CAPS_MAKE("RGBA"), V4L2_PIX_FMT_RGB32, GST_VIDEO_FORMAT_RGBA, 32, 0},
   {GST_VIDEO_CAPS_MAKE("RGBx"), V4L2_PIX_FMT_RGB32, GST_VIDEO_FORMAT_RGBx, 32, 0},
   {GST_VIDEO_CAPS_MAKE("BGRx"), V4L2_PIX_FMT_BGR32, GST_VIDEO_FORMAT_BGRx, 32, 0},
   {GST_VIDEO_CAPS_MAKE("RGB"), V4L2_PIX_FMT_RGB24, GST_VIDEO_FORMAT_RGB, 24, 0},
@@ -662,7 +663,6 @@ gst_imx_v4l2_get_device_caps (gint type)
           GstStructure * structure = gst_structure_from_string(fmt_map[i].caps_str, NULL);
           gst_caps_append_structure (caps, structure);
         }
-        break;
       }
     }
     fmtdesc.index ++;
@@ -1858,7 +1858,7 @@ gint gst_imx_v4l2_queue_gstbuffer (gpointer v4l2handle, GstBuffer *buffer, GstVi
 }
 
 #define TRY_TIMEOUT (500000) //500ms
-#define TRY_INTERVAL (10000) //10ms
+#define TRY_INTERVAL (1000) //1ms
 #define MAX_TRY_CNT (TRY_TIMEOUT/TRY_INTERVAL)
 
 gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk,
