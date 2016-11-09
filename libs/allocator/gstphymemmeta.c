@@ -72,6 +72,13 @@ gst_phy_mem_meta_api_get_type (void)
   return type;
 }
 
+static gboolean
+gst_phy_mem_meta_init (GstMeta * meta, gpointer params,
+    GstBuffer * buf)
+{
+  return TRUE;
+}
+
   const GstMetaInfo *
 gst_phy_mem_meta_get_info (void)
 {
@@ -80,7 +87,7 @@ gst_phy_mem_meta_get_info (void)
   if (g_once_init_enter (&phy_mem_meta_info)) {
     const GstMetaInfo *meta =
       gst_meta_register (GST_PHY_MEM_META_API_TYPE, "GstPhyMemMeta",
-          sizeof (GstPhyMemMeta), (GstMetaInitFunction) NULL,
+          sizeof (GstPhyMemMeta), (GstMetaInitFunction) gst_phy_mem_meta_init,
           (GstMetaFreeFunction) NULL, gst_phy_mem_meta_transform);
     GST_DEBUG_CATEGORY_INIT (phy_mem_meta_debug, "phymemmeta", 0,
                                "Freescale physical memory meta");
