@@ -2261,6 +2261,21 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
             stream->info.audio.block_align, stream->info.audio.sample_width,
             stream->bitrate);
         break;
+      case AUDIO_WMS:
+        parser_ret = IParser->getAudioBlockAlign(handle,track_index,&stream->info.audio.block_align);
+
+        if(parser_ret != PARSER_SUCCESS)
+              goto bail;
+        stream->send_codec_data = TRUE;
+        codec_mime = "audio/x-wms";
+        codec = "WMA Voice";
+        mime =
+          g_strdup_printf
+          ("%s, channels=(int)%ld, rate=(int)%ld, block_align=(int)%ld, depth=(int)%ld, bitrate=(int)%ld",
+          codec_mime, stream->info.audio.n_channels, stream->info.audio.rate,
+          stream->info.audio.block_align, stream->info.audio.sample_width,
+          stream->bitrate);
+        break;
       case AUDIO_PCM:
       {
         int width, depth, endian;

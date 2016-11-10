@@ -1,6 +1,6 @@
 /*
 ***********************************************************************
-* Copyright (c) 2009-2014, Freescale Semiconductor, Inc.
+* Copyright (c) 2009-2014, 2016 Freescale Semiconductor, Inc.
 * All modifications are confidential and proprietary information
 * of Freescale Semiconductor, Inc. 
 ***********************************************************************/
@@ -103,7 +103,8 @@ typedef enum
     AUDIO_REAL, /* Real audio types */
     AUDIO_EC3,
     AUDIO_OPUS,
-    AUDIO_APE   /*Monkey's audio*/
+    AUDIO_APE,   /*Monkey's audio*/
+    AUDIO_WMS  /* Windows Media Voice */
 }AudioCodecType;
 
 
