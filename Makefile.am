@@ -28,7 +28,8 @@ endif
 
 TOOLDIRS =    tools/                      \
               tools/gplay                 \
-              tools/grecorder
+              tools/grecorder             \
+              tools/gplay2
 
 BASEDIRS = $(AIURDIRS) $(BEEPDIRS) $(VIDEO_CONVERT_DIRS) $(COMPOSITOR_DIRS)
               
