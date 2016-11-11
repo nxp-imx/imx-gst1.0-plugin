@@ -13,6 +13,7 @@ libgstfsl_@GST_API_VERSION@_la_SOURCES = allocator/gstphymemmeta.c \
 	device-2d/imx_2d_device_allocator.c \
 	overlaycompositionmeta/imxoverlaycompositionmeta.c \
 	video-overlay/gstimxvideooverlay.c \
+	gstimxcommon.c \
   gstimxcommon.h \
   $(V4L2_CORE_SOURCE)
 
