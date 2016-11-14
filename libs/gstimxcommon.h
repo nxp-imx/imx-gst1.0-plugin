@@ -64,7 +64,7 @@ typedef enum
   CC_MX6SLL = CHIPCODE ('M', 'X', '6', '4'),
   CC_MX7D = CHIPCODE ('M', 'X', '7', 'D'),
   CC_MX8 = CHIPCODE ('M', 'X', '8', '0'),
-  CC_UNKN = CHIPCODE ('U', 'N', 'K', 'N'),
+  CC_UNKN = CHIPCODE ('U', 'N', 'K', 'N')
 
 } CHIP_CODE;
 
@@ -94,7 +94,7 @@ typedef enum {
   IPU,
   PXP,
   VPU,
-  DPU,
+  DPU
 } CHIP_FEATURE;
 
 CHIP_CODE getChipCodeFromCpuinfo (void);
@@ -108,5 +108,21 @@ gboolean check_feature(CHIP_CODE chip_name, CHIP_FEATURE feature);
 #define HAS_PXP() check_feature(imx_chip_code(), PXP)
 #define HAS_VPU() check_feature(imx_chip_code(), VPU)
 #define HAS_DPU() check_feature(imx_chip_code(), DPU)
+
+/* define rotate and flip glib enum for overlaysink and imxv4l2sink */
+typedef enum
+{
+  GST_IMX_ROTATION_0 = 0,
+  GST_IMX_ROTATION_90,
+  GST_IMX_ROTATION_180,
+  GST_IMX_ROTATION_270,
+  GST_IMX_ROTATION_HFLIP,
+  GST_IMX_ROTATION_VFLIP
+}GstImxRotateMethod;
+
+GType gst_imx_rotate_method_get_type();
+
+#define DEFAULT_IMX_ROTATE_METHOD GST_IMX_ROTATION_0
+#define GST_TYPE_IMX_ROTATE_METHOD (gst_imx_rotate_method_get_type())
 
 #endif

@@ -22,6 +22,7 @@
 #include "compositor.h"
 #include "imx_2d_device.h"
 #include "imxoverlaycompositionmeta.h"
+#include "gstimxcommon.h"
 
 GST_DEBUG_CATEGORY_EXTERN (overlay_sink_debug);
 #define GST_CAT_DEFAULT overlay_sink_debug
@@ -97,10 +98,12 @@ compositor_do_composite_surface (CompositorHandle *hcompositor, Surface *surface
   src.crop.h = surface->info.src.bottom - surface->info.src.top;
 
   switch (surface->info.rot) {
-    case 0:   src.rotate = IMX_2D_ROTATION_0;    break;
-    case 90:  src.rotate = IMX_2D_ROTATION_90;   break;
-    case 180: src.rotate = IMX_2D_ROTATION_180;  break;
-    case 270: src.rotate = IMX_2D_ROTATION_270;  break;
+    case GST_IMX_ROTATION_0:   src.rotate = IMX_2D_ROTATION_0;    break;
+    case GST_IMX_ROTATION_90:  src.rotate = IMX_2D_ROTATION_90;   break;
+    case GST_IMX_ROTATION_180: src.rotate = IMX_2D_ROTATION_180;  break;
+    case GST_IMX_ROTATION_270: src.rotate = IMX_2D_ROTATION_270;  break;
+    case GST_IMX_ROTATION_HFLIP: src.rotate = IMX_2D_ROTATION_HFLIP;  break;
+    case GST_IMX_ROTATION_VFLIP: src.rotate = IMX_2D_ROTATION_VFLIP;  break;
     default:  src.rotate = IMX_2D_ROTATION_0;    break;
   }
 
@@ -266,7 +269,8 @@ static void
 compositor_check_keep_ratio (CompositorHandle *hcompositor, Surface *hsurface, SurfaceInfo *surface_info)
 {
   GstVideoRectangle src, dest, result;
-  gboolean brotate = (surface_info->rot == 90 || surface_info->rot == 270) ? TRUE : FALSE;
+  gboolean brotate = surface_info->rot == GST_IMX_ROTATION_90
+                    || surface_info->rot == GST_IMX_ROTATION_270;
 
   src.x = src.y = 0;
   src.w = surface_info->src.right - surface_info->src.left;

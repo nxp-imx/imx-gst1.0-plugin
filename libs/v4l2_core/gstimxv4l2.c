@@ -74,6 +74,7 @@ typedef gint (*V4l2outConfigInput) (void *handle, guint fmt, guint w, guint h, \
     IMXV4l2Rect *crop);
 typedef gint (*V4l2outConfigOutput) (void *handle, struct v4l2_crop *crop);
 typedef gint (*V4l2outConfigRotate) (void *handle, gint rotate);
+typedef gint (*V4l2outConfigFlip) (void *handle, guint flip);
 typedef gint (*V4l2outConfigAlpha) (void *handle, guint alpha);
 typedef gint (*V4l2outConfigColorkey) (void *handle, gboolean enable, guint color_key);
 typedef gint (*V4l2captureConfig) (void *handle, guint fmt, guint w, guint h, \
@@ -84,6 +85,7 @@ typedef struct {
   V4l2outConfigInput v4l2out_config_input;
   V4l2outConfigOutput v4l2out_config_output;
   V4l2outConfigRotate v4l2out_config_rotate;
+  V4l2outConfigFlip v4l2out_config_flip;
   V4l2outConfigAlpha v4l2out_config_alpha;
   V4l2outConfigColorkey v4l2out_config_colorkey;
   V4l2captureConfig v4l2capture_config;
@@ -111,6 +113,7 @@ typedef struct {
   gint allocated;
   IMXV4l2BufferPair buffer_pair[MAX_BUFFER];
   gint rotate;
+  guint flip;
   guint *support_format_table;
   gboolean is_tvin;
   IMXV4l2DeviceItf dev_itf;
@@ -328,6 +331,7 @@ imx_ipu_v4l2out_config_rotate(IMXV4l2Handle *handle, gint rotate)
 
   ctrl.id = V4L2_CID_ROTATE;
   ctrl.value = rotate;
+
   if (ioctl(handle->v4l2_fd, VIDIOC_S_CTRL, &ctrl) < 0) {
     GST_ERROR ("Set ctrl rotate failed.");
     return -1;
@@ -468,8 +472,6 @@ imx_pxp_v4l2out_config_input (IMXV4l2Handle *handle, guint fmt, guint w, guint h
 static gint
 imx_pxp_v4l2out_config_output(IMXV4l2Handle *handle, struct v4l2_crop *crop)
 {
-  gboolean brotate = (handle->rotate == 90 || handle->rotate == 270) ? TRUE : FALSE;
-
   crop->type = V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY;
   if (ioctl(handle->v4l2_fd, VIDIOC_S_CROP, crop) < 0) {
     GST_ERROR ("Set crop failed.");
@@ -486,6 +488,7 @@ imx_pxp_v4l2out_config_rotate(IMXV4l2Handle *handle, gint rotate)
 
   ctrl.id = V4L2_CID_PRIVATE_BASE;
   ctrl.value = rotate;
+
   if (ioctl(handle->v4l2_fd, VIDIOC_S_CTRL, &ctrl) < 0) {
     GST_ERROR ("Set ctrl rotate failed.");
     return -1;
@@ -582,6 +585,23 @@ imx_pxp_v4l2_config_colorkey (IMXV4l2Handle *handle, gboolean enable, guint colo
     GST_ERROR ("Set VIDIOC_S_FMT output overlay failed.");
 
   close(fd);
+}
+
+/* this is a common interface for pxp and ipu */
+static gint
+imx_v4l2out_config_flip(IMXV4l2Handle *handle, guint flip)
+{
+  struct v4l2_control ctrl;
+
+  ctrl.id = flip;
+  ctrl.value = 1;
+
+  if (ioctl(handle->v4l2_fd, VIDIOC_S_CTRL, &ctrl) < 0) {
+    GST_ERROR ("Set ctrl flip failed.");
+    return -1;
+  }
+
+  return 0;
 }
 
 gchar *
@@ -1144,6 +1164,8 @@ gpointer gst_imx_v4l2_open_device (gchar *device, int type)
       handle->streamon_count = MX60_STREAMON_COUNT;
     }
 
+    handle->dev_itf.v4l2out_config_flip = (V4l2outConfigFlip)imx_v4l2out_config_flip;
+
     gst_imx_v4l2output_set_default_res (handle);
   }
 
@@ -1367,7 +1389,7 @@ gint gst_imx_v4l2out_config_output (gpointer v4l2handle, IMXV4l2Rect *overlay, g
   }
 
   memcpy(&handle->overlay, overlay, sizeof(IMXV4l2Rect));
-  brotate = (handle->rotate == 90 || handle->rotate == 270) ? TRUE : FALSE;
+  brotate = handle->rotate == 90 || handle->rotate == 270;
 
   //keep video ratio with display
   src.x = src.y = 0;
@@ -1460,6 +1482,25 @@ gint gst_imx_v4l2_config_rotate (gpointer v4l2handle, gint rotate)
     return -1;
   }
   handle->rotate = rotate;
+
+  return 0;
+}
+
+gint gst_imx_v4l2_config_flip (gpointer v4l2handle, guint flip)
+{
+  IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
+
+  GST_DEBUG ("set flip to (%d).", flip);
+
+  if (flip != V4L2_CID_VFLIP && flip != V4L2_CID_HFLIP) {
+    g_print ("input flip orientation is not correct.\n");
+    return -1;
+  }
+
+  if ((*handle->dev_itf.v4l2out_config_flip) (handle, flip) < 0) {
+    return -1;
+  }
+  handle->flip = flip;
 
   return 0;
 }

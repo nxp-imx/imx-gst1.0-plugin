@@ -145,7 +145,7 @@ gst_imx_v4l2sink_set_property (GObject * object,
       v4l2sink->config_flag |= CONFIG_CROP;
       break;
     case PROP_ROTATE:
-      v4l2sink->rotate = g_value_get_uint (value);
+      v4l2sink->rotate = g_value_get_enum (value);
       v4l2sink->config_flag |= CONFIG_ROTATE;
       break;
     case PROP_KEEP_VIDEO_RATIO:
@@ -205,7 +205,7 @@ gst_imx_v4l2sink_get_property (GObject * object,
       g_value_set_uint (value, v4l2sink->crop.height);
       break;
     case PROP_ROTATE:
-      g_value_set_uint (value, v4l2sink->rotate);
+      g_value_set_enum (value, v4l2sink->rotate);
       break;
     case PROP_KEEP_VIDEO_RATIO:
       g_value_set_boolean (value, v4l2sink->keep_video_ratio);
@@ -375,6 +375,21 @@ gst_imx_v4l2sink_configure_input (GstImxV4l2Sink *v4l2sink)
       v4l2sink->video_align.padding_right, v4l2sink->video_align.padding_bottom);
 
   return gst_imx_v4l2out_config_input (v4l2sink->v4l2handle, v4l2sink->v4l2fmt, w, h, &crop);
+}
+
+static gint
+gst_imx_v4l2sink_configure_rotate (GstImxV4l2Sink *v4l2sink)
+{
+  gint ret = -1;
+
+  if (v4l2sink->rotate < GST_IMX_ROTATION_HFLIP) {
+    ret = gst_imx_v4l2_config_rotate (v4l2sink->v4l2handle, v4l2sink->rotate * 90);
+  } else {
+    guint flip = v4l2sink->rotate > GST_IMX_ROTATION_HFLIP ? V4L2_CID_VFLIP : V4L2_CID_HFLIP;
+    ret = gst_imx_v4l2_config_flip (v4l2sink->v4l2handle, flip);
+  }
+
+  return ret;
 }
 
 static gint
@@ -823,7 +838,7 @@ gst_imx_v4l2sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
     }
 
     if (v4l2sink->config_flag & CONFIG_ROTATE) {
-      if (gst_imx_v4l2_config_rotate (v4l2sink->v4l2handle, v4l2sink->rotate) < 0) {
+      if (gst_imx_v4l2sink_configure_rotate (v4l2sink) < 0) {
         GST_WARNING_OBJECT (v4l2sink, "configure rotate failed.");
         v4l2sink->rotate = v4l2sink->prev_rotate;
       } else {
@@ -996,9 +1011,9 @@ gst_imx_v4l2sink_install_properties (GObjectClass *gobject_class)
         0, G_MAXINT, 0, G_PARAM_READWRITE));
 
   g_object_class_install_property (gobject_class, PROP_ROTATE,
-      g_param_spec_uint ("rotate", "Rotate",
+      g_param_spec_enum ("rotate", "Rotate",
         "The orientation degree of the video; default is 0 degree",
-        0, G_MAXUINT, 0, G_PARAM_READWRITE));
+        GST_TYPE_IMX_ROTATE_METHOD, DEFAULT_IMX_ROTATE_METHOD, G_PARAM_READWRITE));
 
   g_object_class_install_property (gobject_class, PROP_KEEP_VIDEO_RATIO,
       g_param_spec_boolean ("force-aspect-ratio", "Force aspect ratio",

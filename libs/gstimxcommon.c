@@ -19,6 +19,32 @@
 
 #include "gstimxcommon.h"
 
+/* define rotate and flip glib enum for overlaysink and imxv4l2sink */
+static const GEnumValue rotate_methods[] = {
+  {GST_IMX_ROTATION_0, "no rotation", "none"},
+  {GST_IMX_ROTATION_90, "Rotate clockwise 90 degrees", "rotate-90"},
+  {GST_IMX_ROTATION_180, "Rotate clockwise 180 degrees", "rotate-180"},
+  {GST_IMX_ROTATION_270, "Rotate clockwise 270 degrees", "rotate-270"},
+  {GST_IMX_ROTATION_HFLIP, "Flip horizontally", "horizontal-flip"},
+  {GST_IMX_ROTATION_VFLIP, "Flip vertically", "vertically-flip"},
+  {0, NULL, NULL}
+};
+
+GType
+gst_imx_rotate_method_get_type()
+{
+  static GType rotate_method_type = 0;
+  static volatile gsize once = 0;
+
+  if (g_once_init_enter (&once)) {
+    rotate_method_type = g_enum_register_static ("GstImxRotateMethod",
+        rotate_methods);
+    g_once_init_leave (&once, rotate_method_type);
+  }
+
+  return rotate_method_type;
+}
+
 /*=============================================================================
 FUNCTION:               get_chipname
 

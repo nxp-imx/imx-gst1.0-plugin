@@ -163,7 +163,7 @@ gst_overlay_sink_set_property (GObject * object,
       sink->overlay[idx].h = g_value_get_int (value);
       break;
     case OVERLAY_SINK_PROP_ROTATION_0:
-      sink->overlay[idx].rot = g_value_get_int (value);
+      sink->overlay[idx].rot = g_value_get_enum (value);
       break;
     case OVERLAY_SINK_PROP_DISP_UPDATE_0:
       sink->config[idx] = g_value_get_boolean (value);
@@ -219,7 +219,7 @@ gst_overlay_sink_get_property (GObject * object,
       g_value_set_int (value, sink->overlay[idx].h);
       break;
     case OVERLAY_SINK_PROP_ROTATION_0:
-      g_value_set_int (value, sink->overlay[idx].rot);
+      g_value_set_enum (value, sink->overlay[idx].rot);
       break;
     case OVERLAY_SINK_PROP_DISP_UPDATE_0:
       g_value_set_boolean (value, sink->config[idx]);
@@ -979,9 +979,10 @@ gst_overlay_sink_install_properties (GObjectClass *gobject_class)
     else
       prop_name = g_strdup_printf ("rotate-%d", i);
     g_object_class_install_property (gobject_class, prop,
-        g_param_spec_int (prop_name,
+        g_param_spec_enum (prop_name,
           prop_name,
-          "get/set the rotation of the video", 0, G_MAXINT, 0, G_PARAM_READWRITE));
+          "get/set the rotation of the video", GST_TYPE_IMX_ROTATE_METHOD, DEFAULT_IMX_ROTATE_METHOD,
+          G_PARAM_READWRITE));
     g_free (prop_name);
     prop++;
 

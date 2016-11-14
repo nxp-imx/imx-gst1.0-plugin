@@ -1042,7 +1042,7 @@ playengine_set_rotate(PlayEngineHandle handle,
     if(g_object_class_find_property (gstobjclass,"rotate")
       && g_object_class_find_property (gstobjclass,"reconfig"))
     {
-      g_object_set(G_OBJECT(actual_video_sink), "rotate", rotation, NULL);
+      g_object_set(G_OBJECT(actual_video_sink), "rotate", rotation/90, NULL);
       g_object_set(G_OBJECT(actual_video_sink), "reconfig", 1, NULL);
       engine_data->rotation = rotation;
     } else if (g_object_class_find_property (gstobjclass,"rotate-method"))
@@ -1083,6 +1083,7 @@ playengine_get_rotate(PlayEngineHandle handle,
     if(g_object_class_find_property (gstobjclass,"rotate"))
     {
       g_object_get(G_OBJECT(actual_video_sink), "rotate", rotation, NULL);
+      *rotation = *rotation * 90;
     } else if (g_object_class_find_property (gstobjclass,"rotate-method"))
     {
       g_object_get(G_OBJECT(actual_video_sink), "rotate-method", rotation, NULL);
