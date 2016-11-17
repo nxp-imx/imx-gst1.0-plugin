@@ -443,8 +443,8 @@ gint get_next_display_buffer (gpointer display, SurfaceBuffer *buffer)
   DisplayHandle *hdisplay = (DisplayHandle*) display;
 
   buffer->mem.paddr = hdisplay->paddr[hdisplay->panidx];
-  buffer->mem.vaddr = -1;
-  buffer->mem.size = -1;
+  buffer->mem.vaddr = hdisplay->vaddr + hdisplay->s * hdisplay->h * hdisplay->panidx;
+  buffer->mem.size = hdisplay->s * hdisplay->h;
 
   GST_DEBUG ("get display buffer, vaddr (%p) paddr (%p)", buffer->mem.vaddr, buffer->mem.paddr);
 
