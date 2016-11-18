@@ -405,7 +405,7 @@ static gint imx_g2d_blit(Imx2DDevice *device,
     if (src->fd[0] >= 0) {
       pbuf = g2d_buf_from_fd (src->fd[0]);
     } else if (src->mem->vaddr) {
-      pbuf = g2d_buf_from_virt_addr (src->mem->vaddr, src->mem->size);
+      pbuf = g2d_buf_from_virt_addr (src->mem->vaddr, PAGE_ALIGN(src->mem->size));
     } else {
       GST_ERROR ("Invalid parameters.");
       return -1;

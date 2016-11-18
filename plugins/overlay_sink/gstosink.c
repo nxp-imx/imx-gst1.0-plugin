@@ -666,6 +666,17 @@ gst_overlay_sink_check_alignment (GstOverlaySink *sink, GstBuffer *buffer)
         if (meta) {
           if (meta->width > sink->w)
             sink->video_align.padding_right = meta->width - sink->w;
+          switch (meta->format) {
+            case GST_VIDEO_FORMAT_YUY2:
+            case GST_VIDEO_FORMAT_YVYU:
+            case GST_VIDEO_FORMAT_UYVY:
+              if (meta->stride[0]/2 > sink->w)
+                sink->video_align.padding_right = meta->stride[0]/2 - sink->w;
+              break;
+            default:
+              GST_WARNING_OBJECT (sink, "Add more format to check stride.");
+              break;
+          }
           if (meta->height > sink->h)
             sink->video_align.padding_bottom = meta->height - sink->h;
           GST_DEBUG_OBJECT(sink, "video align right %d, bottom %d",
