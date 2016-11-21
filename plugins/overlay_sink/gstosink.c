@@ -27,7 +27,7 @@
 #include "osink_object.h"
 #include "gstosinkallocator.h"
 #ifdef USE_DMA_FD
-#include <gst/ion/gstionmemory.h>
+#include <gst/allocators/gstionmemory.h>
 #endif
 #include "allocator/gstphymemmeta.h"
 #include "gstimxvideooverlay.h"

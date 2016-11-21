@@ -25,7 +25,7 @@
 #include "allocator/gstphymemmeta.h"
 #include <gst/allocators/gstdmabuf.h>
 #ifdef USE_DMA_FD
-#include <gst/ion/gstionmemory.h>
+#include <gst/allocators/gstionmemory.h>
 #endif
 #include "gstimxcompositorpad.h"
 #include "gstimxcompositor.h"

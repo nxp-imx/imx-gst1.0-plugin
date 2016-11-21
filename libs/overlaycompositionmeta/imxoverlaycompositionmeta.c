@@ -30,7 +30,7 @@
 #include "imxoverlaycompositionmeta.h"
 #include "../allocator/gstphymemmeta.h"
 #ifdef USE_DMA_FD
-#include <gst/ion/gstionmemory.h>
+#include <gst/allocators/gstionmemory.h>
 #endif
 
 GST_DEBUG_CATEGORY_STATIC(overlay_composition_meta);

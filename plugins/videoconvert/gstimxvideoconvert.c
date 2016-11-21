@@ -25,7 +25,7 @@
 #include <gst/allocators/gstdmabuf.h>
 #include <gst/allocators/gstallocatorphymem.h>
 #ifdef USE_DMA_FD
-#include <gst/ion/gstionmemory.h>
+#include <gst/allocators/gstionmemory.h>
 #endif
 #include "gstphymemmeta.h"
 #include "gstimxvideoconvert.h"
