@@ -2276,6 +2276,17 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
           stream->info.audio.block_align, stream->info.audio.sample_width,
           stream->bitrate);
         break;
+
+      case AUDIO_APE:
+        codec_mime = "audio/x-ffmpeg-parsed-ape";
+        codec = "APE monkey's Audio";
+        mime =
+            g_strdup_printf
+            ("%s, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld, framed=(boolean)true, depth=(int)%ld",
+            codec_mime, stream->info.audio.n_channels, stream->info.audio.rate,
+            stream->bitrate, stream->info.audio.sample_width);
+        break;
+
       case AUDIO_PCM:
       {
         int width, depth, endian;

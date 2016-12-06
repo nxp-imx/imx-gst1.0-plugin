@@ -32,4 +32,6 @@ library = @ogg_arm_SONAME@
 mime = application/vnd.rn-realmedia
 library = @rm_arm_SONAME@
 
-
+[APE]
+mime = application/x-apetag
+library = @ape_arm_SONAME@
