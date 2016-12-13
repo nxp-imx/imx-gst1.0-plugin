@@ -384,7 +384,6 @@ static gint imx_g2d_blit(Imx2DDevice *device,
 {
   gint ret = 0;
   void *g2d_handle = NULL;
-  struct g2d_buf *pbuf = NULL;
 
   if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
     return -1;
@@ -397,39 +396,37 @@ static gint imx_g2d_blit(Imx2DDevice *device,
 
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
 
-#ifdef USE_DMA_FD
   GST_DEBUG ("src paddr fd vaddr: %p %d %p dst paddr fd vaddr: %p %d %p",
       src->mem->paddr, src->fd[0], src->mem->vaddr, dst->mem->paddr,
       dst->fd[0], dst->mem->vaddr);
+
+  unsigned long paddr = 0;
   if (!src->mem->paddr) {
     if (src->fd[0] >= 0) {
-      pbuf = g2d_buf_from_fd (src->fd[0]);
+      paddr = phy_addr_from_fd (src->fd[0]);
     } else if (src->mem->vaddr) {
-      pbuf = g2d_buf_from_virt_addr (src->mem->vaddr, PAGE_ALIGN(src->mem->size));
+      paddr = phy_addr_from_vaddr (src->mem->vaddr, PAGE_ALIGN(src->mem->size));
     } else {
       GST_ERROR ("Invalid parameters.");
       return -1;
     }
-    if (pbuf) {
-      src->mem->paddr = pbuf->buf_paddr;
-      g2d_free(pbuf);
+    if (paddr) {
+      src->mem->paddr = paddr;
     } else {
       GST_ERROR ("Can't get physical address.");
       return -1;
     }
   }
   if (!dst->mem->paddr) {
-    pbuf = g2d_buf_from_fd (dst->fd[0]);
-    if (pbuf) {
-      dst->mem->paddr = pbuf->buf_paddr;
-      g2d_free(pbuf);
+    paddr = phy_addr_from_fd (dst->fd[0]);
+    if (paddr) {
+      dst->mem->paddr = paddr;
     } else {
       GST_ERROR ("Can't get physical address.");
       return -1;
     }
   }
   GST_DEBUG ("src paddr: %p dst paddr: %p", src->mem->paddr, dst->mem->paddr);
-#endif
 
   // Set input
   g2d->src.global_alpha = src->alpha;
@@ -648,7 +645,6 @@ static gint imx_g2d_fill_color(Imx2DDevice *device, Imx2DFrame *dst,
 {
   void *g2d_handle = NULL;
   gint ret = 0;
-  struct g2d_buf *pbuf = NULL;
 
   if (!device || !device->priv || !dst || !dst->mem)
     return -1;
@@ -660,20 +656,18 @@ static gint imx_g2d_fill_color(Imx2DDevice *device, Imx2DFrame *dst,
 
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
 
-#ifdef USE_DMA_FD
   GST_DEBUG ("dst paddr: %p fd: %d", dst->mem->paddr, dst->fd[0]);
+  unsigned long paddr = 0;
   if (!dst->mem->paddr) {
-    pbuf = g2d_buf_from_fd (dst->fd[0]);
-    if (pbuf) {
-      dst->mem->paddr = pbuf->buf_paddr;
-      g2d_free(pbuf);
+    paddr = phy_addr_from_fd (dst->fd[0]);
+    if (paddr) {
+      dst->mem->paddr = paddr;
     } else {
       GST_ERROR ("Can't get physical address.");
       return -1;
     }
   }
   GST_DEBUG ("dst paddr: %p", dst->mem->paddr);
-#endif
 
   g2d->dst.clrcolor = RGBA8888;
   g2d->dst.planes[0] = (gint)(dst->mem->paddr);

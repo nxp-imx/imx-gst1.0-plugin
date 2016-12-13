@@ -24,7 +24,7 @@
 #include <string.h>
 #include "allocator/gstphymemmeta.h"
 #include <gst/allocators/gstdmabuf.h>
-#ifdef USE_DMA_FD
+#ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
 #include "gstimxcompositorpad.h"
@@ -489,13 +489,15 @@ gst_imxcompositor_pad_prepare_frame (GstVideoAggregatorPad * pad,
     gst_video_info_from_caps(&info, caps); //update the size info
     gst_caps_unref(caps);
 
-    if (!imxcomp->allocator)
-#ifdef USE_DMA_FD
+    if (!imxcomp->allocator) {
+#ifdef USE_ION
       imxcomp->allocator = gst_ion_allocator_obtain ();
-#else
+#endif
+    }
+
+    if (!imxcomp->allocator)
       imxcomp->allocator =
           gst_imx_2d_device_allocator_new((gpointer)(imxcomp->device));
-#endif
 
     if (!cpad->sink_tmp_buf) {
       cpad->sink_tmp_buf = gst_buffer_new_allocate(imxcomp->allocator,

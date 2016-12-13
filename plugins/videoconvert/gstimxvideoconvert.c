@@ -24,7 +24,7 @@
 #include <gst/video/video.h>
 #include <gst/allocators/gstdmabuf.h>
 #include <gst/allocators/gstallocatorphymem.h>
-#ifdef USE_DMA_FD
+#ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
 #include "gstphymemmeta.h"
@@ -949,13 +949,15 @@ gst_imx_video_convert_create_bufferpool(GstImxVideoConvert *imxvct,
 
   pool = gst_video_buffer_pool_new ();
   if (pool) {
-    if (!imxvct->allocator)
-#ifdef USE_DMA_FD
+    if (!imxvct->allocator) {
+#ifdef USE_ION
       imxvct->allocator = gst_ion_allocator_obtain ();
-#else
+#endif
+    }
+
+    if (!imxvct->allocator)
       imxvct->allocator =
           gst_imx_2d_device_allocator_new((gpointer)(imxvct->device));
-#endif
 
     if (!imxvct->allocator) {
       GST_ERROR ("new imx video convert allocator failed.");

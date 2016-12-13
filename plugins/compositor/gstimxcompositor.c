@@ -121,7 +121,7 @@
 #include <gst/allocators/gstdmabuf.h>
 #include <gst/allocators/gstallocatorphymem.h>
 #include "allocator/gstphymemmeta.h"
-#ifdef USE_DMA_FD
+#ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
 #include "gstimxcompositor.h"
@@ -305,13 +305,15 @@ gst_imxcompositor_create_bufferpool(GstImxCompositor *imxcomp,
   GstStructure *config;
   pool = gst_video_buffer_pool_new ();
   if (pool) {
-    if (!imxcomp->allocator)
-#ifdef USE_DMA_FD
+    if (!imxcomp->allocator) {
+#ifdef USE_ION
       imxcomp->allocator = gst_ion_allocator_obtain ();
-#else
+#endif
+    }
+
+    if (!imxcomp->allocator)
       imxcomp->allocator =
           gst_imx_2d_device_allocator_new((gpointer)(imxcomp->device));
-#endif
 
     if (!imxcomp->allocator) {
       GST_ERROR ("new imx compositor allocator failed.");

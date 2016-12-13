@@ -10,8 +10,8 @@ libgstimxvideoconvert_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
 				 -I$(top_srcdir)/libs/device-2d \
 				 -I$(top_srcdir)/libs/overlaycompositionmeta
 
-if PLATFORM_IS_MX8
-libgstimxvideoconvert_la_CFLAGS += -DUSE_DMA_FD 
+if USE_ION
+libgstimxvideoconvert_la_CFLAGS += -DUSE_ION
 endif
 
 libgstimxvideoconvert_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \

@@ -18,6 +18,12 @@
  */
 
 #include "gstimxcommon.h"
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#ifdef USE_ION
+#include <linux/ion.h>
+#endif
 
 /* define rotate and flip glib enum for overlaysink and imxv4l2sink */
 static const GEnumValue rotate_methods[] = {
@@ -251,4 +257,76 @@ gboolean check_feature(CHIP_CODE chip_name, CHIP_FEATURE feature)
     }
   }
   return ret;
+}
+
+const char *dev_ion = "/dev/ion";
+
+unsigned long phy_addr_from_fd(int dmafd)
+{
+#ifdef USE_ION
+  int ret, fd;
+
+  if (dmafd < 0)
+    return NULL;
+  
+  fd = open(dev_ion, O_RDWR);
+  if(fd < 0) {
+    return NULL;
+  }
+
+  struct ion_phys_dma_data data = {
+    .phys = 0,
+    .size = 0,
+    .dmafd = dmafd,
+  };
+
+  struct ion_custom_data custom = {
+    .cmd = ION_IOC_PHYS_DMA,
+    .arg = (unsigned long)&data,
+  };
+
+  ret = ioctl(fd, ION_IOC_CUSTOM, &custom);
+  close(fd);
+  if (ret < 0)
+    return NULL;
+
+  return data.phys;
+#else
+  return NULL;
+#endif
+}
+
+unsigned long phy_addr_from_vaddr(void *vaddr, int size)
+{
+#ifdef USE_ION
+  int ret, fd;
+
+  if (!vaddr)
+    return NULL;
+  
+  fd = open(dev_ion, O_RDWR);
+  if(fd < 0) {
+    return NULL;
+  }
+
+  struct ion_phys_virt_data data = {
+    .virt = (unsigned long)vaddr,
+    .phys = 0,
+    .size = size,
+  };
+
+  struct ion_custom_data custom = {
+    .cmd = ION_IOC_PHYS_VIRT,
+    .arg = (unsigned long)&data,
+  };
+
+  ret = ioctl(fd, ION_IOC_CUSTOM, &custom);
+  close(fd);
+  if (ret < 0)
+    return NULL;
+
+  return data.phys;
+#else
+  return NULL;
+#endif
 }

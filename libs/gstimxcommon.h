@@ -125,4 +125,7 @@ GType gst_imx_rotate_method_get_type();
 #define DEFAULT_IMX_ROTATE_METHOD GST_IMX_ROTATION_0
 #define GST_TYPE_IMX_ROTATE_METHOD (gst_imx_rotate_method_get_type())
 
+unsigned long phy_addr_from_fd(int dmafd);
+unsigned long phy_addr_from_vaddr(void *vaddr, int size);
+
 #endif

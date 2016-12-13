@@ -29,7 +29,7 @@
 #include <gst/allocators/gstdmabuf.h>
 #include "imxoverlaycompositionmeta.h"
 #include "../allocator/gstphymemmeta.h"
-#ifdef USE_DMA_FD
+#ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
 
@@ -448,13 +448,16 @@ gint imx_video_overlay_composition_composite(
 
       if (t_fmt != vmeta->format || !gst_buffer_is_phymem(ovbuf)) {
         // need copy buffer
-        if (!vcomp->allocator)
-#ifdef USE_DMA_FD
+        if (!vcomp->allocator) {
+#ifdef USE_ION
           vcomp->allocator = gst_ion_allocator_obtain ();
-#else
+#endif
+        }
+
+        /* obtain ion allocator will fail on imx6 and 7D */
+        if (!vcomp->allocator)
           vcomp->allocator =
                  gst_imx_2d_device_allocator_new((gpointer)(vcomp->device));
-#endif
 
         if (!vcomp->allocator) {
           GST_WARNING("create allocator for overlay buffer failed\n");

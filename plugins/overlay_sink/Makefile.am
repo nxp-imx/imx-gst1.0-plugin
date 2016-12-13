@@ -27,7 +27,11 @@ libgstoverlaysinkplugins_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
          -I$(top_srcdir)/libs/video-overlay
 
 if PLATFORM_IS_MX8
-libgstoverlaysinkplugins_la_CFLAGS += -DUSE_DMA_FD -DUSE_FB_API
+libgstoverlaysinkplugins_la_CFLAGS += -DUSE_FB_API
+endif
+
+if USE_ION
+libgstoverlaysinkplugins_la_CFLAGS += -DUSE_ION
 endif
 
 libgstoverlaysinkplugins_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \

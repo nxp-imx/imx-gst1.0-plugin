@@ -26,7 +26,7 @@
 #include "gstosink.h"
 #include "osink_object.h"
 #include "gstosinkallocator.h"
-#ifdef USE_DMA_FD
+#ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
 #include "allocator/gstphymemmeta.h"
@@ -413,11 +413,12 @@ gst_overlay_sink_setup_buffer_pool (GstOverlaySink *sink, GstCaps *caps)
   GST_DEBUG_OBJECT (sink, "create buffer pool(%p).", sink->pool);
 
   if (!sink->allocator) {
-#ifdef USE_DMA_FD
+#ifdef USE_ION
     sink->allocator = gst_ion_allocator_obtain ();
-#else
-    sink->allocator = gst_osink_allocator_new (sink->osink_obj);
 #endif
+    if (!sink->allocator) {
+      sink->allocator = gst_osink_allocator_new (sink->osink_obj);
+    }
     if (!sink->allocator) {
       GST_ERROR_OBJECT (sink, "New osink allocator failed.\n");
       return -1;
