@@ -141,6 +141,7 @@ static SOC_INFO soc_info[] = {
   {CC_MX6UL, "i.MX6UL"},
   {CC_MX6UL, "i.MX6ULL"},
   {CC_MX7D, "i.MX7D"},
+  {CC_MX7ULP, "i.MX7ULP"},
   {CC_MX8, "i.MX8DV"},
 };
 
@@ -221,6 +222,7 @@ static IMXV4l2FeatureMap g_imxv4l2feature_maps[] = {
   {CC_MX6SX, TRUE, TRUE, FALSE, TRUE, FALSE, FALSE},
   {CC_MX6UL, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE},
   {CC_MX7D, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE},
+  {CC_MX7ULP, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE},
   {CC_MX8, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE},
 };
 

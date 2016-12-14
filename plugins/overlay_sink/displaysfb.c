@@ -30,6 +30,7 @@
 #include <linux/mxcfb.h>
 #endif
 
+#include "gstimxcommon.h"
 #include "displays.h"
 #include "gstsutils.h"
 #include "gstimxv4l2.h"
@@ -181,11 +182,19 @@ static void set_display_color_key (gchar *device, gboolean enable, gint color_ke
 
 gint scan_displays(gpointer **phandle, gint *pcount)
 {
-#ifdef USE_FB_API
-  GstsutilsEntry *entry =  gstsutils_init_entry ("/usr/share/imx_8dv_display_config");
-#else
-  GstsutilsEntry *entry =  gstsutils_init_entry ("/usr/share/imx_displays_config");
-#endif
+  GstsutilsEntry *entry = NULL;
+  CHIP_CODE chipcode = imx_chip_code();
+  switch (chipcode) {
+    case CC_MX8:
+      entry = gstsutils_init_entry ("/usr/share/imx_8dv_display_config");
+    break;
+    case CC_MX7ULP:
+      entry = gstsutils_init_entry ("/usr/share/imx_7ulp_display_config");
+    break;
+    default:
+    break;
+  }
+
   gint group_count;
   gint i;
   gint count = 0;
@@ -349,29 +358,33 @@ gint init_display (gpointer display)
     return -1;
   }
 
-  fb_var.xoffset = 0;
-  fb_var.xres = hdisplay->w;
-  fb_var.xres_virtual = hdisplay->w;
-  fb_var.yoffset = 0;
-  fb_var.yres = hdisplay->h;
-  fb_var.yres_virtual = hdisplay->h * DISPLAY_NUM_BUFFERS;
-  fb_var.activate |= FB_ACTIVATE_FORCE;
-  fb_var.nonstd = hdisplay->fmt;
+  /*FIXME: 7ULP don't support seting fb temporary */
+  CHIP_CODE chipcode = imx_chip_code();
+  if (chipcode != CC_MX7ULP) {
+    fb_var.xoffset = 0;
+    fb_var.xres = hdisplay->w;
+    fb_var.xres_virtual = hdisplay->w;
+    fb_var.yoffset = 0;
+    fb_var.yres = hdisplay->h;
+    fb_var.yres_virtual = hdisplay->h * DISPLAY_NUM_BUFFERS;
+    fb_var.activate |= FB_ACTIVATE_FORCE;
+    fb_var.nonstd = hdisplay->fmt;
 
-  if (hdisplay->fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'x')
-      || hdisplay->fmt == GST_MAKE_FOURCC('B', 'G', 'R', 'x')
-      || hdisplay->fmt == GST_MAKE_FOURCC('B', 'G', 'R', 'A')
-      || hdisplay->fmt == GST_MAKE_FOURCC('A', 'R', 'G', 'B')) {
-    fb_var.bits_per_pixel = 32;
-  } else if (hdisplay->fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'P')) {
-    fb_var.bits_per_pixel = 16;
-  } else {
-    GST_ERROR ("Unsupported display format, check the display config file.");
-    return -1;
-  }
+    if (hdisplay->fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'x')
+        || hdisplay->fmt == GST_MAKE_FOURCC('B', 'G', 'R', 'x')
+        || hdisplay->fmt == GST_MAKE_FOURCC('B', 'G', 'R', 'A')
+        || hdisplay->fmt == GST_MAKE_FOURCC('A', 'R', 'G', 'B')) {
+      fb_var.bits_per_pixel = 32;
+    } else if (hdisplay->fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'P')) {
+      fb_var.bits_per_pixel = 16;
+    } else {
+      GST_ERROR ("Unsupported display format, check the display config file.");
+      return -1;
+    }
 
-  if (ioctl(hdisplay->fd, FBIOPUT_VSCREENINFO, &fb_var) < 0) {
-    return -1;
+    if (ioctl(hdisplay->fd, FBIOPUT_VSCREENINFO, &fb_var) < 0) {
+      return -1;
+    }
   }
 
   struct fb_fix_screeninfo fb_fix;
@@ -413,7 +426,11 @@ void deinit_display (gpointer display)
   }
 
   if (hdisplay->fd) {
-    ioctl(hdisplay->fd, FBIOBLANK, FB_BLANK_NORMAL);
+    /*FIXME: 7ULP will hang on FBIOBLANK, drivers issue */
+    CHIP_CODE chipcode = imx_chip_code();
+    if (chipcode != CC_MX7ULP) {
+      ioctl(hdisplay->fd, FBIOBLANK, FB_BLANK_NORMAL);
+    }
     munmap(hdisplay->vaddr, hdisplay->fb_size);
     close (hdisplay->fd);
     hdisplay->fd = 0;

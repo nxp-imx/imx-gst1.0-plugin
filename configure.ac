@@ -127,11 +127,11 @@ if test "x$HAVE_PKGCONFIG" = "xno"; then
 fi
 
 dnl check target type
-if  test "$PLATFORM" = "MX6" || test "$PLATFORM" = "MX6SL" || test "$PLATFORM" = "MX6SX" || test "$PLATFORM" = "MX7D" || test "$PLATFORM" = "MX6UL" || test "$PLATFORM" = "MX6SLL" || test "$PLATFORM" = "MX6QP" || test "$PLATFORM" = "MX8" ;
+if  test "$PLATFORM" = "MX6" || test "$PLATFORM" = "MX6SL" || test "$PLATFORM" = "MX6SX" || test "$PLATFORM" = "MX7D" || test "$PLATFORM" = "MX6UL" || test "$PLATFORM" = "MX6SLL" || test "$PLATFORM" = "MX6QP" || test "$PLATFORM" = "MX8" || test "$PLATFORM" = "MX7ULP";
 then
   AC_MSG_NOTICE(build for $PLATFORM)
 else
-  AC_MSG_ERROR(No target platform specified! Use ./configure PLATFORM=(MX6/MX6QP/MX6SL/MX6SX/MX6UL/MX7D/MX6SLL/MX8) to retry)
+  AC_MSG_ERROR(No target platform specified! Use ./configure PLATFORM=(MX6/MX6QP/MX6SL/MX6SX/MX6UL/MX7D/MX6SLL/MX8/MX7ULP) to retry)
 fi
 
 AC_SUBST(PLATFORM)
@@ -333,8 +333,11 @@ AM_CONDITIONAL(PLATFORM_IS_MX6UL, test "x$PLATFORM" = "xMX6UL")
 AM_CONDITIONAL(PLATFORM_IS_MX6SLL, test "x$PLATFORM" = "xMX6SLL")
 AM_CONDITIONAL(PLATFORM_IS_MX6QP, test "x$PLATFORM" = "xMX6QP")
 AM_CONDITIONAL(PLATFORM_IS_MX7D, test "x$PLATFORM" = "xMX7D")
-AM_CONDITIONAL(PLATFORM_IS_ARCH32, test "x$PLATFORM" = "xMX7D" || test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6SL" || test "x$PLATFORM" = "xMX6SX" || test "x$PLATFORM" = "xMX6SLL" || test "x$PLATFORM" = "xMX6UL" || test "x$PLATFORM" = "xMX6QP")
+AM_CONDITIONAL(PLATFORM_IS_MX7ULP, test "x$PLATFORM" = "xMX7ULP")
+AM_CONDITIONAL(PLATFORM_IS_ARCH32, test "x$PLATFORM" = "xMX7D" || test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6SL" || test "x$PLATFORM" = "xMX6SX" || test "x$PLATFORM" = "xMX6SLL" || test "x$PLATFORM" = "xMX6UL" || test "x$PLATFORM" = "xMX6QP" || test "x$PLATFORM" = "xMX7ULP")
 AM_CONDITIONAL(PLATFORM_IS_MX8, test "x$PLATFORM" = "xMX8")
+
+AM_CONDITIONAL(USE_FB_DISPLAY, test "x$PLATFORM" = "xMX8" || test "x$PLATFORM" = "xMX7ULP")
 
 if test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6QP"; then
 	 HAVE_DEVICE_IPU=yes
@@ -350,7 +353,7 @@ if test "x$PLATFORM" = "xMX6UL" || test "x$PLATFORM" = "xMX7D" || test "x$PLATFO
 	 HAVE_DEVICE_PXP=yes
 fi
 
-if test "x$PLATFORM" = "xMX8" || test "x$PLATFORM" = "xMX8"; then
+if test "x$PLATFORM" = "xMX8" || test "x$PLATFORM" = "xMX7ULP"; then
 	 HAVE_DEVICE_G2D=yes
 fi
 

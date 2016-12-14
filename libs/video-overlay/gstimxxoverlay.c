@@ -413,7 +413,8 @@ gst_x_video_overlay_deinit(ImxVideoOverlay * imxxoverlay)
   if (imxxoverlay->video_win)
     XSelectInput (xoverlay->disp, imxxoverlay->video_win, NoEventMask);
   gst_x_video_overlay_destroy_window(imxxoverlay);
-  XCloseDisplay (xoverlay->disp);
+  if (xoverlay->disp)
+    XCloseDisplay (xoverlay->disp);
   xoverlay->disp = NULL;
   g_mutex_clear (&xoverlay->mutex);
   g_free(xoverlay);
