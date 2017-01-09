@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2016, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2017 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -365,6 +366,12 @@ gint init_display (gpointer display)
   fb_var.yres = hdisplay->h;
   fb_var.yres_virtual = hdisplay->h * DISPLAY_NUM_BUFFERS;
   fb_var.activate |= FB_ACTIVATE_FORCE;
+
+  /* FIXME:imx7ulp use grayscale field for format setting, the below
+   * setting cannot take effect in display driver on 7ulp, the format
+   * is still default ARGB. The hdisplay->fmt will be BGRA for g2d
+   * output to workaround the issue that format ARGB of g2d is not
+   * consistent with the display driver of 7ulp */
   fb_var.nonstd = hdisplay->fmt;
 
   if (hdisplay->fmt == GST_MAKE_FOURCC('R', 'G', 'B', 'x')
@@ -437,15 +444,18 @@ void deinit_display (gpointer display)
 gint clear_display (gpointer display)
 {
   DisplayHandle *hdisplay = (DisplayHandle*) display;
-  gchar *framebuffer = hdisplay->vaddr;
+  gint32 *framebuffer = hdisplay->vaddr;
+  gint32 alpha_pixel = 0;
   gint i;
 
-  memset (hdisplay->vaddr, 0, hdisplay->fb_size);
   if(hdisplay->fmt == GST_MAKE_FOURCC('A', 'R', 'G', 'B')) {
-    for (i=0; i<hdisplay->fb_size; i+=4) {
-      framebuffer[i] = 0xff;
-    }
+    alpha_pixel = 0x000000FF;
+  } else if (hdisplay->fmt == GST_MAKE_FOURCC('B', 'G', 'R', 'A')) {
+    alpha_pixel = 0xFF000000;
   }
+
+  for (i=0; i<hdisplay->fb_size / 4; i++)
+    framebuffer[i] = alpha_pixel;
 
   return 0;
 }

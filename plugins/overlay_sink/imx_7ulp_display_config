@@ -1,4 +1,4 @@
 [master]
-device = /dev/fb0
+device = /dev/fb1
 bg_device = /dev/fb0
 fmt = BGRA
