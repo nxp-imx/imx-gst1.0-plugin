@@ -33,5 +33,5 @@ mime = application/vnd.rn-realmedia
 library = @rm_arm_SONAME@
 
 [APE]
-mime = application/x-apetag; application/x-ape
+mime = application/x-ape
 library = @ape_arm_SONAME@
