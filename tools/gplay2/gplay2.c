@@ -1156,7 +1156,7 @@ input_thread_fun (gpointer data)
         total_subtitle_no =
             gst_player_media_info_get_number_of_subtitle_streams (media_info);
         g_object_unref (media_info);
-        g_print ("input video track number[0,%d]:", total_subtitle_no - 1);
+        g_print ("input subtitle track number[0,%d]:", total_subtitle_no - 1);
         gDisable_display = TRUE;
         if (scanf ("%d", &total_subtitle_no) != 1) {
           gDisable_display = FALSE;
