@@ -53,6 +53,9 @@
     (FSL_GPLAY_VERSION OS_NAME SEPARATOR "build on" \
      SEPARATOR __DATE__ SEPARATOR __TIME__)
 
+
+#define DEFAULT_TIME_OUT  20
+
 typedef enum
 {
   PLAYER_REPEAT_NONE = 0,
@@ -150,8 +153,9 @@ playlist_next (GstPlayer * player, gplay_pconfigions * options)
         g_print ("Now Playing: %s\n", options->current);
         uri = filename2uri (options->current);
         gst_player_set_uri (player, uri);
-        gst_player_play (player);
-        g_free(uri);
+        //gst_player_play (player);
+        gst_player_play_sync (player, options->timeout);
+        g_free (uri);
       } else {
         gboolean islast = FALSE;
         isLastItem (options->pl, &islast);
@@ -172,8 +176,9 @@ playlist_next (GstPlayer * player, gplay_pconfigions * options)
         printf ("Now Playing: %s\n", options->current);
         uri = filename2uri (options->current);
         gst_player_set_uri (player, uri);
-        gst_player_play (player);
-        g_free(uri);
+        //gst_player_play (player);
+        gst_player_play_sync (player, options->timeout);
+        g_free (uri);
       } else {
         gboolean islast = FALSE;
         isLastItem (options->pl, &islast);
@@ -190,8 +195,9 @@ playlist_next (GstPlayer * player, gplay_pconfigions * options)
             printf ("Now Playing: %s\n", options->current);
             uri = filename2uri (options->current);
             gst_player_set_uri (player, uri);
-            gst_player_play (player);
-            g_free(uri);
+            //gst_player_play (player);
+            gst_player_play_sync (player, options->timeout);
+            g_free (uri);
           }
         } else {
           g_print ("playlist unknown error\n");
@@ -203,7 +209,8 @@ playlist_next (GstPlayer * player, gplay_pconfigions * options)
 
     case PLAYER_REPEAT_CURRENT:
     {
-      gst_player_play (player);
+      //gst_player_play (player);
+      gst_player_play_sync (player, options->timeout);
     }
       break;
 
@@ -231,8 +238,9 @@ playlist_previous (GstPlayer * player, gplay_pconfigions * options)
         g_print ("Now Playing: %s\n", options->current);
         uri = filename2uri (options->current);
         gst_player_set_uri (player, uri);
-        gst_player_play (player);
-        g_free(uri);
+        //gst_player_play (player);
+        gst_player_play_sync (player, options->timeout);
+        g_free (uri);
       } else {
         gboolean isFirst = FALSE;
         isFirstItem (options->pl, &isFirst);
@@ -253,8 +261,9 @@ playlist_previous (GstPlayer * player, gplay_pconfigions * options)
         printf ("Now Playing: %s\n", options->current);
         uri = filename2uri (options->current);
         gst_player_set_uri (player, uri);
-        gst_player_play (player);
-        g_free(uri);
+        //gst_player_play (player);
+        gst_player_play_sync (player, options->timeout);
+        g_free (uri);
       } else {
         gboolean isFirst = FALSE;
         isFirstItem (options->pl, &isFirst);
@@ -272,8 +281,9 @@ playlist_previous (GstPlayer * player, gplay_pconfigions * options)
             printf ("Now Playing: %s\n", options->current);
             uri = filename2uri (options->current);
             gst_player_set_uri (player, uri);
-            gst_player_play (player);
-            g_free(uri);
+            //gst_player_play (player);
+            gst_player_play_sync (player, options->timeout);
+            g_free (uri);
           }
         } else {
           g_print ("playlist unknown error\n");
@@ -285,7 +295,8 @@ playlist_previous (GstPlayer * player, gplay_pconfigions * options)
 
     case PLAYER_REPEAT_CURRENT:
     {
-      gst_player_play (player);
+      //gst_player_play (player);
+      gst_player_play_sync (player, options->timeout);
     }
       break;
 
@@ -451,22 +462,22 @@ print_one_tag (const GstTagList * list, const gchar * tag, gpointer user_data)
 
     val = gst_tag_list_get_value_index (list, tag, i);
     if (G_VALUE_HOLDS_STRING (val)) {
-      g_print ("    %s : %s \n", tag, g_value_get_string (val));
+      printf ("    %s : %s \n", tag, g_value_get_string (val));
     } else if (G_VALUE_HOLDS_UINT (val)) {
-      g_print ("    %s : %u \n", tag, g_value_get_uint (val));
+      printf ("    %s : %u \n", tag, g_value_get_uint (val));
     } else if (G_VALUE_HOLDS_DOUBLE (val)) {
-      g_print ("    %s : %g \n", tag, g_value_get_double (val));
+      printf ("    %s : %g \n", tag, g_value_get_double (val));
     } else if (G_VALUE_HOLDS_BOOLEAN (val)) {
-      g_print ("    %s : %s \n", tag,
+      printf ("    %s : %s \n", tag,
           g_value_get_boolean (val) ? "true" : "false");
     } else if (GST_VALUE_HOLDS_DATE_TIME (val)) {
       GstDateTime *dt = g_value_get_boxed (val);
       gchar *dt_str = gst_date_time_to_iso8601_string (dt);
 
-      g_print ("    %s : %s \n", tag, dt_str);
+      printf ("    %s : %s \n", tag, dt_str);
       g_free (dt_str);
     } else {
-      g_print ("    %s : tag of type '%s' \n", tag, G_VALUE_TYPE_NAME (val));
+      printf ("    %s : tag of type '%s' \n", tag, G_VALUE_TYPE_NAME (val));
     }
   }
 }
@@ -816,7 +827,8 @@ eos_cb (GstPlayer * player, GstPlayData * play)
   /* for auto test script */
   g_print ("EOS Found\n");
   gst_player_set_rate (player, 1.0);
-  gst_player_stop (player);
+  //gst_player_stop (player);
+  gst_player_stop_sync (player, options->timeout);
 
   if (!options->no_auto_next) {
     if (playlist_next (player, options) != RET_SUCCESS) {
@@ -852,7 +864,6 @@ input_thread_fun (gpointer data)
   GstPlayerVideoOverlayVideoRenderer *VideoOverlayVideoRenderer =
       GST_PLAYER_VIDEO_OVERLAY_VIDEO_RENDERER (VideoRender);
 
-
   while (gexit_input_thread == FALSE) {
     sCommand[0] = ' ';
     errno = 0;
@@ -870,24 +881,28 @@ input_thread_fun (gpointer data)
         if (play->gstPlayerState == GST_PLAYER_STATE_STOPPED) {
           uri = filename2uri (options->current);
           gst_player_set_uri (player, uri);
-          gst_player_play (player);
-          g_free(uri);
+          //gst_player_play (player);
+          gst_player_play_sync (player, options->timeout);
+          g_free (uri);
         }
       }
         break;
 
       case 's':                // Stop
       {
-        gst_player_stop (player);
+        //gst_player_stop (player);
+        gst_player_stop_sync (player, options->timeout);
       }
         break;
 
       case 'a':                // pAuse
       {
         if (play->gstPlayerState == GST_PLAYER_STATE_PLAYING) {
-          gst_player_pause (play->player);
+          //gst_player_pause (play->player);
+          gst_player_pause_sync (play->player, options->timeout);
         } else if (play->gstPlayerState == GST_PLAYER_STATE_PAUSED) {
-          gst_player_play (play->player);
+          //gst_player_play (play->player);
+          gst_player_play_sync (player, options->timeout);
         }
       }
         break;
@@ -1000,7 +1015,8 @@ input_thread_fun (gpointer data)
 
       case 'x':                // eXit
       {
-        gst_player_stop (player);
+        //gst_player_stop (player);
+        gst_player_stop_sync (player, options->timeout);
         g_print ("Ready to exit this app!\n");
         gexit_input_thread = TRUE;
         gexit_display_thread = TRUE;
@@ -1029,7 +1045,8 @@ input_thread_fun (gpointer data)
       case '>':                // Play next file
         g_print ("next\n");
         gst_player_set_rate (player, 1.0);
-        gst_player_stop (player);
+        //gst_player_stop (player);
+        gst_player_stop_sync (player, options->timeout);
         if (playlist_next (player, options) != RET_SUCCESS) {
           gexit_input_thread = TRUE;
           gexit_display_thread = TRUE;
@@ -1040,7 +1057,8 @@ input_thread_fun (gpointer data)
       case '<':                // Play previous file
         g_print ("previous\n");
         gst_player_set_rate (player, 1.0);
-        gst_player_stop (player);
+        //gst_player_stop (player);
+        gst_player_stop_sync (player, options->timeout);
         if (playlist_previous (player, options) != RET_SUCCESS) {
           gexit_input_thread = TRUE;
           gexit_display_thread = TRUE;
@@ -1365,6 +1383,10 @@ main (int argc, char *argv[])
     return RET_FAILURE;
   }
 
+  if (options.timeout == 0) {
+    options.timeout = DEFAULT_TIME_OUT;
+  }
+
   if (!options.video_sink_name)
     if (gplay_checkfeature (G2D)) {
       options.video_sink_name = "overlaysink";
@@ -1386,7 +1408,7 @@ main (int argc, char *argv[])
 
   /* check if the play engine is created successfully */
   if (!player) {
-    g_print ("Create play engine failed!\n");
+    g_print ("Create gstplayer failed!\n");
     return RET_FAILURE;
   }
 
@@ -1403,6 +1425,7 @@ main (int argc, char *argv[])
   sPlay.options = &options;
   sPlay.player = player;
   sPlay.VideoRender = VideoRender;
+  sPlay.gstPlayerState = GST_PLAYER_STATE_STOPPED;
 
   g_signal_connect (player, "end-of-stream", G_CALLBACK (eos_cb), &sPlay);
   g_signal_connect (player, "state-changed", G_CALLBACK (state_changed_cb),
@@ -1414,14 +1437,14 @@ main (int argc, char *argv[])
 
   uri = filename2uri (options.current);
   gst_player_set_uri (player, uri);
-  g_free(uri);
+  g_free (uri);
 
   if (options.suburi) {
     /* load usr define subtitle uri */
     g_print ("Load subtitle: %s\n", options.suburi);
     uri = filename2uri (options.suburi);
     gst_player_set_subtitle_uri (player, uri);
-    g_free(uri);
+    g_free (uri);
 
   } else {
     /* if there is dafault subtitle file, try to load - not support now */
@@ -1433,10 +1456,11 @@ main (int argc, char *argv[])
         g_thread_new ("display_thread", (GThreadFunc) display_thread_fun,
         &sPlay);
   }
+  //gst_player_play (player);
+  gst_player_play_sync (player, options.timeout);
 
-  gst_player_play (player);
   /* for auto test script */
-  g_print ("%s\n", "fsl_player_play()");
+  g_print ("%s\n", "=========== fsl_player_play() ==================");
 
   fflush (stdout);
   print_menu ();
