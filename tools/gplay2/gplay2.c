@@ -97,7 +97,7 @@ typedef struct
 static volatile gboolean gexit_input_thread = FALSE;
 static volatile gboolean gexit_display_thread = FALSE;
 static volatile gboolean gDisable_display = FALSE;
-static volatile gboolean gMainLoop_has_quit = FALSE;
+static volatile gboolean gexit_main = FALSE;
 GMainLoop *gloop = NULL;
 
 /* return a new allocate string, need be freed after use */
@@ -586,10 +586,10 @@ display_thread_fun (gpointer data)
 
   while (1) {
     if (TRUE == gexit_display_thread) {
-      if (gMainLoop_has_quit == FALSE) {
+      if (g_main_loop_is_running(play->loop) == TRUE) {
         g_main_loop_quit (play->loop);
-        gMainLoop_has_quit = TRUE;
       }
+      gexit_main = TRUE;
       g_print ("Exit display thread\n");
       return;
     }
@@ -709,10 +709,10 @@ signal_handler (int sig)
       g_print (" Aborted by signal[%d] Interrupt...\n", sig);
       gexit_input_thread = TRUE;
       gexit_display_thread = TRUE;
-      if (gMainLoop_has_quit == FALSE) {
+      if (g_main_loop_is_running(gloop) == TRUE) {
         g_main_loop_quit (gloop);
-        gMainLoop_has_quit = TRUE;
       }
+      gexit_main = TRUE;
       break;
 
     case SIGTTIN:
@@ -1335,10 +1335,10 @@ input_thread_fun (gpointer data)
     fflush (stdout);
     fflush (stdin);
   }
-  if (gMainLoop_has_quit == FALSE) {
+  if (g_main_loop_is_running(play->loop) == TRUE) {
     g_main_loop_quit (play->loop);
-    gMainLoop_has_quit = TRUE;
   }
+  gexit_main = TRUE;
   g_print ("Exit input thread\n");
   return;
 }
@@ -1468,7 +1468,8 @@ main (int argc, char *argv[])
   input_thread =
       g_thread_new ("input_thread", (GThreadFunc) input_thread_fun, &sPlay);
 
-  g_main_loop_run (sPlay.loop);
+  if (gexit_main == FALSE)
+    g_main_loop_run (sPlay.loop);
 
   gboolean ismute = FALSE;
   ismute = gst_player_get_mute (player);
@@ -1482,12 +1483,6 @@ main (int argc, char *argv[])
 //  g_print ("FSL_PLAYENGINE_UI_MSG_EXIT\n");
   g_print ("FSL_PLAYER_UI_MSG_EXIT\n");
 
-  if (options.pl)
-    destroyPlayList (options.pl);
-  options.pl = NULL;
-  gst_object_unref (player);
-  g_main_loop_unref (sPlay.loop);
-
   if (display_thread) {
     g_thread_join (display_thread);
     display_thread = NULL;
@@ -1497,6 +1492,12 @@ main (int argc, char *argv[])
     g_thread_unref (input_thread);
     input_thread = NULL;
   }
+
+  if (options.pl)
+    destroyPlayList (options.pl);
+  options.pl = NULL;
+  gst_object_unref (player);
+  g_main_loop_unref (sPlay.loop);
 
   /* for auto test script */
   g_print ("fsl_player_deinit\n");
