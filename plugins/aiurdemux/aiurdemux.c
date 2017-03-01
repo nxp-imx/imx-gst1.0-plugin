@@ -470,6 +470,7 @@ static void gst_aiurdemux_init (GstAiurDemux * demux)
     AIUR_STREAM_CACHE_SIZE_MAX, demux);
 
   g_mutex_init (&demux->runmutex);
+  g_mutex_init (&demux->seekmutex);
   demux->play_mode = AIUR_PLAY_MODE_NORMAL;
 
   GST_LOG_OBJECT(demux,"gst_aiurdemux_init");
@@ -489,7 +490,7 @@ static void gst_aiurdemux_finalize (GObject * object)
   }
 
   g_mutex_clear (&demux->runmutex);
-
+  g_mutex_clear (&demux->seekmutex);
   G_OBJECT_CLASS (parent_class)->finalize (object);
 
 }
@@ -3697,13 +3698,16 @@ aiurdemux_do_push_seek (GstAiurDemux * demux, GstPad * pad,
   demux->loop_push = FALSE;
   gst_aiur_stream_cache_close (demux->stream_cache);
 
-  /* wait for streaming to finish */
-  g_mutex_lock (&demux->runmutex);
+  /* wait for previous seek event done */
+  g_mutex_lock (&demux->seekmutex);
 
   /* stop streaming, either by flushing or by pausing the task */
   if (flush) {
     gst_aiurdemux_push_event (demux, gst_event_new_flush_start ());
   }
+
+  /* wait for streaming to finish */
+  g_mutex_lock (&demux->runmutex);
 
   gst_aiur_stream_cache_open (demux->stream_cache);
 
@@ -3740,6 +3744,7 @@ aiurdemux_do_push_seek (GstAiurDemux * demux, GstPad * pad,
 
   demux->thread = g_thread_new ("aiur_push",(GThreadFunc) aiurdemux_loop_push, (gpointer) demux);
   g_mutex_unlock (&demux->runmutex);
+  g_mutex_unlock (&demux->seekmutex);
 
   return ret;
 
@@ -3792,6 +3797,9 @@ aiurdemux_do_seek (GstAiurDemux * demux, GstPad * pad, GstEvent * event)
 
   flush = flags & GST_SEEK_FLAG_FLUSH;
 
+  /* wait for previous seek event done */
+  g_mutex_lock (&demux->seekmutex);
+
   /* stop streaming by pausing the task */
   if (flush) {
     gst_aiurdemux_push_event (demux, gst_event_new_flush_start ());
@@ -3833,6 +3841,7 @@ aiurdemux_do_seek (GstAiurDemux * demux, GstPad * pad, GstEvent * event)
       (GstTaskFunction) aiurdemux_pull_task, demux->sinkpad,NULL);
 
   GST_PAD_STREAM_UNLOCK (demux->sinkpad);
+  g_mutex_unlock (&demux->seekmutex);
 
   return ret;
 

@@ -330,6 +330,7 @@ struct _GstAiurDemux
     AiurDemuxOption option;
 
     GThread *thread;  // for push mode thread
+    GMutex seekmutex;
 
 };
 
