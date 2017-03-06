@@ -27,7 +27,6 @@ COMPOSITOR_DIRS = plugins/compositor
 endif
 
 TOOLDIRS =    tools/                      \
-              tools/gplay                 \
               tools/grecorder             \
               tools/gplay2
 

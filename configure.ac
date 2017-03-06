@@ -403,7 +403,6 @@ plugins/mp3enc/Makefile
 plugins/videoconvert/Makefile
 plugins/compositor/Makefile
 tools/Makefile
-tools/gplay/Makefile
 tools/gplay2/Makefile
 tools/grecorder/Makefile)
 

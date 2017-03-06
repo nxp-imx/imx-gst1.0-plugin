@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2016, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2017 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -19,6 +20,10 @@
 
 #ifndef __IMX_COMMON_H__
 #define __IMX_COMMON_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -129,4 +134,8 @@ GType gst_imx_rotate_method_get_type();
 unsigned long phy_addr_from_fd(int dmafd);
 unsigned long phy_addr_from_vaddr(void *vaddr, int size);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif /* __IMX_COMMON_H__ */ 
