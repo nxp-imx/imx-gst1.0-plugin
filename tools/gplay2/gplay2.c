@@ -1449,6 +1449,8 @@ main (int argc, char *argv[])
   GstPlayerVideoOverlayVideoRenderer *VideoOverlayVideoRenderer = NULL;
   sPlay.loop = NULL;
   GstElement *video_sink = NULL;
+  GstElement *audio_sink = NULL;
+  GstElement *text_sink = NULL;
 
   reset_signal (SIGINT, signal_handler);
   /* support gplay to run in backend */
@@ -1507,12 +1509,16 @@ main (int argc, char *argv[])
 
   if (options.audio_sink_name) {
     g_print ("Set AudioSink %s\n", options.audio_sink_name);
-    gst_player_set_audio_sink (player, options.audio_sink_name);
+    audio_sink =
+        gst_parse_bin_from_description (options.audio_sink_name, TRUE, NULL);
+    gst_player_set_audio_sink (player, audio_sink);
   }
 
   if (options.text_sink_name) {
     g_print ("Set TextSink %s\n", options.text_sink_name);
-    gst_player_set_text_sink (player, options.text_sink_name);
+    text_sink =
+        gst_parse_bin_from_description (options.text_sink_name, TRUE, NULL);
+    gst_player_set_text_sink (player, text_sink);
   }
 
   sPlay.options = &options;
