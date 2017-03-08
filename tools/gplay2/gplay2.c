@@ -90,6 +90,9 @@ typedef struct
   gplay_pconfigions *options;
   GstPlayerState gstPlayerState;
 
+  gboolean seek_finished;
+  gboolean error_found;
+
   GMainLoop *loop;
 } GstPlayData;
 
@@ -586,7 +589,7 @@ display_thread_fun (gpointer data)
 
   while (1) {
     if (TRUE == gexit_display_thread) {
-      if (g_main_loop_is_running(play->loop) == TRUE) {
+      if (g_main_loop_is_running (play->loop) == TRUE) {
         g_main_loop_quit (play->loop);
       }
       gexit_main = TRUE;
@@ -709,7 +712,7 @@ signal_handler (int sig)
       g_print (" Aborted by signal[%d] Interrupt...\n", sig);
       gexit_input_thread = TRUE;
       gexit_display_thread = TRUE;
-      if (g_main_loop_is_running(gloop) == TRUE) {
+      if (g_main_loop_is_running (gloop) == TRUE) {
         g_main_loop_quit (gloop);
       }
       gexit_main = TRUE;
@@ -796,6 +799,7 @@ error_cb (GstPlayer * player, GError * err, GstPlayData * play)
   gplay_pconfigions *options = play->options;
   g_printerr ("ERROR %s for %s\n", err->message, options->current);
 
+  play->error_found = TRUE;
   /* if current repeat is enabled, then disable it else will keep looping forever */
   if (options->repeat == PLAYER_REPEAT_CURRENT) {
     options->repeat = PLAYER_REPEAT_NONE;
@@ -845,10 +849,40 @@ eos_cb (GstPlayer * player, GstPlayData * play)
 }
 
 static void
-state_changed_cb (GstPlayer * player, GstPlayerState state, GstPlayData * Play)
+state_changed_cb (GstPlayer * player, GstPlayerState state, GstPlayData * play)
 {
-  Play->gstPlayerState = state;
+  play->gstPlayerState = state;
   g_print ("State changed: %s\n", gst_player_state_get_name (state));
+}
+
+static void
+seek_done_cb (GstPlayer * player, guint64 position, GstPlayData * play)
+{
+  //g_print("======= seek done signal got ==========\n");
+  play->seek_finished = TRUE;
+
+}
+
+void
+wait_for_seek_done (GstPlayData * play, gint time_out)
+{
+  gint wait_cnt = 0;
+
+  while (time_out < 0 || wait_cnt < time_out) {
+    if (play->seek_finished == TRUE) {
+      play->seek_finished = FALSE;
+      break;
+    } else if (play->error_found == TRUE) {
+      play->error_found = FALSE;
+      return;
+    } else {
+      wait_cnt++;
+      sleep (1);
+    }
+  }
+  if (wait_cnt >= time_out) {
+    g_print ("Wait seek done time out !!!\n");
+  }
 }
 
 void
@@ -966,6 +1000,7 @@ input_thread_fun (gpointer data)
         gDisable_display = FALSE;
         gst_player_config_set_seek_accurate (player, accurate_seek);
         gst_player_seek (player, seek_point_sec * GST_SECOND);
+        wait_for_seek_done (play, options->timeout);
       }
         break;
 
@@ -1002,6 +1037,7 @@ input_thread_fun (gpointer data)
         }
         gDisable_display = FALSE;
         gst_player_set_rate (player, playback_rate);
+        wait_for_seek_done (play, options->timeout);
       }
         break;
 
@@ -1335,7 +1371,7 @@ input_thread_fun (gpointer data)
     fflush (stdout);
     fflush (stdin);
   }
-  if (g_main_loop_is_running(play->loop) == TRUE) {
+  if (g_main_loop_is_running (play->loop) == TRUE) {
     g_main_loop_quit (play->loop);
   }
   gexit_main = TRUE;
@@ -1426,11 +1462,14 @@ main (int argc, char *argv[])
   sPlay.player = player;
   sPlay.VideoRender = VideoRender;
   sPlay.gstPlayerState = GST_PLAYER_STATE_STOPPED;
+  sPlay.seek_finished = FALSE;
+  sPlay.error_found = FALSE;
 
   g_signal_connect (player, "end-of-stream", G_CALLBACK (eos_cb), &sPlay);
   g_signal_connect (player, "state-changed", G_CALLBACK (state_changed_cb),
       &sPlay);
   g_signal_connect (player, "error", G_CALLBACK (error_cb), &sPlay);
+  g_signal_connect (player, "seek-done", G_CALLBACK (seek_done_cb), &sPlay);
 
   sPlay.loop = g_main_loop_new (NULL, FALSE);
   gloop = sPlay.loop;
