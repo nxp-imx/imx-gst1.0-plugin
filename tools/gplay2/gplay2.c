@@ -868,7 +868,7 @@ wait_for_seek_done (GstPlayData * play, gint time_out)
 {
   gint wait_cnt = 0;
 
-  while (time_out < 0 || wait_cnt < time_out) {
+  while (time_out < 0 || wait_cnt < time_out * 20) {
     if (play->seek_finished == TRUE) {
       play->seek_finished = FALSE;
       break;
@@ -877,10 +877,10 @@ wait_for_seek_done (GstPlayData * play, gint time_out)
       return;
     } else {
       wait_cnt++;
-      sleep (1);
+      usleep (50000);
     }
   }
-  if (wait_cnt >= time_out) {
+  if (wait_cnt >= time_out * 20) {
     g_print ("Wait seek done time out !!!\n");
   }
 }
