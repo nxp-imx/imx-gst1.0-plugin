@@ -92,6 +92,7 @@ typedef struct
 
   gboolean seek_finished;
   gboolean error_found;
+  gboolean eos_found;
 
   GMainLoop *loop;
 } GstPlayData;
@@ -830,6 +831,7 @@ eos_cb (GstPlayer * player, GstPlayData * play)
   options = play->options;
   /* for auto test script */
   g_print ("EOS Found\n");
+  play->eos_found = TRUE;
   gst_player_set_rate (player, 1.0);
   //gst_player_stop (player);
   gst_player_stop_sync (player, options->timeout);
@@ -875,7 +877,10 @@ wait_for_seek_done (GstPlayData * play, gint time_out)
     } else if (play->error_found == TRUE) {
       play->error_found = FALSE;
       return;
-    } else {
+    } else if (play->eos_found == TRUE) {
+      play->eos_found = FALSE;
+      return;
+    }else {
       wait_cnt++;
       usleep (50000);
     }
@@ -1464,6 +1469,7 @@ main (int argc, char *argv[])
   sPlay.gstPlayerState = GST_PLAYER_STATE_STOPPED;
   sPlay.seek_finished = FALSE;
   sPlay.error_found = FALSE;
+  sPlay.eos_found = FALSE;
 
   g_signal_connect (player, "end-of-stream", G_CALLBACK (eos_cb), &sPlay);
   g_signal_connect (player, "state-changed", G_CALLBACK (state_changed_cb),
