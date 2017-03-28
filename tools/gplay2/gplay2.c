@@ -93,6 +93,8 @@ typedef struct
   gboolean seek_finished;
   gboolean error_found;
   gboolean eos_found;
+  gint pending_audio_track;
+  gint pending_sub_track;
 
   GMainLoop *loop;
 } GstPlayData;
@@ -574,6 +576,14 @@ print_all_stream_info (GstPlayerMediaInfo * media_info)
   }
 }
 
+static void
+clear_pending_trackselect (GstPlayData *play)
+{
+  play->pending_audio_track = -1;
+  play->pending_sub_track = -1;
+}
+
+
 void
 display_thread_fun (gpointer data)
 {
@@ -808,6 +818,9 @@ error_cb (GstPlayer * player, GError * err, GstPlayData * play)
     gexit_display_thread = TRUE;
   }
 
+  gst_player_set_subtitle_track_enabled (player, TRUE);
+  clear_pending_trackselect (play);
+
   /* try next item in list then */
   if (!options->no_auto_next) {
     if (playlist_next (player, options) != RET_SUCCESS) {
@@ -833,8 +846,10 @@ eos_cb (GstPlayer * player, GstPlayData * play)
   g_print ("EOS Found\n");
   play->eos_found = TRUE;
   gst_player_set_rate (player, 1.0);
+  gst_player_set_subtitle_track_enabled (player, TRUE);
   //gst_player_stop (player);
   gst_player_stop_sync (player, options->timeout);
+  clear_pending_trackselect (play);
 
   if (!options->no_auto_next) {
     if (playlist_next (player, options) != RET_SUCCESS) {
@@ -930,7 +945,9 @@ input_thread_fun (gpointer data)
       case 's':                // Stop
       {
         //gst_player_stop (player);
+        gst_player_set_subtitle_track_enabled (player, TRUE);
         gst_player_stop_sync (player, options->timeout);
+        clear_pending_trackselect (play);
       }
         break;
 
@@ -1041,8 +1058,24 @@ input_thread_fun (gpointer data)
           break;
         }
         gDisable_display = FALSE;
+        if (playback_rate > 2.0 || playback_rate < 0){
+          gst_player_set_subtitle_track_enabled (player, FALSE);
+        } else {
+          gst_player_set_subtitle_track_enabled (player, TRUE);
+        }
         gst_player_set_rate (player, playback_rate);
         wait_for_seek_done (play, options->timeout);
+        if (playback_rate > 0 && playback_rate <= 2.0){
+          /* now do pending track select */
+          if (play->pending_audio_track >= 0) {
+            gst_player_set_audio_track (player, play->pending_audio_track);
+            play->pending_audio_track = -1;
+          }
+          if(play->pending_sub_track >= 0) {
+            gst_player_set_subtitle_track (player, play->pending_sub_track);
+            play->pending_sub_track = -1;
+          }
+        }
       }
         break;
 
@@ -1058,6 +1091,7 @@ input_thread_fun (gpointer data)
       {
         //gst_player_stop (player);
         gst_player_stop_sync (player, options->timeout);
+        clear_pending_trackselect (play);
         g_print ("Ready to exit this app!\n");
         gexit_input_thread = TRUE;
         gexit_display_thread = TRUE;
@@ -1086,8 +1120,10 @@ input_thread_fun (gpointer data)
       case '>':                // Play next file
         g_print ("next\n");
         gst_player_set_rate (player, 1.0);
+        gst_player_set_subtitle_track_enabled (player, TRUE);
         //gst_player_stop (player);
         gst_player_stop_sync (player, options->timeout);
+        clear_pending_trackselect (play);
         if (playlist_next (player, options) != RET_SUCCESS) {
           gexit_input_thread = TRUE;
           gexit_display_thread = TRUE;
@@ -1098,8 +1134,10 @@ input_thread_fun (gpointer data)
       case '<':                // Play previous file
         g_print ("previous\n");
         gst_player_set_rate (player, 1.0);
+        gst_player_set_subtitle_track_enabled (player, TRUE);
         //gst_player_stop (player);
         gst_player_stop_sync (player, options->timeout);
+        clear_pending_trackselect (play);
         if (playlist_previous (player, options) != RET_SUCCESS) {
           gexit_input_thread = TRUE;
           gexit_display_thread = TRUE;
@@ -1188,6 +1226,7 @@ input_thread_fun (gpointer data)
       {
         gint32 audio_track_no = 0;
         gint32 total_audio_no = 0;
+        gdouble rate = gst_player_get_rate (player);
         GstPlayerMediaInfo *media_info = gst_player_get_media_info (player);
         total_audio_no =
             gst_player_media_info_get_number_of_audio_streams (media_info);
@@ -1201,6 +1240,12 @@ input_thread_fun (gpointer data)
         if (audio_track_no < 0 || audio_track_no > total_audio_no - 1) {
           g_print ("Invalid audio track!\n");
         } else {
+          if (rate > 2.0 || rate < 0) {
+            /* just record the audio track num, will do track select when play in normal mode*/
+            play->pending_audio_track = audio_track_no;
+            gDisable_display = FALSE;
+            break;
+          }
           gst_player_set_audio_track (player, audio_track_no);
         }
         gDisable_display = FALSE;
@@ -1211,6 +1256,7 @@ input_thread_fun (gpointer data)
       {
         gint32 subtitle_no = 0;
         gint32 total_subtitle_no = 0;
+        gdouble rate = gst_player_get_rate (player);
         GstPlayerMediaInfo *media_info = gst_player_get_media_info (player);
         total_subtitle_no =
             gst_player_media_info_get_number_of_subtitle_streams (media_info);
@@ -1224,6 +1270,12 @@ input_thread_fun (gpointer data)
         if (subtitle_no < 0 || subtitle_no > total_subtitle_no - 1) {
           g_print ("Invalid subtitle track!\n");
         } else {
+          if (rate > 2.0 || rate < 0) {
+            /* just record the subtitle track num, will do track select when play in normal mode*/
+            play->pending_sub_track = subtitle_no;
+            gDisable_display = FALSE;
+            break;
+          }
           gst_player_set_subtitle_track (player, subtitle_no);
         }
         gDisable_display = FALSE;
@@ -1470,6 +1522,8 @@ main (int argc, char *argv[])
   sPlay.seek_finished = FALSE;
   sPlay.error_found = FALSE;
   sPlay.eos_found = FALSE;
+  sPlay.pending_audio_track = -1;
+  sPlay.pending_sub_track = -1;
 
   g_signal_connect (player, "end-of-stream", G_CALLBACK (eos_cb), &sPlay);
   g_signal_connect (player, "state-changed", G_CALLBACK (state_changed_cb),
