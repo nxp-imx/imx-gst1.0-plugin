@@ -345,6 +345,8 @@ AM_CONDITIONAL(USE_FB_DISPLAY, test "x$PLATFORM" = "xMX8" || test "x$PLATFORM" =
 if test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6QP"; then
 	 HAVE_DEVICE_IPU=yes
 	 HAVE_DEVICE_G2D=yes
+	 HAVE_DEVICE_PXP=yes
+   #HAVE_DEVICE_PXP is enabled for consolidate rootfs when PLATFORM=MX6 for 6sx
 fi
 
 if test "x$PLATFORM" = "xMX6SL" || test "x$PLATFORM" = "xMX6SX"; then
