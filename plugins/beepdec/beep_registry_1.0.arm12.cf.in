@@ -3,7 +3,7 @@
 [aac]
 longname = AAC LC decoder
 description = Decode AAC LC compressed audio to raw data
-mime= audio/mpeg, mpegversion=(int){2,4}
+mime= audio/mpeg, mpegversion=(int){2,4}, profile=(string)lc
 library2 = @aacplusd_arm12_SONAME@
 library = @aacd_arm12_SONAME@
 
