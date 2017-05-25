@@ -30,6 +30,10 @@ noinst_HEADERS = allocator/gstphymemmeta.h \
     overlaycompositionmeta/imxoverlaycompositionmeta.h \
     video-overlay/gstimxvideooverlay.h
 
+if USE_BAD_ALLOCATOR
+libgstfsl_@GST_API_VERSION@_la_LIBADD += -lgstbadallocators-$(GST_API_VERSION)
+endif
+
 if USE_ION
 libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_ION
 endif

@@ -39,6 +39,10 @@ libgstoverlaysinkplugins_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 				 -lg2d \
 				 ../../libs/libgstfsl-@GST_API_VERSION@.la
 
+if USE_BAD_ALLOCATOR
+libgstoverlaysinkplugins_la_LIBADD += -lgstbadallocators-$(GST_API_VERSION)
+endif
+
 libgstoverlaysinkplugins_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstoverlaysinkplugins_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 

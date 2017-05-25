@@ -219,6 +219,10 @@ AC_CHECK_HEADERS([linux/ion.h gst/allocators/gstionmemory.h], HAVE_ION="yes", HA
 AM_CONDITIONAL(USE_ION, test "x$HAVE_ION" = "xyes")
 CFLAGS=$old_CFLAGS
 
+HAVE_BAD_ALLOCATOR=no
+AC_CHECK_LIB(gstbadallocators-$GST_MAJORMINOR, gst_buffer_is_phymem, [HAVE_BAD_ALLOCATOR=yes])
+AM_CONDITIONAL(USE_BAD_ALLOCATOR, test "x$HAVE_BAD_ALLOCATOR" = "xyes")
+
 AC_CHECK_HEADERS([vpu_lib.h], [HAVE_VPU_LIB=yes], [HAVE_VPU_LIB=no])
 if test "x$HAVE_VPU_LIB" = "xyes"; then
     VPU_LIBS=`$PKG_CONFIG --libs libfslvpuwrap 2>/dev/null`

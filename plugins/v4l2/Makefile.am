@@ -21,6 +21,10 @@ libgstimxv4l2plugins_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 				 -lgstvideo-$(GST_API_VERSION) \
 				 $(GST_LIBS) \
 				 ../../libs/libgstfsl-@GST_API_VERSION@.la
+
+if USE_BAD_ALLOCATOR
+libgstimxv4l2plugins_la_LIBADD += -lgstbadallocators-$(GST_API_VERSION)
+endif
 				 
 libgstimxv4l2plugins_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstimxv4l2plugins_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)

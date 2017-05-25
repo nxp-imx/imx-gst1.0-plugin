@@ -21,6 +21,10 @@ libgstvpu_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) $(GST_BASE_LIBS) $(GST_LIBS) -lgs
 	$(VPU_LIBS) $(LIBM)
 libgstvpu_la_LIBADD += ../../libs/libgstfsl-@GST_API_VERSION@.la
 
+if USE_BAD_ALLOCATOR
+libgstvpu_la_LIBADD += -lgstbadallocators-$(GST_API_VERSION)
+endif
+
 libgstvpu_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstvpu_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 
