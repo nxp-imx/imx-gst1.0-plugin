@@ -84,6 +84,7 @@ typedef struct {
   gint panidx;
   void *vaddr;
   gint fb_size;
+  guint num_buffers;
 } DisplayHandle;
 
 static guint string_to_fmt (char *value)
@@ -188,6 +189,9 @@ gint scan_displays(gpointer **phandle, gint *pcount)
   switch (chipcode) {
     case CC_MX8:
       entry = gstsutils_init_entry ("/usr/share/imx_8dv_display_config");
+    break;
+    case CC_MX8Q:
+      entry = gstsutils_init_entry ("/usr/share/imx_8qm_display_config");
     break;
     case CC_MX7ULP:
       entry = gstsutils_init_entry ("/usr/share/imx_7ulp_display_config");
@@ -347,6 +351,9 @@ gint get_display_res(gpointer display, gint *width, gint *height, gint *stride)
 gint init_display (gpointer display)
 {
   DisplayHandle *hdisplay = (DisplayHandle*) display;
+  struct fb_fix_screeninfo fb_fix;
+  struct fb_var_screeninfo fb_var;
+  int i;
 
   hdisplay->fd = open (hdisplay->device, O_RDWR, 0);
   if (hdisplay->fd <= 0) {
@@ -354,9 +361,15 @@ gint init_display (gpointer display)
     return -1;
   }
 
-  struct fb_var_screeninfo fb_var;
   if (ioctl(hdisplay->fd, FBIOGET_VSCREENINFO, &fb_var) < 0) {
     return -1;
+  }
+
+  if (imx_chip_code() == CC_MX8Q) {
+    hdisplay->num_buffers = 1;
+    goto workaround;
+  } else {
+    hdisplay->num_buffers = DISPLAY_NUM_BUFFERS;
   }
 
   fb_var.xoffset = 0;
@@ -364,7 +377,7 @@ gint init_display (gpointer display)
   fb_var.xres_virtual = hdisplay->w;
   fb_var.yoffset = 0;
   fb_var.yres = hdisplay->h;
-  fb_var.yres_virtual = hdisplay->h * DISPLAY_NUM_BUFFERS;
+  fb_var.yres_virtual = hdisplay->h * hdisplay->num_buffers;
   fb_var.activate |= FB_ACTIVATE_FORCE;
 
   /* FIXME:imx7ulp use grayscale field for format setting, the below
@@ -390,13 +403,12 @@ gint init_display (gpointer display)
     return -1;
   }
 
-  struct fb_fix_screeninfo fb_fix;
+workaround:
   if (ioctl(hdisplay->fd, FBIOGET_FSCREENINFO, &fb_fix) < 0) {
     return -1;
   }
 
-  int i;
-  for (i = 0; i < DISPLAY_NUM_BUFFERS; i++) {
+  for (i = 0; i < hdisplay->num_buffers; i++) {
     hdisplay->paddr[i] = (void *) (fb_fix.smem_start + fb_var.yres * fb_fix.line_length * i);
   }
   hdisplay->panidx = 0;
@@ -481,7 +493,7 @@ gint flip_display_buffer (gpointer display, SurfaceBuffer *buffer)
   ioctl (hdisplay->fd, FBIOGET_VSCREENINFO, &fb_var);
   fb_var.yoffset = fb_var.yres * hdisplay->panidx;
   ioctl (hdisplay->fd, FBIOPAN_DISPLAY, &fb_var);
-  hdisplay->panidx = (hdisplay->panidx + 1) % DISPLAY_NUM_BUFFERS;
+  hdisplay->panidx = (hdisplay->panidx + 1) % hdisplay->num_buffers;
 
   return 0;
 }

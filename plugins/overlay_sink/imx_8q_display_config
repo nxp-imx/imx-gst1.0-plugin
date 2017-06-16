@@ -1,0 +1,5 @@
+[master]
+device = /dev/fb0
+bg_device = /dev/fb0
+fmt = RGBP
+
