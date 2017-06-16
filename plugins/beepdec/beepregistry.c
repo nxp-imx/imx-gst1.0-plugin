@@ -16,6 +16,7 @@
 
 /*
  * Copyright (c) 2011-2016, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2017 NXP
  *
  */
 
@@ -61,6 +62,7 @@ static GstsutilsEntry *g_beep_caps_entry = NULL;
 static uint32 beep_core_interface_id_table[] = {
   ACODEC_API_GET_VERSION_INFO,
   ACODEC_API_CREATE_CODEC,
+  ACODEC_API_CREATE_CODEC_PLUS,
   ACODEC_API_DELETE_CODEC,
   ACODEC_API_RESET_CODEC,
   ACODEC_API_SET_PARAMETER,
@@ -147,8 +149,10 @@ static GstCaps * beep_get_caps_from_entry(GstsutilsEntry * entry)
       continue;
     }
     if(!gstsutils_get_value_by_key(group,FSL_KEY_LIB,&libname)){
-      g_free(mime);
-      continue;
+      if (!gstsutils_get_value_by_key(group,FSL_KEY_DSP_LIB,&libname)) {
+        g_free(mime);
+        continue;
+      }
     }
 
     dlhandle = dlopen (libname, RTLD_LAZY);
@@ -236,6 +240,33 @@ beep_core_get_caps ()
 
   return caps;
 }
+
+
+BeepCoreInterface *
+beep_core_create_interface_from_caps_dsp (GstCaps * caps)
+{
+  BeepCoreInterface *inf = NULL;
+  GstsutilsGroup * group;
+  gchar * libname = NULL;
+  void *dlhandle = NULL;
+
+  group = beep_core_find_caps_group(g_beep_caps_entry,caps);
+  if (group) {
+    if (gstsutils_get_value_by_key(group,FSL_KEY_DSP_LIB, &libname)){
+       dlhandle = dlopen(libname, RTLD_LAZY);
+      if (dlhandle) {
+        dlclose (dlhandle);
+        inf = _beep_core_create_interface_from_entry (libname);
+        inf->name = gstsutils_get_group_name(group);
+      }
+    }
+  }
+  if (libname)
+    g_free(libname);
+  return inf;
+}
+
+
 
 BeepCoreInterface *
 beep_core_create_interface_from_caps (GstCaps * caps)

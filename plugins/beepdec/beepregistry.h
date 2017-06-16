@@ -16,6 +16,7 @@
 
 /*
  * Copyright (c) 2011-2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2017 NXP
  *
  */
 
@@ -45,6 +46,7 @@ typedef struct
 {
   UniACodecVersionInfo getVersionInfo;
   UniACodecCreate createDecoder;
+  UniACodecCreatePlus createDecoderplus;
   UniACodecDelete deleteDecoder;
   UniACodecReset resetDecoder;
   UniACodecSetParameter setDecoderPara;
@@ -61,6 +63,7 @@ typedef struct
 
 
 GstCaps *beep_core_get_caps ();
+BeepCoreInterface *beep_core_create_interface_from_caps_dsp (GstCaps * caps);
 BeepCoreInterface *beep_core_create_interface_from_caps (GstCaps * caps);
 
 void

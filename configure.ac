@@ -327,6 +327,7 @@ FIND_ACODEC_SONAME(wbamrd, arm)
 FIND_ACODEC_SONAME(realad, arm9)
 FIND_ACODEC_SONAME(realad, arm11)
 FIND_ACODEC_SONAME(realad, arm)
+FIND_ACODEC_SONAME(dsp, arm)
 
 dnl set the plugindir where plugins should be installed
 plugindir="\$(libdir)/gstreamer-$GST_MAJORMINOR"

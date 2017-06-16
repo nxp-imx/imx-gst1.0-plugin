@@ -1,6 +1,7 @@
 
 /*
-* Copyright (c) 2011-2014,2016, Freescale Semiconductor, Inc. 
+* Copyright (c) 2011-2014,2016, Freescale Semiconductor, Inc.
+* Copyright 2017 NXP
  */
 
 /*
@@ -91,7 +92,8 @@ typedef enum
     UNIA_STREAM_TYPE,
     UNIA_CHAN_MAP_TABLE,
     //UNIA_CHANNEL_MASK,
-    
+    UNIA_TO_STEREO,
+
 /* dedicate for wma */
     UNIA_WMA_BlOCKALIGN= 0x100,
     UNIA_WMA_VERSION,
@@ -99,17 +101,39 @@ typedef enum
 /*dedicate for RealAudio */
     UNIA_RA_FLAVOR_INDEX = 0x110,
     UNIA_RA_FRAME_BITS,
-    
+
+/* dedicate for mp3 dec */
+    UNIA_MP3_DEC_CRC_CHECK = 0x120,
+    UNIA_MP3_DEC_MCH_ENABLE,
+
+/* dedicate for bsac dec */
+    UNIA_BSAC_DEC_DECODELAYERS = 0x130,
+
+/* dedicate for aacplus dec */
+    UNIA_AACPLUS_DEC_BDOWNSAMPLE = 0x140,
+    UNIA_AACPLUS_DEC_BBITSTREAMDOWNMIX,
+    UNIA_AACPLUS_DEC_CHANROUTING,
+
+/* dedicate for dabplus dec */
+    UNIA_DABPLUS_DEC_BDOWNSAMPLE = 0x150,
+    UNIA_DABPLUS_DEC_BBITSTREAMDOWNMIX,
+    UNIA_DABPLUS_DEC_CHANROUTING,
+
+/* dedicate for sbc enc */
+    UNIA_SBC_ENC_SUBBANDS = 0x160,
+    UNIA_SBC_ENC_BLOCKS,
+    UNIA_SBC_ENC_SNR,
+    UNIA_SBC_ENC_BITPOOL,
+    UNIA_SBC_ENC_CHMODE,
+
 /* Get parmameters */
     UNIA_CODEC_DESCRIPTION= 0x200, 
     UNIA_OUTPUT_PCM_FORMAT,
     UNIA_CONSUMED_LENGTH,
     UNIA_OUTBUF_ALLOC_SIZE,  /* used for allocate output buffer outside */
-    
+
     UA_TYPE_MAX
 } UA_ParaType;
-
-
 
 typedef enum
 {
@@ -136,13 +160,18 @@ typedef enum
 
 #define STREAM_NBAMR_BASE  0x10
 #define STREAM_WBAMR_BASE  0x20
+#define STREAM_DABPLUS_BASE  0x30
 typedef enum
 {
     /* AAC/AACPLUS file format */
     STREAM_UNKNOW = 0,
     STREAM_ADTS,
     STREAM_ADIF,
-    STREAM_RAW,  
+    STREAM_RAW,
+
+    STREAM_LATM,
+    STREAM_LATM_OUTOFBAND_CONFIG,
+    STREAM_LOAS,
 
     /* NB-AMR file format */
     STREAM_NBAMR_ETSI = STREAM_NBAMR_BASE,
@@ -157,7 +186,48 @@ typedef enum
     STREAM_WBAMR_IF2,
     STREAM_WBAMR_IF1,
 
+    /* DABPLUS file format */
+    STREAM_DABPLUS_RAW_SIDEINFO = STREAM_DABPLUS_BASE,
+    STREAM_DABPLUS,
+
+    /* BSAC file raw format */
+    STREAM_BSAC_RAW
+
 } STREAM_TYPE;
+
+/* sbc_enc-specific channel modes */
+enum sbc_enc_chmode {
+    CHMODE_MONO =   0,
+    CHMODE_DUAL =   1,
+    CHMODE_STEREO = 2,
+    CHMODE_JOINT =  3
+};
+
+/*
+ * Audio codec types.
+ */
+typedef enum
+{
+    AAC = 0,
+    AAC_PLUS,
+    MP3,
+    WMA,
+    AC3,
+    OGG,
+    DD_PLUS,
+    RA,
+    FLAC,
+    NBAMR,
+    WBAMR,
+    BSAC,
+    DRM,
+    SBCENC,
+    SBCDEC,
+    DAB_PLUS,
+    MP2,
+
+    FORMAT_UNKNOW = 0x200
+}AUDIOFORMAT;
 
 /*********************************************************************
  * Uni Audio memory callback funtion pointer table.
@@ -214,11 +284,33 @@ typedef struct
         /* for real audio decoder */
         uint32 frame_bits;
         uint32 flavor_index;
-		
+
         char ** codecDesc;
         UniAcodecOutputPCMFormat outputFormat;
         uint32 consumed_length;
         uint32 outbuf_alloc_size;
+
+/* defined for dsp */
+        uint32 chanmap;
+        uint32 mono_to_stereo;
+        uint32 layers;
+
+        /* dedicate for mp3 and mp2 dec */
+        uint32 crc_check;
+        uint32 mch_enable;
+
+        /* dedicate for bsac, aacplus and dabplus dec */
+        uint32 bdownsample;
+        uint32 bbitstreamdownmix;
+        uint32 chanrouting;
+
+        /*dedicate for sbc enc */
+        uint32 enc_subbands;
+        uint32 enc_blocks;
+        uint32 enc_snr;
+        uint32 enc_bitpool;
+        uint32 enc_chmode;
+/* end */
 #if !defined(RVDS)        
     };
 #endif
@@ -263,6 +355,7 @@ typedef const char * (*UniACodecVersionInfo)();
  * Codec  Create & Delete
 *******************************************************************/
 typedef UniACodec_Handle (*UniACodecCreate)(  UniACodecMemoryOps * memOps);
+typedef UniACodec_Handle (*UniACodecCreatePlus)(  UniACodecMemoryOps * memOps, AUDIOFORMAT type);
 
 typedef int32 (*UniACodecDelete) (UniACodec_Handle pua_handle);
 
@@ -319,6 +412,7 @@ enum /* API function ID */
     ACODEC_API_GET_VERSION_INFO  = 0x0,
     /* creation & deletion */
     ACODEC_API_CREATE_CODEC     = 0x1,
+    ACODEC_API_CREATE_CODEC_PLUS  = 0x04,
     ACODEC_API_DELETE_CODEC     = 0x2,
     /* reset */
     ACODEC_API_RESET_CODEC = 0x3,
@@ -329,7 +423,7 @@ enum /* API function ID */
 
     /* process frame */
     ACODEC_API_DEC_FRAME    = 0x20,
-    //ACODEC_API_ENC_FRAME    = 0x21,
+    ACODEC_API_ENC_FRAME    = 0x21,
 
     ACODEC_API_GET_LAST_ERROR = 0x1000,
 

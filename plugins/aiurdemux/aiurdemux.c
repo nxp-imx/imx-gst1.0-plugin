@@ -2182,6 +2182,9 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
           case AUDIO_AAC_RAW:
             stream_type = "raw";
             break;
+          case AUDIO_ER_BSAC:
+            codec_mime = "audio/x-bsac";
+            break;
           default:
             stream_type = NULL;
             break;

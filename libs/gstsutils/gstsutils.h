@@ -16,6 +16,7 @@
 
 /*
  * Copyright (c) 2011-2012, Freescale Semiconductor, Inc. All rights reserved. 
+ * Copyright 2017 NXP
  *
  */
 
@@ -57,6 +58,7 @@
 
 #define FSL_KEY_LIB "library"
 #define FSL_KEY_LIB2 "library2"
+#define FSL_KEY_DSP_LIB "dsp_lib"
 #define FSL_KEY_MIME "mime"
 #define FSL_KEY_DESC "description"
 #define FSL_KEY_RANK "rank"

@@ -16,6 +16,7 @@
 
 /*
  * Copyright (c) 2011-2016, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2017 NXP
  *
  */
 
@@ -265,6 +266,7 @@ static gboolean beep_dec_set_init_parameter(GstBeepDec * beep_dec,
     BeepCoreInterface *IDecoder = NULL;
     UniACodec_Handle handle;
     const GValue *value = NULL;
+    UA_ERROR_TYPE rc = ACODEC_SUCCESS;
 
     do{
 
@@ -282,43 +284,64 @@ static gboolean beep_dec_set_init_parameter(GstBeepDec * beep_dec,
         if (gst_structure_get_int (structure, "rate", &intvalue)) {
             GST_INFO ("Set rate %d", intvalue);
             parameter.samplerate = intvalue;
-            IDecoder->setDecoderPara(handle, UNIA_SAMPLERATE, &parameter);
+            rc = IDecoder->setDecoderPara(handle, UNIA_SAMPLERATE, &parameter);
+            if (rc != ACODEC_SUCCESS) {
+              return ret;
+            }
         }
 
         if (gst_structure_get_int (structure, "bitrate", &intvalue)) {
             GST_INFO ("Set bitrate %d", intvalue);
             parameter.bitrate = intvalue;
-            IDecoder->setDecoderPara(handle, UNIA_BITRATE, &parameter);
+            rc = IDecoder->setDecoderPara(handle, UNIA_BITRATE, &parameter);
+            if (rc != ACODEC_SUCCESS) {
+              return ret;
+            }
         }
 
         if (gst_structure_get_int (structure, "channels", &intvalue)) {
             GST_INFO ("Set channel %d", intvalue);
             parameter.channels = intvalue;
-            IDecoder->setDecoderPara(handle, UNIA_CHANNEL, &parameter);
+            rc = IDecoder->setDecoderPara(handle, UNIA_CHANNEL, &parameter);
+            if (rc != ACODEC_SUCCESS) {
+              return ret;
+            }
         }
 
         if (gst_structure_get_int (structure, "depth", &intvalue)) {
             GST_INFO ("Set depth %d", intvalue);
             parameter.depth = intvalue;
-            IDecoder->setDecoderPara(handle, UNIA_DEPTH, &parameter);
+            rc = IDecoder->setDecoderPara(handle, UNIA_DEPTH, &parameter);
+            if (rc != ACODEC_SUCCESS) {
+              return ret;
+            }
         }
 
         if (gst_structure_get_int (structure, "block_align", &intvalue)) {
             GST_INFO ("Set block align %d", intvalue);
             parameter.blockalign = intvalue;
-            IDecoder->setDecoderPara(handle,UNIA_WMA_BlOCKALIGN, &parameter);
+            rc = IDecoder->setDecoderPara(handle,UNIA_WMA_BlOCKALIGN, &parameter);
+            if (rc != ACODEC_SUCCESS) {
+              return ret;
+            }
         }
 
         if (gst_structure_get_int (structure, "frame_bit", &intvalue)) {
             GST_INFO ("Set frame_bits %d", intvalue);
             parameter.frame_bits= intvalue;
-            IDecoder->setDecoderPara(handle,UNIA_RA_FRAME_BITS, &parameter);
+            rc = IDecoder->setDecoderPara(handle,UNIA_RA_FRAME_BITS, &parameter);
+            if (rc != ACODEC_SUCCESS) {
+              return ret;
+            }
         }
 
         if (gst_structure_get_int (structure, "wmaversion", &intvalue)) {
             GST_INFO ("Set wma version %d", intvalue);
             parameter.version = intvalue;
-            IDecoder->setDecoderPara(handle, UNIA_WMA_VERSION, &parameter);
+            rc = IDecoder->setDecoderPara(handle, UNIA_WMA_VERSION, &parameter);
+            if (rc != ACODEC_SUCCESS) {
+              return ret;
+            }
         }
 
         value = gst_structure_get_value (structure, "codec_data");
@@ -331,8 +354,11 @@ static gboolean beep_dec_set_init_parameter(GstBeepDec * beep_dec,
                 GST_INFO ("Set codec_data %" GST_PTR_FORMAT, codec_data);
                 parameter.codecData.size = map.size;
                 parameter.codecData.buf = map.data;
-                IDecoder->setDecoderPara(handle,UNIA_CODEC_DATA, &parameter);
+                rc = IDecoder->setDecoderPara(handle,UNIA_CODEC_DATA, &parameter);
                 gst_buffer_unmap(codec_data, &map);
+                if (rc != ACODEC_SUCCESS) {
+                  return ret;
+                }
                 beep_dec->set_codec_data = TRUE;
             }
         }
@@ -353,7 +379,10 @@ static gboolean beep_dec_set_init_parameter(GstBeepDec * beep_dec,
                 parameter.stream_type = STREAM_UNKNOW;
             }
 
-            IDecoder->setDecoderPara(handle,UNIA_STREAM_TYPE, &parameter);
+            rc = IDecoder->setDecoderPara(handle,UNIA_STREAM_TYPE, &parameter);
+            if (rc != ACODEC_SUCCESS) {
+              return ret;
+            }
         }
 
         parameter.framed = FALSE;
@@ -372,15 +401,21 @@ static gboolean beep_dec_set_init_parameter(GstBeepDec * beep_dec,
 
         //beep_dec->framed = parameter.framed;
         GST_INFO ("Set framed %s", ((parameter.framed) ? "true" : "false"));
-        IDecoder->setDecoderPara(handle,UNIA_FRAMED, &parameter);
+        rc = IDecoder->setDecoderPara(handle,UNIA_FRAMED, &parameter);
+        if (rc != ACODEC_SUCCESS) {
+          return ret;
+        }
 
         {
-        CHAN_TABLE table;
-        memset(&table,0,sizeof(table));
-        table.size = 8;
-        memcpy(&table.channel_table,alsa_channel_layouts,sizeof(alsa_channel_layouts));
-        //set output format for channel layout
-        IDecoder->setDecoderPara(handle,UNIA_CHAN_MAP_TABLE,(UniACodecParameter*)&table);
+          CHAN_TABLE table;
+          memset(&table,0,sizeof(table));
+          table.size = 8;
+          memcpy(&table.channel_table,alsa_channel_layouts,sizeof(alsa_channel_layouts));
+          //set output format for channel layout
+          rc = IDecoder->setDecoderPara(handle,UNIA_CHAN_MAP_TABLE,(UniACodecParameter*)&table);
+          if (rc != ACODEC_SUCCESS) {
+            return ret;
+          }
         }
 
         ret = TRUE;
@@ -398,6 +433,54 @@ static gboolean beep_dec_set_format(GstAudioDecoder *dec, GstCaps *caps)
 
     do{
         beepdec = GST_BEEP_DEC (dec);
+
+        if (beepdec->beep_interface == NULL) {
+          beepdec->beep_interface = beep_core_create_interface_from_caps_dsp (caps);
+          if (beepdec->beep_interface) {
+            AUDIOFORMAT type = FORMAT_UNKNOW;
+            GST_INFO (" dsp wrapper interface created ");
+            IDecoder = beepdec->beep_interface;
+            ops.Malloc = beepdec_core_mem_alloc;
+            ops.Calloc = beepdec_core_mem_calloc;
+            ops.ReAlloc = beepdec_core_mem_realloc;
+            ops.Free = beepdec_core_mem_free;
+            GST_INFO (" audio type: %s ", IDecoder->name);
+            if (!strcmp (IDecoder->name, "aac")) {
+              type = AAC_PLUS;
+            } else if (!strcmp (IDecoder->name, "mp3")) {
+              type = MP3;
+            } else if (!strcmp (IDecoder->name, "bsac")) {
+              type = BSAC;
+            } else if (!strcmp (IDecoder->name, "dabplus")) {
+              type = DAB_PLUS;
+            } else if (!strcmp (IDecoder->name, "sbc")) {
+              type = SBCDEC;
+            } else {
+              goto dsp_fail;
+            }
+            beepdec->handle = IDecoder->createDecoderplus(&ops, type);
+            if (beepdec->handle == NULL) {
+              /* create fail, dsp not support */
+              GST_INFO (" dsp create decoder fail ");
+              goto dsp_fail;
+            }
+            ret = beep_dec_set_init_parameter (beepdec,caps);
+            if (ret == FALSE) {
+              /* dsp not support parameter, try SW decoder*/
+              GST_INFO (" dsp set parameter fail ");
+              goto dsp_fail;
+            }
+            break;
+          }
+dsp_fail:
+          if (beepdec->handle && beepdec->beep_interface) {
+            beepdec->beep_interface->deleteDecoder (beepdec->handle);
+            beepdec->handle = NULL;
+          }
+          beepdec->beep_interface = NULL;
+        }
+
+        GST_INFO ("normal create sw wrapper interface");
 
         if(beepdec->beep_interface == NULL)
             beepdec->beep_interface = beep_core_create_interface_from_caps (caps);
