@@ -70,6 +70,7 @@ typedef enum
   CC_MX7D = CHIPCODE ('M', 'X', '7', 'D'),
   CC_MX7ULP = CHIPCODE ('M', 'X', '7', 'U'),
   CC_MX8 = CHIPCODE ('M', 'X', '8', '0'),
+  CC_MX8Q = CHIPCODE ('M', 'X', '8', '1'),
   CC_UNKN = CHIPCODE ('U', 'N', 'K', 'N')
 
 } CHIP_CODE;

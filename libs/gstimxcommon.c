@@ -143,6 +143,8 @@ static SOC_INFO soc_info[] = {
   {CC_MX7D, "i.MX7D"},
   {CC_MX7ULP, "i.MX7ULP"},
   {CC_MX8, "i.MX8DV"},
+  {CC_MX8Q, "i.MX8QM"},
+  {CC_MX8Q, "i.MX8QXP"},
 };
 
 CHIP_CODE getChipCodeFromSocid (void)
@@ -216,6 +218,7 @@ CHIP_CODE imx_chip_code (void)
 }
 
 static IMXV4l2FeatureMap g_imxv4l2feature_maps[] = {
+  /* chip_name, g3d, g2d, ipu, pxp, vpu, dpu */
   {CC_MX6Q, TRUE, TRUE, TRUE, FALSE, TRUE, FALSE},
   {CC_MX6SL, FALSE, TRUE, FALSE, TRUE, FALSE, FALSE},
   {CC_MX6SLL, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE},
@@ -224,6 +227,7 @@ static IMXV4l2FeatureMap g_imxv4l2feature_maps[] = {
   {CC_MX7D, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE},
   {CC_MX7ULP, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE},
   {CC_MX8, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE},
+  {CC_MX8Q, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE},
 };
 
 
