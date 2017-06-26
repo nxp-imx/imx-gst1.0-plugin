@@ -52,7 +52,6 @@ registry_file1 = imx_6q_display_config
 registry_file2 = imx_6sx_display_config
 registry_file3 = imx_8dv_display_config
 registry_file4 = imx_7ulp_display_config
-registry_file5 = imx_8q_display_config
 
-data_DATA = $(registry_file1) $(registry_file2) $(registry_file3) $(registry_file4) $(registry_file5)
-EXTRA_DIST = $(registry_file1) $(registry_file2) $(registry_file3) $(registry_file4) $(registry_file5)
+data_DATA = $(registry_file1) $(registry_file2) $(registry_file3) $(registry_file4)
+EXTRA_DIST = $(registry_file1) $(registry_file2) $(registry_file3) $(registry_file4)
