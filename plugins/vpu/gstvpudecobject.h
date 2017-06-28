@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2017 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -68,6 +69,7 @@ struct _GstVpuDecObject {
   guint frame_plus;
   gboolean use_vpu_memory;
   guint min_buf_cnt;
+  guint frame_size;
   guint actual_buf_cnt;
   guint buf_align;
   GstVideoAlignment video_align;
@@ -106,6 +108,8 @@ struct _GstVpuDecObject {
   TSMGR_MODE tsm_mode;
   GstClockTime last_valid_ts;
   GstClockTime last_received_ts;
+  gint64 total_time;
+  gint64 total_frames;
 };
 
 struct _GstVpuDecObjectClass {

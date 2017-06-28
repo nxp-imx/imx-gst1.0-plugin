@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2017 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -19,6 +20,7 @@
 
 #include <string.h>
 #include <gst/video/gstvideometa.h>
+#include "gstimxcommon.h"
 #include "allocator/gstphymemmeta.h"
 #include "gstvpuallocator.h"
 #include "gstvpudecobject.h"
@@ -118,11 +120,13 @@ gst_vpu_dec_object_get_sink_caps (void)
     VPUMapper *map = vpu_mappers;
     while ((map) && (map->mime)) {
       if ((map->std != VPU_V_RV && map->std != VPU_V_DIVX3
-            && map->std != VPU_V_DIVX4 && map->std != VPU_V_DIVX56)
+            && map->std != VPU_V_DIVX4 && map->std != VPU_V_DIVX56
+            && map->std != VPU_V_VP9 && map->std != VPU_V_HEVC)
           || ((vpu_fwcode & VPU_FIRMWARE_CODE_RV_FLAG) && map->std == VPU_V_RV)
           || ((vpu_fwcode & VPU_FIRMWARE_CODE_DIVX_FLAG) 
             && (map->std == VPU_V_DIVX3 || map->std == VPU_V_DIVX4
-              || map->std == VPU_V_DIVX56))) {
+              || map->std == VPU_V_DIVX56)) || (IS_HANTRO()
+              && (map->std == VPU_V_VP9 || map->std == VPU_V_HEVC))) {
         if (caps) {
           GstCaps *newcaps = gst_caps_from_string (map->mime);
           if (newcaps) {
@@ -323,6 +327,8 @@ gst_vpu_dec_object_start (GstVpuDecObject * vpu_dec_object)
 
   vpu_dec_object->frame2gstbuffer_table = g_hash_table_new(NULL, NULL);
   vpu_dec_object->gstbuffer2frame_table = g_hash_table_new(NULL, NULL);
+  vpu_dec_object->total_frames = 0;
+  vpu_dec_object->total_time = 0;
 
   vpu_dec_object->state = STATE_ALLOCATED_INTERNAL_BUFFER;
 
@@ -362,19 +368,21 @@ gst_vpu_dec_object_allocate_mv_buffer (GstVpuDecObject * vpu_dec_object)
   memset (vpu_dec_object->vpuframebuffers, 0, sizeof (VpuFrameBuffer) \
       * vpu_dec_object->actual_buf_cnt);
 
-  for (i=0; i<vpu_dec_object->actual_buf_cnt; i++) {
-    vpu_frame = &vpu_dec_object->vpuframebuffers[i];
-    size = vpu_dec_object->width_paded * vpu_dec_object->height_paded / 4;
-    gst_memory = gst_allocator_alloc (gst_vpu_allocator_obtain(), size, NULL);
-    memory = gst_memory_query_phymem_block (gst_memory);
-    if (memory == NULL) {
-      GST_ERROR_OBJECT (vpu_dec_object, "Could not allocate memory using VPU allocator");
-      return FALSE;
-    }
+  if (!IS_HANTRO()) {
+    for (i=0; i<vpu_dec_object->actual_buf_cnt; i++) {
+      vpu_frame = &vpu_dec_object->vpuframebuffers[i];
+      size = vpu_dec_object->width_paded * vpu_dec_object->height_paded / 4;
+      gst_memory = gst_allocator_alloc (gst_vpu_allocator_obtain(), size, NULL);
+      memory = gst_memory_query_phymem_block (gst_memory);
+      if (memory == NULL) {
+        GST_ERROR_OBJECT (vpu_dec_object, "Could not allocate memory using VPU allocator");
+        return FALSE;
+      }
 
-    vpu_frame->pbufMvCol = memory->paddr;
-    vpu_frame->pbufVirtMvCol = memory->vaddr;
-    vpu_dec_object->mv_mem = g_list_append (vpu_dec_object->mv_mem, gst_memory);
+      vpu_frame->pbufMvCol = memory->paddr;
+      vpu_frame->pbufVirtMvCol = memory->vaddr;
+      vpu_dec_object->mv_mem = g_list_append (vpu_dec_object->mv_mem, gst_memory);
+    }
   }
 
   return TRUE;
@@ -385,6 +393,9 @@ gst_vpu_dec_object_stop (GstVpuDecObject * vpu_dec_object)
 {
   VpuDecRetCode dec_ret;
 
+  GST_INFO_OBJECT(vpu_dec_object, "Video decoder frames: %lld time: %lld fps: (%.3f).\n",
+      vpu_dec_object->total_frames, vpu_dec_object->total_time, (gfloat)1000000
+      * vpu_dec_object->total_frames / vpu_dec_object->total_time);
   if (vpu_dec_object->gstbuffer_in_vpudec != NULL) {
     g_list_foreach (vpu_dec_object->gstbuffer_in_vpudec, (GFunc) gst_buffer_unref, NULL);
     g_list_free (vpu_dec_object->gstbuffer_in_vpudec);
@@ -701,6 +712,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
         vpu_dec_object->init_info.nPicHeight, vpu_dec_object->input_state);
 
   vpu_dec_object->min_buf_cnt = vpu_dec_object->init_info.nMinFrameBufferCount;
+  vpu_dec_object->frame_size = vpu_dec_object->init_info.nFrameSize;
   GST_VIDEO_INFO_WIDTH (&(state->info)) = vpu_dec_object->init_info.nPicWidth;
   GST_VIDEO_INFO_HEIGHT (&(state->info)) = vpu_dec_object->init_info.nPicHeight;
   GST_VIDEO_INFO_INTERLACE_MODE(&(state->info)) = \
@@ -984,6 +996,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
       vpu_dec_object->last_valid_ts = out_frame->pts;
   }
 
+  vpu_dec_object->total_frames ++;
   GST_DEBUG_OBJECT (vpu_dec_object, "vpu dec output frame time stamp: %" \
       GST_TIME_FORMAT, GST_TIME_ARGS (out_frame->pts));
 
@@ -1194,6 +1207,7 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
 
     GST_DEBUG_OBJECT(vpu_dec_object, "buf status: 0x%x time: %lld\n", \
         buf_ret, g_get_monotonic_time () - start_time);
+    vpu_dec_object->total_time += g_get_monotonic_time () - start_time;
 
     if ((vpu_dec_object->use_new_tsm) && (buf_ret & VPU_DEC_ONE_FRM_CONSUMED)) {
       if (!gst_vpu_dec_object_set_tsm_consumed_len (vpu_dec_object)) {

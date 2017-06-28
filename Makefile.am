@@ -134,7 +134,9 @@ V4LSINKDIRS =
 
 OVERLAYSINKDIRS =
 
-VPUWRAPDIRS =
+if USE_VPU_WRAP
+VPUWRAPDIRS = plugins/vpu
+endif
 
 endif
 

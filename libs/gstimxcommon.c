@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2017 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -229,7 +230,7 @@ static IMXV4l2FeatureMap g_imxv4l2feature_maps[] = {
   {CC_MX7ULP, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE},
   {CC_MX8, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE},
   {CC_MX8Q, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE},
-  {CC_MX8M, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE},
+  {CC_MX8M, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE},
 };
 
 

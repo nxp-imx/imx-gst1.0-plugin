@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2017 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -173,8 +174,6 @@ gst_vpu_dec_init (GstVpuDec * dec)
   GST_VPU_DEC_FRAMES_PLUS (dec->vpu_dec_object) = DEFAULT_FRAMES_PLUS;
   GST_VPU_DEC_USE_VPU_MEMORY (dec->vpu_dec_object) = DEFAULT_USE_VPU_MEMORY;
   GST_VPU_DEC_MIN_BUF_CNT (dec->vpu_dec_object) = 0;
-  dec->vpu_dec_object->use_my_pool = FALSE;
-  dec->vpu_dec_object->use_my_allocator = FALSE;
 
   /* As VPU can support stream mode. need call parser before decode */
   gst_video_decoder_set_packetized (GST_VIDEO_DECODER (dec), TRUE);
@@ -241,6 +240,9 @@ gst_vpu_dec_open (GstVideoDecoder * bdec)
 {
   GstVpuDec *dec = (GstVpuDec *) bdec;
 
+  dec->vpu_dec_object->use_my_pool = FALSE;
+  dec->vpu_dec_object->use_my_allocator = FALSE;
+
   return gst_vpu_dec_object_open (dec->vpu_dec_object);
 }
 
@@ -282,7 +284,8 @@ gst_vpu_dec_set_format (GstVideoDecoder * bdec, GstVideoCodecState * state)
   }
   gst_query_unref (query);
 
-  if (is_live) {
+  // Hantro VPU can get best performance with low lantency.
+  if (is_live || IS_HANTRO()) {
     GST_INFO_OBJECT (dec, "Pipeline is live, set VPU to low latency mode.\n");
     GST_VPU_DEC_LOW_LATENCY (dec->vpu_dec_object) = TRUE;
   } else {
@@ -353,6 +356,7 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
 
     update_pool = FALSE;
   }
+  size = MAX (size, dec->vpu_dec_object->frame_size);
 
   if (dec->vpu_dec_object->vpu_need_reconfig == FALSE
     && dec->vpu_dec_object->use_my_pool
