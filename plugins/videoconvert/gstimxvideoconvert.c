@@ -1100,10 +1100,7 @@ static gboolean imx_video_convert_decide_allocation(GstBaseTransform *transform,
           config = NULL;
         }
 
-        if (allocator) {
-          gst_object_unref (allocator);
-          allocator = NULL;
-        }
+        allocator = NULL;
         gst_object_unref (pool);
       }
     }
