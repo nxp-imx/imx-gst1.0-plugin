@@ -32,8 +32,9 @@ static gboolean
 plugin_init (GstPlugin * plugin)
 {
   if (HAS_VPU()) {
-    if (!gst_vpu_enc_register (plugin))
-      return FALSE;
+    if (!IS_HANTRO())
+      if (!gst_vpu_enc_register (plugin))
+        return FALSE;
     
     if (!gst_element_register (plugin, "vpudec", IMX_GST_PLUGIN_RANK,
           GST_TYPE_VPU_DEC))
