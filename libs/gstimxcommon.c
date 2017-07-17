@@ -220,17 +220,17 @@ CHIP_CODE imx_chip_code (void)
 }
 
 static IMXV4l2FeatureMap g_imxv4l2feature_maps[] = {
-  /* chip_name, g3d, g2d, ipu, pxp, vpu, dpu */
-  {CC_MX6Q, TRUE, TRUE, TRUE, FALSE, TRUE, FALSE},
-  {CC_MX6SL, FALSE, TRUE, FALSE, TRUE, FALSE, FALSE},
-  {CC_MX6SLL, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE},
-  {CC_MX6SX, TRUE, TRUE, FALSE, TRUE, FALSE, FALSE},
-  {CC_MX6UL, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE},
-  {CC_MX7D, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE},
-  {CC_MX7ULP, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE},
-  {CC_MX8, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE},
-  {CC_MX8Q, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE},
-  {CC_MX8M, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE},
+  /* chip_name, g3d, g2d, ipu, pxp, vpu, dpu, dcss*/
+  {CC_MX6Q, TRUE, TRUE, TRUE, FALSE, TRUE, FALSE, FALSE},
+  {CC_MX6SL, FALSE, TRUE, FALSE, TRUE, FALSE, FALSE, FALSE},
+  {CC_MX6SLL, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE},
+  {CC_MX6SX, TRUE, TRUE, FALSE, TRUE, FALSE, FALSE, FALSE},
+  {CC_MX6UL, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE},
+  {CC_MX7D, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE},
+  {CC_MX7ULP, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE},
+  {CC_MX8, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE},
+  {CC_MX8Q, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE},
+  {CC_MX8M, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE, TRUE},
 };
 
 
@@ -258,6 +258,9 @@ gboolean check_feature(CHIP_CODE chip_name, CHIP_FEATURE feature)
           break;
         case DPU:
           ret = g_imxv4l2feature_maps[i].dpu;
+          break;
+        case DCSS:
+          ret = g_imxv4l2feature_maps[i].dcss;
           break;
         default:
           break;

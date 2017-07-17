@@ -413,6 +413,7 @@ plugins/vpu/Makefile
 plugins/mp3enc/Makefile
 plugins/videoconvert/Makefile
 plugins/compositor/Makefile
+plugins/fbdevsink/Makefile
 tools/Makefile
 tools/gplay2/Makefile
 tools/grecorder/Makefile)

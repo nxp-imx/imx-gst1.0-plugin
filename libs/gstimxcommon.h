@@ -94,6 +94,7 @@ typedef struct {
   gboolean pxp;
   gboolean vpu;
   gboolean dpu;
+  gboolean dcss;
 } IMXV4l2FeatureMap;
 
 typedef enum {
@@ -102,7 +103,8 @@ typedef enum {
   IPU,
   PXP,
   VPU,
-  DPU
+  DPU,
+  DCSS
 } CHIP_FEATURE;
 
 CHIP_CODE getChipCodeFromCpuinfo (void);
@@ -116,6 +118,7 @@ gboolean check_feature(CHIP_CODE chip_name, CHIP_FEATURE feature);
 #define HAS_PXP() check_feature(imx_chip_code(), PXP)
 #define HAS_VPU() check_feature(imx_chip_code(), VPU)
 #define HAS_DPU() check_feature(imx_chip_code(), DPU)
+#define HAS_DCSS() check_feature(imx_chip_code(), DCSS)
 
 #define IS_HANTRO() (CC_MX8M == imx_chip_code())
 
