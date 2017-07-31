@@ -3,6 +3,8 @@
 * Copyright (c) 2009-2014, 2016 Freescale Semiconductor, Inc.
 * All modifications are confidential and proprietary information
 * of Freescale Semiconductor, Inc. 
+*
+* Copyright 2017 NXP
 ***********************************************************************/
 /*
 * This library is free software; you can redistribute it and/or
@@ -75,7 +77,8 @@ typedef enum
     VIDEO_REAL, /* Real video types */
     VIDEO_JPEG, /* ISO JPEG still image */
     VIDEO_SORENSON, /* Sorenson video types, including Sorenson Spark, SVQ1, SVQ3 etc */
-    VIDEO_HEVC
+    VIDEO_HEVC,
+    VIDEO_AVS
 }VideoCodecType;
 
 

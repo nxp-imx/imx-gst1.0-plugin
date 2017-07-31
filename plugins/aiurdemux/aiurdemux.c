@@ -81,6 +81,7 @@ static AiurdemuxCodecStruct aiurdemux_videocodec_tab[] ={
   {VIDEO_ON2_VP, VIDEO_VP9, "VP9", "video/x-vp9"},
   {VIDEO_ON2_VP, 0, NULL, NULL},
   {VIDEO_HEVC, 0, "H.265/HEVC", "video/x-h265, parsed = (boolean)true, alignment=(string)au"},
+  {VIDEO_AVS, 0, "AVS", "video/x-cavs"},
 };
 
 static GstStaticPadTemplate gst_aiurdemux_videosrc_template =
