@@ -121,12 +121,18 @@ gst_vpu_dec_object_get_sink_caps (void)
     while ((map) && (map->mime)) {
       if ((map->std != VPU_V_RV && map->std != VPU_V_DIVX3
             && map->std != VPU_V_DIVX4 && map->std != VPU_V_DIVX56
+            && map->std != VPU_V_AVS && map->std != VPU_V_VP6
+            && map->std != VPU_V_SORENSON
             && map->std != VPU_V_VP9 && map->std != VPU_V_HEVC)
           || ((vpu_fwcode & VPU_FIRMWARE_CODE_RV_FLAG) && map->std == VPU_V_RV)
           || ((vpu_fwcode & VPU_FIRMWARE_CODE_DIVX_FLAG) 
             && (map->std == VPU_V_DIVX3 || map->std == VPU_V_DIVX4
               || map->std == VPU_V_DIVX56)) || (IS_HANTRO()
-              && (map->std == VPU_V_VP9 || map->std == VPU_V_HEVC))) {
+              && (map->std == VPU_V_VP9 || map->std == VPU_V_HEVC
+                || map->std == VPU_V_RV || map->std == VPU_V_DIVX3
+                || map->std == VPU_V_DIVX4 || map->std == VPU_V_DIVX56
+                || map->std == VPU_V_AVS || map->std == VPU_V_VP6
+                || map->std == VPU_V_SORENSON))) {
         if (caps) {
           GstCaps *newcaps = gst_caps_from_string (map->mime);
           if (newcaps) {
@@ -495,6 +501,7 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
   open_param->nChromaInterleave = 0;
   open_param->nMapType = 0;
   open_param->nTiled2LinearEnable = 0;
+  open_param->nEnableVideoCompressor = 1;
   vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_NV12;
   if (open_param->CodecFormat == VPU_V_MJPG) {
     vpu_dec_object->is_mjpeg = TRUE;
@@ -713,6 +720,8 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
 
   vpu_dec_object->min_buf_cnt = vpu_dec_object->init_info.nMinFrameBufferCount;
   vpu_dec_object->frame_size = vpu_dec_object->init_info.nFrameSize;
+  vpu_dec_object->init_info.nBitDepth;
+  GST_INFO_OBJECT(vpu_dec_object, "video bit depth: %d", vpu_dec_object->init_info.nBitDepth);
   GST_VIDEO_INFO_WIDTH (&(state->info)) = vpu_dec_object->init_info.nPicWidth;
   GST_VIDEO_INFO_HEIGHT (&(state->info)) = vpu_dec_object->init_info.nPicHeight;
   GST_VIDEO_INFO_INTERLACE_MODE(&(state->info)) = \
@@ -723,7 +732,10 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
   if (vpu_dec_object->init_info.nPicWidth % DEFAULT_FRAME_BUFFER_ALIGNMENT_H)
     vpu_dec_object->video_align.padding_right = DEFAULT_FRAME_BUFFER_ALIGNMENT_H \
       - vpu_dec_object->init_info.nPicWidth % DEFAULT_FRAME_BUFFER_ALIGNMENT_H;
-  height_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_V;
+  if (IS_HANTRO())
+    height_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_V_HANTRO;
+  else
+    height_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_V;
   if (vpu_dec_object->init_info.nInterlace)
     height_align <<= 1;
   if (vpu_dec_object->init_info.nPicHeight % height_align)
@@ -1359,7 +1371,7 @@ gst_vpu_dec_object_flush (GstVideoDecoder * bdec, GstVpuDecObject * vpu_dec_obje
 
   // FIXME: workaround for VP8 seek. VPU will block if VPU need framebuffer
   // before seek.
-  if (vpu_dec_object->state >= STATE_REGISTRIED_FRAME_BUFFER) {
+  if (!IS_HANTRO() && vpu_dec_object->state >= STATE_REGISTRIED_FRAME_BUFFER) {
     gst_vpu_dec_object_get_gst_buffer(bdec, vpu_dec_object);
   }
 

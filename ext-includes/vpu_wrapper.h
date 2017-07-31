@@ -51,7 +51,7 @@ extern "C" {
 //typedef RetCode VpuRetCode;
 //typedef vpu_versioninfo VpuVersionInfo;
 //typedef DecHandle VpuDecHandle;
-typedef unsigned long VpuDecHandle;
+typedef void * VpuDecHandle;
 //typedef DecOpenParam VpuDecOpenParam;
 //typedef DecInitialInfo VpuSeqInfo;
 //typedef FrameBuffer VpuFrameBuffer;
@@ -83,6 +83,8 @@ typedef enum {
 	VPU_V_VP8,
 	VPU_V_VP9,
 	VPU_V_HEVC,
+	VPU_V_SORENSON,
+	VPU_V_VP6,
 } VpuCodStd;
 
 typedef enum {
@@ -334,8 +336,9 @@ typedef struct {
 	//DecReportBufSize reportBufSize;
 	int nAddressAlignment;	/*address alignment for Y/Cb/Cr (unit: bytes)*/
 	int nFrameSize;         /*hantro video decoder append DMV and compression table in pixel buffer */
+	int nBitDepth;
 
-	int nReserved[4];			/*reserved for future extension*/
+	int nReserved[3];			/*reserved for future extension*/
 	void* pSpecialInfo;		/*reserved for future special extension*/
 } VpuDecInitInfo;
 
