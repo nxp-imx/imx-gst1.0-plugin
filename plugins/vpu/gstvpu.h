@@ -55,6 +55,7 @@ static VPUMapper vpu_mappers[] = {
   {VPU_V_VC1_AP, "video/x-wmv, wmvversion=(int)3, format=(string)WVC1"},
   {VPU_V_RV, "video/x-pn-realvideo"},
   {VPU_V_MJPG, "image/jpeg"},
+  {VPU_V_WEBP, "image/webp"},
   {-1, NULL}
 };
 

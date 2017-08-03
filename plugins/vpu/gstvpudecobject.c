@@ -122,7 +122,7 @@ gst_vpu_dec_object_get_sink_caps (void)
       if ((map->std != VPU_V_RV && map->std != VPU_V_DIVX3
             && map->std != VPU_V_DIVX4 && map->std != VPU_V_DIVX56
             && map->std != VPU_V_AVS && map->std != VPU_V_VP6
-            && map->std != VPU_V_SORENSON
+            && map->std != VPU_V_SORENSON && map->std != VPU_V_WEBP
             && map->std != VPU_V_VP9 && map->std != VPU_V_HEVC)
           || ((vpu_fwcode & VPU_FIRMWARE_CODE_RV_FLAG) && map->std == VPU_V_RV)
           || ((vpu_fwcode & VPU_FIRMWARE_CODE_DIVX_FLAG) 
@@ -132,7 +132,7 @@ gst_vpu_dec_object_get_sink_caps (void)
                 || map->std == VPU_V_RV || map->std == VPU_V_DIVX3
                 || map->std == VPU_V_DIVX4 || map->std == VPU_V_DIVX56
                 || map->std == VPU_V_AVS || map->std == VPU_V_VP6
-                || map->std == VPU_V_SORENSON))) {
+                || map->std == VPU_V_SORENSON || map->std == VPU_V_WEBP))) {
         if (caps) {
           GstCaps *newcaps = gst_caps_from_string (map->mime);
           if (newcaps) {
@@ -508,6 +508,12 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
   } else {
     vpu_dec_object->is_mjpeg = FALSE;
   }
+  if (IS_HANTRO() && (open_param->CodecFormat == VPU_V_HEVC
+        || open_param->CodecFormat == VPU_V_VP9)) {
+    vpu_dec_object->is_g2 = TRUE;
+  } else {
+    vpu_dec_object->is_g2 = FALSE;
+  }
   gst_vpu_dec_object_decide_output_format(vpu_dec_object, bdec);
   if (vpu_dec_object->is_mjpeg 
       && (vpu_dec_object->output_format_decided == GST_VIDEO_FORMAT_NV12
@@ -732,7 +738,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
   if (vpu_dec_object->init_info.nPicWidth % DEFAULT_FRAME_BUFFER_ALIGNMENT_H)
     vpu_dec_object->video_align.padding_right = DEFAULT_FRAME_BUFFER_ALIGNMENT_H \
       - vpu_dec_object->init_info.nPicWidth % DEFAULT_FRAME_BUFFER_ALIGNMENT_H;
-  if (IS_HANTRO())
+  if (IS_HANTRO() && vpu_dec_object->is_g2 == TRUE)
     height_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_V_HANTRO;
   else
     height_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_V;
