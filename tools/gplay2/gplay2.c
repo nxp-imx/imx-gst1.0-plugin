@@ -1511,6 +1511,10 @@ main (int argc, char *argv[])
       options.video_sink_name = "overlaysink";
     } else {
       options.video_sink_name = "imxv4l2sink";
+      /* FIXME: in mscale alpha release, dafault to use glimagesink,
+       * will change to imxfbdevsink based on dcss later */
+      if (imx_chip_code() == CC_MX8M)
+        options.video_sink_name = "glimagesink";
     }
   g_print ("Set VideoSink %s \n", options.video_sink_name);
   video_sink =
