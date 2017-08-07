@@ -76,12 +76,12 @@ static GstStateChangeReturn gst_imx_fbdevsink_change_state (GstElement * element
 #define DISPLAY_NUM_BUFFERS (1)
 
 /* FIXME: how to support 10 bit */
-#define VIDEO_CAPS "{BGRA, NV12, YUY2, YVYU, UYVY, VYUY}"
+#define VIDEO_CAPS "{BGRA, NV12, YVYU, UYVY, VYUY}"
 
 #define BG_DEVICE "/dev/fb0"
 #define ISALIGNED(a, b) (!(a & (b-1)))
 #define ALIGNTO(a, b) ((a + (b-1)) & (~(b-1)))
-#define ALIGNMENT (16) 
+#define ALIGNMENT (8)
 #define MAX_BUFFERS 30
 #define MIN_BUFFERS 3
 
@@ -632,14 +632,14 @@ gst_imx_fbdevsink_stop (GstBaseSink * bsink)
 
   fbdevsink = GST_IMX_FBDEVSINK (bsink);
 
+  if (strcmp (fbdevsink->device, "/dev/fb0") != 0)
+    ioctl(fbdevsink->fd, FBIOBLANK, FB_BLANK_NORMAL);
+
   if (ioctl (fbdevsink->fd, FBIOPUT_VSCREENINFO, &fbdevsink->stored) < 0) {
     GST_DEBUG("put var failed");
     return FALSE;
   }
   
-  if (strcmp (fbdevsink->device, "/dev/fb0") != 0)
-    ioctl(fbdevsink->fd, FBIOBLANK, FB_BLANK_NORMAL);
-
   if (close (fbdevsink->fd))
     return FALSE;
 
