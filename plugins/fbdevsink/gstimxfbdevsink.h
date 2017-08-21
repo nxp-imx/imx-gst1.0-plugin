@@ -56,6 +56,10 @@ struct _GstImxFBDEVSink {
   struct fb_var_screeninfo varinfo;
   struct fb_var_screeninfo stored;
 
+  /* status flags */
+  gboolean var_stored;
+  gboolean unblanked;
+
   int display_width, display_height; 
 
   int width, height;

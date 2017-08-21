@@ -294,6 +294,7 @@ gst_imx_fbdevsink_setcaps (GstBaseSink * bsink, GstCaps * caps)
     return FALSE;
 
   fbdevsink->varinfo = fbdevsink->stored;
+  fbdevsink->var_stored = TRUE;
 
   GST_DEBUG_OBJECT (fbdevsink, "start to configure display");
   /* FIXME: remove this condition when fb0 can be used */
@@ -572,8 +573,10 @@ gst_imx_fbdevsink_show_frame (GstVideoSink * videosink, GstBuffer * buf)
   GST_DEBUG_OBJECT (fbdevsink, "pan display successfully");
 
   if (fbdevsink->frame_showed == 0) {
-    if (strcmp (fbdevsink->device, "/dev/fb0") != 0)
+    if (strcmp (fbdevsink->device, "/dev/fb0") != 0) {
       ioctl(fbdevsink->fd, FBIOBLANK, FB_BLANK_UNBLANK);
+      fbdevsink->unblanked = TRUE;
+    }
   }
 
   if (fbdevsink->last_buffer)
@@ -632,12 +635,14 @@ gst_imx_fbdevsink_stop (GstBaseSink * bsink)
 
   fbdevsink = GST_IMX_FBDEVSINK (bsink);
 
-  if (strcmp (fbdevsink->device, "/dev/fb0") != 0)
+  if (strcmp (fbdevsink->device, "/dev/fb0") != 0 && fbdevsink->unblanked)
     ioctl(fbdevsink->fd, FBIOBLANK, FB_BLANK_NORMAL);
 
-  if (ioctl (fbdevsink->fd, FBIOPUT_VSCREENINFO, &fbdevsink->stored) < 0) {
-    GST_DEBUG("put var failed");
-    return FALSE;
+  if (fbdevsink->var_stored) {
+    if (ioctl (fbdevsink->fd, FBIOPUT_VSCREENINFO, &fbdevsink->stored) < 0) {
+      GST_DEBUG("put var failed");
+      return FALSE;
+    }
   }
   
   if (close (fbdevsink->fd))
@@ -729,6 +734,8 @@ gst_imx_fbdevsink_change_state (GstElement * element, GstStateChange transition)
       fbdevsink->frame_showed = 0;
       fbdevsink->run_time = 0;
       fbdevsink->need_reconfigure = TRUE;
+      fbdevsink->var_stored = FALSE;
+      fbdevsink->unblanked = FALSE;
     default:
       break;
   }
