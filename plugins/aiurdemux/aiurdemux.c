@@ -2462,7 +2462,15 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
             stream->info.audio.n_channels, stream->info.audio.rate,
             stream->bitrate);
         break;
-       default:
+      case AUDIO_OPUS:
+        codec = "OPUS";
+        mime =
+            g_strdup_printf
+            ("audio/x-opus, channel-mapping-family=(int)0, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld",
+            stream->info.audio.n_channels, stream->info.audio.rate,
+            stream->bitrate);
+        break;
+      default:
         break;
     }
 
