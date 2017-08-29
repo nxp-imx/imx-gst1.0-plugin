@@ -740,11 +740,23 @@ print_menu ()
 }
 
 static void
+reset_signal (int sig, void *handler)
+{
+  struct sigaction act;
+  act.sa_handler = handler;
+  sigemptyset (&act.sa_mask);
+  act.sa_flags = 0;
+  sigaction (sig, &act, NULL);
+}
+
+static void
 signal_handler (int sig)
 {
   switch (sig) {
     case SIGINT:
       g_print (" Aborted by signal[%d] Interrupt...\n", sig);
+      /* restore to default handler for SIGINT */
+      reset_signal (SIGINT, SIG_DFL);
       gexit_input_thread = TRUE;
       gexit_display_thread = TRUE;
       if (g_main_loop_is_running (gloop) == TRUE) {
@@ -760,19 +772,6 @@ signal_handler (int sig)
     default:
       break;
   }
-}
-
-static void
-reset_signal (int sig, void *handler)
-{
-  if (!handler)
-    return;
-
-  struct sigaction act;
-  act.sa_handler = handler;
-  sigemptyset (&act.sa_mask);
-  act.sa_flags = 0;
-  sigaction (sig, &act, NULL);
 }
 
 gboolean
