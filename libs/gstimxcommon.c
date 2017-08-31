@@ -182,34 +182,36 @@ CHIP_CODE getChipCodeFromSocid (void)
   return code;
 }
 
+int get_kernel_version (void)
+{
+  struct utsname sys_name;
+  int kv_major, kv_minor, kv_rel;
 
-#define KERN_VER(a, b, c) (((a) << 16) + ((b) << 8) + (c))
+  if (uname(&sys_name) < 0) {
+    g_print("get kernel version via uname failed.\n");
+    return -1;
+  }
+
+  if (sscanf(sys_name.release, "%d.%d.%d", &kv_major, &kv_minor, &kv_rel) != 3) {
+    g_print("sscanf kernel version failed.\n");
+    return -1;
+  }
+
+  return KERN_VER (kv_major, kv_minor, kv_rel);
+}
 
 static CHIP_CODE gimx_chip_code = CC_UNKN;
 
 CHIP_CODE imx_chip_code (void)
 {
-  struct utsname sys_name;
-  int kv, kv_major, kv_minor, kv_rel;
-  char soc_name[255];
-  int rev_major, rev_minor;
-  int idx, num;
+  int kv;
 
   if (gimx_chip_code != CC_UNKN)
     return gimx_chip_code;
 
-  if (uname(&sys_name) < 0) {
-    g_print("get kernel version via uname failed.\n");
+  kv = get_kernel_version();
+  if (kv < 0)
     return CC_UNKN;
-  }
-
-  if (sscanf(sys_name.release, "%d.%d.%d", &kv_major, &kv_minor, &kv_rel) != 3) {
-    g_print("sscanf kernel version failed.\n");
-    return CC_UNKN;
-  }
-
-  kv = ((kv_major << 16) + (kv_minor << 8) + kv_rel);
-  //GST_INFO("kernel:%s, %d.%d.%d\n", sys_name.release, kv_major, kv_minor, kv_rel);
 
   if (kv < KERN_VER(3, 10, 0))
     gimx_chip_code = getChipCodeFromCpuinfo();

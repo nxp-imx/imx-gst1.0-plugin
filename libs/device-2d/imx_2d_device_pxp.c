@@ -293,7 +293,19 @@ static gint imx_pxp_config_input(Imx2DDevice *device, Imx2DVideoInfo* in_info)
   pxp->config.s0_param.pixel_fmt = in_map->pxp_format;
   pxp->config.s0_param.width = in_info->w;
   pxp->config.s0_param.height = in_info->h;
-  pxp->config.s0_param.stride = in_info->w;
+
+  int kv = get_kernel_version();
+  if (kv < 0) {
+    GST_ERROR ("get kernel version failed");
+    return -1;
+  }
+
+  /* on 4.9.11 kernel or later, we need pass the actual stride
+   * to pxp driver */
+  if (kv < KERN_VER(4,9,11))
+    pxp->config.s0_param.stride = in_info->w;
+  else
+    pxp->config.s0_param.stride = in_info->stride;
 
   GST_TRACE("input format = %s", gst_video_format_to_string(in_info->fmt));
 
@@ -319,7 +331,19 @@ static gint imx_pxp_config_output(Imx2DDevice *device, Imx2DVideoInfo* out_info)
   pxp->config.out_param.pixel_fmt = out_map->pxp_format;
   pxp->config.out_param.width = out_info->w;
   pxp->config.out_param.height = out_info->h;
-  pxp->config.out_param.stride = out_info->w;
+
+  int kv = get_kernel_version();
+  if (kv < 0) {
+    GST_ERROR ("get kernel version failed");
+    return -1;
+  }
+
+  /* on 4.9.11 kernel or later, we need pass the actual stride
+   * to pxp driver */
+  if (kv < KERN_VER(4,9,11))
+    pxp->config.out_param.stride = out_info->w;
+  else
+    pxp->config.out_param.stride = out_info->stride;
 
   GST_TRACE("output format = %s", gst_video_format_to_string(out_info->fmt));
 
