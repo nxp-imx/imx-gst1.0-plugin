@@ -112,9 +112,6 @@ CHIP_CODE getChipCodeFromSocid (void);
 CHIP_CODE imx_chip_code (void);
 gboolean check_feature(CHIP_CODE chip_name, CHIP_FEATURE feature);
 
-#define KERN_VER(a, b, c) (((a) << 16) + ((b) << 8) + (c))
-int get_kernel_version (void);
-
 #define HAS_G3D() check_feature(imx_chip_code(), G3D)
 #define HAS_G2D() check_feature(imx_chip_code(), G2D)
 #define HAS_IPU() check_feature(imx_chip_code(), IPU)
