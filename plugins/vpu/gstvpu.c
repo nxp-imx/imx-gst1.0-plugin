@@ -18,6 +18,7 @@
  */
 
 #include "gstvpuenc.h"
+#include <gst/allocators/gstphysmemory.h>
 
 gint
 gst_vpu_find_std (GstCaps * caps)
@@ -116,21 +117,28 @@ gst_vpu_register_frame_buffer (GList * gstbuffer_in_vpudec, \
         i, buffer);
     vpu_frame = &(vpuframebuffers[i]);
 
-    if (!gst_video_frame_map (&frame, info, buffer, GST_MAP_READ)) {
+    if (!gst_video_frame_map (&frame, info, buffer, GST_MAP_WRITE | GST_MAP_READ)) {
       GST_ERROR ("Could not map video buffer");
       return FALSE;
     }
     vpu_frame->nStrideY = GST_VIDEO_FRAME_COMP_STRIDE (&frame, 0);
     vpu_frame->nStrideC = GST_VIDEO_FRAME_COMP_STRIDE (&frame, 1);
 
-    if (!gst_buffer_is_phymem (buffer)) {
+    if (!(gst_buffer_is_phymem (buffer)
+        || gst_is_phys_memory (gst_buffer_peek_memory (buffer, 0)))) {
       GST_ERROR ("isn't physical memory allocator");
       gst_video_frame_unmap (&frame);
       return FALSE;
     }
 
-    mem_block = gst_buffer_query_phymem_block (buffer);
-    vpu_frame->pbufY = mem_block->paddr;
+    if (gst_is_phys_memory (gst_buffer_peek_memory (buffer, 0))) {
+      vpu_frame->pbufY = gst_phys_memory_get_phys_addr(gst_buffer_peek_memory (buffer, 0));
+      GST_DEBUG ("video buffer phys add: %p", vpu_frame->pbufY);
+    } else {
+      mem_block = gst_buffer_query_phymem_block (buffer);
+      vpu_frame->pbufY = mem_block->paddr;
+      GST_DEBUG ("video buffer phys add: %p", vpu_frame->pbufY);
+    }
     vpu_frame->pbufCb = vpu_frame->pbufY + \
       (GST_VIDEO_FRAME_COMP_DATA (&frame, 1) - GST_VIDEO_FRAME_COMP_DATA (&frame, 0));
     vpu_frame->pbufCr = vpu_frame->pbufCb + \

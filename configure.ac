@@ -214,7 +214,7 @@ fi
 
 dnl check ion allocator headfile
 old_CFLAGS=$CFLAGS
-CFLAGS="$CFLAGS `$PKG_CONFIG --cflags gstreamer-allocators-1.0`"
+CFLAGS="$CFLAGS `$PKG_CONFIG --cflags gstreamer-bad-allocators-1.0`"
 AC_CHECK_HEADERS([linux/ion.h gst/allocators/gstionmemory.h], HAVE_ION="yes", HAVE_ION="no")
 AM_CONDITIONAL(USE_ION, test "x$HAVE_ION" = "xyes")
 CFLAGS=$old_CFLAGS

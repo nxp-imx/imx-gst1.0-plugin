@@ -39,6 +39,10 @@
 #include <gst/video/video.h>
 #include <gst/video/gstvideometa.h>
 #include <gst/video/gstvideopool.h>
+#include <gst/allocators/gstphysmemory.h>
+#ifdef USE_ION
+#include <gst/allocators/gstionmemory.h>
+#endif
 #include "gstimxcommon.h"
 #include "gstvpuallocator.h"
 #include "gstvpudec.h"
@@ -329,6 +333,8 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
   gst_video_info_init (&vinfo);
   gst_video_info_from_caps (&vinfo, outcaps);
 
+  GST_DEBUG_OBJECT (dec, "gst_vpu_dec_decide_allocation");
+
   /* we got configuration from our peer or the decide_allocation method,
    * parse them */
   if (gst_query_get_n_allocation_params (query) > 0) {
@@ -407,14 +413,21 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     pool = NULL;
   }
 
-  if (allocator == NULL || !GST_IS_ALLOCATOR_PHYMEM (allocator)) {
+  if (allocator == NULL
+      || !(GST_IS_ALLOCATOR_PHYMEM (allocator)
+        || GST_IS_PHYS_MEMORY_ALLOCATOR (allocator))) {
     /* no allocator or isn't physical memory allocator. VPU need continus
      * physical memory. use VPU memory allocator. */
     if (allocator) {
       gst_object_unref (allocator);
     }
     GST_DEBUG_OBJECT (dec, "using vpu allocator.\n");
-    allocator = gst_vpu_allocator_obtain();
+#ifdef USE_ION
+    allocator = gst_ion_allocator_obtain ();
+#endif
+    if (!allocator) {
+      allocator = gst_vpu_allocator_obtain();
+    }
     dec->vpu_dec_object->use_my_allocator = TRUE;
   } else {
     dec->vpu_dec_object->use_my_allocator = FALSE;

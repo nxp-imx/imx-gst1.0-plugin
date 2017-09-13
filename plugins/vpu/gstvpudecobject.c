@@ -1037,7 +1037,8 @@ gst_vpu_dec_object_get_gst_buffer (GstVideoDecoder * bdec, GstVpuDecObject * vpu
       GST_DEBUG_OBJECT (vpu_dec_object, "could not get buffer.");
       return GST_FLOW_FLUSHING;
     }
-    if (!gst_buffer_is_phymem (buffer)) {
+    if (!(gst_buffer_is_phymem (buffer)
+        || gst_is_phys_memory (gst_buffer_peek_memory (buffer, 0)))) {
       gst_buffer_unref (buffer);
       GST_DEBUG_OBJECT(vpu_dec_object, "gstbuffer isn't physical buffer.");
       return GST_FLOW_FLUSHING;
