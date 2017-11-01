@@ -91,6 +91,7 @@ struct _GstBeepDec
     gint frame_cnt;
     gint in_cnt;
     gboolean eos_sent;
+    gboolean dsp_dec;       /* use hifi decoder or not*/
 };
 
 struct _GstBeepDecClass

@@ -434,8 +434,10 @@ static gboolean beep_dec_set_format(GstAudioDecoder *dec, GstCaps *caps)
     do{
         beepdec = GST_BEEP_DEC (dec);
 
-        if (beepdec->beep_interface == NULL) {
-          beepdec->beep_interface = beep_core_create_interface_from_caps_dsp (caps);
+        if (beepdec->beep_interface == NULL || beepdec->dsp_dec == TRUE) {
+          if (beepdec->beep_interface == NULL) {
+            beepdec->beep_interface = beep_core_create_interface_from_caps_dsp (caps);
+          }
           if (beepdec->beep_interface) {
             AUDIOFORMAT type = FORMAT_UNKNOW;
             GST_INFO (" dsp wrapper interface created ");
@@ -470,6 +472,7 @@ static gboolean beep_dec_set_format(GstAudioDecoder *dec, GstCaps *caps)
               GST_INFO (" dsp set parameter fail ");
               goto dsp_fail;
             }
+            beepdec->dsp_dec = TRUE;
             break;
           }
 dsp_fail:
@@ -478,6 +481,7 @@ dsp_fail:
             beepdec->handle = NULL;
           }
           beepdec->beep_interface = NULL;
+          beepdec->dsp_dec = FALSE;
         }
 
         GST_INFO ("normal create sw wrapper interface");
@@ -532,6 +536,7 @@ static gboolean beep_dec_start (GstAudioDecoder * dec)
     beepdec->set_codec_data = FALSE;
     beepdec->in_cnt = 0;
     beepdec->eos_sent = FALSE;
+    beepdec->dsp_dec = FALSE;
 
     gst_audio_decoder_set_estimate_rate(dec, TRUE);
 
