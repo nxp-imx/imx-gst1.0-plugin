@@ -20,6 +20,7 @@
 
 #include <string.h>
 #include <gst/video/gstvideometa.h>
+#include <gst/video/gstvideohdr10meta.h>
 #include "gstimxcommon.h"
 #include "allocator/gstphymemmeta.h"
 #include "gstvpuallocator.h"
@@ -1005,6 +1006,27 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
       pmeta = GST_PHY_MEM_META_ADD (out_frame->output_buffer);
       pmeta->x_padding = vpu_dec_object->video_align.padding_right;
       pmeta->y_padding = vpu_dec_object->video_align.padding_bottom;
+  }
+  
+  if (vpu_dec_object->init_info.hasHdr10Meta) {
+    GstVideoHdr10Meta *meta = gst_buffer_add_video_hdr10_meta (out_frame->output_buffer);
+    meta->hdr10meta.redPrimary[0] = vpu_dec_object->init_info.Hdr10Meta.redPrimary[0];
+    meta->hdr10meta.redPrimary[1] = vpu_dec_object->init_info.Hdr10Meta.redPrimary[1];
+    meta->hdr10meta.greenPrimary[0] = vpu_dec_object->init_info.Hdr10Meta.greenPrimary[0];
+    meta->hdr10meta.greenPrimary[1] = vpu_dec_object->init_info.Hdr10Meta.greenPrimary[1];
+    meta->hdr10meta.bluePrimary[0] = vpu_dec_object->init_info.Hdr10Meta.bluePrimary[0];
+    meta->hdr10meta.bluePrimary[1] = vpu_dec_object->init_info.Hdr10Meta.bluePrimary[1];
+    meta->hdr10meta.whitePoint[0] = vpu_dec_object->init_info.Hdr10Meta.whitePoint[0];
+    meta->hdr10meta.whitePoint[1] = vpu_dec_object->init_info.Hdr10Meta.whitePoint[1];
+    meta->hdr10meta.maxMasteringLuminance = vpu_dec_object->init_info.Hdr10Meta.maxMasteringLuminance;
+    meta->hdr10meta.minMasteringLuminance = vpu_dec_object->init_info.Hdr10Meta.minMasteringLuminance;
+    meta->hdr10meta.maxContentLightLevel = vpu_dec_object->init_info.Hdr10Meta.maxContentLightLevel;
+    meta->hdr10meta.maxFrameAverageLightLevel = vpu_dec_object->init_info.Hdr10Meta.maxFrameAverageLightLevel;
+    meta->hdr10meta.colourPrimaries = vpu_dec_object->init_info.ColourDesc.colourPrimaries;
+    meta->hdr10meta.transferCharacteristics = vpu_dec_object->init_info.ColourDesc.transferCharacteristics;
+    meta->hdr10meta.matrixCoeffs = vpu_dec_object->init_info.ColourDesc.matrixCoeffs;
+    meta->hdr10meta.chromaSampleLocTypeTopField = vpu_dec_object->init_info.ChromaLocInfo.chromaSampleLocTypeTopField;
+    meta->hdr10meta.chromaSampleLocTypeBottomField = vpu_dec_object->init_info.ChromaLocInfo.chromaSampleLocTypeTopField;
   }
 
   if (vpu_dec_object->tsm_mode == MODE_FIFO) {
