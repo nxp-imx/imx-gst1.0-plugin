@@ -161,7 +161,7 @@ gst_vpu_dec_object_get_src_caps (void)
 
   if (caps == NULL) {
     caps = gst_caps_from_string (GST_VIDEO_CAPS_MAKE ("{ NV12, I420, YV12, Y42B, \
-          NV16, Y444, NV24 }"));
+          NV16, Y444, NV24, NV12_10LE}"));
   }
 
   return gst_caps_ref (caps);
@@ -716,6 +716,10 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
   }
   else
     fmt = vpu_dec_object->output_format_decided;
+
+  if (fmt ==  GST_VIDEO_FORMAT_NV12 && vpu_dec_object->init_info.nBitDepth == 10){
+    fmt = GST_VIDEO_FORMAT_NV12_10LE;
+  }
 
   GST_INFO_OBJECT(vpu_dec_object, "using %s as video output format", gst_video_format_to_string(fmt));
 
