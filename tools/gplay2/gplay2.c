@@ -1523,7 +1523,7 @@ main (int argc, char *argv[])
     } else {
       options.video_sink_name = "imxv4l2sink";
       if (gplay_checkfeature (DCSS))
-        options.video_sink_name = "imxfbdevsink";
+        options.video_sink_name = "kmssink";
     }
   g_print ("Set VideoSink %s \n", options.video_sink_name);
   video_sink =
