@@ -19,6 +19,7 @@
 
 #include "gstvpuenc.h"
 #include <gst/allocators/gstphysmemory.h>
+#include "gstimxcommon.h"
 
 gint
 gst_vpu_find_std (GstCaps * caps)
@@ -117,9 +118,16 @@ gst_vpu_register_frame_buffer (GList * gstbuffer_in_vpudec, \
         i, buffer);
     vpu_frame = &(vpuframebuffers[i]);
 
-    if (!gst_video_frame_map (&frame, info, buffer, GST_MAP_WRITE | GST_MAP_READ)) {
-      GST_ERROR ("Could not map video buffer");
-      return FALSE;
+    if (IS_HANTRO()) {
+      if (!gst_video_frame_map (&frame, info, buffer, GST_MAP_WRITE | GST_MAP_READ)) {
+        GST_ERROR ("Could not map video buffer");
+        return FALSE;
+      }
+    } else {
+      if (!gst_video_frame_map (&frame, info, buffer, GST_MAP_READ)) {
+        GST_ERROR ("Could not map video buffer");
+        return FALSE;
+      }
     }
     vpu_frame->nStrideY = GST_VIDEO_FRAME_COMP_STRIDE (&frame, 0);
     vpu_frame->nStrideC = GST_VIDEO_FRAME_COMP_STRIDE (&frame, 1);
