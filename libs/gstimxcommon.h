@@ -70,7 +70,8 @@ typedef enum
   CC_MX7D = CHIPCODE ('M', 'X', '7', 'D'),
   CC_MX7ULP = CHIPCODE ('M', 'X', '7', 'U'),
   CC_MX8 = CHIPCODE ('M', 'X', '8', '0'),
-  CC_MX8Q = CHIPCODE ('M', 'X', '8', '1'),
+  CC_MX8QM = CHIPCODE ('M', 'X', '8', '1'),
+  CC_MX8QXP = CHIPCODE ('M', 'X', '8', '3'),
   CC_MX8M = CHIPCODE ('M', 'X', '8', '2'),
   CC_UNKN = CHIPCODE ('U', 'N', 'K', 'N')
 
@@ -121,7 +122,7 @@ gboolean check_feature(CHIP_CODE chip_name, CHIP_FEATURE feature);
 #define HAS_DCSS() check_feature(imx_chip_code(), DCSS)
 
 #define IS_HANTRO() (CC_MX8M == imx_chip_code())
-#define IS_AMPHION() (CC_MX8Q == imx_chip_code())
+#define IS_AMPHION() (CC_MX8QXP == imx_chip_code())
 
 /* define rotate and flip glib enum for overlaysink and imxv4l2sink */
 typedef enum
