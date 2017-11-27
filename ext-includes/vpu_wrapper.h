@@ -30,6 +30,7 @@
  *	2011-12-22		eagle zhou		1.0				refine api
  *	2012-01-**		eagle zhou		1.0.*			add new features: including tile format,etc
  *	2016-12-30	  Song Bing			2.0.0			Add Hantro video decoder support
+ *	2017-11-20	  Song Bing			3.0.0			Add Amphion video decoder support
  */
 
 #ifndef VPU_WRAPPER_H
@@ -42,7 +43,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(2, 0, 0)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(3, 0, 0)
 
 /**************************** decoder part **********************************/
 
@@ -258,8 +259,9 @@ typedef struct {
 	int nEnableVideoCompressor;
 	int nPixelFormat; /*output 10 bit or cut to 8 bit for Hantro G2. 0 for output 10 bit, 1 for cut to 8 bit */
 
-	int nReserved[1];			/*reserved for future extension*/
+	int nAdaptiveMode;
 	void* pAppCxt;			/*reserved for future application extension*/
+    int nSecureMode;
 } VpuDecOpenParam;
 
 
@@ -461,13 +463,19 @@ typedef struct
 	void* pPrivate;				/*reserved for future special extension*/
 }VpuBufferNode;
 
+typedef enum{
+    VPU_MEM_DESC_NORMAL = 0,
+    VPU_MEM_DESC_SECURE = 1,
+}VpuMemDescType;
+
 typedef struct 
 {
 	int nSize;				/*!requested memory size */
 	unsigned long nPhyAddr;	/*!physical memory address allocated */
 	unsigned long nCpuAddr;	/*!cpu addr for system free usage */
 	unsigned long nVirtAddr;	/*!virtual user space address */	
-	int nReserved[4];			/*reserved for future extension*/
+    VpuMemDescType nType;
+	int nReserved[3];			/*reserved for future extension*/
 }VpuMemDesc;
 
 typedef struct {

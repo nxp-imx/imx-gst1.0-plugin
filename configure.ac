@@ -232,6 +232,10 @@ AC_CHECK_HEADERS([codec.h dwl.h], [HAVE_VPU_LIB=yes], [HAVE_VPU_LIB=no])
 if test "x$HAVE_VPU_LIB" = "xyes"; then
     VPU_LIBS=`$PKG_CONFIG --libs libfslvpuwrap 2>/dev/null`
 fi
+AC_CHECK_HEADERS([malone/hevc_defines.h], [HAVE_VPU_LIB=yes], [HAVE_VPU_LIB=no])
+if test "x$HAVE_VPU_LIB" = "xyes"; then
+    VPU_LIBS=`$PKG_CONFIG --libs libfslvpuwrap 2>/dev/null`
+fi
 AC_SUBST(VPU_LIBS)
 
 AC_CHECK_HEADERS([linux/ipu.h], [HAVE_IPU_HEAD=yes], [HAVE_IPU_HEAD=no])

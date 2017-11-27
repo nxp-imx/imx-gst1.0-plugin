@@ -40,9 +40,11 @@
 #include <gst/video/gstvideometa.h>
 #include <gst/video/gstvideopool.h>
 #include <gst/allocators/gstphysmemory.h>
+#include <gst/allocators/gstdmabufmeta.h>
 #ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
+#include <libdrm/drm_fourcc.h>
 #include "gstimxcommon.h"
 #include "gstvpuallocator.h"
 #include "gstvpudec.h"
@@ -246,6 +248,7 @@ gst_vpu_dec_open (GstVideoDecoder * bdec)
 
   dec->vpu_dec_object->use_my_pool = FALSE;
   dec->vpu_dec_object->use_my_allocator = FALSE;
+  dec->vpu_dec_object->drm_modifier = 0;
 
   return gst_vpu_dec_object_open (dec->vpu_dec_object);
 }
@@ -328,6 +331,8 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
   GstStructure *config;
   gboolean update_pool, update_allocator;
   GstVideoInfo vinfo;
+  gboolean alloc_has_meta = FALSE;
+  guint alloc_index;
 
   gst_query_parse_allocation (query, &outcaps, NULL);
   gst_video_info_init (&vinfo);
@@ -363,6 +368,47 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     update_pool = FALSE;
   }
   size = MAX (size, dec->vpu_dec_object->frame_size);
+  GST_DEBUG_OBJECT (dec, "video frame size %d", size);
+
+  alloc_has_meta = gst_query_find_allocation_meta (query,
+      GST_DMABUF_META_API_TYPE, &alloc_index);
+
+  GST_DEBUG_OBJECT (dec, "vpudec query has dmabuf meta %d", alloc_has_meta);
+
+  if (IS_AMPHION()) {
+    const GstStructure *params;
+    guint64 drm_modifier;
+    gchar *meta;
+
+    if (!alloc_has_meta) {
+      GST_ERROR_OBJECT (dec, "vpudec query hasn't dmabuf meta");
+      return FALSE;
+    }
+
+    gst_query_parse_nth_allocation_meta (query, alloc_index, &params);
+    GST_DEBUG_OBJECT (dec, "Expected field 'GstDmabufMeta' in structure: %" GST_PTR_FORMAT,
+        params);
+    if (!params) {
+      GST_ERROR_OBJECT (dec, "allocation meta wrong");
+      return FALSE;
+    }
+    meta = gst_structure_to_string (params);
+    if (!meta) {
+      GST_ERROR_OBJECT (dec, "no allocation meta");
+      return FALSE;
+    }
+
+    GST_DEBUG_OBJECT (dec, "dmabuf meta has modifier: %s", meta);
+    sscanf (meta, "GstDmabufMeta, dmabuf.drm_modifier=(guint64){ %lld };", &drm_modifier);
+    GST_DEBUG_OBJECT (dec, "dmabuf meta has modifier: %lld", drm_modifier);
+    if (drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED) {
+      GST_DEBUG_OBJECT (dec, "video sink support modifier: %lld", drm_modifier);
+      dec->vpu_dec_object->drm_modifier = drm_modifier;
+    } else {
+      GST_ERROR_OBJECT (dec, "video sink can't support modifier: %lld", DRM_FORMAT_MOD_AMPHION_TILED);
+      return FALSE;
+    }
+  }
 
   if (dec->vpu_dec_object->vpu_need_reconfig == FALSE
     && dec->vpu_dec_object->use_my_pool

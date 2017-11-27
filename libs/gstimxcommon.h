@@ -121,6 +121,7 @@ gboolean check_feature(CHIP_CODE chip_name, CHIP_FEATURE feature);
 #define HAS_DCSS() check_feature(imx_chip_code(), DCSS)
 
 #define IS_HANTRO() (CC_MX8M == imx_chip_code())
+#define IS_AMPHION() (CC_MX8Q == imx_chip_code())
 
 /* define rotate and flip glib enum for overlaysink and imxv4l2sink */
 typedef enum

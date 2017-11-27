@@ -28,6 +28,8 @@ G_BEGIN_DECLS
 #define DEFAULT_FRAME_BUFFER_ALIGNMENT_H 16
 #define DEFAULT_FRAME_BUFFER_ALIGNMENT_V 16
 #define DEFAULT_FRAME_BUFFER_ALIGNMENT_V_HANTRO 8
+#define DEFAULT_FRAME_BUFFER_ALIGNMENT_H_AMPHION 256
+#define DEFAULT_FRAME_BUFFER_ALIGNMENT_V_AMPHION 256
 #define ALIGN(ptr,align)	((align) ? ((((unsigned long)(ptr))+(align)-1)/(align)*(align)) : ((unsigned long)(ptr)))
 
 typedef struct

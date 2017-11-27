@@ -133,7 +133,12 @@ gst_vpu_dec_object_get_sink_caps (void)
                 || map->std == VPU_V_RV || map->std == VPU_V_DIVX3
                 || map->std == VPU_V_DIVX4 || map->std == VPU_V_DIVX56
                 || map->std == VPU_V_AVS || map->std == VPU_V_VP6
-                || map->std == VPU_V_SORENSON || map->std == VPU_V_WEBP))) {
+                || map->std == VPU_V_SORENSON || map->std == VPU_V_WEBP))
+          || (IS_AMPHION() && (map->std == VPU_V_HEVC
+              || map->std == VPU_V_RV || map->std == VPU_V_DIVX3
+              || map->std == VPU_V_DIVX4 || map->std == VPU_V_DIVX56
+              || map->std == VPU_V_AVS || map->std == VPU_V_VP6
+              || map->std == VPU_V_SORENSON))) {
         if (caps) {
           GstCaps *newcaps = gst_caps_from_string (map->mime);
           if (newcaps) {
@@ -211,6 +216,7 @@ gst_vpu_dec_object_init(GstVpuDecObject *vpu_dec_object)
   vpu_dec_object->vpu_internal_mem.internal_phy_mem = NULL;
   vpu_dec_object->mv_mem = NULL;
   vpu_dec_object->gstbuffer_in_vpudec = NULL;
+  vpu_dec_object->gstbuffer_in_vpudec2 = NULL;
   vpu_dec_object->system_frame_number_in_vpu = NULL;
   vpu_dec_object->dropping = FALSE;
   vpu_dec_object->vpu_report_resolution_change = FALSE; 
@@ -336,6 +342,7 @@ gst_vpu_dec_object_start (GstVpuDecObject * vpu_dec_object)
   vpu_dec_object->gstbuffer2frame_table = g_hash_table_new(NULL, NULL);
   vpu_dec_object->total_frames = 0;
   vpu_dec_object->total_time = 0;
+  vpu_dec_object->vpu_hold_buffer = 0;
 
   vpu_dec_object->state = STATE_ALLOCATED_INTERNAL_BUFFER;
 
@@ -407,6 +414,11 @@ gst_vpu_dec_object_stop (GstVpuDecObject * vpu_dec_object)
     g_list_foreach (vpu_dec_object->gstbuffer_in_vpudec, (GFunc) gst_buffer_unref, NULL);
     g_list_free (vpu_dec_object->gstbuffer_in_vpudec);
     vpu_dec_object->gstbuffer_in_vpudec = NULL;
+  }
+
+  if (vpu_dec_object->gstbuffer_in_vpudec2 != NULL) {
+    g_list_free (vpu_dec_object->gstbuffer_in_vpudec2);
+    vpu_dec_object->gstbuffer_in_vpudec2 = NULL;
   }
 
   if (vpu_dec_object->system_frame_number_in_vpu != NULL) {
@@ -625,7 +637,9 @@ gst_vpu_dec_object_config (GstVpuDecObject * vpu_dec_object, \
 
   g_list_foreach (vpu_dec_object->gstbuffer_in_vpudec, (GFunc) gst_buffer_unref, NULL);
   g_list_free (vpu_dec_object->gstbuffer_in_vpudec);
+  g_list_free (vpu_dec_object->gstbuffer_in_vpudec2);
   vpu_dec_object->gstbuffer_in_vpudec = NULL;
+  vpu_dec_object->gstbuffer_in_vpudec2 = NULL;
   GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer_in_vpudec list free\n");
 
   if (vpu_dec_object->state < STATE_OPENED) {
@@ -660,17 +674,23 @@ gst_vpu_dec_object_register_frame_buffer (GstVpuDecObject * vpu_dec_object, \
 
     g_hash_table_replace(vpu_dec_object->frame2gstbuffer_table, \
         (gpointer)(vpu_dec_object->vpuframebuffers[i].pbufVirtY), (gpointer)(buffer));
+    g_hash_table_replace(vpu_dec_object->gstbuffer2frame_table, \
+        (gpointer)(buffer), \
+        (gpointer)(&(vpu_dec_object->vpuframebuffers[i])));
     GST_DEBUG_OBJECT (vpu_dec_object, "VpuFrameBuffer: 0x%x VpuFrameBuffer pbufVirtY: 0x%x GstBuffer: 0x%x\n", \
         vpu_dec_object->vpuframebuffers[i], vpu_dec_object->vpuframebuffers[i].pbufVirtY, buffer);
   }
 
-	dec_ret = VPU_DecRegisterFrameBuffer (vpu_dec_object->handle, \
-      vpu_dec_object->vpuframebuffers, vpu_dec_object->actual_buf_cnt);
-	if (dec_ret != VPU_DEC_RET_SUCCESS) {
-		GST_ERROR_OBJECT(vpu_dec_object, "registering framebuffers failed: %s", \
-        gst_vpu_dec_object_strerror(dec_ret));
-		return FALSE;
-	}
+  if (!IS_AMPHION()) {
+    dec_ret = VPU_DecRegisterFrameBuffer (vpu_dec_object->handle, \
+        vpu_dec_object->vpuframebuffers, vpu_dec_object->actual_buf_cnt);
+    if (dec_ret != VPU_DEC_RET_SUCCESS) {
+      GST_ERROR_OBJECT(vpu_dec_object, "registering framebuffers failed: %s", \
+          gst_vpu_dec_object_strerror(dec_ret));
+      return FALSE;
+    }
+  } else
+    vpu_dec_object->vpu_hold_buffer = vpu_dec_object->actual_buf_cnt;
 
   vpu_dec_object->state = STATE_REGISTRIED_FRAME_BUFFER;
 
@@ -685,6 +705,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
   GstVideoCodecState *state;
   GstVideoFormat fmt;
   gint height_align;
+  gint width_align;
   GstBuffer *buffer;
   guint i;
 
@@ -740,11 +761,18 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
     : GST_VIDEO_INTERLACE_MODE_PROGRESSIVE;
   vpu_dec_object->buf_align = vpu_dec_object->init_info.nAddressAlignment;
   memset(&(vpu_dec_object->video_align), 0, sizeof(GstVideoAlignment));
-  if (vpu_dec_object->init_info.nPicWidth % DEFAULT_FRAME_BUFFER_ALIGNMENT_H)
-    vpu_dec_object->video_align.padding_right = DEFAULT_FRAME_BUFFER_ALIGNMENT_H \
-      - vpu_dec_object->init_info.nPicWidth % DEFAULT_FRAME_BUFFER_ALIGNMENT_H;
+
+  if (IS_AMPHION())
+    width_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_H_AMPHION;
+  else
+    width_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_H;
+  if (vpu_dec_object->init_info.nPicWidth % width_align)
+    vpu_dec_object->video_align.padding_right = width_align \
+      - vpu_dec_object->init_info.nPicWidth % width_align;
   if (IS_HANTRO() && vpu_dec_object->is_g2 == TRUE)
     height_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_V_HANTRO;
+  else if (IS_AMPHION())
+    height_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_V_AMPHION;
   else
     height_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_V;
   if (vpu_dec_object->init_info.nInterlace)
@@ -754,7 +782,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
       - vpu_dec_object->init_info.nPicHeight % height_align;
 
   for (i = 0; i < GST_VIDEO_MAX_PLANES; i++)
-    vpu_dec_object->video_align.stride_align[i] = DEFAULT_FRAME_BUFFER_ALIGNMENT_H - 1;
+    vpu_dec_object->video_align.stride_align[i] = width_align - 1;
 
   vpu_dec_object->width_paded = vpu_dec_object->init_info.nPicWidth \
                                 + vpu_dec_object->video_align.padding_right;
@@ -773,6 +801,8 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
     buffer = gst_video_decoder_allocate_output_buffer(bdec);
     vpu_dec_object->gstbuffer_in_vpudec = g_list_append ( \
         vpu_dec_object->gstbuffer_in_vpudec, buffer);
+    vpu_dec_object->gstbuffer_in_vpudec2 = g_list_append ( \
+        vpu_dec_object->gstbuffer_in_vpudec2, buffer);
     GST_DEBUG_OBJECT (vpu_dec_object, "gst_video_decoder_allocate_output_buffer end");
     GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer get from buffer pool: %x\n", buffer);
     GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer_in_vpudec list length: %d actual_buf_cnt: %d \n", \
@@ -986,6 +1016,11 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   cmeta->width = out_frame_info.pExtInfo->FrmCropRect.nRight-out_frame_info.pExtInfo->FrmCropRect.nLeft;
   cmeta->height = out_frame_info.pExtInfo->FrmCropRect.nBottom-out_frame_info.pExtInfo->FrmCropRect.nTop;
 
+  if (vpu_dec_object->drm_modifier) {
+    gst_buffer_add_dmabuf_meta(out_frame->output_buffer, vpu_dec_object->drm_modifier);
+    GST_DEBUG_OBJECT(vpu_dec_object, "add drm modifier: %lld\n", vpu_dec_object->drm_modifier);
+  }
+
   /* set physical memory padding info */
   if (vpu_dec_object->use_my_pool && !vpu_dec_object->pool_alignment_checked) {
     GstStructure *config;
@@ -1057,8 +1092,18 @@ gst_vpu_dec_object_get_gst_buffer (GstVideoDecoder * bdec, GstVpuDecObject * vpu
   GST_DEBUG_OBJECT (vpu_dec_object, "min_buf_cnt: %d frame_plus: %d actual_buf_cnt: %d",
       vpu_dec_object->min_buf_cnt, vpu_dec_object->frame_plus, vpu_dec_object->actual_buf_cnt);
   if (g_list_length (vpu_dec_object->gstbuffer_in_vpudec) \
-      < (vpu_dec_object->min_buf_cnt + vpu_dec_object->frame_plus)) {
-    buffer = gst_video_decoder_allocate_output_buffer(bdec);
+      < (vpu_dec_object->min_buf_cnt + vpu_dec_object->frame_plus)
+      || vpu_dec_object->vpu_hold_buffer > 0) {
+    if (vpu_dec_object->vpu_hold_buffer > 0) {
+      buffer = g_list_nth_data (vpu_dec_object->gstbuffer_in_vpudec2, 0);
+      vpu_dec_object->gstbuffer_in_vpudec2 = g_list_remove ( \
+          vpu_dec_object->gstbuffer_in_vpudec2, buffer);
+      vpu_dec_object->gstbuffer_in_vpudec = g_list_remove ( \
+          vpu_dec_object->gstbuffer_in_vpudec, buffer);
+      vpu_dec_object->vpu_hold_buffer --;
+    }
+    else
+      buffer = gst_video_decoder_allocate_output_buffer(bdec);
     if (G_UNLIKELY (buffer == NULL)) {
       GST_DEBUG_OBJECT (vpu_dec_object, "could not get buffer.");
       return GST_FLOW_FLUSHING;
@@ -1242,14 +1287,14 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
   if (frame)
     gst_video_codec_frame_unref (frame);
 
-  if (in_data.nSize == 0 && (frame || vpu_dec_object->state == STATE_OPENED)) {
+  if (!IS_AMPHION() && in_data.nSize == 0 && (frame || vpu_dec_object->state == STATE_OPENED)) {
     return GST_FLOW_OK;
   }
 
   while (1) {
     gint64 start_time;
 
-    GST_DEBUG_OBJECT(vpu_dec_object, "in data: %d \n", in_data.nSize);
+    GST_DEBUG_OBJECT (vpu_dec_object, "in data: %d \n", in_data.nSize);
 
     start_time = g_get_monotonic_time ();
 
@@ -1260,7 +1305,7 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
       return GST_FLOW_ERROR;
     }
 
-    GST_DEBUG_OBJECT(vpu_dec_object, "buf status: 0x%x time: %lld\n", \
+    GST_DEBUG_OBJECT (vpu_dec_object, "buf status: 0x%x time: %lld\n", \
         buf_ret, g_get_monotonic_time () - start_time);
     vpu_dec_object->total_time += g_get_monotonic_time () - start_time;
 
@@ -1278,7 +1323,8 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
       vpu_dec_object->vpu_need_reconfig = TRUE;
       ret = gst_vpu_dec_object_handle_reconfig(vpu_dec_object, bdec);
       /* workaround for VPU will discard decoded video frame when resolution change. */
-      gst_vpu_dec_object_clear_decoded_frame_ts (vpu_dec_object);
+      if (!IS_HANTRO() && !IS_AMPHION())
+        gst_vpu_dec_object_clear_decoded_frame_ts (vpu_dec_object);
       vpu_dec_object->vpu_report_resolution_change = FALSE; 
       vpu_dec_object->vpu_need_reconfig = FALSE;
       if (ret != GST_FLOW_OK) {
@@ -1361,7 +1407,7 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
     }
     if (buf_ret & VPU_DEC_NO_ENOUGH_INBUF) {
       GST_LOG_OBJECT (vpu_dec_object, "Got not enough input message!!");
-      if (vpu_dec_object->state < STATE_REGISTRIED_FRAME_BUFFER) {
+      if (!IS_AMPHION() && vpu_dec_object->state < STATE_REGISTRIED_FRAME_BUFFER) {
         GST_WARNING_OBJECT (vpu_dec_object, "Dropped video frame before VPU init ok!");
         ret = gst_vpu_dec_object_send_output (vpu_dec_object, bdec, TRUE);
         if (ret != GST_FLOW_OK) {
@@ -1417,7 +1463,7 @@ gst_vpu_dec_object_flush (GstVideoDecoder * bdec, GstVpuDecObject * vpu_dec_obje
 
   // FIXME: workaround for VP8 seek. VPU will block if VPU need framebuffer
   // before seek.
-  if (!IS_HANTRO() && vpu_dec_object->state >= STATE_REGISTRIED_FRAME_BUFFER) {
+  if (!IS_HANTRO() && !IS_AMPHION() && vpu_dec_object->state >= STATE_REGISTRIED_FRAME_BUFFER) {
     gst_vpu_dec_object_get_gst_buffer(bdec, vpu_dec_object);
   }
 
