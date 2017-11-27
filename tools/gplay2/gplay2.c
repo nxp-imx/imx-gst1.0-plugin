@@ -1515,10 +1515,10 @@ main (int argc, char *argv[])
     if (gplay_checkfeature (G2D)) {
       options.video_sink_name = "overlaysink";
       if (gplay_checkfeature (DPU)) {
-        /* FIXME: on 8qm/qxp if use kmssink, passthrough is disable after
-         * negotation in videoconvert, we do not have g2d convert 
-         * temporarily either, so use glimagesink for better performance */
-        options.video_sink_name = "glimagesink";
+        if (gplay_checkfeature (VPU)) 
+          options.video_sink_name = "kmssink";
+        else
+          options.video_sink_name = "glimagesink";
       }
     } else {
       options.video_sink_name = "imxv4l2sink";
