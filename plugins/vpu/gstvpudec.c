@@ -376,37 +376,27 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
   GST_DEBUG_OBJECT (dec, "vpudec query has dmabuf meta %d", alloc_has_meta);
 
   if (IS_AMPHION()) {
-    const GstStructure *params;
-    guint64 drm_modifier;
-    gchar *meta;
+    if (alloc_has_meta) {
+      const GstStructure *params;
+      gchar *meta;
 
-    if (!alloc_has_meta) {
-      GST_ERROR_OBJECT (dec, "vpudec query hasn't dmabuf meta");
-      return FALSE;
-    }
-
-    gst_query_parse_nth_allocation_meta (query, alloc_index, &params);
-    GST_DEBUG_OBJECT (dec, "Expected field 'GstDmabufMeta' in structure: %" GST_PTR_FORMAT,
-        params);
-    if (!params) {
-      GST_ERROR_OBJECT (dec, "allocation meta wrong");
-      return FALSE;
-    }
-    meta = gst_structure_to_string (params);
-    if (!meta) {
-      GST_ERROR_OBJECT (dec, "no allocation meta");
-      return FALSE;
-    }
-
-    GST_DEBUG_OBJECT (dec, "dmabuf meta has modifier: %s", meta);
-    sscanf (meta, "GstDmabufMeta, dmabuf.drm_modifier=(guint64){ %lld };", &drm_modifier);
-    GST_DEBUG_OBJECT (dec, "dmabuf meta has modifier: %lld", drm_modifier);
-    if (drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED) {
-      GST_DEBUG_OBJECT (dec, "video sink support modifier: %lld", drm_modifier);
-      dec->vpu_dec_object->drm_modifier = drm_modifier;
-    } else {
-      GST_ERROR_OBJECT (dec, "video sink can't support modifier: %lld", DRM_FORMAT_MOD_AMPHION_TILED);
-      return FALSE;
+      gst_query_parse_nth_allocation_meta (query, alloc_index, &params);
+      GST_DEBUG_OBJECT (dec, "Expected field 'GstDmabufMeta' in structure: %" GST_PTR_FORMAT,
+          params);
+      if (params) {
+        if (meta = gst_structure_to_string (params)) {
+          guint64 drm_modifier;
+          GST_DEBUG_OBJECT (dec, "dmabuf meta has modifier: %s", meta);
+          sscanf (meta, "GstDmabufMeta, dmabuf.drm_modifier=(guint64){ %lld };", &drm_modifier);
+          GST_DEBUG_OBJECT (dec, "dmabuf meta has modifier: %lld", drm_modifier);
+          if (drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED) {
+            GST_DEBUG_OBJECT (dec, "video sink support modifier: %lld", drm_modifier);
+            dec->vpu_dec_object->drm_modifier = drm_modifier;
+          } else {
+            GST_WARNING_OBJECT (dec, "video sink can't support modifier: %lld", DRM_FORMAT_MOD_AMPHION_TILED);
+          }
+        }
+      }
     }
   }
 
