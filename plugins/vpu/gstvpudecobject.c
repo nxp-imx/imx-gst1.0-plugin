@@ -1393,10 +1393,8 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
      * only can output key frame when rewind as video decoder base will buffer output
      * between key frame, so VPU can't get output buffer to decode and then blocked. 
      */
-    /* Hantro video decoder can output video frame even if only input one frame.
-     * Needn't send EOS to drain it.
-     */
-    if (!IS_HANTRO() && vpu_dec_object->tsm_mode == MODE_FIFO) {
+
+    if (vpu_dec_object->tsm_mode == MODE_FIFO) {
       GST_DEBUG_OBJECT (vpu_dec_object, "send eos to VPU.\n");
       frame = NULL;
       if (!(buf_ret & VPU_DEC_INPUT_USED))
