@@ -19,6 +19,8 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "aiurcontent.h"
 
 GST_DEBUG_CATEGORY_EXTERN (aiurdemux_debug);
@@ -35,6 +37,7 @@ static AiurdemuxProtocalEntry aiurdemux_protocol_table[] = {
   {"rtsp",FILE_FLAG_READ_IN_SEQUENCE},
   {"udp",FILE_FLAG_READ_IN_SEQUENCE},
   {"rtp",FILE_FLAG_READ_IN_SEQUENCE},
+  {"mtp-track",FILE_FLAG_READ_IN_SEQUENCE},
   {"mms",FILE_FLAG_NON_SEEKABLE|FILE_FLAG_READ_IN_SEQUENCE},
   {"rtmp",FILE_FLAG_NON_SEEKABLE|FILE_FLAG_READ_IN_SEQUENCE},
   {NULL,FILE_FLAG_NON_SEEKABLE|FILE_FLAG_READ_IN_SEQUENCE},
