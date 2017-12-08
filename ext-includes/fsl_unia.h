@@ -105,6 +105,7 @@ typedef enum
 /* dedicate for mp3 dec */
     UNIA_MP3_DEC_CRC_CHECK = 0x120,
     UNIA_MP3_DEC_MCH_ENABLE,
+    UNIA_MP3_DEC_NONSTD_STRM_SUPPORT,
 
 /* dedicate for bsac dec */
     UNIA_BSAC_DEC_DECODELAYERS = 0x130,
@@ -235,7 +236,7 @@ typedef enum
 typedef struct
 {
     void* (*Calloc) (uint32 numElements, uint32 size);
-    void* (*Malloc) (uint32 size);
+    void* (*Malloc) (size_t size);
     void  (*Free) (void * ptr);
     void* (*ReAlloc)(void * ptr, uint32 size);
 }UniACodecMemoryOps; /* callback operation callback table */
@@ -310,8 +311,11 @@ typedef struct
         uint32 enc_snr;
         uint32 enc_bitpool;
         uint32 enc_chmode;
+
+        /* dedicate for mp3 dec only */
+        uint32 nonstd_strm_support;
 /* end */
-#if !defined(RVDS)        
+#if !defined(RVDS)
     };
 #endif
 }UniACodecParameter;
