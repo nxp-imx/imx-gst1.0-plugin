@@ -134,11 +134,13 @@ gst_vpu_dec_object_get_sink_caps (void)
                 || map->std == VPU_V_DIVX4 || map->std == VPU_V_DIVX56
                 || map->std == VPU_V_AVS || map->std == VPU_V_VP6
                 || map->std == VPU_V_SORENSON || map->std == VPU_V_WEBP))
-          || (IS_AMPHION() && (map->std == VPU_V_HEVC
-              || map->std == VPU_V_RV || map->std == VPU_V_DIVX3
-              || map->std == VPU_V_DIVX4 || map->std == VPU_V_DIVX56
-              || map->std == VPU_V_AVS || map->std == VPU_V_VP6
-              || map->std == VPU_V_SORENSON))) {
+          || (IS_AMPHION() && (map->std == VPU_V_HEVC))) {
+        if (IS_AMPHION() && (map->std == VPU_V_VP8 || map->std == VPU_V_H263
+              || map->std == VPU_V_XVID || map->std == VPU_V_VC1
+              || map->std == VPU_V_MJPG || map->std == VPU_V_VC1_AP)) {
+          map++;
+          continue;
+        }
         if (caps) {
           GstCaps *newcaps = gst_caps_from_string (map->mime);
           if (newcaps) {
