@@ -951,6 +951,7 @@ input_thread_fun (gpointer data)
     sCommand[0] = ' ';
     errno = 0;
     if (scanf ("%256s", sCommand) != 1) {
+      usleep (100000);
       continue;
     }
 
