@@ -869,7 +869,8 @@ begin:
             IDecoder->resetDecoder(handle);
             //send null frame to delete the timestamp
             beepdec->err_cnt ++;
-            ret = gst_audio_decoder_finish_frame (dec, NULL, beepdec->in_cnt);
+            if (beepdec->in_cnt != 0)
+              ret = gst_audio_decoder_finish_frame (dec, NULL, beepdec->in_cnt);
             beepdec->in_cnt = 0;
             sent = TRUE;
             break;
