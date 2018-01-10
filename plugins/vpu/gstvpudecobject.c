@@ -22,7 +22,7 @@
 #include <gst/video/gstvideometa.h>
 #include <gst/video/gstvideohdr10meta.h>
 #include "gstimxcommon.h"
-#include "allocator/gstphymemmeta.h"
+#include <gst/allocators/gstphymemmeta.h>
 #include "gstvpuallocator.h"
 #include "gstvpudecobject.h"
 

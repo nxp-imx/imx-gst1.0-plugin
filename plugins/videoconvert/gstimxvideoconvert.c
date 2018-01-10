@@ -27,7 +27,7 @@
 #ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
-#include "gstphymemmeta.h"
+#include <gst/allocators/gstphymemmeta.h>
 #include "gstimxvideoconvert.h"
 
 #define IMX_VCT_IN_POOL_MAX_BUFFERS   30

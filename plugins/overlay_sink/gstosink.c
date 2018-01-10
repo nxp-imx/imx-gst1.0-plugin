@@ -29,7 +29,7 @@
 #ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
-#include "allocator/gstphymemmeta.h"
+#include <gst/allocators/gstphymemmeta.h>
 #include "gstimxvideooverlay.h"
 #include "imxoverlaycompositionmeta.h"
 

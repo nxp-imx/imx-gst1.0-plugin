@@ -23,7 +23,7 @@
 #include "gstimxv4l2allocator.h"
 #include "imx_2d_device.h"
 #include "gstimxvideooverlay.h"
-#include "allocator/gstphymemmeta.h"
+#include <gst/allocators/gstphymemmeta.h>
 
 #define ALIGNMENT_8 (8)
 #define ALIGNMENT_2 (2)
