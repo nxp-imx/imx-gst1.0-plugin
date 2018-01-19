@@ -821,6 +821,12 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
     return GST_FLOW_ERROR;
   }
 
+  if (IS_HANTRO()) {
+    VpuBufferNode in_data = {0};
+    int buf_ret;
+    VPU_DecDecodeBuf(vpu_dec_object->handle, &in_data, &buf_ret);
+  }
+
   if (!gst_vpu_dec_object_register_frame_buffer (vpu_dec_object, bdec)) {
     GST_ERROR_OBJECT(vpu_dec_object, "gst_vpu_dec_object_register_frame_buffer fail");
     return GST_FLOW_ERROR;
@@ -1043,10 +1049,12 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
     gst_object_unref (pool);
   }
 
-  if (vpu_dec_object->use_my_pool) {
-      pmeta = GST_PHY_MEM_META_ADD (out_frame->output_buffer);
-      pmeta->x_padding = vpu_dec_object->video_align.padding_right;
-      pmeta->y_padding = vpu_dec_object->video_align.padding_bottom;
+  if (IS_HANTRO() || vpu_dec_object->use_my_pool) {
+    pmeta = GST_PHY_MEM_META_ADD (out_frame->output_buffer);
+    pmeta->x_padding = vpu_dec_object->video_align.padding_right;
+    pmeta->y_padding = vpu_dec_object->video_align.padding_bottom;
+    pmeta->rfc_luma_offset = out_frame_info.pExtInfo->rfc_luma_offset;
+    pmeta->rfc_chroma_offset = out_frame_info.pExtInfo->rfc_chroma_offset;
   }
   
   if (vpu_dec_object->init_info.hasHdr10Meta) {

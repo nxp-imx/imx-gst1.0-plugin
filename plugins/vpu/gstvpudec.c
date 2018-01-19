@@ -367,24 +367,44 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
 
     update_pool = FALSE;
   }
-  size = MAX (size, dec->vpu_dec_object->frame_size);
-  GST_DEBUG_OBJECT (dec, "video frame size %d", size);
 
   alloc_has_meta = gst_query_find_allocation_meta (query,
       GST_DMABUF_META_API_TYPE, &alloc_index);
 
   GST_DEBUG_OBJECT (dec, "vpudec query has dmabuf meta %d", alloc_has_meta);
 
-  if (IS_AMPHION()) {
+  if (IS_HANTRO() || IS_AMPHION()) {
     if (alloc_has_meta) {
       const GstStructure *params;
       gchar *meta;
+      gint j, len;
 
       gst_query_parse_nth_allocation_meta (query, alloc_index, &params);
       GST_DEBUG_OBJECT (dec, "Expected field 'GstDmabufMeta' in structure: %" GST_PTR_FORMAT,
           params);
       if (params) {
-        if (meta = gst_structure_to_string (params)) {
+        const GValue *vdrm_modifier = gst_structure_get_value (params, "dmabuf.drm_modifier");
+        if (GST_VALUE_HOLDS_LIST (vdrm_modifier)) {
+          len = gst_value_list_get_size (vdrm_modifier);
+          for (j = 0; j < len; j++) {
+            const GValue *val;
+            val = gst_value_list_get_value (vdrm_modifier, j);
+            guint64 drm_modifier = g_value_get_uint64 (val);
+            GST_DEBUG_OBJECT (dec, "dmabuf meta has modifier: %lld", drm_modifier);
+            if (IS_AMPHION() && drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED)
+              dec->vpu_dec_object->drm_modifier = drm_modifier;
+           // else if (IS_HANTRO() && drm_modifier == DRM_FORMAT_MOD_VSI_G2_TILED_COMPRESSED
+           //     && dec->vpu_dec_object->is_g2 == TRUE)
+           //   dec->vpu_dec_object->drm_modifier = drm_modifier;
+           // else if (IS_HANTRO() && drm_modifier == DRM_FORMAT_MOD_VSI_G1_TILED
+           //     && dec->vpu_dec_object->is_g2 == FALSE)
+           //   dec->vpu_dec_object->drm_modifier = drm_modifier;
+            else {
+              GST_WARNING_OBJECT (dec, "video sink can't support modifier: %lld",
+                  DRM_FORMAT_MOD_AMPHION_TILED);
+            }
+          }
+        } else if (meta = gst_structure_to_string (params)) {
           guint64 drm_modifier;
           GST_DEBUG_OBJECT (dec, "dmabuf meta has modifier: %s", meta);
           sscanf (meta, "GstDmabufMeta, dmabuf.drm_modifier=(guint64){ %lld };", &drm_modifier);
@@ -393,11 +413,52 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
             GST_DEBUG_OBJECT (dec, "video sink support modifier: %lld", drm_modifier);
             dec->vpu_dec_object->drm_modifier = drm_modifier;
           } else {
-            GST_WARNING_OBJECT (dec, "video sink can't support modifier: %lld", DRM_FORMAT_MOD_AMPHION_TILED);
+            GST_WARNING_OBJECT (dec, "video sink can't support modifier: %lld",
+                DRM_FORMAT_MOD_AMPHION_TILED);
           }
         }
       }
     }
+  }
+
+  if (dec->vpu_dec_object->drm_modifier == DRM_FORMAT_MOD_VSI_G1_TILED
+      || dec->vpu_dec_object->drm_modifier == DRM_FORMAT_MOD_VSI_G2_TILED_COMPRESSED) {
+    int config_param = 1;
+    GstVpuDecObject * vpu_dec_object = dec->vpu_dec_object;
+    gint height_align;
+    gint width_align;
+    guint i;
+
+    VPU_DecConfig(dec->vpu_dec_object->handle, VPU_DEC_CONF_ENABLE_TILED, &config_param);
+
+    VPU_DecGetInitialInfo(dec->vpu_dec_object->handle, &(dec->vpu_dec_object->init_info));
+    dec->vpu_dec_object->frame_size = dec->vpu_dec_object->init_info.nFrameSize;
+
+    width_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_H_HANTRO_TILE;
+    if (vpu_dec_object->init_info.nPicWidth % width_align)
+      vpu_dec_object->video_align.padding_right = width_align \
+                                                  - vpu_dec_object->init_info.nPicWidth % width_align;
+    if (IS_HANTRO() && vpu_dec_object->is_g2 == TRUE)
+      height_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_V_HANTRO;
+    else
+      height_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_V;
+    if (vpu_dec_object->init_info.nInterlace)
+      height_align <<= 1;
+    if (vpu_dec_object->init_info.nPicHeight % height_align)
+      vpu_dec_object->video_align.padding_bottom = height_align \
+                                                   - vpu_dec_object->init_info.nPicHeight % height_align;
+
+    for (i = 0; i < GST_VIDEO_MAX_PLANES; i++)
+      vpu_dec_object->video_align.stride_align[i] = width_align - 1;
+
+    vpu_dec_object->width_paded = vpu_dec_object->init_info.nPicWidth \
+                                  + vpu_dec_object->video_align.padding_right;
+    vpu_dec_object->height_paded = vpu_dec_object->init_info.nPicHeight \
+                                   + vpu_dec_object->video_align.padding_bottom;
+
+    GST_DEBUG_OBJECT (vpu_dec_object, "width: %d height: %d paded width: %d paded height: %d\n", \
+        vpu_dec_object->init_info.nPicWidth, vpu_dec_object->init_info.nPicHeight, \
+        vpu_dec_object->width_paded, vpu_dec_object->height_paded);
   }
 
   if (dec->vpu_dec_object->vpu_need_reconfig == FALSE
@@ -496,6 +557,9 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
   params.flags |= GST_MEMORY_FLAG_READONLY;
   GST_INFO_OBJECT (dec, "vpudec frame buffer count: %d.\n", \
       GST_VPU_DEC_ACTUAL_BUF_CNT (dec->vpu_dec_object));
+
+  size = MAX (size, dec->vpu_dec_object->frame_size);
+  GST_DEBUG_OBJECT (dec, "video frame size %d", size);
 
   /* now configure */
   config = gst_buffer_pool_get_config (pool);
