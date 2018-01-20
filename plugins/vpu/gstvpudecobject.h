@@ -94,6 +94,7 @@ struct _GstVpuDecObject {
   GList * gstbuffer_in_vpudec2;
   gint vpu_hold_buffer;
   guint64 drm_modifier;
+  guint64 drm_modifier_pre;
   gboolean use_new_tsm;
   gboolean use_my_pool;
   gboolean use_my_allocator;

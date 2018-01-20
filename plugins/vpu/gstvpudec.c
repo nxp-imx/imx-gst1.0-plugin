@@ -249,6 +249,7 @@ gst_vpu_dec_open (GstVideoDecoder * bdec)
   dec->vpu_dec_object->use_my_pool = FALSE;
   dec->vpu_dec_object->use_my_allocator = FALSE;
   dec->vpu_dec_object->drm_modifier = 0;
+  dec->vpu_dec_object->drm_modifier_pre = 0;
 
   return gst_vpu_dec_object_open (dec->vpu_dec_object);
 }
@@ -393,9 +394,9 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
             GST_DEBUG_OBJECT (dec, "dmabuf meta has modifier: %lld", drm_modifier);
             if (IS_AMPHION() && drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED)
               dec->vpu_dec_object->drm_modifier = drm_modifier;
-           // else if (IS_HANTRO() && drm_modifier == DRM_FORMAT_MOD_VSI_G2_TILED_COMPRESSED
-           //     && dec->vpu_dec_object->is_g2 == TRUE)
-           //   dec->vpu_dec_object->drm_modifier = drm_modifier;
+            else if (IS_HANTRO() && drm_modifier == DRM_FORMAT_MOD_VSI_G2_TILED_COMPRESSED
+                && dec->vpu_dec_object->is_g2 == TRUE)
+              dec->vpu_dec_object->drm_modifier = drm_modifier;
            // else if (IS_HANTRO() && drm_modifier == DRM_FORMAT_MOD_VSI_G1_TILED
            //     && dec->vpu_dec_object->is_g2 == FALSE)
            //   dec->vpu_dec_object->drm_modifier = drm_modifier;
@@ -421,8 +422,9 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     }
   }
 
-  if (dec->vpu_dec_object->drm_modifier == DRM_FORMAT_MOD_VSI_G1_TILED
-      || dec->vpu_dec_object->drm_modifier == DRM_FORMAT_MOD_VSI_G2_TILED_COMPRESSED) {
+  if (dec->vpu_dec_object->drm_modifier_pre != dec->vpu_dec_object->drm_modifier
+      && (dec->vpu_dec_object->drm_modifier == DRM_FORMAT_MOD_VSI_G1_TILED
+      || dec->vpu_dec_object->drm_modifier == DRM_FORMAT_MOD_VSI_G2_TILED_COMPRESSED)) {
     int config_param = 1;
     GstVpuDecObject * vpu_dec_object = dec->vpu_dec_object;
     gint height_align;
@@ -459,6 +461,8 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     GST_DEBUG_OBJECT (vpu_dec_object, "width: %d height: %d paded width: %d paded height: %d\n", \
         vpu_dec_object->init_info.nPicWidth, vpu_dec_object->init_info.nPicHeight, \
         vpu_dec_object->width_paded, vpu_dec_object->height_paded);
+
+    dec->vpu_dec_object->drm_modifier_pre = dec->vpu_dec_object->drm_modifier;
   }
 
   if (dec->vpu_dec_object->vpu_need_reconfig == FALSE
