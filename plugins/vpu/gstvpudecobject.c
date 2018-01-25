@@ -19,6 +19,7 @@
  */
 
 #include <string.h>
+#include <libdrm/drm_fourcc.h>
 #include <gst/video/gstvideometa.h>
 #include <gst/video/gstvideohdr10meta.h>
 #include "gstimxcommon.h"
@@ -515,7 +516,21 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
 
   open_param->nChromaInterleave = 0;
   open_param->nMapType = 0;
-  open_param->nTiled2LinearEnable = 0;
+  vpu_dec_object->implement_config = FALSE;
+  if ((IS_HANTRO() && (open_param->CodecFormat == VPU_V_HEVC
+        || open_param->CodecFormat == VPU_V_VP9
+        || open_param->CodecFormat == VPU_V_AVC))
+      || IS_AMPHION()) {
+    open_param->nTiled2LinearEnable = 1;
+    vpu_dec_object->implement_config = TRUE;
+    if (open_param->CodecFormat == VPU_V_HEVC
+        || open_param->CodecFormat == VPU_V_VP9)
+      vpu_dec_object->drm_modifier_pre = DRM_FORMAT_MOD_VSI_G2_TILED_COMPRESSED;
+    else
+      vpu_dec_object->drm_modifier_pre = DRM_FORMAT_MOD_VSI_G1_TILED;
+  } else {
+    open_param->nTiled2LinearEnable = 0;
+  }
   open_param->nEnableVideoCompressor = 1;
   vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_NV12;
   if (open_param->CodecFormat == VPU_V_MJPG) {

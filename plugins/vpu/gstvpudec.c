@@ -397,9 +397,9 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
             else if (IS_HANTRO() && drm_modifier == DRM_FORMAT_MOD_VSI_G2_TILED_COMPRESSED
                 && dec->vpu_dec_object->is_g2 == TRUE)
               dec->vpu_dec_object->drm_modifier = drm_modifier;
-           // else if (IS_HANTRO() && drm_modifier == DRM_FORMAT_MOD_VSI_G1_TILED
-           //     && dec->vpu_dec_object->is_g2 == FALSE)
-           //   dec->vpu_dec_object->drm_modifier = drm_modifier;
+            else if (IS_HANTRO() && drm_modifier == DRM_FORMAT_MOD_VSI_G1_TILED
+                && dec->vpu_dec_object->is_g2 == FALSE)
+              dec->vpu_dec_object->drm_modifier = drm_modifier;
             else {
               GST_WARNING_OBJECT (dec, "video sink can't support modifier: %lld",
                   DRM_FORMAT_MOD_AMPHION_TILED);
@@ -422,10 +422,11 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     }
   }
 
-  if (dec->vpu_dec_object->drm_modifier_pre != dec->vpu_dec_object->drm_modifier
-      && (dec->vpu_dec_object->drm_modifier == DRM_FORMAT_MOD_VSI_G1_TILED
-      || dec->vpu_dec_object->drm_modifier == DRM_FORMAT_MOD_VSI_G2_TILED_COMPRESSED)) {
-    int config_param = 1;
+  if (IS_HANTRO() && !dec->vpu_dec_object->implement_config)
+    dec->vpu_dec_object->drm_modifier = 0;
+  //FIXME: handle video track selection.
+  if (IS_HANTRO() && dec->vpu_dec_object->drm_modifier_pre != dec->vpu_dec_object->drm_modifier) {
+    int config_param = 0;
     GstVpuDecObject * vpu_dec_object = dec->vpu_dec_object;
     gint height_align;
     gint width_align;
@@ -436,34 +437,9 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     VPU_DecGetInitialInfo(dec->vpu_dec_object->handle, &(dec->vpu_dec_object->init_info));
     dec->vpu_dec_object->frame_size = dec->vpu_dec_object->init_info.nFrameSize;
 
-    width_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_H_HANTRO_TILE;
-    if (vpu_dec_object->init_info.nPicWidth % width_align)
-      vpu_dec_object->video_align.padding_right = width_align \
-                                                  - vpu_dec_object->init_info.nPicWidth % width_align;
-    if (IS_HANTRO() && vpu_dec_object->is_g2 == TRUE)
-      height_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_V_HANTRO;
-    else
-      height_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_V;
-    if (vpu_dec_object->init_info.nInterlace)
-      height_align <<= 1;
-    if (vpu_dec_object->init_info.nPicHeight % height_align)
-      vpu_dec_object->video_align.padding_bottom = height_align \
-                                                   - vpu_dec_object->init_info.nPicHeight % height_align;
-
-    for (i = 0; i < GST_VIDEO_MAX_PLANES; i++)
-      vpu_dec_object->video_align.stride_align[i] = width_align - 1;
-
-    vpu_dec_object->width_paded = vpu_dec_object->init_info.nPicWidth \
-                                  + vpu_dec_object->video_align.padding_right;
-    vpu_dec_object->height_paded = vpu_dec_object->init_info.nPicHeight \
-                                   + vpu_dec_object->video_align.padding_bottom;
-
-    GST_DEBUG_OBJECT (vpu_dec_object, "width: %d height: %d paded width: %d paded height: %d\n", \
-        vpu_dec_object->init_info.nPicWidth, vpu_dec_object->init_info.nPicHeight, \
-        vpu_dec_object->width_paded, vpu_dec_object->height_paded);
-
     dec->vpu_dec_object->drm_modifier_pre = dec->vpu_dec_object->drm_modifier;
   }
+  GST_DEBUG_OBJECT (dec, "used modifier: %lld", dec->vpu_dec_object->drm_modifier);
 
   if (dec->vpu_dec_object->vpu_need_reconfig == FALSE
     && dec->vpu_dec_object->use_my_pool
