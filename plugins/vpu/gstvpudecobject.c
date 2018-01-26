@@ -836,7 +836,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
     return GST_FLOW_ERROR;
   }
 
-  if (IS_HANTRO()) {
+  if (IS_HANTRO() && vpu_dec_object->implement_config) {
     VpuBufferNode in_data = {0};
     int buf_ret;
     VPU_DecDecodeBuf(vpu_dec_object->handle, &in_data, &buf_ret);
