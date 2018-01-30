@@ -323,6 +323,7 @@ typedef struct VpuColourDesc {
   unsigned int colourPrimaries;
   unsigned int transferCharacteristics;
   unsigned int matrixCoeffs;
+  unsigned int fullRange;
 } VpuColourDesc;
 
 typedef struct VpuChromaLocInfo {

@@ -1089,6 +1089,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
     meta->hdr10meta.colourPrimaries = vpu_dec_object->init_info.ColourDesc.colourPrimaries;
     meta->hdr10meta.transferCharacteristics = vpu_dec_object->init_info.ColourDesc.transferCharacteristics;
     meta->hdr10meta.matrixCoeffs = vpu_dec_object->init_info.ColourDesc.matrixCoeffs;
+    meta->hdr10meta.fullRange = vpu_dec_object->init_info.ColourDesc.fullRange;
     meta->hdr10meta.chromaSampleLocTypeTopField = vpu_dec_object->init_info.ChromaLocInfo.chromaSampleLocTypeTopField;
     meta->hdr10meta.chromaSampleLocTypeBottomField = vpu_dec_object->init_info.ChromaLocInfo.chromaSampleLocTypeTopField;
   }
