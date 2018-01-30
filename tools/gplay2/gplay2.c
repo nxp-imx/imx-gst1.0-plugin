@@ -1557,6 +1557,13 @@ main (int argc, char *argv[])
     text_sink =
         gst_parse_bin_from_description (options.text_sink_name, TRUE, NULL);
     gst_player_set_text_sink (player, text_sink);
+  } else if (gplay_checkfeature (VPU)
+      && (gplay_checkfeature (DCSS) || gplay_checkfeature (DPU))) {
+    options.text_sink_name = "fakesink";
+    g_print ("Set TextSink %s\n", options.text_sink_name);
+    text_sink =
+        gst_parse_bin_from_description (options.text_sink_name, TRUE, NULL);
+    gst_player_set_text_sink (player, text_sink);
   }
 
   sPlay.options = &options;
