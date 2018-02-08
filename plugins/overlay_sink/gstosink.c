@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014-2016, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2018 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -44,6 +45,7 @@ enum
 {
   OVERLAY_SINK_PROP_0,
   OVERLAY_SINK_PROP_COMPOSITION_META_ENABLE,
+  OVERLAY_SINK_PROP_VIDEO_DIRECTION,
   OVERLAY_SINK_PROP_DISP_ON_0,
   OVERLAY_SINK_PROP_DISPWIN_X_0,
   OVERLAY_SINK_PROP_DISPWIN_Y_0,
@@ -58,6 +60,35 @@ enum
 
 #define OVERLAY_SINK_PROP_DISP_LENGTH (OVERLAY_SINK_PROP_DISP_MAX_0-OVERLAY_SINK_PROP_DISP_ON_0)
 #define OVERLAY_SINK_COMPOMETA_DEFAULT     TRUE
+
+#define DEFAULT_IMX_ROTATE_METHOD GST_IMX_ROTATION_0
+#define GST_TYPE_IMX_ROTATE_METHOD (gst_imx_rotate_method_get_type())
+
+static const GEnumValue rotate_methods[] = {
+  {GST_IMX_ROTATION_0, "no rotation", "none"},
+  {GST_IMX_ROTATION_90, "Rotate clockwise 90 degrees", "rotate-90"},
+  {GST_IMX_ROTATION_180, "Rotate clockwise 180 degrees", "rotate-180"},
+  {GST_IMX_ROTATION_270, "Rotate clockwise 270 degrees", "rotate-270"},
+  {GST_IMX_ROTATION_HFLIP, "Flip horizontally", "horizontal-flip"},
+  {GST_IMX_ROTATION_VFLIP, "Flip vertically", "vertically-flip"},
+  {0, NULL, NULL}
+};
+
+GType
+gst_imx_rotate_method_get_type()
+{
+  static GType rotate_method_type = 0;
+  static volatile gsize once = 0;
+
+  if (g_once_init_enter (&once)) {
+    rotate_method_type = g_enum_register_static ("GstImxRotateMethod",
+        rotate_methods);
+    g_once_init_leave (&once, rotate_method_type);
+  }
+
+  return rotate_method_type;
+}
+
 
 static GstFlowReturn
 gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer);
@@ -97,10 +128,20 @@ static void overlay_sink_config_color_key(GObject * object, gboolean enable, gui
     osink_object_set_color_key(osink->osink_obj, 0, enable, color_key);
 }
 
+static void
+gst_overlay_sink_video_direction_interface_init (GstVideoDirectionInterface *
+    iface)
+{
+  /* We implement the video-direction property */
+}
+
 #define gst_overlay_sink_parent_class parent_class
+
 G_DEFINE_TYPE_WITH_CODE (GstOverlaySink, gst_overlay_sink, GST_TYPE_VIDEO_SINK,
     G_IMPLEMENT_INTERFACE (GST_TYPE_VIDEO_OVERLAY,
-        gst_overlay_sink_video_overlay_interface_init));
+        gst_overlay_sink_video_overlay_interface_init);
+    G_IMPLEMENT_INTERFACE (GST_TYPE_VIDEO_DIRECTION,
+        gst_overlay_sink_video_direction_interface_init));
 
 //G_DEFINE_TYPE (GstOverlaySink, gst_overlay_sink, GST_TYPE_VIDEO_SINK);
 
@@ -143,7 +184,10 @@ gst_overlay_sink_set_property (GObject * object,
     sink->composition_meta_enable = g_value_get_boolean(value);
     return;
   }
-
+  if (prop_id == OVERLAY_SINK_PROP_VIDEO_DIRECTION) {
+    sink->overlay[0].rot = g_value_get_enum (value);
+    return;
+  }
   idx = (prop_id - OVERLAY_SINK_PROP_DISP_ON_0) / OVERLAY_SINK_PROP_DISP_LENGTH;
   prop = prop_id - idx * OVERLAY_SINK_PROP_DISP_LENGTH;
   switch (prop) {
@@ -199,7 +243,10 @@ gst_overlay_sink_get_property (GObject * object,
     g_value_set_boolean(value, sink->composition_meta_enable);
     return;
   }
-
+  if (prop_id == OVERLAY_SINK_PROP_VIDEO_DIRECTION) {
+     g_value_set_enum (value, sink->overlay[0].rot);
+     return;
+  }
   idx = (prop_id - OVERLAY_SINK_PROP_DISP_ON_0) / OVERLAY_SINK_PROP_DISP_LENGTH;
   prop = prop_id - idx * OVERLAY_SINK_PROP_DISP_LENGTH;
   switch (prop) {
@@ -986,15 +1033,20 @@ gst_overlay_sink_install_properties (GObjectClass *gobject_class)
     g_free (prop_name);
     prop++;
 
-    if (i == 0)
-      prop_name = g_strdup_printf ("rotate");
-    else
+
+    if (i == 0) {
+      prop_name = g_strdup_printf("video-direction");
+      g_object_class_override_property (gobject_class, OVERLAY_SINK_PROP_VIDEO_DIRECTION, "video-direction");
+
+    }
+    else {
       prop_name = g_strdup_printf ("rotate-%d", i);
-    g_object_class_install_property (gobject_class, prop,
+      g_object_class_install_property (gobject_class, prop,
         g_param_spec_enum (prop_name,
           prop_name,
           "get/set the rotation of the video", GST_TYPE_IMX_ROTATE_METHOD, DEFAULT_IMX_ROTATE_METHOD,
           G_PARAM_READWRITE));
+    }
     g_free (prop_name);
     prop++;
 

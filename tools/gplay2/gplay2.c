@@ -1,6 +1,6 @@
 /*
  * Copyright 2014-2016 Freescale Semiconductor, Inc.
- * Copyright 2017 NXP
+ * Copyright 2017, 2018 NXP
  *
  */
 
@@ -35,11 +35,11 @@
 #include <signal.h>
 #include <unistd.h>
 #include <errno.h>
+#include <gstimxcommon.h>
 
 #include <gst/player/player.h>
 
 #include "playlist.h"
-#include "../../libs/gstimxcommon.h"
 
 #include <fcntl.h>
 #include <linux/fb.h>
@@ -1512,26 +1512,18 @@ main (int argc, char *argv[])
     options.timeout = DEFAULT_TIME_OUT;
   }
 
-  if (!options.video_sink_name)
-    if (gplay_checkfeature (G2D)) {
-      options.video_sink_name = "overlaysink";
-      if (gplay_checkfeature (DPU)) {
-        if (gplay_checkfeature (VPU)) 
-          options.video_sink_name = "kmssink";
-        else
-          options.video_sink_name = "glimagesink";
-      }
-    } else {
-      options.video_sink_name = "imxv4l2sink";
-      if (gplay_checkfeature (DCSS))
-        options.video_sink_name = "kmssink";
-    }
-  g_print ("Set VideoSink %s \n", options.video_sink_name);
-  video_sink =
-      gst_parse_bin_from_description (options.video_sink_name, TRUE, NULL);
 
-  VideoRender =
-      gst_player_video_overlay_video_renderer_new_with_sink (NULL, video_sink);
+    if (!options.video_sink_name) {
+      VideoRender =
+        gst_player_video_overlay_video_renderer_new (NULL);
+    } else {
+      g_print ("Set VideoSink %s \n", options.video_sink_name);
+      video_sink =
+          gst_parse_bin_from_description (options.video_sink_name, TRUE, NULL);
+      VideoRender =
+        gst_player_video_overlay_video_renderer_new_with_sink (NULL, video_sink);
+    }
+
   VideoOverlayVideoRenderer =
       GST_PLAYER_VIDEO_OVERLAY_VIDEO_RENDERER (VideoRender);
 

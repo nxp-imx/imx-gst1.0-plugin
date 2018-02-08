@@ -22,6 +22,7 @@
 
 #include <gst/video/video.h>
 #include "gstimxcommon.h"
+#include "gstimx.h"
 #include "imx_2d_device_allocator.h"
 
 #define ALIGNMENT (16)

@@ -1,7 +1,6 @@
 lib_LTLIBRARIES = libgstfsl-@GST_API_VERSION@.la
 
 libgstfsl_@GST_API_VERSION@includedir = $(includedir)/gstreamer-@GST_MAJORMINOR@/gst/imx-mm/
-libgstfsl_@GST_API_VERSION@include_HEADERS = gstimxcommon.h
 
 if USE_V4L2_CORE
 V4L2_CORE_SOURCE = v4l2_core/gstimxv4l2.c

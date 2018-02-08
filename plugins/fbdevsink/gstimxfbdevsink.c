@@ -41,6 +41,7 @@
 
 #include "gstimxfbdevsink.h"
 #include "gstimxcommon.h"
+#include "gstimx.h"
 #include "gstimxvideooverlay.h"
 
 GST_DEBUG_CATEGORY (imx_fbdevsink_debug);

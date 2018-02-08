@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2018 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -47,12 +48,12 @@ enum {
   PROP_CROP_LEFT,
   PROP_CROP_WIDTH,
   PROP_CROP_HEIGHT,
-  PROP_ROTATE,
   PROP_KEEP_VIDEO_RATIO,
   PROP_DEINTERLACE_ENABLE,
   PROP_DEINTERLACE_MOTION,
   PROP_CONFIG,
-  PROP_COMPOSITION_META_ENABLE
+  PROP_COMPOSITION_META_ENABLE,
+  PROP_VIDEO_DIRECTION,
 };
 
 enum {
@@ -92,10 +93,19 @@ static void v4l2sink_config_color_key(GObject * object, gboolean enable, guint c
     gst_imx_v4l2out_config_color_key(v4l2sink->v4l2handle, enable, color_key);
 }
 
+static void
+gst_imx_v4l2sink_video_direction_interface_init (GstVideoDirectionInterface *
+    iface)
+{
+  /* We implement the video-direction property */
+}
+
 #define gst_imx_v4l2sink_parent_class parent_class
 G_DEFINE_TYPE_WITH_CODE (GstImxV4l2Sink, gst_imx_v4l2sink, GST_TYPE_VIDEO_SINK,
     G_IMPLEMENT_INTERFACE (GST_TYPE_VIDEO_OVERLAY,
-                       gst_imx_v4l2sink_video_overlay_interface_init));
+                       gst_imx_v4l2sink_video_overlay_interface_init);
+    G_IMPLEMENT_INTERFACE (GST_TYPE_VIDEO_DIRECTION,
+        gst_imx_v4l2sink_video_direction_interface_init));
 
 //G_DEFINE_TYPE (GstImxV4l2Sink, gst_imx_v4l2sink, GST_TYPE_VIDEO_SINK);
 
@@ -144,7 +154,7 @@ gst_imx_v4l2sink_set_property (GObject * object,
       v4l2sink->crop.height = g_value_get_uint (value);
       v4l2sink->config_flag |= CONFIG_CROP;
       break;
-    case PROP_ROTATE:
+    case PROP_VIDEO_DIRECTION:
       v4l2sink->rotate = g_value_get_enum (value);
       v4l2sink->config_flag |= CONFIG_ROTATE;
       break;
@@ -204,7 +214,7 @@ gst_imx_v4l2sink_get_property (GObject * object,
     case PROP_CROP_HEIGHT:
       g_value_set_uint (value, v4l2sink->crop.height);
       break;
-    case PROP_ROTATE:
+    case PROP_VIDEO_DIRECTION:
       g_value_set_enum (value, v4l2sink->rotate);
       break;
     case PROP_KEEP_VIDEO_RATIO:
@@ -1010,11 +1020,6 @@ gst_imx_v4l2sink_install_properties (GObjectClass *gobject_class)
         "The height of the video crop; default is equal to negotiated image height",
         0, G_MAXINT, 0, G_PARAM_READWRITE));
 
-  g_object_class_install_property (gobject_class, PROP_ROTATE,
-      g_param_spec_enum ("rotate", "Rotate",
-        "The orientation degree of the video; default is 0 degree",
-        GST_TYPE_IMX_ROTATE_METHOD, DEFAULT_IMX_ROTATE_METHOD, G_PARAM_READWRITE));
-
   g_object_class_install_property (gobject_class, PROP_KEEP_VIDEO_RATIO,
       g_param_spec_boolean ("force-aspect-ratio", "Force aspect ratio",
         "When enabled, scaling will respect original aspect ratio",
@@ -1043,6 +1048,9 @@ gst_imx_v4l2sink_install_properties (GObjectClass *gobject_class)
         "Enable overlay composition meta processing",
         TRUE,
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+    g_object_class_override_property (gobject_class, PROP_VIDEO_DIRECTION,
+      "video-direction");
 
   return;
 }
