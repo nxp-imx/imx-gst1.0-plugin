@@ -781,6 +781,8 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
 
   if (IS_AMPHION())
     width_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_H_AMPHION;
+  else if (IS_HANTRO() && vpu_dec_object->implement_config)
+    width_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_H_HANTRO_TILE;
   else
     width_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_H;
   if (vpu_dec_object->init_info.nPicWidth % width_align)

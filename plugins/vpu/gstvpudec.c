@@ -437,6 +437,21 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     VPU_DecGetInitialInfo(dec->vpu_dec_object->handle, &(dec->vpu_dec_object->init_info));
     dec->vpu_dec_object->frame_size = dec->vpu_dec_object->init_info.nFrameSize;
 
+    width_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_H;
+    if (vpu_dec_object->init_info.nPicWidth % width_align)
+      vpu_dec_object->video_align.padding_right = width_align \
+        - vpu_dec_object->init_info.nPicWidth % width_align;
+
+    for (i = 0; i < GST_VIDEO_MAX_PLANES; i++)
+      vpu_dec_object->video_align.stride_align[i] = width_align - 1;
+
+    vpu_dec_object->width_paded = vpu_dec_object->init_info.nPicWidth \
+                                  + vpu_dec_object->video_align.padding_right;
+
+    GST_DEBUG_OBJECT (vpu_dec_object, "width: %d height: %d paded width: %d paded height: %d\n", \
+        vpu_dec_object->init_info.nPicWidth, vpu_dec_object->init_info.nPicHeight, \
+        vpu_dec_object->width_paded, vpu_dec_object->height_paded);
+
     dec->vpu_dec_object->drm_modifier_pre = dec->vpu_dec_object->drm_modifier;
   }
   GST_DEBUG_OBJECT (dec, "used modifier: %lld", dec->vpu_dec_object->drm_modifier);
