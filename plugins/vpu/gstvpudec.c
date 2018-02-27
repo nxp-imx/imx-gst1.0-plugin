@@ -422,7 +422,8 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     }
   }
 
-  if (IS_HANTRO() && !dec->vpu_dec_object->implement_config)
+  if (IS_HANTRO() && (!dec->vpu_dec_object->implement_config
+        || dec->vpu_dec_object->force_linear))
     dec->vpu_dec_object->drm_modifier = 0;
   //FIXME: handle video track selection.
   if (IS_HANTRO() && dec->vpu_dec_object->drm_modifier_pre != dec->vpu_dec_object->drm_modifier) {
@@ -448,7 +449,7 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
     vpu_dec_object->width_paded = vpu_dec_object->init_info.nPicWidth \
                                   + vpu_dec_object->video_align.padding_right;
 
-    GST_DEBUG_OBJECT (vpu_dec_object, "width: %d height: %d paded width: %d paded height: %d\n", \
+    GST_DEBUG_OBJECT (dec, "width: %d height: %d paded width: %d paded height: %d\n", \
         vpu_dec_object->init_info.nPicWidth, vpu_dec_object->init_info.nPicHeight, \
         vpu_dec_object->width_paded, vpu_dec_object->height_paded);
 
