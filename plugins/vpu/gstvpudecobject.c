@@ -517,6 +517,7 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
   open_param->nChromaInterleave = 0;
   open_param->nMapType = 0;
   vpu_dec_object->implement_config = FALSE;
+  vpu_dec_object->force_linear = FALSE;
   if ((IS_HANTRO() && (open_param->CodecFormat == VPU_V_HEVC
         || open_param->CodecFormat == VPU_V_VP9
         || open_param->CodecFormat == VPU_V_AVC))
@@ -758,6 +759,10 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
   if (fmt ==  GST_VIDEO_FORMAT_NV12 && vpu_dec_object->init_info.nBitDepth == 10){
     fmt = GST_VIDEO_FORMAT_NV12_10LE;
   }
+  if (IS_HANTRO() && vpu_dec_object->init_info.nInterlace
+      && vpu_dec_object->implement_config) {
+    vpu_dec_object->force_linear = TRUE;
+  }
 
   GST_INFO_OBJECT(vpu_dec_object, "using %s as video output format", gst_video_format_to_string(fmt));
 
@@ -794,7 +799,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
     height_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_V_AMPHION;
   else
     height_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_V;
-  if (vpu_dec_object->init_info.nInterlace)
+  if (!IS_HANTRO() && vpu_dec_object->init_info.nInterlace)
     height_align <<= 1;
   if (vpu_dec_object->init_info.nPicHeight % height_align)
     vpu_dec_object->video_align.padding_bottom = height_align \
