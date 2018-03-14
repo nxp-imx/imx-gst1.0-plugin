@@ -2738,7 +2738,7 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
     stream = aiurdemux_trackidx_to_stream (demux, *track_idx);
 
     if((parser_ret == PARSER_EOS) || (PARSER_BOS == parser_ret)
-        || (PARSER_READ_ERROR == parser_ret)){
+        || (PARSER_READ_ERROR == parser_ret) || (PARSER_ERR_INVALID_PARAMETER == parser_ret)){
         if (demux->read_mode == PARSER_READ_MODE_FILE_BASED) {
             aiurdemux_send_stream_eos_all (demux);
             ret = GST_FLOW_EOS;
