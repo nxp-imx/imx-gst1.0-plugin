@@ -369,6 +369,7 @@ typedef struct {
 	int nReserved[3];			/*reserved for future extension*/
 	void* pSpecialInfo;		/*reserved for future special extension*/
 
+        int hasColorDesc;
         int hasHdr10Meta;
         VpuHDR10Meta Hdr10Meta; /* HDR10 meta data */
         VpuColourDesc ColourDesc;
