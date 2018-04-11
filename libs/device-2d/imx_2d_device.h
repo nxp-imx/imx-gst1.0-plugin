@@ -48,6 +48,11 @@ typedef enum {
 } Imx2DDeviceCap;
 
 typedef enum {
+  IMX_2D_TILE_NULL,
+  IMX_2D_TILE_AMHPION
+} Imx2DTileType;
+
+typedef enum {
   IMX_2D_ROTATION_0,
   IMX_2D_ROTATION_90,
   IMX_2D_ROTATION_180,
@@ -88,6 +93,7 @@ typedef struct _Imx2DVideoInfo {
   guint w;
   guint h;
   guint stride;
+  Imx2DTileType tile_type;
 } Imx2DVideoInfo;
 
 typedef struct _Imx2DFrame {

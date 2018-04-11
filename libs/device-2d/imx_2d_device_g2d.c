@@ -20,6 +20,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include "g2d.h"
+#include "g2dExt.h"
 #include "imx_2d_device.h"
 
 GST_DEBUG_CATEGORY_EXTERN (imx2ddevice_debug);
@@ -27,8 +28,8 @@ GST_DEBUG_CATEGORY_EXTERN (imx2ddevice_debug);
 
 typedef struct _Imx2DDeviceG2d {
   gint capabilities;
-  struct g2d_surface src;
-  struct g2d_surface dst;
+  struct g2d_surfaceEx src;
+  struct g2d_surfaceEx dst;
 } Imx2DDeviceG2d;
 
 typedef struct {
@@ -287,14 +288,19 @@ static gint imx_g2d_config_input(Imx2DDevice *device, Imx2DVideoInfo* in_info)
   if (!in_map)
     return -1;
 
-  g2d->src.width = in_info->w;
-  g2d->src.height = in_info->h;
-  g2d->src.stride = g2d->src.width;//stride / (in_map->bpp/8);
-  g2d->src.format = in_map->g2d_format;
-  g2d->src.left = 0;
-  g2d->src.top = 0;
-  g2d->src.right = in_info->w;
-  g2d->src.bottom = in_info->h;
+  g2d->src.base.width = in_info->w;
+  g2d->src.base.height = in_info->h;
+  g2d->src.base.stride = g2d->src.base.width;//stride / (in_map->bpp/8);
+  g2d->src.base.format = in_map->g2d_format;
+  g2d->src.base.left = 0;
+  g2d->src.base.top = 0;
+  g2d->src.base.right = in_info->w;
+  g2d->src.base.bottom = in_info->h;
+  if (in_info->tile_type == IMX_2D_TILE_AMHPION) {
+    g2d->src.base.stride = in_info->stride / (in_map->bpp/8);
+    g2d->src.tiling = G2D_AMPHION_TILED;
+  } else
+    g2d->src.tiling = G2D_LINEAR;
   GST_TRACE("input format = %s", gst_video_format_to_string(in_info->fmt));
 
   return 0;
@@ -310,18 +316,18 @@ static gint imx_g2d_config_output(Imx2DDevice *device, Imx2DVideoInfo* out_info)
   if (!out_map)
     return -1;
 
-  g2d->dst.width = out_info->w;
-  g2d->dst.height = out_info->h;
+  g2d->dst.base.width = out_info->w;
+  g2d->dst.base.height = out_info->h;
   // G2D stride is pixel, not bytes.
-  if (out_info->stride < g2d->dst.width * (out_map->bpp / 8))
-    g2d->dst.stride = g2d->dst.width;
+  if (out_info->stride < g2d->dst.base.width * (out_map->bpp / 8))
+    g2d->dst.base.stride = g2d->dst.base.width;
   else
-    g2d->dst.stride = out_info->stride / (out_map->bpp / 8);
-  g2d->dst.format = out_map->g2d_format;
-  g2d->dst.left = 0;
-  g2d->dst.top = 0;
-  g2d->dst.right = out_info->w;
-  g2d->dst.bottom = out_info->h;
+    g2d->dst.base.stride = out_info->stride / (out_map->bpp / 8);
+  g2d->dst.base.format = out_map->g2d_format;
+  g2d->dst.base.left = 0;
+  g2d->dst.base.top = 0;
+  g2d->dst.base.right = out_info->w;
+  g2d->dst.base.bottom = out_info->h;
   GST_TRACE("output format = %s", gst_video_format_to_string(out_info->fmt));
 
   return 0;
@@ -429,95 +435,98 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   GST_DEBUG ("src paddr: %p dst paddr: %p", src->mem->paddr, dst->mem->paddr);
 
   // Set input
-  g2d->src.global_alpha = src->alpha;
-  g2d->src.left = src->crop.x;
-  g2d->src.top = src->crop.y;
-  g2d->src.right = src->crop.x + MIN(src->crop.w, g2d->src.width-src->crop.x);
-  g2d->src.bottom = src->crop.y + MIN(src->crop.h, g2d->src.height-src->crop.y);
+  g2d->src.base.global_alpha = src->alpha;
+  g2d->src.base.left = src->crop.x;
+  g2d->src.base.top = src->crop.y;
+  g2d->src.base.right = src->crop.x + MIN(src->crop.w, g2d->src.base.width-src->crop.x);
+  g2d->src.base.bottom = src->crop.y + MIN(src->crop.h, g2d->src.base.height-src->crop.y);
 
-  if (g2d->src.left >= g2d->src.width || g2d->src.top >= g2d->src.height ||
-      g2d->src.right <= 0 || g2d->src.bottom <= 0) {
+  if (g2d->src.base.left >= g2d->src.base.width || g2d->src.base.top >= g2d->src.base.height ||
+      g2d->src.base.right <= 0 || g2d->src.base.bottom <= 0) {
     GST_WARNING("input crop outside of source");
     g2d_close (g2d_handle);
     return 0;
   }
 
-  if (g2d->src.left < 0)
-    g2d->src.left = 0;
-  if (g2d->src.top < 0)
-    g2d->src.top = 0;
-  if (g2d->src.right > g2d->src.width)
-    g2d->src.right = g2d->src.width;
-  if (g2d->src.bottom > g2d->src.height)
-    g2d->src.bottom = g2d->src.height;
+  if (g2d->src.base.left < 0)
+    g2d->src.base.left = 0;
+  if (g2d->src.base.top < 0)
+    g2d->src.base.top = 0;
+  if (g2d->src.base.right > g2d->src.base.width)
+    g2d->src.base.right = g2d->src.base.width;
+  if (g2d->src.base.bottom > g2d->src.base.height)
+    g2d->src.base.bottom = g2d->src.base.height;
 
-  if (imx_g2d_set_src_plane (&g2d->src, src->mem->paddr) < 0) {
+  if (imx_g2d_set_src_plane (&g2d->src.base, src->mem->paddr) < 0) {
     g2d_close (g2d_handle);
     return -1;
   }
 
+  if (g2d->src.tiling == G2D_AMPHION_TILED && src->fd[1] >= 0)
+    g2d->src.base.planes[1] = phy_addr_from_fd (src->fd[1]);
+
   GST_TRACE ("g2d src : %dx%d,%d(%d,%d-%d,%d), alpha=%d, format=%d",
-      g2d->src.width, g2d->src.height,g2d->src.stride, g2d->src.left,
-      g2d->src.top, g2d->src.right, g2d->src.bottom, g2d->src.global_alpha,
-      g2d->src.format);
+      g2d->src.base.width, g2d->src.base.height,g2d->src.base.stride, g2d->src.base.left,
+      g2d->src.base.top, g2d->src.base.right, g2d->src.base.bottom, g2d->src.base.global_alpha,
+      g2d->src.base.format);
 
   // Set output
-  g2d->dst.global_alpha = dst->alpha;
-  g2d->dst.planes[0] = (gint)(dst->mem->paddr);
-  g2d->dst.left = dst->crop.x;
-  g2d->dst.top = dst->crop.y;
-  g2d->dst.right = dst->crop.x + dst->crop.w;
-  g2d->dst.bottom = dst->crop.y + dst->crop.h;
+  g2d->dst.base.global_alpha = dst->alpha;
+  g2d->dst.base.planes[0] = (gint)(dst->mem->paddr);
+  g2d->dst.base.left = dst->crop.x;
+  g2d->dst.base.top = dst->crop.y;
+  g2d->dst.base.right = dst->crop.x + dst->crop.w;
+  g2d->dst.base.bottom = dst->crop.y + dst->crop.h;
 
-  if (g2d->dst.left >= g2d->dst.width || g2d->dst.top >= g2d->dst.height ||
-      g2d->dst.right <= 0 || g2d->dst.bottom <= 0) {
+  if (g2d->dst.base.left >= g2d->dst.base.width || g2d->dst.base.top >= g2d->dst.base.height ||
+      g2d->dst.base.right <= 0 || g2d->dst.base.bottom <= 0) {
     GST_WARNING("output crop outside of destination");
     g2d_close (g2d_handle);
     return 0;
   }
 
-  if (g2d->dst.left < 0)
-    g2d->dst.left = 0;
-  if (g2d->dst.top < 0)
-    g2d->dst.top = 0;
-  if (g2d->dst.right > g2d->dst.width)
-    g2d->dst.right = g2d->dst.width;
-  if (g2d->dst.bottom > g2d->dst.height)
-    g2d->dst.bottom = g2d->dst.height;
+  if (g2d->dst.base.left < 0)
+    g2d->dst.base.left = 0;
+  if (g2d->dst.base.top < 0)
+    g2d->dst.base.top = 0;
+  if (g2d->dst.base.right > g2d->dst.base.width)
+    g2d->dst.base.right = g2d->dst.base.width;
+  if (g2d->dst.base.bottom > g2d->dst.base.height)
+    g2d->dst.base.bottom = g2d->dst.base.height;
 
   //adjust incrop size by outcrop size and output resolution
   guint src_w, src_h, dst_w, dst_h, org_src_left, org_src_top;
-  src_w = g2d->src.right-g2d->src.left;
-  src_h = g2d->src.bottom-g2d->src.top;
+  src_w = g2d->src.base.right-g2d->src.base.left;
+  src_h = g2d->src.base.bottom-g2d->src.base.top;
   dst_w = dst->crop.w;
   dst_h = dst->crop.h;
-  org_src_left = g2d->src.left;
-  org_src_top = g2d->src.top;
+  org_src_left = g2d->src.base.left;
+  org_src_top = g2d->src.base.top;
 
-  g2d->src.left = org_src_left + (g2d->dst.left-dst->crop.x) * src_w / dst_w;
-  g2d->src.top = org_src_top + (g2d->dst.top-dst->crop.y) * src_h / dst_h;
-  g2d->src.right = org_src_left + (g2d->dst.right-dst->crop.x) * src_w / dst_w;
-  g2d->src.bottom = org_src_top + (g2d->dst.bottom-dst->crop.y) * src_h / dst_h;
+  g2d->src.base.left = org_src_left + (g2d->dst.base.left-dst->crop.x) * src_w / dst_w;
+  g2d->src.base.top = org_src_top + (g2d->dst.base.top-dst->crop.y) * src_h / dst_h;
+  g2d->src.base.right = org_src_left + (g2d->dst.base.right-dst->crop.x) * src_w / dst_w;
+  g2d->src.base.bottom = org_src_top + (g2d->dst.base.bottom-dst->crop.y) * src_h / dst_h;
 
   GST_TRACE ("g2d dest : %dx%d,%d(%d,%d-%d,%d), alpha=%d, format=%d",
-      g2d->dst.width, g2d->dst.height,g2d->dst.stride, g2d->dst.left,
-      g2d->dst.top, g2d->dst.right, g2d->dst.bottom, g2d->dst.global_alpha,
-      g2d->dst.format);
+      g2d->dst.base.width, g2d->dst.base.height,g2d->dst.base.stride, g2d->dst.base.left,
+      g2d->dst.base.top, g2d->dst.base.right, g2d->dst.base.bottom, g2d->dst.base.global_alpha,
+      g2d->dst.base.format);
 
   // Final blending
   if (alpha_en &&
-      (g2d->src.global_alpha < 0xFF || is_format_has_alpha(g2d->src.format))) {
-    g2d->src.blendfunc = G2D_ONE;
-    g2d->dst.blendfunc = G2D_ONE_MINUS_SRC_ALPHA;
+      (g2d->src.base.global_alpha < 0xFF || is_format_has_alpha(g2d->src.base.format))) {
+    g2d->src.base.blendfunc = G2D_ONE;
+    g2d->dst.base.blendfunc = G2D_ONE_MINUS_SRC_ALPHA;
     g2d_enable(g2d_handle, G2D_BLEND);
     g2d_enable(g2d_handle, G2D_GLOBAL_ALPHA);
 
-    ret = g2d_blit(g2d_handle, &g2d->src, &g2d->dst);
+    ret = g2d_blitEx(g2d_handle, &g2d->src, &g2d->dst);
 
     g2d_disable(g2d_handle, G2D_GLOBAL_ALPHA);
     g2d_disable(g2d_handle, G2D_BLEND);
   } else {
-    ret = g2d_blit(g2d_handle, &g2d->src, &g2d->dst);
+    ret = g2d_blitEx(g2d_handle, &g2d->src, &g2d->dst);
   }
 
   ret |= g2d_finish(g2d_handle);
@@ -549,7 +558,7 @@ static gint imx_g2d_set_rotate(Imx2DDevice *device, Imx2DRotationMode rot)
   default:                     g2d_rotate = G2D_ROTATION_0;    break;
   }
 
-  g2d->dst.rot = g2d_rotate;
+  g2d->dst.base.rot = g2d_rotate;
   return 0;
 }
 
@@ -566,7 +575,7 @@ static Imx2DRotationMode imx_g2d_get_rotate (Imx2DDevice* device)
 
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
   Imx2DRotationMode rot = IMX_2D_ROTATION_0;
-  switch (g2d->dst.rot) {
+  switch (g2d->dst.base.rot) {
   case G2D_ROTATION_0:    rot = IMX_2D_ROTATION_0;     break;
   case G2D_ROTATION_90:   rot = IMX_2D_ROTATION_90;    break;
   case G2D_ROTATION_180:  rot = IMX_2D_ROTATION_180;   break;
@@ -669,18 +678,18 @@ static gint imx_g2d_fill_color(Imx2DDevice *device, Imx2DFrame *dst,
   }
   GST_DEBUG ("dst paddr: %p", dst->mem->paddr);
 
-  g2d->dst.clrcolor = RGBA8888;
-  g2d->dst.planes[0] = (gint)(dst->mem->paddr);
-  g2d->dst.left = 0;
-  g2d->dst.top = 0;
-  g2d->dst.right = g2d->dst.width;
-  g2d->dst.bottom = g2d->dst.height;
+  g2d->dst.base.clrcolor = RGBA8888;
+  g2d->dst.base.planes[0] = (gint)(dst->mem->paddr);
+  g2d->dst.base.left = 0;
+  g2d->dst.base.top = 0;
+  g2d->dst.base.right = g2d->dst.base.width;
+  g2d->dst.base.bottom = g2d->dst.base.height;
 
   GST_TRACE ("g2d clear : %dx%d,%d(%d,%d-%d,%d), format=%d",
-      g2d->dst.width, g2d->dst.height, g2d->dst.stride, g2d->dst.left,
-      g2d->dst.top, g2d->dst.right, g2d->dst.bottom, g2d->dst.format);
+      g2d->dst.base.width, g2d->dst.base.height, g2d->dst.base.stride, g2d->dst.base.left,
+      g2d->dst.base.top, g2d->dst.base.right, g2d->dst.base.bottom, g2d->dst.base.format);
 
-  ret = g2d_clear(g2d_handle, &g2d->dst);
+  ret = g2d_clear(g2d_handle, &g2d->dst.base);
   ret |= g2d_finish(g2d_handle);
   g2d_close(g2d_handle);
 

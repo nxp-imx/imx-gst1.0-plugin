@@ -23,6 +23,8 @@
 
 #include <gst/video/video.h>
 #include <gst/allocators/gstdmabuf.h>
+#include <gst/allocators/gstdmabufmeta.h>
+#include <libdrm/drm_fourcc.h>
 #include <gst/allocators/gstallocatorphymem.h>
 #ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
@@ -1230,6 +1232,8 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   guint i, n_mem;
   GstVideoCropMeta *in_crop = NULL, *out_crop = NULL;
   GstVideoInfo info;
+  GstDmabufMeta *dmabuf_meta;
+  gint64 drm_modifier = 0;
 
   if (!device)
     return GST_FLOW_ERROR;
@@ -1352,6 +1356,15 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   src.info.h = in->info.height + imxvct->in_video_align.padding_top +
               imxvct->in_video_align.padding_bottom;
   src.info.stride = in->info.stride[0];
+
+  dmabuf_meta = gst_buffer_get_dmabuf_meta (in->buffer);
+  if (dmabuf_meta)
+    drm_modifier = dmabuf_meta->drm_modifier;
+
+  GST_INFO_OBJECT (imxvct, "buffer modifier type %d", drm_modifier);
+
+  if (drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED)
+    src.info.tile_type = IMX_2D_TILE_AMHPION;
 
   gint ret = device->config_input(device, &src.info);
 
