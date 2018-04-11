@@ -50,5 +50,5 @@ plugin_init (GstPlugin * plugin)
   return TRUE;
 }
 
-IMX_GST_PLUGIN_DEFINE (beep, "universal audio decoder", plugin_init);
+IMX_GST_PLUGIN_DEFINE (beepdec, "universal audio decoder", plugin_init);
 

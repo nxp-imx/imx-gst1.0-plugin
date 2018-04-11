@@ -1,11 +1,11 @@
-plugin_LTLIBRARIES = libgstoverlaysinkplugins.la
+plugin_LTLIBRARIES = libgstoverlaysink.la
 
-libgstoverlaysinkplugins_la_SOURCES = gstosink.c \
+libgstoverlaysink_la_SOURCES = gstosink.c \
               gstosinkallocator.c \
 				      osink_object.c \
 				      compositor.c
 
-libgstoverlaysinkplugins_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
+libgstoverlaysink_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
 				 $(GST_BASE_CFLAGS) \
 				 $(GST_CFLAGS) \
 				 -I$(top_srcdir)/libs \
@@ -18,20 +18,20 @@ libgstoverlaysinkplugins_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) \
          -I$(top_srcdir)/libs/video-overlay
 
 if USE_FB_DISPLAY
-libgstoverlaysinkplugins_la_SOURCES += displaysfb.c
+libgstoverlaysink_la_SOURCES += displaysfb.c
 else
-libgstoverlaysinkplugins_la_SOURCES += displaysv4l2.c
+libgstoverlaysink_la_SOURCES += displaysv4l2.c
 endif
 
 if PLATFORM_IS_MX8
-libgstoverlaysinkplugins_la_CFLAGS += -DUSE_FB_API
+libgstoverlaysink_la_CFLAGS += -DUSE_FB_API
 endif
 
 if USE_ION
-libgstoverlaysinkplugins_la_CFLAGS += -DUSE_ION
+libgstoverlaysink_la_CFLAGS += -DUSE_ION
 endif
 
-libgstoverlaysinkplugins_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
+libgstoverlaysink_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 				 $(GST_BASE_LIBS) \
 				 $(GST_PLUGINS_BASE_LIBS) \
 				 -lgstvideo-$(GST_API_VERSION) \
@@ -40,11 +40,11 @@ libgstoverlaysinkplugins_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 				 ../../libs/libgstfsl-@GST_API_VERSION@.la
 
 if USE_BAD_ALLOCATOR
-libgstoverlaysinkplugins_la_LIBADD += -lgstbadallocators-$(GST_API_VERSION)
+libgstoverlaysink_la_LIBADD += -lgstbadallocators-$(GST_API_VERSION)
 endif
 
-libgstoverlaysinkplugins_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
-libgstoverlaysinkplugins_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
+libgstoverlaysink_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
+libgstoverlaysink_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
 
 noinst_HEADERS = osink_common.h gstosink.h gstosinkallocator.h osink_object.h compositor.h displays.h
 
