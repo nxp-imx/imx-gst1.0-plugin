@@ -223,6 +223,9 @@ HAVE_BAD_ALLOCATOR=no
 AC_CHECK_LIB(gstbadallocators-$GST_MAJORMINOR, gst_buffer_is_phymem, [HAVE_BAD_ALLOCATOR=yes])
 AM_CONDITIONAL(USE_BAD_ALLOCATOR, test "x$HAVE_BAD_ALLOCATOR" = "xyes")
 
+PKG_CHECK_MODULES(GST, gstreamer-$GST_MAJORMINOR >= 1.14, HAVE_BAD_BASE=no, HAVE_BAD_BASE=yes)
+AM_CONDITIONAL(USE_BAD_BASE, test "x$HAVE_BAD_BASE" = "xyes")
+
 AC_CHECK_HEADERS([vpu_lib.h], [HAVE_VPU_LIB=yes], [HAVE_VPU_LIB=no])
 if test "x$HAVE_VPU_LIB" = "xyes"; then
     VPU_LIBS=`$PKG_CONFIG --libs libfslvpuwrap 2>/dev/null`

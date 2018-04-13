@@ -17,12 +17,15 @@ endif
 
 libgstimxcompositor_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 				 $(GST_BASE_LIBS) \
-				 -lgstbadbase-$(GST_API_VERSION) \
 				 -lgstbadvideo-$(GST_API_VERSION) \
 				 $(GST_PLUGINS_BASE_LIBS) \
 				 -lgstvideo-$(GST_API_VERSION) \
 				 $(GST_LIBS) \
 				 ../../libs/libgstfsl-@GST_API_VERSION@.la
+
+if USE_BAD_BASE
+libgstimxcompositor_la_LIBADD += -lgstbadbase-$(GST_API_VERSION)
+endif
 
 libgstimxcompositor_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstimxcompositor_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)
