@@ -473,8 +473,13 @@ gst_imxcompositor_pad_prepare_frame (GstVideoAggregatorPad * pad,
 
   frame = g_slice_new0 (GstVideoFrame);
 
+#if GST_CHECK_VERSION(1, 14, 0)
+  if (!gst_video_frame_map (frame, &pad->info, pad->buffer,
+#else
   if (!gst_video_frame_map (frame, &pad->buffer_vinfo, pad->buffer,
+#endif
           GST_MAP_READ)) {
+
     GST_WARNING_OBJECT (vagg, "Could not map input buffer");
     g_slice_free (GstVideoFrame, frame);
     return FALSE;

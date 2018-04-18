@@ -1600,8 +1600,13 @@ gst_imxcompositor_class_init (GstImxCompositorClass * klass)
     GST_ERROR ("Couldn't create caps for device '%s'", in_plugin->name);
     caps = gst_caps_new_empty_simple ("video/x-raw");
   }
+#if GST_CHECK_VERSION(1, 14, 0)
+   gst_element_class_add_pad_template (gstelement_class,
+      gst_pad_template_new_with_gtype ("sink_%u", GST_PAD_SINK, GST_PAD_REQUEST, caps, GST_TYPE_IMXCOMPOSITOR_PAD));
+#else
   gst_element_class_add_pad_template (gstelement_class,
       gst_pad_template_new ("sink_%u", GST_PAD_SINK, GST_PAD_REQUEST, caps));
+#endif
 
   list = dev->get_supported_out_fmts(dev);
   caps = imx_compositor_caps_from_fmt_list(list);
@@ -1617,14 +1622,18 @@ gst_imxcompositor_class_init (GstImxCompositorClass * klass)
   klass->in_plugin = in_plugin;
   in_plugin->destroy(dev);
 
+#if GST_CHECK_VERSION(1, 14, 0)
+  agg_class->negotiated_src_caps = gst_imxcompositor_negotiated_caps;
+#else
   agg_class->sinkpads_type = GST_TYPE_IMXCOMPOSITOR_PAD;
+  videoaggregator_class->negotiated_caps = gst_imxcompositor_negotiated_caps;
+#endif
   agg_class->sink_query = gst_imxcompositor_sink_query;
   agg_class->src_query = gst_imxcompositor_src_query;
 
   videoaggregator_class->find_best_format = gst_imxcompositor_find_best_format;
   videoaggregator_class->update_caps = gst_imxcompositor_update_caps;
   videoaggregator_class->aggregate_frames = gst_imxcompositor_aggregate_frames;
-  videoaggregator_class->negotiated_caps = gst_imxcompositor_negotiated_caps;
   videoaggregator_class->get_output_buffer=gst_imxcompositor_get_output_buffer;
 
   g_object_class_install_property (gobject_class,
