@@ -1036,6 +1036,8 @@ gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps,
         1, G_MAXINT32, G_MAXINT32, 1, NULL);
   }
 
+  vagg->info = info;
+
   return ret;
 }
 
