@@ -191,7 +191,7 @@ PKG_CHECK_MODULES(GST_BAD_BASE, gstreamer-bad-base-$GST_MAJORMINOR >= $GST_REQUI
 
 dnl Give a warning if we don't have gstreamer libs
 if test "x$HAVE_GST_BAD_BASE" = "xno"; then
-  AC_MSG_ERROR(no GStreamer bad-base found)
+  AC_MSG_WARN(no GStreamer bad-base found)
 fi
 
 dnl make GST_BAD_BASE_CFLAGS and GST_BAD_BASE_LIBS available
