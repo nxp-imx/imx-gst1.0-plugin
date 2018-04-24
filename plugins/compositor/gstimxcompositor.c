@@ -1616,15 +1616,17 @@ gst_imxcompositor_class_init (GstImxCompositorClass * klass)
     GST_ERROR ("Couldn't create caps for device '%s'", in_plugin->name);
     caps = gst_caps_new_empty_simple ("video/x-raw");
   }
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_pad_template_new ("src", GST_PAD_SRC, GST_PAD_ALWAYS, caps));
 
   klass->in_plugin = in_plugin;
   in_plugin->destroy(dev);
 
 #if GST_CHECK_VERSION(1, 14, 0)
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_pad_template_new_with_gtype ("src", GST_PAD_SRC, GST_PAD_ALWAYS, caps, GST_TYPE_AGGREGATOR_PAD));
   agg_class->negotiated_src_caps = gst_imxcompositor_negotiated_caps;
 #else
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_pad_template_new ("src", GST_PAD_SRC, GST_PAD_ALWAYS, caps));
   agg_class->sinkpads_type = GST_TYPE_IMXCOMPOSITOR_PAD;
   videoaggregator_class->negotiated_caps = gst_imxcompositor_negotiated_caps;
 #endif
