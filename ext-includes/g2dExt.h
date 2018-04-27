@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 2013-2016 Freescale Semiconductor, Inc.
- *
+ *  Copyright 2018 NXP
  */
 /*
 * This library is free software; you can redistribute it and/or

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2010-2016, Freescale Semiconductor, Inc.
- * Copyright 2017 NXP
+ * Copyright 2017-2018 NXP
  */
 
 /*
