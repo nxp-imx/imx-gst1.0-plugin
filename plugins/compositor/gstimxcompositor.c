@@ -120,6 +120,8 @@
 #include <string.h>
 
 #include <gst/allocators/gstdmabuf.h>
+#include <gst/allocators/gstdmabufmeta.h>
+#include <libdrm/drm_fourcc.h>
 #include <gst/allocators/gstallocatorphymem.h>
 #include <gst/allocators/gstphymemmeta.h>
 #ifdef USE_ION
@@ -1146,6 +1148,8 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
 {
   GstVideoAggregatorPad *ppad = (GstVideoAggregatorPad *)pad;
   guint i, n_mem;
+  GstDmabufMeta *dmabuf_meta;
+  gint64 drm_modifier = 0;
 
   src->info.fmt = GST_VIDEO_INFO_FORMAT(&(ppad->aggregated_frame->info));
   src->info.w = ppad->aggregated_frame->info.width +
@@ -1153,6 +1157,15 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
   src->info.h = ppad->aggregated_frame->info.height +
                 pad->align.padding_top + pad->align.padding_bottom;
   src->info.stride = ppad->aggregated_frame->info.stride[0];
+
+  dmabuf_meta = gst_buffer_get_dmabuf_meta (ppad->aggregated_frame->buffer);
+  if (dmabuf_meta)
+    drm_modifier = dmabuf_meta->drm_modifier;
+
+  GST_INFO_OBJECT (pad, "buffer modifier type %d", drm_modifier);
+
+  if (drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED)
+    src->info.tile_type = IMX_2D_TILE_AMHPION;
 
   GST_LOG_OBJECT (pad, "Input: %s, %dx%d(%d), crop(%d,%d,%d,%d)",
       GST_VIDEO_FORMAT_INFO_NAME(ppad->aggregated_frame->info.finfo),
