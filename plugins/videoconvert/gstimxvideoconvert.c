@@ -1359,8 +1359,15 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   src.info.stride = in->info.stride[0];
 
   dmabuf_meta = gst_buffer_get_dmabuf_meta (in->buffer);
-  if (dmabuf_meta)
+  if (dmabuf_meta) {
     drm_modifier = dmabuf_meta->drm_modifier;
+    dmabuf_meta->drm_modifier = 0;
+  }
+
+  dmabuf_meta = gst_buffer_get_dmabuf_meta (out->buffer);
+  if (dmabuf_meta) {
+    dmabuf_meta->drm_modifier = 0;
+  }
 
   GST_INFO_OBJECT (imxvct, "buffer modifier type %d", drm_modifier);
 
