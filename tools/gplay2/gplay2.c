@@ -805,6 +805,8 @@ gplay_checkfeature (CHIP_FEATURE type)
       ret = FALSE;
       break;
   }
+
+  return ret;
 }
 
 
@@ -1512,17 +1514,24 @@ main (int argc, char *argv[])
     options.timeout = DEFAULT_TIME_OUT;
   }
 
-
-    if (!options.video_sink_name) {
-      VideoRender =
-        gst_player_video_overlay_video_renderer_new (NULL);
-    } else {
+  if (!options.video_sink_name) {
+    if (gplay_checkfeature (VPU) && gplay_checkfeature (DPU)) {
+      options.video_sink_name = "imxvideoconvert_g2d ! queue ! video/x-raw,format=RGB16 ! waylandsink";
       g_print ("Set VideoSink %s \n", options.video_sink_name);
       video_sink =
-          gst_parse_bin_from_description (options.video_sink_name, TRUE, NULL);
+        gst_parse_bin_from_description (options.video_sink_name, TRUE, NULL);
       VideoRender =
         gst_player_video_overlay_video_renderer_new_with_sink (NULL, video_sink);
-    }
+    } else
+      VideoRender =
+        gst_player_video_overlay_video_renderer_new (NULL);
+  } else {
+    g_print ("Set VideoSink %s \n", options.video_sink_name);
+    video_sink =
+      gst_parse_bin_from_description (options.video_sink_name, TRUE, NULL);
+    VideoRender =
+      gst_player_video_overlay_video_renderer_new_with_sink (NULL, video_sink);
+  }
 
   VideoOverlayVideoRenderer =
       GST_PLAYER_VIDEO_OVERLAY_VIDEO_RENDERER (VideoRender);
