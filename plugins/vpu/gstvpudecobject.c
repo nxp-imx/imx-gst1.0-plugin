@@ -142,6 +142,11 @@ gst_vpu_dec_object_get_sink_caps (void)
           map++;
           continue;
         }
+        if (IS_IMX8MM() && (map->std != VPU_V_HEVC && map->std != VPU_V_VP9
+                    && map->std != VPU_V_AVC && map->std != VPU_V_VP8)) {
+            map++;
+            continue;
+        }
         if (caps) {
           GstCaps *newcaps = gst_caps_from_string (map->mime);
           if (newcaps) {
