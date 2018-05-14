@@ -849,7 +849,7 @@ gst_imx_fbdevsink_class_init (GstImxFBDEVSinkClass * klass)
 
   videosink_class->show_frame = GST_DEBUG_FUNCPTR (gst_imx_fbdevsink_show_frame);
 
-  gst_element_class_set_static_metadata (gstelement_class, "imx fbdev video sink",
+  gst_element_class_set_static_metadata (gstelement_class, "IMX fbdev video sink",
       "Sink/Video", "Linux framebuffer videosink for i.Mx",
       IMX_GST_PLUGIN_AUTHOR);
 

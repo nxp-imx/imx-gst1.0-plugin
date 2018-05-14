@@ -430,7 +430,7 @@ static void gst_aiurdemux_class_init (GstAiurDemuxClass * klass)
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&gst_aiurdemux_subsrc_template));
 
-  gst_element_class_set_static_metadata (gstelement_class, "Aiur universal demuxer",
+  gst_element_class_set_static_metadata (gstelement_class, "IMX Aiur universal demuxer",
       "Codec/Demuxer",
       "demux container file to video, audio, and subtitle",
       "FreeScale Multimedia Team <shamm@freescale.com>");
