@@ -194,7 +194,7 @@ gst_beep_dec_class_init (GstBeepDecClass * klass)
     //base_class->parse = GST_DEBUG_FUNCPTR (beep_dec_parse_and_decode);
     base_class->flush = GST_DEBUG_FUNCPTR (beep_dec_flush);
 
-    gst_element_class_set_static_metadata (gstelement_class, "Beep universal decoder",
+    gst_element_class_set_static_metadata (gstelement_class, "IMX Beep universal decoder",
         "Codec/Decoder/Audio",
         "Decode compressed audio to raw data",
         "FreeScale Multimedia Team <shamm@freescale.com>");
