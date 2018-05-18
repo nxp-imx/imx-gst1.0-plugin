@@ -528,6 +528,8 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
         || open_param->CodecFormat == VPU_V_AVC))
       || IS_AMPHION()) {
     open_param->nTiled2LinearEnable = 1;
+    if (IS_IMX8MM())
+        open_param->nTiled2LinearEnable = 0;
     vpu_dec_object->implement_config = TRUE;
     if (open_param->CodecFormat == VPU_V_HEVC
         || open_param->CodecFormat == VPU_V_VP9)
@@ -538,8 +540,10 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
     open_param->nTiled2LinearEnable = 0;
   }
   open_param->nEnableVideoCompressor = 1;
-  if (IS_IMX8MM())
+  if (IS_IMX8MM()) {
     open_param->nEnableVideoCompressor = 0;
+    open_param->nPixelFormat = 1;
+  }
   vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_NV12;
   if (open_param->CodecFormat == VPU_V_MJPG) {
     vpu_dec_object->is_mjpeg = TRUE;
