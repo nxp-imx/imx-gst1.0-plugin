@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2013-2016 Freescale Semiconductor, Inc.
+ *  Copyright (C) 2013-2015 Freescale Semiconductor, Inc.
  *  Copyright 2018 NXP
  */
 /*
@@ -54,21 +54,6 @@ int g2d_blitEx(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_surfaceEx *
 int g2d_blitEx_dispatch(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_surfaceEx *dstEx, int imxdpu_id);
 
 int g2d_set_clipping(void *handle, int left, int top, int right, int bottom);
-
-#if defined(ANDROID)
-#include <system/window.h>
-//this is private API and not exported in g2d.h
-//fsl hwcomposer need get alignment information for gralloc buffer
-int get_aligned_size(buffer_handle_t hnd, int *width, int *height);
-int get_flip_offset(buffer_handle_t hnd, int *offset);
-
-void* g2d_getRenderBuffer(void *handle, void *BufferHandle);
-unsigned int g2d_postBuffer(void *handle, void* PostBuffer);
-
-int g2d_getTiling(buffer_handle_t hnd, enum g2d_tiling* tile);
-enum g2d_format g2d_alterFormat(buffer_handle_t hnd, enum g2d_format format);
-#endif
-
 
 #ifdef __cplusplus
 }

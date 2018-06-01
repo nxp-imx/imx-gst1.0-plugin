@@ -33,6 +33,9 @@
  *  2015-04-10         Meng Mingming     0.9            support multiple source blit
  *  2015-11-03         Meng Mingming     1.0            support query 2D hardware type and feature
  *  2016-05-24         Meng Mingming     1.1            support get g2d_buf from dma fd
+ *  2017-07-04         Prabhu Sundararaj 1.2            support get g2d_buf to export dma fd
+ *  2018-04-24         Yuchou Gan        1.3            Add AMPHION_TILED support
+
 */
 
 #ifndef __G2D_H__
@@ -132,6 +135,13 @@ enum g2d_hardware_type
     G2D_HARDWARE_VG           = 1,
 };
 
+enum g2d_status
+{
+    G2D_STATUS_FAIL           =-1,
+    G2D_STATUS_OK             = 0,
+    G2D_STATUS_NOT_SUPPORTED  = 1,
+};
+
 struct g2d_surface
 {
     enum g2d_format format;
@@ -171,6 +181,8 @@ struct g2d_surface
 
     //rotation degree
     enum g2d_rotation rot;
+
+    int deinterlace;
 };
 
 struct g2d_surface_pair
@@ -206,6 +218,7 @@ int g2d_disable(void *handle, enum g2d_cap_mode cap);
 int g2d_cache_op(struct g2d_buf *buf, enum g2d_cache_mode op);
 struct g2d_buf *g2d_alloc(int size, int cacheable);
 struct g2d_buf *g2d_buf_from_fd(int fd);
+int g2d_buf_export_fd(struct g2d_buf *);
 struct g2d_buf *g2d_buf_from_virt_addr(void *vaddr, int size);
 int g2d_free(struct g2d_buf *buf);
 

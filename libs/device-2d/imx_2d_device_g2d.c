@@ -466,10 +466,18 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   if (g2d->src.tiling == G2D_AMPHION_TILED && src->fd[1] >= 0)
     g2d->src.base.planes[1] = phy_addr_from_fd (src->fd[1]);
 
-  GST_TRACE ("g2d src : %dx%d,%d(%d,%d-%d,%d), alpha=%d, format=%d",
+  switch (src->interlace_type) {
+    case IMX_2D_INTERLACE_INTERLEAVED:
+      g2d->src.base.deinterlace = 1;
+      break;
+    default:
+      break;
+  }
+
+  GST_TRACE ("g2d src : %dx%d,%d(%d,%d-%d,%d), alpha=%d, format=%d, deinterlace: %d",
       g2d->src.base.width, g2d->src.base.height,g2d->src.base.stride, g2d->src.base.left,
       g2d->src.base.top, g2d->src.base.right, g2d->src.base.bottom, g2d->src.base.global_alpha,
-      g2d->src.base.format);
+      g2d->src.base.format, g2d->src.base.deinterlace);
 
   // Set output
   g2d->dst.base.global_alpha = dst->alpha;
