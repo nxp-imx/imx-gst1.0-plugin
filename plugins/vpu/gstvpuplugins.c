@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2018 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -32,7 +33,7 @@ static gboolean
 plugin_init (GstPlugin * plugin)
 {
   if (HAS_VPU()) {
-    if (!IS_HANTRO())
+    if (!IS_HANTRO() || IS_IMX8MM())
       if (!gst_vpu_enc_register (plugin))
         return FALSE;
     

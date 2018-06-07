@@ -25,6 +25,10 @@ if USE_ION
 libgstvpu_la_CFLAGS += -DUSE_ION
 endif
 
+if USE_H1_ENC
+libgstvpu_la_CFLAGS += -DUSE_H1_ENC
+endif
+
 if USE_BAD_ALLOCATOR
 libgstvpu_la_LIBADD += -lgstbadallocators-$(GST_API_VERSION)
 endif

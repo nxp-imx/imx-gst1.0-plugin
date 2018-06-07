@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2018 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -47,6 +48,8 @@ struct _GstVpuEnc {
 	GstBuffer *internal_input_buffer;
   guint gop_count;
   gboolean bitrate_updated;
+  gint64 total_frames;
+  gint64 total_time;
 };
 
 struct _GstVpuEncClass {
