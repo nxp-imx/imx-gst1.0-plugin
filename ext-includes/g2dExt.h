@@ -42,6 +42,7 @@ enum g2d_tiling
     G2D_TILED               = 0x2,
     G2D_SUPERTILED          = 0x4,
     G2D_AMPHION_TILED       = 0x8,
+    G2D_AMPHION_INTERLACED  = 0x10,
 };
 
 struct g2d_surfaceEx

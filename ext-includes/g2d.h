@@ -1,6 +1,6 @@
 /*
- *  Copyright (C) 2013-2016 Freescale Semiconductor, Inc.
- *
+ *  Copyright (C) 2013-2015 Freescale Semiconductor, Inc.
+ *  Copyright 2018 NXP
  */
 /*
 * This library is free software; you can redistribute it and/or
@@ -181,8 +181,6 @@ struct g2d_surface
 
     //rotation degree
     enum g2d_rotation rot;
-
-    int deinterlace;
 };
 
 struct g2d_surface_pair
