@@ -460,7 +460,8 @@ static gboolean beep_dec_set_format(GstAudioDecoder *dec, GstCaps *caps)
             } else {
               goto dsp_fail;
             }
-            beepdec->handle = IDecoder->createDecoderplus(&ops, type);
+            if (beepdec->handle == NULL)
+              beepdec->handle = IDecoder->createDecoderplus(&ops, type);
             if (beepdec->handle == NULL) {
               /* create fail, dsp not support */
               GST_INFO (" dsp create decoder fail ");
@@ -499,7 +500,8 @@ dsp_fail:
         ops.ReAlloc = beepdec_core_mem_realloc;
         ops.Free = beepdec_core_mem_free;
 
-        beepdec->handle = IDecoder->createDecoder (&ops);
+        if(beepdec->handle == NULL)
+          beepdec->handle = IDecoder->createDecoder (&ops);
 
         if(beepdec->handle == NULL)
             break;
@@ -864,7 +866,7 @@ begin:
         GST_LOG_OBJECT (beepdec,"decode RET=%x input size=%d,used size=%d,output_size=%d"
             ,core_ret,inbuf_size,offset,out_size);
 
-        if (ACODEC_ERROR_STREAM == core_ret) {
+        if ((ACODEC_ERROR_STREAM == core_ret) || (ACODEC_ERR_UNKNOWN == core_ret)){
             GST_WARNING("decode END error = %x\n", core_ret);
             IDecoder->resetDecoder(handle);
             //send null frame to delete the timestamp
