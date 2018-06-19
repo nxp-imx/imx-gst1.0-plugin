@@ -40,6 +40,7 @@
 #include <gst/video/video.h>
 #include <gst/video/gstvideometa.h>
 #include <gst/video/gstvideopool.h>
+#include <gst/allocators/gstdmabuf.h>
 #include "gstimxcommon.h"
 #include "gstvpuallocator.h"
 #include "gstvpuenc.h"
@@ -281,12 +282,15 @@ gst_vpu_enc_class_init (GstVpuEncClass * klass)
         gst_static_pad_template_get (&static_sink_template_jpeg));
     gst_element_class_add_pad_template (element_class,
         gst_static_pad_template_get (&static_src_template_jpeg));
-  } else if (in_plugin->std == VPU_V_VP8) {
+  }
+#ifdef USE_H1_ENC
+  else if (in_plugin->std == VPU_V_VP8) {
     gst_element_class_add_pad_template (element_class,
         gst_static_pad_template_get (&static_sink_template));
     gst_element_class_add_pad_template (element_class,
         gst_static_pad_template_get (&static_src_template_vp8));
   }
+#endif
 
   gst_element_class_set_static_metadata (element_class,
       in_plugin->description, "Codec/Encoder/Video",
@@ -1218,6 +1222,11 @@ gboolean gst_vpu_enc_register (GstPlugin * plugin)
   while (in_plugin->name) {
 #ifdef USE_H1_ENC
     if (g_strcmp0 (in_plugin->name, "h264") && g_strcmp0 (in_plugin->name, "vp8")) {
+      in_plugin++;
+      continue;
+    }
+#else
+    if (!g_strcmp0 (in_plugin->name, "vp8")) {
       in_plugin++;
       continue;
     }
