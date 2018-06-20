@@ -2458,7 +2458,7 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
         codec = "Dobly Digital Plus (E-AC3)";
         mime =
             g_strdup_printf
-            ("audio/eac3, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld",
+            ("audio/x-eac3, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld",
             stream->info.audio.n_channels, stream->info.audio.rate,
             stream->bitrate);
         break;

@@ -35,7 +35,7 @@ library = @vorbisd_arm12_SONAME@
 [ddplus]
 longname = DDplus decoder
 description = Decode Dobly Digital Plus audio to raw data
-mime = audio/eac3
+mime = audio/x-eac3
 library = @ddpd_arm12_SONAME@
 
 [amr-nb]
