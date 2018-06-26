@@ -629,6 +629,10 @@ gst_vpu_enc_decide_output_video_format (GstVideoEncoder * benc)
   if (!g_strcmp0(video_format_str, "avc"))
     enc->open_param.nIsAvcc = 1;
 
+  // hantro vpu wrapper only output bytestream
+  if (IS_HANTRO())
+      enc->open_param.nIsAvcc = 0;
+
   gst_caps_unref(caps);
 
   return TRUE;
