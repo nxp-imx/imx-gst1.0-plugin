@@ -35,6 +35,7 @@
 #include <gst/pbutils/encoding-profile.h>
 #include <gst/pbutils/encoding-target.h>
 #include "recorder_engine.h"
+#include "gstimxcommon.h"
 /*
  * debug logging
  */
@@ -328,6 +329,16 @@ create_encording_profile (gRecorderEngine *recorder)
         gst_encoding_container_profile_add_profile (container, sprof);
         gst_caps_unref (caps);
         break;
+    case RE_VIDEO_ENCODER_VP8:
+        caps = gst_caps_new_simple ("video/x-vp8", NULL);
+        sprof = (GstEncodingProfile *)
+          gst_encoding_video_profile_new (caps, NULL, NULL, 1);
+        //FIXME: videorate has issue.
+        gst_encoding_video_profile_set_variableframerate ((GstEncodingVideoProfile
+              *) sprof, TRUE);
+        gst_encoding_container_profile_add_profile (container, sprof);
+        gst_caps_unref (caps);
+        break;
     default:
       break;
   }
@@ -336,7 +347,7 @@ create_encording_profile (gRecorderEngine *recorder)
     case RE_AUDIO_ENCODER_DEFAULT:
     case RE_AUDIO_ENCODER_MP3:
       caps = gst_caps_new_simple ("audio/mpeg",
-          "mpegversion", G_TYPE_INT, 1, "layer", G_TYPE_INT, 3, NULL);
+          "mpegversion", G_TYPE_INT, 1, "layer", G_TYPE_INT, 2, NULL);
       gst_encoding_container_profile_add_profile (container, (GstEncodingProfile *)
           gst_encoding_audio_profile_new (caps, NULL, NULL, 1));
       gst_caps_unref (caps);
@@ -822,7 +833,8 @@ setup_pipeline (gRecorderEngine *recorder)
     else
       wrapper = gst_element_factory_make ("wrappercamerabinsrc", NULL);
 
-    if (g_strcmp0(recorder->videosrc_name, "imxv4l2src") == 0
+    if (g_strcmp0(recorder->videosrc_name, "v4l2src") == 0
+        || g_strcmp0(recorder->videosrc_name, "imxv4l2src") == 0
         || g_strcmp0(recorder->videosrc_name, "videotestsrc") == 0) {
       camerasrc = gst_element_factory_make (recorder->videosrc_name, NULL);
     } else {
@@ -893,7 +905,7 @@ setup_pipeline (gRecorderEngine *recorder)
     if (recorder->video_detect_name)
       recorder->vfsink_name = "imxv4l2sink";
     else
-      recorder->vfsink_name = "overlaysink";
+      recorder->vfsink_name = "autovideosink";
 
   /* configure used elements */
   res &=
@@ -1008,6 +1020,7 @@ setup_pipeline (gRecorderEngine *recorder)
         recorder->mode == MODE_VIDEO ? MODE_IMAGE : MODE_VIDEO, NULL);
   }
 
+#if 0
   //FIXME: shouldn't need those code. will check later.
   if (GST_IS_VIDEO_OVERLAY (recorder->viewfinder_sink)) {
     gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(recorder->viewfinder_sink),
@@ -1015,6 +1028,7 @@ setup_pipeline (gRecorderEngine *recorder)
   } else {
     g_warning ("view finder sink isn't video overlay.\n");
   }
+#endif
 
   if (GST_STATE_CHANGE_FAILURE ==
       gst_element_set_state (recorder->camerabin, GST_STATE_READY)) {
@@ -1436,12 +1450,13 @@ static REresult set_video_source(RecorderEngineHandle handle, REuint32 vs)
   RecorderEngine *h = (RecorderEngine *)(handle);
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
   CHECK_PARAM (vs, RE_VIDEO_SOURCE_LIST_END);
+  gchar *videosrc = NULL;
 
   static KeyMap kKeyMap[] = {
-    { RE_VIDEO_SOURCE_DEFAULT, (REchar *)"imxv4l2src" },
-    { RE_VIDEO_SOURCE_CAMERA, (REchar *)"imxv4l2src" },
-    { RE_VIDEO_SOURCE_SCREEN, (REchar *)"ximagesrc ! queue ! imxcompositor_ipu" },
+    { RE_VIDEO_SOURCE_DEFAULT, (REchar *)"autovideosrc" },
+    { RE_VIDEO_SOURCE_CAMERA, (REchar *)"autovideosrc" },
     { RE_VIDEO_SOURCE_TEST, (REchar *)"videotestsrc" },
+    { RE_VIDEO_SOURCE_SCREEN, (REchar *)"ximagesrc ! queue ! imxcompositor_ipu" },
   };
 
   recorder->videosrc_name = key_value_pair (vs, kKeyMap, sizeof(kKeyMap));
@@ -1658,7 +1673,12 @@ static REresult add_time_stamp(RecorderEngineHandle handle, REboolean bAddTimeSt
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
 
   if (bAddTimeStamp) {
-    recorder->date_time = "clockoverlay halignment=left valignment=top time-format=\"%Y/%m/%d  %H:%M:%S \" ! queue ! imxvideoconvert_ipu composition-meta-enable=true in-place=true ! queue";
+      if (IS_IMX8MM()) {
+          recorder->date_time = "clockoverlay halignment=left valignment=top time-format=\"%Y/%m/%d  %H:%M:%S \" ! queue ! imxvideoconvert_g2d composition-meta-enable=true in-place=true ! queue";
+      }
+      else {
+          recorder->date_time = "clockoverlay halignment=left valignment=top time-format=\"%Y/%m/%d  %H:%M:%S \" ! queue ! imxvideoconvert_ipu composition-meta-enable=true in-place=true ! queue";
+      }
   } else {
     recorder->date_time = NULL;
   }
@@ -1671,6 +1691,11 @@ static REresult add_video_effect(RecorderEngineHandle handle, REuint32 videoEffe
   RecorderEngine *h = (RecorderEngine *)(handle);
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
   CHECK_PARAM (videoEffect, RE_VIDEO_EFFECT_LIST_END);
+
+  if (IS_IMX8MM()) {
+      g_print("***Video effect is not supported!\n");
+      return RE_RESULT_FEATURE_UNSUPPORTED;
+  }
 
 /* check gstreamer version, pipeline is different in 1.4.5 and 1.6.0 */
 /* gray shader effect has been removed in GST-1.8.0 */
@@ -1718,6 +1743,11 @@ static REresult add_video_detect(RecorderEngineHandle handle, REuint32 videoDete
   RecorderEngine *h = (RecorderEngine *)(handle);
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
   CHECK_PARAM (videoDetect, RE_VIDEO_DETECT_LIST_END);
+
+  if (IS_IMX8MM()) {
+      g_print("***Video detect is not supported!\n");
+      return RE_RESULT_FEATURE_UNSUPPORTED;
+  }
 
   static KeyMap kKeyMap[] = {
     { RE_VIDEO_DETECT_DEFAULT, NULL },

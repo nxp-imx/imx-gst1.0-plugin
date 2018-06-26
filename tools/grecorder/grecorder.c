@@ -303,7 +303,9 @@ static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
   /* Video time stamp and video effect */
   recorder->add_time_stamp ((RecorderEngineHandle)recorder, pOpt->add_time_stamp);
   recorder->add_video_effect ((RecorderEngineHandle)recorder, pOpt->video_effect);
+#ifdef SUPPORT_VIDEO_DETECT
   recorder->add_video_detect ((RecorderEngineHandle)recorder, pOpt->video_detect);
+#endif
 
   /* Audio encoder interface */
   {
@@ -601,7 +603,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"audio input: 0->default(mic), 1->mic, 2->audiotestsrc"},
       {"audio sample rate"},
       {"audio channel"},
-      {"video input: 0->default(camera), 1->camera, 2->screen, 3->videotestsrc"},
+      {"video input: 0->default(camera), 1->camera, 2->videotestsrc"},
       {"camera id: 0->/dev/video0, 1->/dev/video1"},
       {"camera output video format: 0->default(I420), 1->I420, 2->NV12, 3->YUYV, 4->UYVY"},
       {"camera output video width"},
@@ -609,7 +611,9 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"camera output video FPS"},
       {"add date/time onto video"},
       {"video effect: 0->default(no effect),1:cube,2:mirror,3:squeeze,4:fisheye,5:gray,6:tunnel,7:twirl"},
+#ifdef SUPPORT_VIDEO_DETECT
       {"video detect: 0->default(no detect),1:face detect,2:faceblur"},
+#endif
       {"preview video left"},
       {"preview video top"},
       {"preview video width"},
@@ -618,9 +622,9 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"need preview buffer"},
       {"audio encoder type: 0->default(MP3), 1->MP3"},
       {"audio encoder bitrate(kbps)"},
-      {"video encoder type: 0->default(H264), 1->H264, 2->MPEG4, 3->H263, 4->MPEG"},
+      {"video encoder type: 0->default(H264), 1->H264, 2->MPEG4, 3->H263, 4->MPEG, 5->VP8"},
       {"video encoder bitrate(kbps)"},
-      {"media container format: 0->default(MOV), 1->MOV, 2->MKV, 3->AVI, 4->FLV, 5->TS"},
+      {"media container format: 0->default(MP4), 1->MP4, 2->MKV, 3->AVI, 4->FLV, 5->TS"},
       {"output path"},
       {"RTP streaming host IP address"},
       {"RTP streaming port"},
@@ -645,7 +649,9 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"fps",    required_argument, 0, 'f'},
       {"date_time", no_argument,       &add_time_stamp, 1},
       {"video_effect",    required_argument, 0, 'q'},
+#ifdef SUPPORT_VIDEO_DETECT
       {"video_detect",    required_argument, 0, 'x'},
+#endif
       {"preview_left",    required_argument, 0, 'l'},
       {"preview_top",    required_argument, 0, 't'},
       {"preview_width",    required_argument, 0, 'b'},
@@ -667,7 +673,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {0, 0, 0, 0}
     };
 
-    c = getopt_long (argc, argv, "abcdefg",
+    c = getopt_long (argc, argv, "a:s:w:e:u:f:k:t:q:i:v:n:z:o:r:x",
         long_options, &option_index);
 
     /* Detect the end of the options. */
@@ -805,6 +811,11 @@ int main(int argc, char* argv[])
   sigemptyset(&act.sa_mask);
   act.sa_flags = 0;
   sigaction(SIGINT, &act, NULL);
+
+  if (argc < 2) {
+      g_print ("Use -h to get usage help.\n");
+      return 0;
+  }
 
   memset(&options, 0, sizeof(REOptions));
   if (recorder_parse_options(argc,argv,&options)){
