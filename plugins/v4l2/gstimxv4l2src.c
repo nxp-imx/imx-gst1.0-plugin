@@ -848,7 +848,7 @@ gst_imx_v4l2src_class_init (GstImxV4l2SrcClass * klass)
   pushsrc_class->create = GST_DEBUG_FUNCPTR (gst_imx_v4l2src_create);
 
   gst_element_class_set_static_metadata (element_class, \
-      "IMX Video (video4linux2) Source", "Src/Video", \
+      "IMX Video (video4linux2) Source", "Source/Video", \
       "Capture frames from IMX SoC video4linux2 device", IMX_GST_PLUGIN_AUTHOR);
 
   GST_DEBUG_CATEGORY_INIT (imxv4l2src_debug, "imxv4l2src", 0, "Freescale IMX V4L2 source element");
