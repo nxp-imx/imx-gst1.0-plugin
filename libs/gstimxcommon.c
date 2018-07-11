@@ -23,6 +23,8 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <linux/version.h>
+#include <linux/dma-buf.h>
 #ifdef USE_ION
 #include <linux/ion.h>
 #endif
@@ -36,6 +38,7 @@ unsigned long phy_addr_from_fd(int dmafd)
   if (dmafd < 0)
     return NULL;
   
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 34)
   fd = open(dev_ion, O_RDWR);
   if(fd < 0) {
     return NULL;
@@ -59,6 +62,15 @@ unsigned long phy_addr_from_fd(int dmafd)
 
   return data.phys;
 #else
+  struct dma_buf_phys dma_phys;
+
+  ret = ioctl(dmafd, DMA_BUF_IOCTL_PHYS, &dma_phys);
+  if (ret < 0)
+    return NULL;
+
+  return dma_phys.phys;
+#endif
+#else
   return NULL;
 #endif
 }
@@ -71,6 +83,7 @@ unsigned long phy_addr_from_vaddr(void *vaddr, int size)
   if (!vaddr)
     return NULL;
   
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 34)
   fd = open(dev_ion, O_RDWR);
   if(fd < 0) {
     return NULL;
@@ -93,6 +106,9 @@ unsigned long phy_addr_from_vaddr(void *vaddr, int size)
     return NULL;
 
   return data.phys;
+#else
+  return NULL;
+#endif
 #else
   return NULL;
 #endif
