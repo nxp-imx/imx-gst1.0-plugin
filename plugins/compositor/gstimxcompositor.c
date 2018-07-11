@@ -1166,6 +1166,8 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
 
   if (drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED)
     src->info.tile_type = IMX_2D_TILE_AMHPION;
+  else
+    src->info.tile_type = IMX_2D_TILE_NULL;
 
   GST_LOG_OBJECT (pad, "Input: %s, %dx%d(%d), crop(%d,%d,%d,%d)",
       GST_VIDEO_FORMAT_INFO_NAME(ppad->aggregated_frame->info.finfo),
