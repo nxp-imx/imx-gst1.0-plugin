@@ -109,7 +109,8 @@ typedef REuint32    REresult;
 
 #define RE_AUDIO_ENCODER_DEFAULT            ((REuint32) 0x00000000)
 #define RE_AUDIO_ENCODER_MP3                ((REuint32) 0x00000001)
-#define RE_AUDIO_ENCODER_LIST_END           ((REuint32) 0x00000002)
+#define RE_AUDIO_ENCODER_NO_AUDIO           ((REuint32) 0x00000002)
+#define RE_AUDIO_ENCODER_LIST_END           ((REuint32) 0x00000003)
 
 #define RE_VIDEO_ENCODER_DEFAULT            ((REuint32) 0x00000000)
 #define RE_VIDEO_ENCODER_H264               ((REuint32) 0x00000001)

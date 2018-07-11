@@ -833,17 +833,12 @@ setup_pipeline (gRecorderEngine *recorder)
     else
       wrapper = gst_element_factory_make ("wrappercamerabinsrc", NULL);
 
-    if (g_strcmp0(recorder->videosrc_name, "v4l2src") == 0
-        || g_strcmp0(recorder->videosrc_name, "imxv4l2src") == 0
-        || g_strcmp0(recorder->videosrc_name, "videotestsrc") == 0) {
-      camerasrc = gst_element_factory_make (recorder->videosrc_name, NULL);
-    } else {
-      camerasrc = gst_parse_bin_from_description (recorder->videosrc_name, TRUE,
-          NULL);
-    }
+    camerasrc = gst_parse_bin_from_description (recorder->videosrc_name, TRUE, NULL);
+
     if (g_strcmp0(recorder->videosrc_name, "videotestsrc") == 0) {
       g_object_set (camerasrc, "is-live", TRUE, NULL);
     }
+
     g_object_set (wrapper, "video-source", camerasrc, NULL);
     g_object_set (wrapper, "post-previews", FALSE, NULL);
     g_object_unref (camerasrc);
@@ -1763,6 +1758,12 @@ static REresult add_video_detect(RecorderEngineHandle handle, REuint32 videoDete
 static REresult set_audio_encoder_settings(RecorderEngineHandle handle, REAudioEncoderSettings *audioEncoderSettings)
 {
   RecorderEngine *h = (RecorderEngine *)(handle);
+  gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
+  CHECK_PARAM (audioEncoderSettings->encoderType, RE_AUDIO_ENCODER_LIST_END);
+
+  GST_DEBUG ("set audio encoder format: %d", audioEncoderSettings->encoderType);
+  recorder->audio_encoder_format = audioEncoderSettings->encoderType;
+
   return RE_RESULT_SUCCESS;
 }
 

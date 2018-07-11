@@ -620,7 +620,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"preview video height"},
       {"disable view finder"},
       {"need preview buffer"},
-      {"audio encoder type: 0->default(MP3), 1->MP3"},
+      {"audio encoder type: 0->default(MP3), 1->MP3, 2->No Audio"},
       {"audio encoder bitrate(kbps)"},
       {"video encoder type: 0->default(H264), 1->H264, 2->MPEG4, 3->H263, 4->MPEG, 5->VP8"},
       {"video encoder bitrate(kbps)"},
@@ -673,7 +673,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {0, 0, 0, 0}
     };
 
-    c = getopt_long (argc, argv, "a:s:w:e:u:f:k:t:q:i:v:n:z:o:r:x",
+    c = getopt_long (argc, argv, "a:s:w:e:u:f:k:t:q:i:v:n:z:o:r:x:g:",
         long_options, &option_index);
 
     /* Detect the end of the options. */
@@ -754,6 +754,10 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       case 'x':
         if (optarg)
           pOpt->video_detect = atoi (optarg);
+        break;
+      case 'g':
+        if (optarg)
+          pOpt->audio_encoder = atoi (optarg);
         break;
       case 'h':
         printf ("Usage: grecorder-1.0 [OPTION]\n");
