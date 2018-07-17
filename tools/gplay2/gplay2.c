@@ -1083,6 +1083,18 @@ input_thread_fun (gpointer data)
       case 'c':                // playing direction and speed Control.
       {
         gdouble playback_rate;
+        gboolean seekable = FALSE;
+        GstPlayerMediaInfo *media_info = gst_player_get_media_info (player);
+
+        gDisable_display = TRUE;
+        seekable = gst_player_media_info_is_seekable (media_info);
+        g_object_unref (media_info);
+
+        if (!seekable) {
+          g_print ("file is not seekable!, rate can not be set! \n");
+          gDisable_display = FALSE;
+          break;
+        }
         g_print ("Set playing speed[-8,-4,-2,0.125,0.25,0.5,1,2,4,8]:");
         gDisable_display = TRUE;
         if (scanf ("%lf", &playback_rate) != 1) {
