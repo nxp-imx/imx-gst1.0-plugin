@@ -3828,6 +3828,8 @@ aiurdemux_do_seek (GstAiurDemux * demux, GstPad * pad, GstEvent * event)
   memcpy (&seeksegment, &demux->segment, sizeof (GstSegment));
 
   if (event) {
+    if (cur > seeksegment.stop)
+      seeksegment.stop = cur;
     gst_segment_do_seek (&seeksegment, rate, format, flags,
         cur_type, cur, stop_type, stop, &update);
   }
