@@ -788,6 +788,7 @@ gst_vpu_enc_setup_internal_bufferpool (GstVpuEnc * enc)
   GstCaps *caps;
   GstStructure *config;
   guint i;
+  guint alignH, alignV;
 
   enc->pool = gst_video_buffer_pool_new ();
   if (!enc->pool) {
@@ -803,15 +804,21 @@ gst_vpu_enc_setup_internal_bufferpool (GstVpuEnc * enc)
 
   params.align = enc->init_info.nAddressAlignment;
   memset(&(enc->video_align), 0, sizeof(GstVideoAlignment));
-  if (enc->open_param.nPicWidth % DEFAULT_FRAME_BUFFER_ALIGNMENT_H)
-    enc->video_align.padding_right = DEFAULT_FRAME_BUFFER_ALIGNMENT_H \
-      - enc->open_param.nPicWidth % DEFAULT_FRAME_BUFFER_ALIGNMENT_H;
-  if (enc->open_param.nPicHeight % DEFAULT_FRAME_BUFFER_ALIGNMENT_V)
-    enc->video_align.padding_bottom = DEFAULT_FRAME_BUFFER_ALIGNMENT_V\
-      - enc->open_param.nPicHeight % DEFAULT_FRAME_BUFFER_ALIGNMENT_V;
+
+  if (IS_HANTRO()) {
+    alignH = DEFAULT_FRAME_BUFFER_ALIGNMENT_H_HANTRO;
+    alignV = DEFAULT_FRAME_BUFFER_ALIGNMENT_V_HANTRO;
+  } else {
+    alignH = DEFAULT_FRAME_BUFFER_ALIGNMENT_H;
+    alignV = DEFAULT_FRAME_BUFFER_ALIGNMENT_V;
+  }
+  if (enc->open_param.nPicWidth % alignH)
+    enc->video_align.padding_right = alignH - enc->open_param.nPicWidth % alignH;
+  if (enc->open_param.nPicHeight % alignV)
+    enc->video_align.padding_bottom = alignV - enc->open_param.nPicHeight % alignV;
 
   for (i = 0; i < GST_VIDEO_MAX_PLANES; i++)
-    enc->video_align.stride_align[i] = DEFAULT_FRAME_BUFFER_ALIGNMENT_H - 1;
+    enc->video_align.stride_align[i] = alignH - 1;
 
   config = gst_buffer_pool_get_config(enc->pool);
   gst_buffer_pool_config_add_option(config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
