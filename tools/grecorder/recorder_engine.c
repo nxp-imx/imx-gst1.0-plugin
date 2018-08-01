@@ -922,6 +922,8 @@ setup_pipeline (gRecorderEngine *recorder)
   else
     if (recorder->video_detect_name)
       recorder->vfsink_name = "imxv4l2sink";
+    else if (IS_IMX6Q())
+      recorder->vfsink_name = "overlaysink";
     else
       recorder->vfsink_name = "autovideosink";
 
@@ -1038,15 +1040,13 @@ setup_pipeline (gRecorderEngine *recorder)
         recorder->mode == MODE_VIDEO ? MODE_IMAGE : MODE_VIDEO, NULL);
   }
 
-#if 0
-  //FIXME: shouldn't need those code. will check later.
+  /* handle imxcamera's preivewwidget window id */
   if (GST_IS_VIDEO_OVERLAY (recorder->viewfinder_sink)) {
     gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(recorder->viewfinder_sink),
         recorder->window);
   } else {
-    g_warning ("view finder sink isn't video overlay.\n");
+    GST_WARNING ("view finder sink isn't video overlay");
   }
-#endif
 
   if (GST_STATE_CHANGE_FAILURE ==
       gst_element_set_state (recorder->camerabin, GST_STATE_READY)) {
