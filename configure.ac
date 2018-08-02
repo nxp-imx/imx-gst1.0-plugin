@@ -235,7 +235,7 @@ if test "x$HAVE_VPU_LIB" = "xyes"; then
     VPU_LIBS=`$PKG_CONFIG --libs libfslvpuwrap 2>/dev/null`
     VPU_LIBS+=" -lvpu"
 fi
-AC_CHECK_HEADERS([hantro_dec/codec.h hantro_dec/dwl.h], [HAVE_VPU_LIB=yes], [HAVE_VPU_LIB=no])
+AC_CHECK_HEADERS([hantro_dec/dwl.h], [HAVE_VPU_LIB=yes], [HAVE_VPU_LIB=no])
 if test "x$HAVE_VPU_LIB" = "xyes"; then
     VPU_LIBS=`$PKG_CONFIG --libs libfslvpuwrap 2>/dev/null`
 fi
