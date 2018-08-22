@@ -46,7 +46,11 @@
 #include "gstvpuenc.h"
 
 #define DEFAULT_BITRATE 0
+#ifdef USE_H1_ENC
+#define DEFAULT_GOP_SIZE 30
+#else
 #define DEFAULT_GOP_SIZE 15
+#endif
 #define DEFAULT_QUANT -1
 #define DEFAULT_H264_QUANT 35
 #define DEFAULT_MPEG4_QUANT 15
