@@ -567,6 +567,7 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
     open_param->nChromaInterleave = 1;
     vpu_dec_object->chroma_interleaved = TRUE;
   }
+  open_param->nAdaptiveMode = 1;
   open_param->nReorderEnable = 1;
   open_param->nEnableFileMode = 0;
   open_param->nPicWidth = GST_VIDEO_INFO_WIDTH(info);
@@ -643,6 +644,8 @@ gst_vpu_dec_object_config (GstVpuDecObject * vpu_dec_object, \
 
   if (vpu_dec_object->vpu_report_resolution_change == FALSE \
       && vpu_dec_object->state >= STATE_REGISTRIED_FRAME_BUFFER) {
+    /* drain output */
+    gst_vpu_dec_object_decode (vpu_dec_object, bdec, NULL);
     dec_ret = VPU_DecClose(vpu_dec_object->handle);
     if (dec_ret != VPU_DEC_RET_SUCCESS) {
       GST_ERROR_OBJECT(vpu_dec_object, "closing decoder failed: %s", \
