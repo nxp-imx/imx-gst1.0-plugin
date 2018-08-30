@@ -112,7 +112,7 @@ static GstStaticPadTemplate static_sink_template = GST_STATIC_PAD_TEMPLATE(
 	GST_STATIC_CAPS(
 		"video/x-raw,"
 #ifdef USE_H1_ENC
-		"format = (string) { NV12, I420, YV12, YUY2 }, "
+		"format = (string) { NV12, I420, YUY2, UYVY, RGBA, RGBx, RGB16, RGB15, BGRA, BGRx, BGR16 }, "
 #else
         "format = (string) { NV12, I420, YV12 }, "
 #endif
@@ -736,7 +736,20 @@ gst_vpu_enc_set_format (GstVideoEncoder * benc, GstVideoCodecState * state)
       enc->open_param.eColorFormat = VPU_COLOR_420;
     } else if (!g_strcmp0(video_format_str, "YUY2")) {
       enc->open_param.nChromaInterleave = 1;
-      enc->open_param.eColorFormat = VPU_COLOR_422H;
+      enc->open_param.eColorFormat = VPU_COLOR_422YUYV;
+    } else if (!g_strcmp0(video_format_str, "UYVY")) {
+      enc->open_param.nChromaInterleave = 1;
+      enc->open_param.eColorFormat = VPU_COLOR_422UYVY;
+    } else if (!g_strcmp0(video_format_str, "RGBA") || !g_strcmp0(video_format_str, "RGBx")) {
+      enc->open_param.eColorFormat = VPU_COLOR_ARGB8888;
+    } else if (!g_strcmp0(video_format_str, "BGRA") || !g_strcmp0(video_format_str, "BGRx")) {
+      enc->open_param.eColorFormat = VPU_COLOR_BGRA8888;
+    }else if (!g_strcmp0(video_format_str, "RGB16")) {
+      enc->open_param.eColorFormat = VPU_COLOR_RGB565;
+    } else if (!g_strcmp0(video_format_str, "RGB15")) {
+      enc->open_param.eColorFormat = VPU_COLOR_RGB555;
+    } else if (!g_strcmp0(video_format_str, "BGR16")) {
+      enc->open_param.eColorFormat = VPU_COLOR_BGR565;
     }
   }
 

@@ -152,9 +152,9 @@ gst_vpu_register_frame_buffer (GList * gstbuffer_in_vpudec, \
     vpu_frame->pbufCr = vpu_frame->pbufCb + \
       (GST_VIDEO_FRAME_COMP_DATA (&frame, 2) - GST_VIDEO_FRAME_COMP_DATA (&frame, 1));
 
-    vpu_frame->pbufVirtY = GST_VIDEO_FRAME_COMP_DATA (&frame, 0);
-    vpu_frame->pbufVirtCb = GST_VIDEO_FRAME_COMP_DATA (&frame, 1);
-    vpu_frame->pbufVirtCr = GST_VIDEO_FRAME_COMP_DATA (&frame, 2);
+    vpu_frame->pbufVirtY = GST_VIDEO_FRAME_PLANE_DATA (&frame, 0);
+    vpu_frame->pbufVirtCb = GST_VIDEO_FRAME_PLANE_DATA (&frame, 1);
+    vpu_frame->pbufVirtCr = GST_VIDEO_FRAME_PLANE_DATA (&frame, 2);
 
     gst_video_frame_unmap (&frame);
   }
