@@ -1035,7 +1035,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 	}
 
   // Allocate needed physical buffer.
-  if (!gst_vpu_enc_allocate_physical_mem (enc, src_stride)) {
+  if (enc->init_info.nMinFrameBufferCount > 0 && (!gst_vpu_enc_allocate_physical_mem (enc, src_stride))) {
     GST_ERROR_OBJECT(enc, "gst_vpu_enc_allocate_physical_mem failed.");
     ret = GST_FLOW_ERROR;
     goto bail;
