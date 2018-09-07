@@ -1528,7 +1528,7 @@ main (int argc, char *argv[])
 
   if (!options.video_sink_name) {
     if (gplay_checkfeature (VPU) && gplay_checkfeature (DPU)) {
-      options.video_sink_name = "imxvideoconvert_g2d ! queue ! video/x-raw,format=RGB16 ! waylandsink";
+      options.video_sink_name = "imxvideoconvert_g2d ! queue ! waylandsink";
       g_print ("Set VideoSink %s \n", options.video_sink_name);
       video_sink =
         gst_parse_bin_from_description (options.video_sink_name, TRUE, NULL);
