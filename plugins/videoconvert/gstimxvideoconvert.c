@@ -1462,6 +1462,8 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   }
   if (GST_BUFFER_FLAG_IS_SET (input_frame->buffer, GST_VIDEO_BUFFER_FLAG_INTERLACED)) {
     src.interlace_type = IMX_2D_INTERLACE_INTERLEAVED;
+    GST_BUFFER_FLAG_UNSET (input_frame->buffer, GST_VIDEO_BUFFER_FLAG_INTERLACED);
+    GST_BUFFER_FLAG_UNSET (out->buffer, GST_VIDEO_BUFFER_FLAG_INTERLACED);
   }
 
   if (gst_is_dmabuf_memory (gst_buffer_peek_memory (out->buffer, 0))) {
