@@ -861,7 +861,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
     VpuBufferNode in_data = {0};
     int buf_ret;
     dec_ret = VPU_DecDecodeBuf(vpu_dec_object->handle, &in_data, &buf_ret);
-    if (dec_ret != VPU_DEC_RET_SUCCESS) {
+    if (dec_ret == VPU_DEC_RET_FAILURE) {
       GST_ERROR_OBJECT(vpu_dec_object, "VPU_DecDecodeBuf fail: %s", \
           gst_vpu_dec_object_strerror(dec_ret));
       return GST_FLOW_ERROR;
