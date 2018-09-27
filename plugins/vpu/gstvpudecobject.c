@@ -1098,7 +1098,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
     pmeta->rfc_chroma_offset = out_frame_info.pExtInfo->rfc_chroma_offset;
   }
   
-  if (vpu_dec_object->init_info.hasHdr10Meta) {
+  if (vpu_dec_object->init_info.hasHdr10Meta || vpu_dec_object->init_info.hasColorDesc) {
     GstVideoHdr10Meta *meta = gst_buffer_add_video_hdr10_meta (out_frame->output_buffer);
     meta->hdr10meta.redPrimary[0] = vpu_dec_object->init_info.Hdr10Meta.redPrimary[0];
     meta->hdr10meta.redPrimary[1] = vpu_dec_object->init_info.Hdr10Meta.redPrimary[1];
