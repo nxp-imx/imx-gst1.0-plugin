@@ -63,8 +63,7 @@ GST_DEBUG_CATEGORY_STATIC (recorder_engine);
 #define TIME_OVERLAY ""
 #endif
 
-// FIXME: g2d has issue to convert RGB to YUV, use SW composition currently
-//#define USE_HW_COMPOSITOR
+#define USE_HW_COMPOSITOR
 #ifdef USE_HW_COMPOSITOR
 #define HW_COMPOSITOR "queue ! imxvideoconvert_g2d composition-meta-enable=true in-place=true !"
 #else
@@ -1692,8 +1691,11 @@ static REresult add_time_stamp(RecorderEngineHandle handle, REboolean bAddTimeSt
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
 
   if (bAddTimeStamp) {
-      if (IS_IMX8MM() || IS_IMX8Q()) {
+      if (IS_IMX8MM()) {
           recorder->date_time = DATE_TIME TIME_OVERLAY HW_COMPOSITOR "queue";
+      }
+      else if (IS_IMX8Q()) {
+          recorder->date_time = DATE_TIME TIME_OVERLAY "queue";
       }
       else {
           recorder->date_time = DATE_TIME TIME_OVERLAY "queue ! imxvideoconvert_ipu composition-meta-enable=true in-place=true ! queue";
