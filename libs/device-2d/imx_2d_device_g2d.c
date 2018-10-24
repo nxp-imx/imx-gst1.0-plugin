@@ -464,8 +464,12 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   }
 
   if (g2d->src.tiling == G2D_AMPHION_TILED && src->fd[1] >= 0)
-    g2d->src.base.planes[1] = phy_addr_from_fd (src->fd[1]);
-
+  {
+    if (!src->mem->user_data)
+      src->mem->user_data = g2d->src.base.planes[1] = phy_addr_from_fd (src->fd[1]);
+    else
+      g2d->src.base.planes[1] = src->mem->user_data;
+  }
   switch (src->interlace_type) {
     case IMX_2D_INTERLACE_INTERLEAVED:
       g2d->src.tiling |= G2D_AMPHION_INTERLACED;

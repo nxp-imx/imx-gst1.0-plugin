@@ -1219,6 +1219,20 @@ static gboolean imx_video_convert_set_info(GstVideoFilter *filter,
   return TRUE;
 }
 
+static guint8 *
+_get_cached_phyaddr (GstMemory * mem)
+{
+    return gst_mini_object_get_qdata (GST_MINI_OBJECT (mem),
+              g_quark_from_static_string ("phyaddr"));
+}
+
+static void
+_set_cached_phyaddr (GstMemory * mem, guint8 * phyadd)
+{
+  return gst_mini_object_set_qdata (GST_MINI_OBJECT (mem),
+                g_quark_from_static_string ("phyaddr"), phyadd, NULL);
+}
+
 static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     GstVideoFrame *in, GstVideoFrame *out)
 {
@@ -1493,9 +1507,23 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     dst.crop.h = MIN(out_crop->height, (out->info.height - out_crop->y));
   }
 
+  if (!src.mem->paddr)
+    src.mem->paddr = _get_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 0));
+  if (!src.mem->user_data && src.fd[1])
+    src.mem->user_data = _get_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 1));
+  if (!dst.mem->paddr)
+    dst.mem->paddr = _get_cached_phyaddr (gst_buffer_peek_memory (out->buffer, 0));
+
   //convert
   if (device->convert(device, &dst, &src) == 0) {
     GST_TRACE ("frame conversion done");
+
+    if (!_get_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 0)))
+      _set_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 0), src.mem->paddr);
+    if (src.fd[1] && !_get_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 1)))
+      _set_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 1), src.mem->user_data);
+    if (!_get_cached_phyaddr (gst_buffer_peek_memory (out->buffer, 0)))
+      _set_cached_phyaddr (gst_buffer_peek_memory (out->buffer, 0), dst.mem->paddr);
 
     if (imxvct->composition_meta_enable) {
       if (imx_video_overlay_composition_has_meta(in->buffer)) {
