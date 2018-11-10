@@ -849,6 +849,7 @@ setup_pipeline (gRecorderEngine *recorder)
     GstElement *video_effect;
     GstElement *camerasrc;
     GstElement *capsfilter;
+    GstElement *actual_video_source;
     gchar *video_filter_str = NULL;
 
     if (recorder->wrappersrc_name)
@@ -859,7 +860,18 @@ setup_pipeline (gRecorderEngine *recorder)
     camerasrc = gst_parse_bin_from_description (recorder->videosrc_name, TRUE, NULL);
 
     if (g_strcmp0(recorder->videosrc_name, "videotestsrc") == 0) {
-      g_object_set (camerasrc, "is-live", TRUE, NULL);
+      GValue item = G_VALUE_INIT;
+      GstIterator *it = gst_bin_iterate_sources ((GstBin*)camerasrc);
+      if (gst_iterator_next (it, &item) != GST_ITERATOR_OK)
+      {
+        g_warning("%s(): gst_iterator_next failed\n", __FUNCTION__);
+        gst_iterator_free (it);
+        return RE_RESULT_INTERNAL_ERROR;
+      }
+      actual_video_source = g_value_get_object (&item);
+      g_value_unset (&item);
+      gst_iterator_free (it);
+      g_object_set (actual_video_source, "is-live", TRUE, NULL);
     }
 
     g_object_set (wrapper, "video-source", camerasrc, NULL);
