@@ -32,6 +32,7 @@ longname = Vorbis decoder
 description = Decode Vorbis compressed audio to raw data
 rank = 259
 mime = audio/x-vorbis
+dsp_lib = @dsp_arm_SONAME@
 library = @vorbisd_arm_SONAME@
 
 [ddplus]
