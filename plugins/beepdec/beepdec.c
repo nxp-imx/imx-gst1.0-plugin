@@ -457,7 +457,9 @@ static gboolean beep_dec_set_format(GstAudioDecoder *dec, GstCaps *caps)
               type = DAB_PLUS;
             } else if (!strcmp (IDecoder->name, "sbc")) {
               type = SBCDEC;
-            } else {
+            } else if (!strcmp (IDecoder->name, "vorbis")) {
+              type = OGG;
+            }else {
               goto dsp_fail;
             }
             if (beepdec->handle == NULL)
