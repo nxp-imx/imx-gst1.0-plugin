@@ -269,6 +269,7 @@ typedef struct {
 	int nAdaptiveMode;
 	void* pAppCxt;			/*reserved for future application extension*/
     int nSecureMode;
+    int nSecureBufferAllocSize;
 } VpuDecOpenParam;
 
 
