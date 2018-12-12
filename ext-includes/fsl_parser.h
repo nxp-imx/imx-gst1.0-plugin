@@ -2,6 +2,7 @@
 
 /*
 * Copyright (c) 2009-2016, Freescale Semiconductor, Inc. 
+* Copyright 2017-2018 NXP
  */
 
 /*
@@ -196,6 +197,13 @@ enum
 
 #define FLAG_SAMPLE_CODEC_DATA   0x40 /* This is a sample of codec data */
 
+#define FLAG_SAMPLE_PCR_INFO     0x80 /* This is a sample of PCR data, the data is stored in struct PCRInfo type */
+
+#define FLAG_SAMPLE_H264_SEI_POS_DATA 0x100 /* This is a sample of h264 sei position data, the position data gives the offset and
+                                             * size of the sei nalu in the h264 frame it belongs to */
+
+#define FLAG_SAMPLE_COMPRESSED_SAMPLE 0x200 //drm sample flag, need to call drm api to get drm info
+
 /*********************************************************************
  * seeking flags :
  when to seek, must set one of the following flags
@@ -205,7 +213,8 @@ enum
 #define SEEK_FLAG_NO_EARLIER 0X03    /* The actual seeked time shall be no earlier than the given time */
 #define SEEK_FLAG_FUZZ 0X04 /* Reserved. No accurate request on time but request quick response.
                                Parsers shall optimize performances with other flags.*/
-
+#define SEEK_FLAG_CLOSEST 0X05 /* this flag is only used for android when read options is ReadOptions::SEEK_CLOSEST in mp4 parser. */
+#define SEEK_FLAG_FRAME_INDEX 0X06 /* android cts requires this feature for mp4 parser */
 
 /*********************************************************************
  * direction for trick mode/sync sample reading
@@ -235,6 +244,10 @@ enum
 #define FLAG_OUTPUT_PTS 0x08
 //if set the flag, do not convert id3 data to utf8 in parser, other components will do it. 
 #define FLAG_ID3_FORMAT_NON_UTF8  0x10
+//if set the flag, send out PCR data
+#define FLAG_OUTPUT_PCR  0x20
+//if set the flag, output sei position data in a sample buffer
+#define FLAG_OUTPUT_H264_SEI_POS_DATA 0x40
 
 /*********************************************************************
  * User data ID
@@ -292,6 +305,7 @@ typedef enum FSL_PARSER_USER_DATA_TYPE
     USER_DATA_ANDROID_VERSION,
     USER_DATA_CAPTURE_FPS,
     USER_DATA_PSSH,
+    USER_DATA_MP4_CREATION_TIME, //in seconds since midnite, Jan,1, 1904, in UTC time
     USER_DATA_MAX
 } UserDataID;
 
@@ -555,6 +569,52 @@ typedef struct _PMTInfoList
     PMTInfo *m_ptPMTInfo;
 }PMTInfoList;
 
+//struct for FslParserGetTrackExtTag
+typedef struct _TrackExtTagItem
+{
+    uint32 index;
+    uint32 type;
+    uint32 size;
+    uint8* data;
+    struct _TrackExtTagItem * nextItemPtr;
+}TrackExtTagItem;
+
+typedef struct TrackExtTagList
+{
+    int32 num;
+    TrackExtTagItem * m_ptr;
+}TrackExtTagList;
+
+enum{
+    FSL_PARSER_TRACKEXTTAG_CRPYTOKEY = 0,
+    FSL_PARSER_TRACKEXTTAG_TX3G,
+    FSL_PARSER_TRACKEXTTAG_CRPYTOMODE,
+    FSL_PARSER_TRACKEXTTAG_CRPYTODEFAULTIVSIZE
+}TrackExtTagIndex;
+
+typedef struct _SeiPosition
+{
+    uint32 offset;
+    uint32 size;
+}SeiPosition;
+
+typedef struct
+{
+    uint32 maxCLL;
+    uint32 maxFALL;
+    bool hasMasteringMetadata;
+    float PrimaryRChromaticityX;
+    float PrimaryRChromaticityY;
+    float PrimaryGChromaticityX;
+    float PrimaryGChromaticityY;
+    float PrimaryBChromaticityX;
+    float PrimaryBChromaticityY;
+    float WhitePointChromaticityX;
+    float WhitePointChromaticityY;
+    float LuminanceMax;
+    float LuminanceMin;
+}VideoHDRColorInfo;
+
 /*********************************************************************************************************
  *                  API Function Prototypes List
  *
@@ -635,6 +695,10 @@ typedef int32 (*FslParserGetProgramTracks)( FslParserHandle parserHandle,
                                             uint32 * numTracks,
                                             uint32 ** ppTrackNumList);
 
+typedef int32 (*FslParserGetPCR)( FslParserHandle parserHandle,
+                                            uint32 programNum,
+                                            uint64* usPCR);
+
 /************************************************************************************************************
  *
  *              General Track Properties
@@ -664,6 +728,9 @@ typedef int32 (*FslParserGetDecSpecificInfo)(   FslParserHandle parserHandle,
                                                 uint8 ** data,
                                                 uint32 * size);
 
+typedef int32 (*FslParserGetTrackExtTag)(   FslParserHandle parserHandle,
+                                                uint32 trackNum,
+                                                TrackExtTagList **pList);
 
 /************************************************************************************************************
  *
@@ -682,6 +749,20 @@ typedef    int32 (*FslParserGetVideoFrameRate)( FslParserHandle parserHandle,
                                                 uint32 * scale);
 
 typedef    int32 (*FslParserGetVideoFrameRotation)(FslParserHandle parserHandle, uint32 trackNum, uint32 *rotation);
+
+/* optional */
+typedef    int32 (*FslParserGetVideoColorInfo)(FslParserHandle parserHandle, uint32 trackNum
+                                                , int32* primaries,int32 * transfer, int32* coeff, int32* fullRange);
+
+
+typedef    int32 (*FslParserGetVideoHDRColorInfo)(FslParserHandle parserHandle, uint32 trackNum, VideoHDRColorInfo *pInfo);
+
+typedef    int32 (*FslParserGetVideoDisplayWidth)(FslParserHandle parserHandle, uint32 trackNum, uint32 *width);
+
+typedef    int32 (*FslParserGetVideoDisplayHeight)(FslParserHandle parserHandle, uint32 trackNum, uint32 *height);
+
+typedef    int32 (*FslParserGetVideoFrameCount)(FslParserHandle parserHandle, uint32 trackNum, uint32 *count);
+
 
 /************************************************************************************************************
  *
@@ -729,7 +810,9 @@ typedef int32 (*FslParserGetTextTrackHeight)(   FslParserHandle parserHandle,
                                                 uint32 trackNum,
                                                 uint32 * height);
 
-
+typedef int32 (*FslParserGetTextTrackMime)(   FslParserHandle parserHandle,
+                                                uint32 trackNum,
+                                                uint8 ** sampleBuffer,uint32 * dataSize);
 /************************************************************************************************************
  *
  *               Sample Reading, Seek & Trick Mode
@@ -789,6 +872,15 @@ typedef int32 (*FslParserGetFileNextSyncSample)(FslParserHandle parserHandle,
                                             uint64 * usDuration,
                                             uint32 * flags); /* only for trick mode on video track */
 
+//crypto info for android widevine
+typedef int32 (*FslParserGetSampleCryptoInfo)(FslParserHandle parserHandle,
+                                            uint32 trackNum,
+                                            uint8** iv,
+                                            uint32 * ivSize,
+                                            uint8 ** clearBuffer,
+                                            uint32 * clearSize,
+                                            uint8 ** encryptedBuffer,
+                                            uint32 * encryptedSize);
 
 /* mandatory */
 typedef int32 (*FslParserSeek)( FslParserHandle parserHandle,
@@ -828,6 +920,7 @@ enum /* API function ID */
 
     PARSER_API_GET_NUM_PROGRAMS     = 26,
     PARSER_API_GET_PROGRAM_TRACKS   = 27,
+    PARSER_API_GET_PCR              = 28,
 
 
     /* generic track properties */
@@ -836,14 +929,18 @@ enum /* API function ID */
     PARSER_API_GET_LANGUAGE                     = 32,
     PARSER_API_GET_BITRATE                      = 36,
     PARSER_API_GET_DECODER_SPECIFIC_INFO        = 37,
-
+    PARSER_API_GET_TRACK_EXT_TAG                = 38,
 
     /* video properties */
     PARSER_API_GET_VIDEO_FRAME_WIDTH        = 50,
     PARSER_API_GET_VIDEO_FRAME_HEIGHT       = 51,
     PARSER_API_GET_VIDEO_FRAME_RATE         = 52,
     PARSER_API_GET_VIDEO_FRAME_ROTATION     = 53,
-
+    PARSER_API_GET_VIDEO_COLOR_INFO         = 54,
+    PARSER_API_GET_VIDEO_HDR_COLOR_INFO     = 55,
+    PARSER_API_GET_VIDEO_DISPLAY_WIDTH      = 56,
+    PARSER_API_GET_VIDEO_DISPLAY_HEIGHT     = 57,
+    PARSER_API_GET_VIDEO_FRAME_COUNT        = 58,
 
     /* audio properties */
     PARSER_API_GET_AUDIO_NUM_CHANNELS       = 60,
@@ -858,6 +955,7 @@ enum /* API function ID */
     /* text/subtitle properties */
     PARSER_API_GET_TEXT_TRACK_WIDTH = 80,
     PARSER_API_GET_TEXT_TRACK_HEIGHT= 81,
+    PARSER_API_GET_TEXT_TRACK_MIME = 82,
 
     /* sample reading, seek & trick mode */
     PARSER_API_GET_READ_MODE = 100,
@@ -872,6 +970,7 @@ enum /* API function ID */
     PARSER_API_GET_FILE_NEXT_SAMPLE = 115,
     PARSER_API_GET_FILE_NEXT_SYNC_SAMPLE = 116,
 
+    PARSER_API_GET_SAMPLE_CRYPTO_INFO = 117,
 
     PARSER_API_SEEK  = 120
 
