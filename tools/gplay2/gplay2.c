@@ -865,6 +865,11 @@ error_cb (GstPlayer * player, GError * err, GstPlayData * play)
     gexit_input_thread = TRUE;
     gexit_display_thread = TRUE;
   }
+  if (gexit_input_thread == TRUE ) {
+    if (g_main_loop_is_running (gloop) == TRUE) {
+      g_main_loop_quit (gloop);
+    }
+  }
 }
 
 static void
@@ -893,6 +898,11 @@ eos_cb (GstPlayer * player, GstPlayData * play)
     g_print ("no auto next is on\n");
     gexit_input_thread = TRUE;
     gexit_display_thread = TRUE;
+  }
+  if (gexit_input_thread == TRUE ) {
+    if (g_main_loop_is_running (gloop) == TRUE) {
+      g_main_loop_quit (gloop);
+    }
   }
 }
 
