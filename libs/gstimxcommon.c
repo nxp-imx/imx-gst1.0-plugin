@@ -38,7 +38,7 @@ unsigned long phy_addr_from_fd(int dmafd)
   if (dmafd < 0)
     return NULL;
   
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 34)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
   fd = open(dev_ion, O_RDWR);
   if(fd < 0) {
     return NULL;
@@ -83,7 +83,7 @@ unsigned long phy_addr_from_vaddr(void *vaddr, int size)
   if (!vaddr)
     return NULL;
   
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 34)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
   fd = open(dev_ion, O_RDWR);
   if(fd < 0) {
     return NULL;
