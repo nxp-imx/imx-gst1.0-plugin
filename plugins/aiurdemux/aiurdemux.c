@@ -342,7 +342,7 @@ static GstFlowReturn gst_aiurdemux_close_core (GstAiurDemux * demux);
 
 
 
-
+#define SUBTITLE_GAP_INTERVAL (GST_SECOND/5)
 
 #define AIUR_MEDIATYPE2STR(media) \
     (((media)==MEDIA_VIDEO)?"video":(((media)==MEDIA_AUDIO)?"audio":"subtitle"))
@@ -2783,16 +2783,18 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
 
       GST_INFO ("min_time=%lld\n", min_time);
 
+      /* sutitle gap is used to inform the downstream elements that there is no data for a
+       * certain amount of time, SUBTITLE_GAP_INTERVAL is set to avoid video being blocked. */
       if (GST_CLOCK_TIME_IS_VALID(stream->time_position) &&
           min_time != G_MAXINT64 &&
-          stream->time_position + GST_SECOND <= min_time) {
+          stream->time_position + SUBTITLE_GAP_INTERVAL <= min_time) {
         if (stream->new_segment) {
           aiurdemux_send_stream_newsegment (demux, stream);
         }
 
-        GstEvent *gap = gst_event_new_gap (stream->time_position, GST_SECOND);
+        GstEvent *gap = gst_event_new_gap (stream->time_position, SUBTITLE_GAP_INTERVAL);
         stream->last_start = stream->time_position;
-        stream->last_stop = stream->time_position + GST_SECOND;
+        stream->last_stop = stream->time_position + SUBTITLE_GAP_INTERVAL;
 
         gst_pad_push_event (stream->pad, gap);
         GST_INFO ("TEXT GAP event sent %d, time_position=%lld, "
