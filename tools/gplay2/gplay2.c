@@ -1112,13 +1112,13 @@ input_thread_fun (gpointer data)
           break;
         }
         gDisable_display = FALSE;
+        gst_player_set_rate (player, playback_rate);
+        wait_for_seek_done (play, options->timeout);
         if (playback_rate > 2.0 || playback_rate < 0){
           gst_player_set_subtitle_track_enabled (player, FALSE);
         } else {
           gst_player_set_subtitle_track_enabled (player, TRUE);
         }
-        gst_player_set_rate (player, playback_rate);
-        wait_for_seek_done (play, options->timeout);
         if (playback_rate > 0 && playback_rate <= 2.0){
           /* now do pending track select */
           if (play->pending_audio_track >= 0) {
