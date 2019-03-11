@@ -69,7 +69,7 @@ typedef struct {
 static gint
 compositor_do_composite_surface (CompositorHandle *hcompositor, Surface *surface, SurfaceBuffer *dest)
 {
-  Imx2DFrame src, dst;
+  Imx2DFrame src = {0}, dst = {0};
   guint i;
 
   dst.mem = &dest->mem;
@@ -85,6 +85,7 @@ compositor_do_composite_surface (CompositorHandle *hcompositor, Surface *surface
   src.info.w = surface->info.src.width;
   src.info.h = surface->info.src.height;
   src.info.stride = src.info.w;
+  src.info.tile_type = IMX_2D_TILE_NULL;
   src.mem = &surface->buffer.mem;
   if (!surface->buffer.mem.paddr) {
     for (i = 0; i < 4; i++)
