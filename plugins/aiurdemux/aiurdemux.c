@@ -609,6 +609,7 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
 
       if (segment->stop < segment->start) {
         gst_event_unref (event);
+        GST_ERROR_OBJECT (demux, "failed to handle sink event GST_EVENT_SEGMENT");
         return FALSE;
       }
 
@@ -665,6 +666,13 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
         goto drop;
         break;
         }
+    case GST_EVENT_CUSTOM_DOWNSTREAM_STICKY:
+    {
+      /* drop this event to avoid typefind push event error */
+      GST_WARNING ("need to drop sink event GST_EVENT_CUSTOM_DOWNSTREAM_STICKY");
+      gst_event_unref (event);
+      goto drop;
+    }
     default:
         GST_LOG_OBJECT(demux,"gst_aiurdemux_handle_sink_event event=%x",GST_EVENT_TYPE (event));
       break;
@@ -673,6 +681,8 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
   res = gst_pad_event_default (demux->sinkpad, parent, event);
 
 drop:
+  if (res == FALSE)
+      GST_ERROR_OBJECT (demux, "failed to handle sink event %" GST_PTR_FORMAT, event);
   return res;
 
 }
