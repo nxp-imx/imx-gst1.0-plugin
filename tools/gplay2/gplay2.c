@@ -963,6 +963,8 @@ input_thread_fun (gpointer data)
     sCommand[0] = ' ';
     errno = 0;
     if (scanf ("%256s", sCommand) != 1) {
+      // need to seek in case read to EOF
+      fseek (stdin, 0, SEEK_CUR);
       usleep (100000);
       continue;
     }
