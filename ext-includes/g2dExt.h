@@ -56,6 +56,14 @@ int g2d_blitEx_dispatch(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_su
 
 int g2d_set_clipping(void *handle, int left, int top, int right, int bottom);
 
+/**
+ * @brief Set the Color Space Conversion Matrix.
+ * @param handle A g2d handle.
+ * @param matrix A 4x4 matrix. When NULL, Color Space Coversion is disabled.
+ * @return       0 if successful; or 1 if failed
+ */
+int g2d_set_csc_matrix(void *handle, const unsigned *matrix);
+
 #ifdef __cplusplus
 }
 #endif

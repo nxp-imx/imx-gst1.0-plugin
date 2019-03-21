@@ -164,18 +164,11 @@ struct g2d_surface
     int top;
     int right;
     int bottom;
-
-    int stride;//surface buffer stride
-
-    int width;//surface width
-    int height;//surface height
-
-    //alpha blending parameters
-    enum g2d_blend_func blendfunc;
-
-    //the global alpha value is 0 ~ 255
-    int global_alpha;
-
+    int stride;                     ///< buffer stride, in Pixels
+    int width;                      ///< surface width, in Pixels
+    int height;                     ///< surface height, in Pixels
+    enum g2d_blend_func blendfunc;  ///< alpha blending parameters
+    int global_alpha;               ///< value is 0 ~ 255
     //clrcolor format is RGBA8888, used as dst for clear, as src for blend dim
     int clrcolor;
 
