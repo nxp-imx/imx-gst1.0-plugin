@@ -956,9 +956,6 @@ input_thread_fun (gpointer data)
   GstPlayerVideoRenderer *VideoRender = play->VideoRender;
   gplay_pconfigions *options = play->options;
 
-  GstPlayerVideoOverlayVideoRenderer *VideoOverlayVideoRenderer =
-      GST_PLAYER_VIDEO_OVERLAY_VIDEO_RENDERER (VideoRender);
-
   while (gexit_input_thread == FALSE) {
     sCommand[0] = ' ';
     errno = 0;
@@ -1228,6 +1225,8 @@ input_thread_fun (gpointer data)
         guint y = 0;
         guint width = 0;
         guint height = 0;
+        GstPlayerVideoOverlayVideoRenderer *VideoOverlayVideoRenderer =
+                              GST_PLAYER_VIDEO_OVERLAY_VIDEO_RENDERER (VideoRender);
         g_print ("Input [x y width height]:");
         gDisable_display = TRUE;
         if (scanf ("%d %d %d %d", &x, &y, &width, &height) != 4) {
@@ -1247,6 +1246,8 @@ input_thread_fun (gpointer data)
       {
         guint width = 0;
         guint height = 0;
+        GstPlayerVideoOverlayVideoRenderer *VideoOverlayVideoRenderer =
+                              GST_PLAYER_VIDEO_OVERLAY_VIDEO_RENDERER (VideoRender);
         if (!gplay_get_fullscreen_size (&width, &height));
         gst_player_video_overlay_video_renderer_set_render_rectangle
             (VideoOverlayVideoRenderer, 0, 0, width, height);
@@ -1449,6 +1450,8 @@ input_thread_fun (gpointer data)
             guint y = 0;
             guint width = 0;
             guint height = 0;
+            GstPlayerVideoOverlayVideoRenderer *VideoOverlayVideoRenderer =
+                              GST_PLAYER_VIDEO_OVERLAY_VIDEO_RENDERER (VideoRender);
             gst_player_video_overlay_video_renderer_get_render_rectangle
                 (VideoOverlayVideoRenderer, &x, &y, &width, &height);
             g_print ("Current video display area : %d %d %d %d\n", x, y, width,
