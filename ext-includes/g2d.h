@@ -1,6 +1,6 @@
 /*
- *  Copyright (C) 2013-2015 Freescale Semiconductor, Inc.
- *  Copyright 2018 NXP
+ *  Copyright (C) 2013-2016 Freescale Semiconductor, Inc.
+ *  Copyright 2017-2019 NXP
  */
 /*
 * This library is free software; you can redistribute it and/or
@@ -30,11 +30,11 @@
  *	2013-05-17         Li Xianzhong      0.6            support vg core in g2d library
  *	2013-12-23         Li Xianzhong      0.7            support blend dim feature
  *	2014-03-20         Li Xianzhong      0.8            support pre-multipied & de-mutlipy out alpha
- *  2015-04-10         Meng Mingming     0.9            support multiple source blit
- *  2015-11-03         Meng Mingming     1.0            support query 2D hardware type and feature
- *  2016-05-24         Meng Mingming     1.1            support get g2d_buf from dma fd
- *  2017-07-04         Prabhu Sundararaj 1.2            support get g2d_buf to export dma fd
- *  2018-04-24         Yuchou Gan        1.3            Add AMPHION_TILED support
+ *	2015-04-10         Meng Mingming     0.9            support multiple source blit
+ * 	2015-11-03         Meng Mingming     1.0            support query 2D hardware type and feature
+ *	2016-05-24         Meng Mingming     1.1            support get g2d_buf from dma fd
+ *	2017-07-04         Prabhu Sundararaj 1.2            support get g2d_buf to export dma fd
+ *	2018-04-24         Yuchou Gan        1.3            Add AMPHION_TILED support
 
 */
 

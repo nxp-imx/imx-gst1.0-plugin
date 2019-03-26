@@ -1,6 +1,6 @@
 /*
- *  Copyright (C) 2013-2015 Freescale Semiconductor, Inc.
- *  Copyright 2018 NXP
+ *  Copyright (C) 2013-2016 Freescale Semiconductor, Inc.
+ *  Copyright 2017-2019 NXP
  */
 /*
 * This library is free software; you can redistribute it and/or
@@ -20,8 +20,8 @@
 
 /*
  *  g2dExt.h
- *  g2dExt.h is a extension to g2d.h. It's private and should not be exported to customer.
- *  So any extension which is private should be here, others will still be updated in g2d.h.
+ *  g2dExt.h is for g2d extension, some feature has platform dependency, not recommended to customer.
+ *  So any platform dependent extension should be here, others will still be updated in g2d.h.
  *  History :
  *  Date(y.m.d)        Author            Version        Description
  *
@@ -52,7 +52,6 @@ struct g2d_surfaceEx
 };
 
 int g2d_blitEx(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_surfaceEx *dstEx);
-int g2d_blitEx_dispatch(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_surfaceEx *dstEx, int imxdpu_id);
 
 int g2d_set_clipping(void *handle, int left, int top, int right, int bottom);
 
