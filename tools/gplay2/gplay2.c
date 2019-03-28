@@ -1667,7 +1667,7 @@ main (int argc, char *argv[])
   }
 
   if (input_thread) {
-    g_thread_unref (input_thread);
+    g_thread_join (input_thread);
     input_thread = NULL;
   }
 
