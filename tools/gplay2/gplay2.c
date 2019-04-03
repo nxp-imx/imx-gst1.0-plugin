@@ -1487,8 +1487,10 @@ input_thread_fun (gpointer data)
     fflush (stdout);
     fflush (stdin);
   }
-  if (g_main_loop_is_running (play->loop) == TRUE) {
-    g_main_loop_quit (play->loop);
+  if (play->loop) {
+    if (g_main_loop_is_running (play->loop) == TRUE) {
+      g_main_loop_quit (play->loop);
+    }
   }
   gexit_main = TRUE;
   g_print ("Exit input thread\n");
@@ -1667,7 +1669,7 @@ main (int argc, char *argv[])
   }
 
   if (input_thread) {
-    g_thread_join (input_thread);
+    g_thread_unref (input_thread);
     input_thread = NULL;
   }
 
