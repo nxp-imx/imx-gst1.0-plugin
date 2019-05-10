@@ -459,6 +459,14 @@ static gboolean beep_dec_set_format(GstAudioDecoder *dec, GstCaps *caps)
               type = SBCDEC;
             } else if (!strcmp (IDecoder->name, "vorbis")) {
               type = OGG;
+            } else if (!strcmp (IDecoder->name, "ac3")) {
+              type = AC3;
+            } else if (!strcmp (IDecoder->name, "ddplus")) {
+              type = DD_PLUS;
+            } else if (!strcmp (IDecoder->name, "nb-amr")) {
+              type = NBAMR;
+            } else if (!strcmp (IDecoder->name, "wb-amr")) {
+              type = WBAMR;
             }else {
               goto dsp_fail;
             }

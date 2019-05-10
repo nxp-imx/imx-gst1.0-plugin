@@ -24,6 +24,7 @@ library = @wma10d_arm_SONAME@
 [ac3]
 longname = AC3 decoder
 description = Decode AC3 compressed audio to raw data
+dsp_lib = @dsp_arm_SONAME@
 mime = audio/x-ac3; audio/x-3ca
 library = @ac3d_arm_SONAME@
 
@@ -39,18 +40,21 @@ library = @vorbisd_arm_SONAME@
 longname = DDplus decoder
 description = Decode Dobly Digital Plus audio to raw data
 mime = audio/x-eac3
+dsp_lib = @dsp_arm_SONAME@
 library = @ddpd_arm_SONAME@
 
 [amr-nb]
 longname = AMR nb decoder
 description = decode amr nb audio to raw data
 mime = audio/AMR;
+dsp_lib = @dsp_arm_SONAME@
 library = @nbamrd_arm_SONAME@
 
 [amr-wb]
 longname = AMR wb decoder
 description = decode amr wb audio to raw data
 mime = audio/AMR-WB
+dsp_lib = @dsp_arm_SONAME@
 library = @wbamrd_arm_SONAME@
 
 [realaudio]
