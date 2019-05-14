@@ -1,7 +1,7 @@
 
 /*
 * Copyright (c) 2011-2014,2016, Freescale Semiconductor, Inc.
-* Copyright 2017 NXP
+* Copyright 2017,2019 NXP
  */
 
 /*
@@ -93,6 +93,13 @@ typedef enum
     UNIA_CHAN_MAP_TABLE,
     //UNIA_CHANNEL_MASK,
     UNIA_TO_STEREO,
+	/* dedicate for Cadence codec wrapper */
+	UNIA_INPUT_OVER,
+	UNIA_CODEC_ID,
+	UNIA_CODEC_ENTRY_ADDR,
+
+	/* dedicate for debug */
+	UNIA_FUNC_PRINT,
 
 /* dedicate for wma */
     UNIA_WMA_BlOCKALIGN= 0x100,
@@ -132,9 +139,11 @@ typedef enum
     UNIA_OUTPUT_PCM_FORMAT,
     UNIA_CONSUMED_LENGTH,
     UNIA_OUTBUF_ALLOC_SIZE,  /* used for allocate output buffer outside */
-
+    
     UA_TYPE_MAX
 } UA_ParaType;
+
+
 
 typedef enum
 {
@@ -285,7 +294,7 @@ typedef struct
         /* for real audio decoder */
         uint32 frame_bits;
         uint32 flavor_index;
-
+		
         char ** codecDesc;
         UniAcodecOutputPCMFormat outputFormat;
         uint32 consumed_length;
@@ -314,6 +323,13 @@ typedef struct
 
         /* dedicate for mp3 dec only */
         uint32 nonstd_strm_support;
+
+		/* for Cadence wrapper */
+		uint32 codec_id;
+		uint32 codec_entry_addr;
+
+		/* for debug */
+		uint32 (*Printf)(char* fmt, ...);
 /* end */
 #if !defined(RVDS)
     };
