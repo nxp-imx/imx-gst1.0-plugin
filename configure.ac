@@ -184,7 +184,7 @@ dnl make GST_PLUGINS_BASE_CFLAGS and GST_PLUGINS_BASE_LIBS available
 AC_SUBST(GST_PLUGINS_BASE_CFLAGS)
 AC_SUBST(GST_PLUGINS_BASE_LIBS)
 
-if test "x$PLATFORM" = "xMX8" || test "x$PLATFORM" = "xMX8"; then
+dnl if test "x$PLATFORM" = "xMX8" || test "x$PLATFORM" = "xMX8"; then
 dnl If we need them, we can also use the plugin libraries
 PKG_CHECK_MODULES(GST_BAD_BASE, gstreamer-bad-base-$GST_MAJORMINOR >= $GST_REQUIRED,
                   HAVE_GST_BAD_BASE=yes, HAVE_GST_BAD_BASE=no)
@@ -201,16 +201,17 @@ AC_SUBST(GST_BAD_BASE_LIBS)
 dnl If we need them, we can also use the plugin libraries
 PKG_CHECK_MODULES(GST_BAD_VIDEO, gstreamer-bad-video-$GST_MAJORMINOR >= $GST_REQUIRED,
                   HAVE_GST_BAD_VIDEO=yes, HAVE_GST_BAD_VIDEO=no)
+AM_CONDITIONAL(USE_BAD_VIDEO, test "x$HAVE_GST_BAD_VIDEO" = "xyes")
 
 dnl Give a warning if we don't have gstreamer libs
 if test "x$HAVE_GST_BAD_VIDEO" = "xno"; then
-  AC_MSG_ERROR(no GStreamer bad-video found)
+  AC_MSG_WARN(no GStreamer bad-video found)
 fi
 
 dnl make GST_BAD_VIDEO_CFLAGS and GST_BAD_VIDEO_LIBS available
 AC_SUBST(GST_BAD_VIDEO_CFLAGS)
 AC_SUBST(GST_BAD_VIDEO_LIBS)
-fi
+dnl fi
 
 dnl check ion allocator headfile
 old_CFLAGS=$CFLAGS

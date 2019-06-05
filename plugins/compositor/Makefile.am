@@ -17,7 +17,6 @@ endif
 
 libgstimxcompositor_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 				 $(GST_BASE_LIBS) \
-				 -lgstbadvideo-$(GST_API_VERSION) \
 				 $(GST_PLUGINS_BASE_LIBS) \
 				 -lgstvideo-$(GST_API_VERSION) \
 				 $(GST_LIBS) \
@@ -25,6 +24,10 @@ libgstimxcompositor_la_LIBADD = $(GST_PLUGINS_BASE_LIBS) \
 
 if USE_BAD_BASE
 libgstimxcompositor_la_LIBADD += -lgstbadbase-$(GST_API_VERSION)
+endif
+
+if USE_BAD_VIDEO
+libgstimxcompositor_la_LIBADD += -lgstbadvideo-$(GST_API_VERSION)
 endif
 
 libgstimxcompositor_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)

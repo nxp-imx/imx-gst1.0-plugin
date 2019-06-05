@@ -1,6 +1,6 @@
 /* GStreamer IMX video compositor plugin
  * Copyright (c) 2015-2016, Freescale Semiconductor, Inc. All rights reserved.
- * Copyright 2018 NXP
+ * Copyright 2018-2019 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -772,7 +772,7 @@ gst_imxcompositor_src_query (GstAggregator * agg, GstQuery * query)
 }
 
 static gboolean
-gst_imxcompositor_negotiated_caps (GstVideoAggregator * vagg, GstCaps * caps)
+gst_imxcompositor_negotiated_caps (GstAggregator * vagg, GstCaps * caps)
 {
   GstImxCompositor *imxcomp = (GstImxCompositor *) (vagg);
   GstQuery *query;
@@ -933,8 +933,7 @@ gst_imxcompositor_find_best_format (
 }
 
 static GstCaps *
-gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps,
-    GstCaps * filter)
+gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps)
 {
   GList *l;
   gint best_width = -1, best_height = -1;
@@ -1151,14 +1150,20 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
   GstDmabufMeta *dmabuf_meta;
   gint64 drm_modifier = 0;
 
-  src->info.fmt = GST_VIDEO_INFO_FORMAT(&(ppad->aggregated_frame->info));
-  src->info.w = ppad->aggregated_frame->info.width +
-                pad->align.padding_left + pad->align.padding_right;
-  src->info.h = ppad->aggregated_frame->info.height +
-                pad->align.padding_top + pad->align.padding_bottom;
-  src->info.stride = ppad->aggregated_frame->info.stride[0];
+#if GST_CHECK_VERSION(1, 16, 0)
+  GstVideoFrame * aggregated_frame = gst_video_aggregator_pad_get_prepared_frame (ppad);
+#else
+  GstVideoFrame * aggregated_frame = ppad->aggregated_frame;
+#endif
 
-  dmabuf_meta = gst_buffer_get_dmabuf_meta (ppad->aggregated_frame->buffer);
+  src->info.fmt = GST_VIDEO_INFO_FORMAT(&(aggregated_frame->info));
+  src->info.w = aggregated_frame->info.width +
+                pad->align.padding_left + pad->align.padding_right;
+  src->info.h = aggregated_frame->info.height +
+                pad->align.padding_top + pad->align.padding_bottom;
+  src->info.stride = aggregated_frame->info.stride[0];
+
+  dmabuf_meta = gst_buffer_get_dmabuf_meta (aggregated_frame->buffer);
   if (dmabuf_meta)
     drm_modifier = dmabuf_meta->drm_modifier;
 
@@ -1170,7 +1175,7 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
     src->info.tile_type = IMX_2D_TILE_NULL;
 
   GST_LOG_OBJECT (pad, "Input: %s, %dx%d(%d), crop(%d,%d,%d,%d)",
-      GST_VIDEO_FORMAT_INFO_NAME(ppad->aggregated_frame->info.finfo),
+      GST_VIDEO_FORMAT_INFO_NAME(aggregated_frame->info.finfo),
       src->info.w, src->info.h, src->info.stride,
       pad->src_crop.x, pad->src_crop.y, pad->src_crop.w, pad->src_crop.h);
 
@@ -1179,12 +1184,12 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
     return -1;
   }
 
-  if (gst_is_dmabuf_memory (gst_buffer_peek_memory (ppad->aggregated_frame->buffer, 0))) {
-    n_mem = gst_buffer_n_memory (ppad->aggregated_frame->buffer);
+  if (gst_is_dmabuf_memory (gst_buffer_peek_memory (aggregated_frame->buffer, 0))) {
+    n_mem = gst_buffer_n_memory (aggregated_frame->buffer);
     for (i = 0; i < n_mem; i++)
-      src->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (ppad->aggregated_frame->buffer, i));
+      src->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (aggregated_frame->buffer, i));
   } else 
-    src->mem = gst_buffer_query_phymem_block (ppad->aggregated_frame->buffer);
+    src->mem = gst_buffer_query_phymem_block (aggregated_frame->buffer);
   src->alpha = (gint)(pad->alpha * 255);
   src->rotate = pad->rotate;
   src->interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
@@ -1414,6 +1419,7 @@ gst_imxcompositor_fill_background(Imx2DFrame *dst, guint RGBA8888)
 }
 #endif
 
+#if !GST_CHECK_VERSION(1, 16, 0)
 static gint imxcompositor_pad_zorder_compare (gconstpointer a, gconstpointer b)
 {
   if (a && b) {
@@ -1424,6 +1430,7 @@ static gint imxcompositor_pad_zorder_compare (gconstpointer a, gconstpointer b)
     return 0;
   }
 }
+#endif
 
 static GstFlowReturn
 gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
@@ -1464,13 +1471,21 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
 
   //re-order by zorder of pad
   GList *pads = g_list_copy(GST_ELEMENT (vagg)->sinkpads);
+#if !GST_CHECK_VERSION(1, 16, 0)
   pads = g_list_sort(pads, imxcompositor_pad_zorder_compare);
+#endif
 
   for (l = pads; l; l = l->next) {
     GstVideoAggregatorPad *ppad = l->data;
     GstImxCompositorPad *pad = GST_IMXCOMPOSITOR_PAD (ppad);
 
-    if (ppad->aggregated_frame != NULL) {
+#if GST_CHECK_VERSION(1, 16, 0)
+    GstVideoFrame * aggregated_frame = gst_video_aggregator_pad_get_prepared_frame (ppad);
+#else
+    GstVideoFrame * aggregated_frame = ppad->aggregated_frame;
+#endif
+
+    if (aggregated_frame != NULL) {
       src.mem = &src_mem;
       memset (src.mem, 0, sizeof(PhyMemBlock));
       if (gst_imxcompositor_config_src(imxcomp, pad, &src) < 0) {
@@ -1500,11 +1515,11 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
       aggregated++;
 
       if (imxcomp->composition_meta_enable &&
-        imx_video_overlay_composition_has_meta(ppad->buffer)) {
+        imx_video_overlay_composition_has_meta(aggregated_frame->buffer)) {
         VideoCompositionVideoInfo in_v, out_v;
         memset (&in_v, 0, sizeof(VideoCompositionVideoInfo));
         memset (&out_v, 0, sizeof(VideoCompositionVideoInfo));
-        in_v.buf = ppad->buffer;
+        in_v.buf = aggregated_frame->buffer;
         in_v.fmt = src.info.fmt;
         in_v.width = src.info.w;
         in_v.height = src.info.h;
@@ -1581,6 +1596,88 @@ static GstCaps* imx_compositor_caps_from_fmt_list(GList* list)
   return caps;
 }
 
+#if GST_CHECK_VERSION (1, 16, 0)
+static GstPad *
+gst_imxcompositor_request_new_pad (GstElement * element, GstPadTemplate * templ,
+    const gchar * req_name, const GstCaps * caps)
+{
+  GstPad *newpad;
+
+  newpad = (GstPad *)
+      GST_ELEMENT_CLASS (parent_class)->request_new_pad (element,
+      templ, req_name, caps);
+
+  if (newpad == NULL)
+    goto could_not_create;
+
+  gst_child_proxy_child_added (GST_CHILD_PROXY (element), G_OBJECT (newpad),
+      GST_OBJECT_NAME (newpad));
+
+  return newpad;
+
+could_not_create:
+  {
+    GST_DEBUG_OBJECT (element, "could not create/add pad");
+    return NULL;
+  }
+}
+
+static void
+gst_imxcompositor_release_pad (GstElement * element, GstPad * pad)
+{
+  GstImxCompositor *compositor;
+
+  compositor = (GstImxCompositor *) (element);
+
+  GST_DEBUG_OBJECT (compositor, "release pad %s:%s", GST_DEBUG_PAD_NAME (pad));
+
+  gst_child_proxy_child_removed (GST_CHILD_PROXY (compositor), G_OBJECT (pad),
+      GST_OBJECT_NAME (pad));
+
+  GST_ELEMENT_CLASS (parent_class)->release_pad (element, pad);
+}
+
+/* GstChildProxy implementation */
+static GObject *
+gst_imxcompositor_child_proxy_get_child_by_index (GstChildProxy * child_proxy,
+    guint index)
+{
+  GstImxCompositor *comp = (GstImxCompositor *) (child_proxy);
+  GObject *obj = NULL;
+
+  GST_OBJECT_LOCK (comp);
+  obj = g_list_nth_data (GST_ELEMENT_CAST (comp)->sinkpads, index);
+  if (obj)
+    gst_object_ref (obj);
+  GST_OBJECT_UNLOCK (comp);
+
+  return obj;
+}
+
+static guint
+gst_imxcompositor_child_proxy_get_children_count (GstChildProxy * child_proxy)
+{
+  guint count = 0;
+  GstImxCompositor *comp = (GstImxCompositor *) (child_proxy);
+
+  GST_OBJECT_LOCK (comp);
+  count = GST_ELEMENT_CAST (comp)->numsinkpads;
+  GST_OBJECT_UNLOCK (comp);
+  GST_INFO_OBJECT (comp, "Children Count: %d", count);
+
+  return count;
+}
+
+static void
+gst_imxcompositor_child_proxy_init (gpointer g_iface, gpointer iface_data)
+{
+  GstChildProxyInterface *iface = g_iface;
+
+  iface->get_child_by_index = gst_imxcompositor_child_proxy_get_child_by_index;
+  iface->get_children_count = gst_imxcompositor_child_proxy_get_children_count;
+}
+#endif
+
 static void
 gst_imxcompositor_class_init (GstImxCompositorClass * klass)
 {
@@ -1595,6 +1692,11 @@ gst_imxcompositor_class_init (GstImxCompositorClass * klass)
   gobject_class->finalize = gst_imxcompositor_finalize;
   gobject_class->get_property = gst_imxcompositor_get_property;
   gobject_class->set_property = gst_imxcompositor_set_property;
+
+#if GST_CHECK_VERSION (1, 16, 0)
+  gstelement_class->request_new_pad = gst_imxcompositor_request_new_pad;
+  gstelement_class->release_pad = gst_imxcompositor_release_pad;
+#endif
 
   Imx2DDeviceInfo *in_plugin = (Imx2DDeviceInfo *)g_type_get_qdata (
                 G_OBJECT_CLASS_TYPE (klass), GST_IMX_COMPOSITOR_PARAMS_QDATA);
@@ -1654,7 +1756,11 @@ gst_imxcompositor_class_init (GstImxCompositorClass * klass)
   videoaggregator_class->find_best_format = gst_imxcompositor_find_best_format;
   videoaggregator_class->update_caps = gst_imxcompositor_update_caps;
   videoaggregator_class->aggregate_frames = gst_imxcompositor_aggregate_frames;
+#if GST_CHECK_VERSION(1, 16, 0)
+  videoaggregator_class->create_output_buffer=gst_imxcompositor_get_output_buffer;
+#else
   videoaggregator_class->get_output_buffer=gst_imxcompositor_get_output_buffer;
+#endif
 
   g_object_class_install_property (gobject_class,
       PROP_IMXCOMPOSITOR_BACKGROUND_ENABLE,
@@ -1732,6 +1838,12 @@ static gboolean gst_imx_compositor_register (GstPlugin * plugin)
     (GInstanceInitFunc) gst_imxcompositor_init,
   };
 
+#if GST_CHECK_VERSION (1, 16, 0)
+  const GInterfaceInfo g_implement_interface_info = {
+    (GInterfaceInitFunc) gst_imxcompositor_child_proxy_init, NULL, NULL
+  };
+#endif
+
   GType type;
   gchar *t_name;
 
@@ -1754,6 +1866,9 @@ static gboolean gst_imx_compositor_register (GstPlugin * plugin)
                                       t_name, &tinfo, 0);
       g_type_set_qdata (type, GST_IMX_COMPOSITOR_PARAMS_QDATA,
                         (gpointer) in_plugin);
+#if GST_CHECK_VERSION (1, 16, 0)
+      g_type_add_interface_static (type, GST_TYPE_CHILD_PROXY, &g_implement_interface_info);
+#endif
     }
 
     if (!gst_element_register (plugin, t_name, IMX_GST_PLUGIN_RANK, type)) {

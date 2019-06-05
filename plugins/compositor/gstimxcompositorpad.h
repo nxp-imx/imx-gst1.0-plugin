@@ -1,5 +1,6 @@
 /* GStreamer IMX video compositor plugin
  * Copyright (c) 2015, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2019 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -46,7 +47,11 @@ typedef struct _GstImxCompositorPadClass GstImxCompositorPadClass;
 
 struct _GstImxCompositorPad
 {
+#if !GST_CHECK_VERSION(1, 16, 0)
   GstVideoAggregatorPad parent;
+#else
+  GstVideoAggregatorConvertPad parent;
+#endif
 
   GstBufferPool *sink_pool;
   gboolean sink_pool_update;
@@ -69,7 +74,11 @@ struct _GstImxCompositorPad
 
 struct _GstImxCompositorPadClass
 {
+#if !GST_CHECK_VERSION(1, 16, 0)
   GstVideoAggregatorPadClass parent_class;
+#else
+  GstVideoAggregatorConvertPadClass parent_class;
+#endif
 };
 
 GType gst_imxcompositor_pad_get_type (void);
