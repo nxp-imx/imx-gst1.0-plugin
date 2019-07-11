@@ -36,6 +36,7 @@ struct _GstVpuEnc {
 	guint gop_size;
 	guint bitrate;
 	gint quant;
+  guint stream_slice_count;
 
 	VpuEncHandle handle;
 	VpuEncInitInfo init_info;

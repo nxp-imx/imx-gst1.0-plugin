@@ -564,6 +564,9 @@ typedef struct {
 	int nFrameRate;
 	int nBitRate;				/*unit: kbps*/
 	int nGOPSize;
+	int nFullRange;
+	int nColorConversionType;
+	int nStreamSliceCount;
 	int nIntraRefresh;		/*intra macro block numbers*/
 	int nIntraQP;				/*0: auto, >0: qp value*/
 	int nChromaInterleave;	/*should be set to 1 when (nMapType!=0)*/
@@ -624,6 +627,9 @@ typedef struct {
 	int nFrameRate;
 	int nBitRate;				/*unit: kbps*/
 	int nGOPSize;
+	int nFullRange;
+	int nColorConversionType;
+	int nStreamSliceCount;
 	int nChromaInterleave;	/*should be set to 1 when (nMapType!=0)*/
 	VpuEncMirrorDirection sMirror;
 	//int nQuantParam;

@@ -231,6 +231,9 @@ AM_CONDITIONAL(USE_BAD_BASE, test "x$HAVE_BAD_BASE" = "xyes")
 AC_CHECK_HEADERS([hantro_enc/ewl.h], [HAVE_H1_ENC=yes], [HAVE_H1_ENC=no])
 AM_CONDITIONAL(USE_H1_ENC, test "x$HAVE_H1_ENC" = "xyes")
 
+AC_CHECK_HEADERS([hantro_VC8000E_enc/ewl.h], [HAVE_VC8000E_ENC=yes], [HAVE_VC8000E_ENC=no])
+AM_CONDITIONAL(USE_VC8000E_ENC, test "x$HAVE_VC8000E_ENC" = "xyes")
+
 AC_CHECK_HEADERS([vpu_lib.h], [HAVE_VPU_LIB=yes], [HAVE_VPU_LIB=no])
 if test "x$HAVE_VPU_LIB" = "xyes"; then
     VPU_LIBS=`$PKG_CONFIG --libs libfslvpuwrap 2>/dev/null`

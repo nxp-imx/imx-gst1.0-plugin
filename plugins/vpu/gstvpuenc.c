@@ -46,7 +46,7 @@
 #include "gstvpuenc.h"
 
 #define DEFAULT_BITRATE 0
-#ifdef USE_H1_ENC
+#if defined(USE_H1_ENC) || defined(USE_VC8000E_ENC)
 #define DEFAULT_GOP_SIZE 30
 #else
 #define DEFAULT_GOP_SIZE 15
@@ -54,6 +54,7 @@
 #define DEFAULT_QUANT -1
 #define DEFAULT_H264_QUANT 35
 #define DEFAULT_MPEG4_QUANT 15
+#define DEFAULT_STREAM_SLICE_COUNT 1
 
 #define GST_VPU_ENC_PARAMS_QDATA   g_quark_from_static_string("vpuenc-params")
 
@@ -92,6 +93,13 @@ static const VpuEncInfo VpuEncInfos[] = {
     .detail                   = "Encode raw data to compressed video",
   },
 #endif
+#ifdef USE_VC8000E_ENC
+  { .name                     = "hevc",
+    .std                      = VPU_V_HEVC,
+    .description              = "IMX VPU-based HEVC video encoder",
+    .detail                   = "Encode raw data to compressed video",
+  },
+#endif
   {
     NULL
   }
@@ -103,6 +111,7 @@ enum
   PROP_BITRATE,
   PROP_GOP_SIZE,
   PROP_QUANT,
+  PROP_STREAM_SLICE_COUNT,
 };
 
 static GstStaticPadTemplate static_sink_template = GST_STATIC_PAD_TEMPLATE(
@@ -111,11 +120,33 @@ static GstStaticPadTemplate static_sink_template = GST_STATIC_PAD_TEMPLATE(
 	GST_PAD_ALWAYS,
 	GST_STATIC_CAPS(
 		"video/x-raw,"
-#ifdef USE_H1_ENC
-		"format = (string) { NV12, I420, YUY2, UYVY, RGBA, RGBx, RGB16, RGB15, BGRA, BGRx, BGR16 }, "
-#else
-        "format = (string) { NV12, I420, YV12 }, "
-#endif
+    "format = (string) { NV12, I420, YV12 }, "
+		"width = (int) [ 64, 1920, 8 ], "
+		"height = (int) [ 64, 1088, 8 ], "
+		"framerate = (fraction) [ 0, MAX ]"
+	)
+);
+
+static GstStaticPadTemplate static_sink_template_H1 = GST_STATIC_PAD_TEMPLATE(
+  "sink",
+	GST_PAD_SINK,
+	GST_PAD_ALWAYS,
+	GST_STATIC_CAPS(
+		"video/x-raw,"
+    "format = (string) { NV12, I420, YUY2, UYVY, RGBA, RGBx, RGB16, RGB15, BGRA, BGRx, BGR16}, "
+		"width = (int) [ 64, 1920, 8 ], "
+		"height = (int) [ 64, 1088, 8 ], "
+		"framerate = (fraction) [ 0, MAX ]"
+	)
+);
+
+static GstStaticPadTemplate static_sink_template_VC8000E = GST_STATIC_PAD_TEMPLATE(
+  "sink",
+	GST_PAD_SINK,
+	GST_PAD_ALWAYS,
+	GST_STATIC_CAPS(
+		"video/x-raw,"
+    "format = (string) { NV12, I420, YUY2, UYVY, RGBA, RGBx, RGB16, RGB15, BGRA, BGRx, BGR16}, "
 		"width = (int) [ 64, 1920, 8 ], "
 		"height = (int) [ 64, 1088, 8 ], "
 		"framerate = (fraction) [ 0, MAX ]"
@@ -180,6 +211,21 @@ static GstStaticPadTemplate static_src_template_vp8 = GST_STATIC_PAD_TEMPLATE(
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS(
         "video/x-vp8, "
+        "variant = (string) itu, "
+        "width = (int) [ 64, 1920, 8 ], "
+        "height = (int) [ 64, 1088, 8 ], "
+        "framerate = (fraction) [ 0, MAX ]; "
+    )
+);
+#endif
+
+#ifdef USE_VC8000E_ENC
+static GstStaticPadTemplate static_src_template_hevc = GST_STATIC_PAD_TEMPLATE(
+    "src",
+    GST_PAD_SRC,
+    GST_PAD_ALWAYS,
+    GST_STATIC_CAPS(
+        "video/x-h265, "
         "variant = (string) itu, "
         "width = (int) [ 64, 1920, 8 ], "
         "height = (int) [ 64, 1088, 8 ], "
@@ -264,11 +310,31 @@ gst_vpu_enc_class_init (GstVpuEncClass * klass)
       g_param_spec_int ("quant", "quant",
         "set quant value: VP8(1-31) (-1 for automatic)",
         -1, 31, DEFAULT_QUANT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  } else if (in_plugin->std == VPU_V_HEVC) {
+    g_object_class_install_property (gobject_class, PROP_QUANT,
+      g_param_spec_int ("quant", "quant",
+        "set quant value: HEVC(0-51) (-1 for automatic)",
+        -1, 51, DEFAULT_QUANT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   }
 
-  if (in_plugin->std == VPU_V_AVC) {
-    gst_element_class_add_pad_template (element_class,
-        gst_static_pad_template_get (&static_sink_template));
+  if ((in_plugin->std == VPU_V_AVC || in_plugin->std == VPU_V_HEVC) && IS_IMX8MP()) {
+    g_object_class_install_property (gobject_class, PROP_STREAM_SLICE_COUNT,
+      g_param_spec_int ("stream-multislice", "stream multislice",
+        "the number of slices a picture contains",
+        1, G_MAXINT, DEFAULT_STREAM_SLICE_COUNT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  }
+
+ if (in_plugin->std == VPU_V_AVC) {
+    if (IS_IMX8MM()) {
+      gst_element_class_add_pad_template (element_class,
+          gst_static_pad_template_get (&static_sink_template_H1));
+    } else if (IS_IMX8MP()) {
+      gst_element_class_add_pad_template (element_class,
+          gst_static_pad_template_get (&static_sink_template_VC8000E));
+    } else {
+      gst_element_class_add_pad_template (element_class,
+          gst_static_pad_template_get (&static_sink_template));
+    }
     gst_element_class_add_pad_template (element_class,
         gst_static_pad_template_get (&static_src_template_h264));
   } else if (in_plugin->std == VPU_V_MPEG4) {
@@ -290,12 +356,19 @@ gst_vpu_enc_class_init (GstVpuEncClass * klass)
 #ifdef USE_H1_ENC
   else if (in_plugin->std == VPU_V_VP8) {
     gst_element_class_add_pad_template (element_class,
-        gst_static_pad_template_get (&static_sink_template));
+        gst_static_pad_template_get (&static_sink_template_H1));
     gst_element_class_add_pad_template (element_class,
         gst_static_pad_template_get (&static_src_template_vp8));
   }
 #endif
-
+#ifdef USE_VC8000E_ENC
+  else if (in_plugin->std == VPU_V_HEVC) {
+    gst_element_class_add_pad_template (element_class,
+        gst_static_pad_template_get (&static_sink_template_VC8000E));
+    gst_element_class_add_pad_template (element_class,
+        gst_static_pad_template_get (&static_src_template_hevc));
+  }
+#endif
   gst_element_class_set_static_metadata (element_class,
       in_plugin->description, "Codec/Encoder/Video",
       in_plugin->detail, IMX_GST_PLUGIN_AUTHOR);
@@ -321,6 +394,7 @@ gst_vpu_enc_init (GstVpuEnc * enc)
   enc->bitrate = DEFAULT_BITRATE;
   enc->gop_size = DEFAULT_GOP_SIZE;
   enc->quant = DEFAULT_QUANT;
+  enc->stream_slice_count = DEFAULT_STREAM_SLICE_COUNT;
   enc->gstbuffer_in_vpuenc = NULL;
   enc->gop_count = 0;
   enc->handle = NULL;
@@ -344,6 +418,9 @@ gst_vpu_enc_get_property (GObject * object, guint prop_id, GValue * value,
     case PROP_QUANT:
       g_value_set_int (value, enc->quant);
       break;
+    case PROP_STREAM_SLICE_COUNT:
+      g_value_set_int (value, enc->stream_slice_count);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -366,6 +443,9 @@ gst_vpu_enc_set_property (GObject * object, guint prop_id,
       break;
     case PROP_QUANT:
       enc->quant = g_value_get_int (value);
+      break;
+    case PROP_STREAM_SLICE_COUNT:
+      enc->stream_slice_count = g_value_get_int (value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -718,6 +798,9 @@ gst_vpu_enc_set_format (GstVideoEncoder * benc, GstVideoCodecState * state)
 	enc->open_param.sMirror = VPU_ENC_MIRDIR_NONE;
   enc->open_param.nBitRate = enc->bitrate;
   enc->open_param.nGOPSize = enc->gop_size;
+  enc->open_param.nFullRange = state->info.colorimetry.range;              /* 1:full range, 2:none full range*/
+  enc->open_param.nColorConversionType = state->info.colorimetry.matrix; /* 3:BT.709, 4:BT.601 */
+  enc->open_param.nStreamSliceCount = enc->stream_slice_count;
   enc->open_param.nChromaInterleave = 0;
   enc->open_param.nMapType = 0;
   enc->open_param.nLinear2TiledEnable = 0;
@@ -1249,12 +1332,19 @@ gboolean gst_vpu_enc_register (GstPlugin * plugin)
 
   while (in_plugin->name) {
 #ifdef USE_H1_ENC
-    if (g_strcmp0 (in_plugin->name, "h264") && g_strcmp0 (in_plugin->name, "vp8")) {
+    if (g_strcmp0 (in_plugin->name, "h264") && g_strcmp0 (in_plugin->name, "vp8") && IS_IMX8MM()) {
       in_plugin++;
       continue;
     }
-#else
-    if (!g_strcmp0 (in_plugin->name, "vp8")) {
+#endif
+#ifdef USE_VC8000E_ENC
+    if (g_strcmp0 (in_plugin->name, "h264") && g_strcmp0 (in_plugin->name, "hevc") && IS_IMX8MP()) {
+      in_plugin++;
+      continue;
+    }
+#endif
+#if !defined(USE_H1_ENC) && !defined(USE_VC8000E_ENC)
+    if (!g_strcmp0 (in_plugin->name, "vp8") || !g_strcmp0 (in_plugin->name, "hevc")) {
       in_plugin++;
       continue;
     }

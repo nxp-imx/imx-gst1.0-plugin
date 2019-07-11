@@ -33,7 +33,7 @@ static gboolean
 plugin_init (GstPlugin * plugin)
 {
   if (HAS_VPU()) {
-    if (!IS_HANTRO() || IS_IMX8MM())
+    if (!IS_HANTRO() || IS_IMX8MM() || IS_IMX8MP())
       if (!gst_vpu_enc_register (plugin))
         return FALSE;
     
