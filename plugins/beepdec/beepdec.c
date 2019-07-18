@@ -903,6 +903,14 @@ begin:
         status = core_ret & CORE_STATUS_MASK;
 
         if (status == ACODEC_CAPIBILITY_CHANGE) {
+            adapter_size = gst_adapter_available (beepdec->adapter);
+            if(adapter_size > 0){
+                /* when audio channel number change, push the buffer of previous channel first */
+                out = gst_adapter_take_buffer (beepdec->adapter, adapter_size);
+                sent=TRUE;
+                ret = gst_audio_decoder_finish_frame (dec, out, 1);
+                gst_adapter_clear (beepdec->adapter);
+            }
             beep_dec_handle_output_changed(beepdec);
         }
 
