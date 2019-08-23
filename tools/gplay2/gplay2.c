@@ -1017,8 +1017,13 @@ input_thread_fun (gpointer data)
         GstPlayerMediaInfo *media_info = gst_player_get_media_info (player);
 
         gDisable_display = TRUE;
-        seekable = gst_player_media_info_is_seekable (media_info);
-        g_object_unref (media_info);
+        if (media_info) {
+          seekable = gst_player_media_info_is_seekable (media_info);
+          g_object_unref (media_info);
+        } else {
+          gDisable_display = FALSE;
+          break;
+        }
 
         if (!seekable) {
           g_print ("file is not seekable!\n");
@@ -1096,8 +1101,13 @@ input_thread_fun (gpointer data)
         GstPlayerMediaInfo *media_info = gst_player_get_media_info (player);
 
         gDisable_display = TRUE;
-        seekable = gst_player_media_info_is_seekable (media_info);
-        g_object_unref (media_info);
+        if (media_info) {
+          seekable = gst_player_media_info_is_seekable (media_info);
+          g_object_unref (media_info);
+        } else {
+          gDisable_display = FALSE;
+          break;
+        }
 
         if (!seekable) {
           g_print ("file is not seekable!, rate can not be set! \n");
