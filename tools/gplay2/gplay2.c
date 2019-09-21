@@ -1497,9 +1497,11 @@ input_thread_fun (gpointer data)
     fflush (stdout);
     fflush (stdin);
   }
-  if (play->loop) {
-    if (g_main_loop_is_running (play->loop) == TRUE) {
-      g_main_loop_quit (play->loop);
+  if (play->eos_found == FALSE) {
+    if (play->loop) {
+      if (g_main_loop_is_running (play->loop) == TRUE) {
+        g_main_loop_quit (play->loop);
+      }
     }
   }
   gexit_main = TRUE;
