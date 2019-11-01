@@ -463,9 +463,9 @@ static gboolean beep_dec_set_format(GstAudioDecoder *dec, GstCaps *caps)
               type = AC3;
             } else if (!strcmp (IDecoder->name, "ddplus")) {
               type = DD_PLUS;
-            } else if (!strcmp (IDecoder->name, "nb-amr")) {
+            } else if (!strcmp (IDecoder->name, "amr-nb")) {
               type = NBAMR;
-            } else if (!strcmp (IDecoder->name, "wb-amr")) {
+            } else if (!strcmp (IDecoder->name, "amr-wb")) {
               type = WBAMR;
             }else {
               goto dsp_fail;
