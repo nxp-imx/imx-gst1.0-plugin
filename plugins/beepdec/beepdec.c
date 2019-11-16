@@ -818,6 +818,8 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
 
     inbuf_size = gst_buffer_get_size(buffer);
 
+    /* ref and unref input buffer to avoid memory be freed for channel changed audio */
+    gst_buffer_ref (buffer);
     gst_buffer_map(buffer, &map, GST_MAP_READ);
     inbuf = map.data;
     gst_buffer_unmap(buffer, &map);
@@ -973,6 +975,9 @@ begin:
     }
 
 bail:
+    if (buffer) {
+        gst_buffer_unref (buffer);
+    }
     return ret;
 
 }
