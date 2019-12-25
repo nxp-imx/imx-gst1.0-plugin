@@ -142,7 +142,7 @@ gst_vpu_dec_object_get_sink_caps (void)
           map++;
           continue;
         }
-        if (IS_IMX8MM() && (map->std != VPU_V_HEVC && map->std != VPU_V_VP9
+        if ((IS_IMX8MM() || IS_IMX8MP()) && (map->std != VPU_V_HEVC && map->std != VPU_V_VP9
                     && map->std != VPU_V_AVC && map->std != VPU_V_VP8)) {
             map++;
             continue;
@@ -528,7 +528,7 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
         || open_param->CodecFormat == VPU_V_AVC))
       || IS_AMPHION()) {
     open_param->nTiled2LinearEnable = 1;
-    if (IS_IMX8MM())
+    if (IS_IMX8MM() || IS_IMX8MP())
         open_param->nTiled2LinearEnable = 0;
     vpu_dec_object->implement_config = TRUE;
     if (open_param->CodecFormat == VPU_V_HEVC
@@ -540,7 +540,7 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
     open_param->nTiled2LinearEnable = 0;
   }
   open_param->nEnableVideoCompressor = 1;
-  if (IS_IMX8MM()) {
+  if (IS_IMX8MM() || IS_IMX8MP()) {
     open_param->nEnableVideoCompressor = 0;
     open_param->nPixelFormat = 1;
   }
