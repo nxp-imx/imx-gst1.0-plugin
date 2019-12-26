@@ -622,7 +622,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"need preview buffer"},
       {"audio encoder type: 0->default(MP3), 1->MP3, 2->No Audio"},
       {"audio encoder bitrate(kbps)"},
-      {"video encoder type: 0->default(H264), 1->H264, 2->MPEG4, 3->H263, 4->MPEG, 5->VP8"},
+      {"video encoder type: 0->default(H264), 1->H264, 2->MPEG4, 3->H263, 4->MPEG, 5->VP8, 6->HEVC"},
       {"video encoder bitrate(kbps)"},
       {"media container format: 0->default(MP4), 1->MP4, 2->MKV, 3->AVI, 4->FLV, 5->TS"},
       {"output path"},

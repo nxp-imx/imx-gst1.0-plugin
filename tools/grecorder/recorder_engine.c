@@ -320,6 +320,16 @@ create_encording_profile (gRecorderEngine *recorder)
         gst_encoding_container_profile_add_profile (container, sprof);
         gst_caps_unref (caps);
         break;
+    case RE_VIDEO_ENCODER_H265:
+        caps = gst_caps_new_simple ("video/x-h265", NULL);
+        sprof = (GstEncodingProfile *)
+          gst_encoding_video_profile_new (caps, NULL, NULL, 1);
+        //FIXME: videorate has issue.
+        gst_encoding_video_profile_set_variableframerate ((GstEncodingVideoProfile
+              *) sprof, TRUE);
+        gst_encoding_container_profile_add_profile (container, sprof);
+        gst_caps_unref (caps);
+        break;
     case RE_VIDEO_ENCODER_MPEG4:
         caps = gst_caps_new_simple
             ("video/mpeg", "mpegversion", G_TYPE_INT, 4, "systemstream", 
@@ -1703,7 +1713,7 @@ static REresult add_time_stamp(RecorderEngineHandle handle, REboolean bAddTimeSt
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
 
   if (bAddTimeStamp) {
-      if (IS_IMX8MM()) {
+      if (IS_IMX8MM() || IS_IMX8MP()) {
           recorder->date_time = DATE_TIME TIME_OVERLAY HW_COMPOSITOR "queue";
       }
       else if (IS_IMX8Q()) {
@@ -1725,7 +1735,7 @@ static REresult add_video_effect(RecorderEngineHandle handle, REuint32 videoEffe
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
   CHECK_PARAM (videoEffect, RE_VIDEO_EFFECT_LIST_END);
 
-  if (IS_IMX8MM()) {
+  if (IS_IMX8MM() || IS_IMX8MP()) {
       g_print("***Video effect is not supported!\n");
       return RE_RESULT_FEATURE_UNSUPPORTED;
   }
@@ -1777,7 +1787,7 @@ static REresult add_video_detect(RecorderEngineHandle handle, REuint32 videoDete
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
   CHECK_PARAM (videoDetect, RE_VIDEO_DETECT_LIST_END);
 
-  if (IS_IMX8MM()) {
+  if (IS_IMX8MM() || IS_IMX8MP()) {
       g_print("***Video detect is not supported!\n");
       return RE_RESULT_FEATURE_UNSUPPORTED;
   }

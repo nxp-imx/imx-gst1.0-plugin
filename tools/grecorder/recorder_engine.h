@@ -118,7 +118,8 @@ typedef REuint32    REresult;
 #define RE_VIDEO_ENCODER_H263               ((REuint32) 0x00000003)
 #define RE_VIDEO_ENCODER_MJPEG              ((REuint32) 0x00000004)
 #define RE_VIDEO_ENCODER_VP8                ((REuint32) 0x00000005)
-#define RE_VIDEO_ENCODER_LIST_END           ((REuint32) 0x00000006)
+#define RE_VIDEO_ENCODER_H265               ((REuint32) 0x00000006)
+#define RE_VIDEO_ENCODER_LIST_END           ((REuint32) 0x00000007)
 
 #define RE_EVENT_NONE                       ((REuint32) 0x00000000)
 #define RE_EVENT_ERROR_UNKNOWN              ((REuint32) 0x00000001)
