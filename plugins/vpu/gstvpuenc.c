@@ -1092,8 +1092,10 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
           for (i = 0; i < n_mem; i++) {
             fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (frame->input_buffer, i));
           }
-          if (fd[0] >= 0)
-            phys_ptr = phy_addr_from_fd (fd[0]);
+          if (fd[0] >= 0) {
+            //workaround incorrect physical address of input buffer returned by phy_addr_from_fd (fd[0])
+            phys_ptr = (phy_addr_from_fd (fd[0]) & 0xFFFFFFFF);
+          }
         } else {
           input_phys_buffer = gst_buffer_query_phymem_block (input_buffer);
           if (input_phys_buffer == NULL) {
