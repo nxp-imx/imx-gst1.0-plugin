@@ -134,8 +134,8 @@ static GstStaticPadTemplate static_sink_template_H1 = GST_STATIC_PAD_TEMPLATE(
 	GST_STATIC_CAPS(
 		"video/x-raw,"
     "format = (string) { NV12, I420, YUY2, UYVY, RGBA, RGBx, RGB16, RGB15, BGRA, BGRx, BGR16}, "
-		"width = (int) [ 64, 1920, 8 ], "
-		"height = (int) [ 64, 1088, 8 ], "
+		"width = (int) [ 64, 1920 ], "
+		"height = (int) [ 64, 1088 ], "
 		"framerate = (fraction) [ 0, MAX ]"
 	)
 );
@@ -147,8 +147,8 @@ static GstStaticPadTemplate static_sink_template_VC8000E = GST_STATIC_PAD_TEMPLA
 	GST_STATIC_CAPS(
 		"video/x-raw,"
     "format = (string) { NV12, I420, YUY2, UYVY, RGBA, RGBx, RGB16, RGB15, BGRA, BGRx, BGR16}, "
-		"width = (int) [ 64, 1920, 8 ], "
-		"height = (int) [ 64, 1088, 8 ], "
+		"width = (int) [ 64, 1920 ], "
+		"height = (int) [ 64, 1088 ], "
 		"framerate = (fraction) [ 0, MAX ]"
 	)
 );
@@ -212,8 +212,8 @@ static GstStaticPadTemplate static_src_template_vp8 = GST_STATIC_PAD_TEMPLATE(
     GST_STATIC_CAPS(
         "video/x-vp8, "
         "variant = (string) itu, "
-        "width = (int) [ 64, 1920, 8 ], "
-        "height = (int) [ 64, 1088, 8 ], "
+        "width = (int) [ 64, 1920 ], "
+        "height = (int) [ 64, 1088 ], "
         "framerate = (fraction) [ 0, MAX ]; "
     )
 );
@@ -227,8 +227,8 @@ static GstStaticPadTemplate static_src_template_hevc = GST_STATIC_PAD_TEMPLATE(
     GST_STATIC_CAPS(
         "video/x-h265, "
         "variant = (string) itu, "
-        "width = (int) [ 64, 1920, 8 ], "
-        "height = (int) [ 64, 1088, 8 ], "
+        "width = (int) [ 64, 1920 ], "
+        "height = (int) [ 64, 1088 ], "
         "framerate = (fraction) [ 0, MAX ]; "
     )
 );
@@ -1281,6 +1281,7 @@ gst_vpu_enc_propose_allocation (GstVideoEncoder * benc, GstQuery * query)
     GstStructure *structure;
     GstAllocator *allocator = NULL;
     GstAllocationParams params = { 0 };
+    guint stride_align;
 
     allocator = gst_vpu_allocator_obtain();
 
@@ -1290,6 +1291,21 @@ gst_vpu_enc_propose_allocation (GstVideoEncoder * benc, GstQuery * query)
     structure = gst_buffer_pool_get_config (pool);
     gst_buffer_pool_config_set_params (structure, caps, size, 0, 0);
     gst_buffer_pool_config_set_allocator (structure, allocator, &params);
+
+    if (IS_HANTRO()) {
+      if (IS_IMX8MP() && GST_VIDEO_INFO_FORMAT(&info) == GST_VIDEO_FORMAT_I420)
+        stride_align = 32;
+      else
+        stride_align = 16;
+      if (info.width % stride_align) {
+        GstVideoAlignment alignment;
+        memset (&alignment, 0, sizeof (GstVideoAlignment));
+        alignment.padding_right = GST_ROUND_UP_N (info.width, stride_align) - info.width;
+        gst_buffer_pool_config_add_option (structure, GST_BUFFER_POOL_OPTION_VIDEO_META);
+        gst_buffer_pool_config_add_option (structure, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
+        gst_buffer_pool_config_set_video_alignment (structure, &alignment);
+      }
+    }
 
     if (!gst_buffer_pool_set_config (pool, structure)) {
       GST_ERROR_OBJECT (enc, "failed to set config");
