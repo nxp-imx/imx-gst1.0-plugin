@@ -35,7 +35,7 @@
  *	2016-05-24         Meng Mingming     1.1            support get g2d_buf from dma fd
  *	2017-07-04         Prabhu Sundararaj 1.2            support get g2d_buf to export dma fd
  *	2018-04-24         Yuchou Gan        1.3            Add AMPHION_TILED support
-
+ *	2019-12-30         Yong Gan          1.4            Add G2D_TILED_STATUS support
 */
 
 #ifndef __G2D_H__

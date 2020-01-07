@@ -36,6 +36,15 @@
 extern "C"  {
 #endif
 
+struct g2d_tile_status
+{
+    unsigned int ts_addr;
+
+    unsigned int fc_enabled;
+    unsigned int fc_value;
+    unsigned int fc_value_upper;
+};
+
 enum g2d_tiling
 {
     G2D_LINEAR              = 0x1,
@@ -43,12 +52,16 @@ enum g2d_tiling
     G2D_SUPERTILED          = 0x4,
     G2D_AMPHION_TILED       = 0x8,
     G2D_AMPHION_INTERLACED  = 0x10,
+    G2D_TILED_STATUS        = 0x20,
 };
 
 struct g2d_surfaceEx
 {
     struct g2d_surface base;
     enum g2d_tiling tiling;
+
+    struct g2d_tile_status ts;
+    int reserved[8];
 };
 
 int g2d_blitEx(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_surfaceEx *dstEx);
