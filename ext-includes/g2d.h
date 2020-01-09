@@ -36,6 +36,7 @@
  *	2017-07-04         Prabhu Sundararaj 1.2            support get g2d_buf to export dma fd
  *	2018-04-24         Yuchou Gan        1.3            Add AMPHION_TILED support
  *	2019-12-30         Yong Gan          1.4            Add G2D_TILED_STATUS support
+ *	2020-01-08         Li Xianzhong      1.5            support BT_601 and BT_709
 */
 
 #ifndef __G2D_H__
@@ -101,6 +102,8 @@ enum g2d_cap_mode
     G2D_GLOBAL_ALPHA          = 2,//only support source global alpha
     G2D_BLEND_DIM             = 3,//support special blend effect
     G2D_BLUR                  = 4,//blur effect
+    G2D_YUV_BT_601            = 5,//yuv BT.601
+    G2D_YUV_BT_709            = 6,//yuv BT.709
 };
 
 enum g2d_feature
