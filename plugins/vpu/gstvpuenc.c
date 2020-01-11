@@ -756,6 +756,11 @@ gst_vpu_enc_set_caps (GstVideoEncoder * benc, guint8 * codec_data, gint codec_da
           NULL);
     }
     gst_structure_set (s, "alignment", G_TYPE_STRING, "au", NULL);
+  } else if (enc->open_param.eFormat == VPU_V_HEVC) {
+    //HEVC only supports byte-stream output, HW only supports one output buffer.
+    gst_structure_set (s, "stream-format", G_TYPE_STRING, "byte-stream",
+        NULL);
+    gst_structure_set (s, "alignment", G_TYPE_STRING, "au", NULL);
   } else {
     if (gstbuf != NULL) {
       gst_caps_set_simple (out_caps, "codec_data", GST_TYPE_BUFFER, gstbuf, NULL);
