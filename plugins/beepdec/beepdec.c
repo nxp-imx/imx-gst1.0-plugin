@@ -467,6 +467,8 @@ static gboolean beep_dec_set_format(GstAudioDecoder *dec, GstCaps *caps)
               type = NBAMR;
             } else if (!strcmp (IDecoder->name, "amr-wb")) {
               type = WBAMR;
+            } else if (!strcmp (IDecoder->name, "wma")) {
+              type = WMA;
             }else {
               goto dsp_fail;
             }
