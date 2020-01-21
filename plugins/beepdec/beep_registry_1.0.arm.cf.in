@@ -19,6 +19,7 @@ library = @mp3d_arm_SONAME@
 longname = WMA decoder
 description = Decode WMA compressed audio to raw data
 mime = audio/x-wma, wmaversion = (int)[ 1, 4 ]
+dsp_lib = @dsp_arm_SONAME@
 library = @wma10d_arm_SONAME@
 
 [ac3]
@@ -63,8 +64,8 @@ description = decode real audio cook to raw data
 mime = audio/x-pn-realaudio, channels = (int)[ 1, 2 ]
 library = @realad_arm_SONAME@
 
-[bsac]
-longname = BSAC decoder
-description = Decode BSAC compressed audio to raw data
-mime= audio/x-bsac
-dsp_lib = @dsp_arm_SONAME@
+#[bsac]
+#longname = BSAC decoder
+#description = Decode BSAC compressed audio to raw data
+#mime= audio/x-bsac
+#dsp_lib = @dsp_arm_SONAME@
