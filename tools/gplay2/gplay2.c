@@ -1,6 +1,6 @@
 /*
  * Copyright 2014-2016 Freescale Semiconductor, Inc.
- * Copyright 2017-2019 NXP
+ * Copyright 2017-2020 NXP
  *
  */
 
@@ -1158,6 +1158,13 @@ input_thread_fun (gpointer data)
         g_print ("Ready to exit this app!\n");
         gexit_input_thread = TRUE;
         gexit_display_thread = TRUE;
+        if (play->eos_found == FALSE) {
+          if (play->loop) {
+            if (g_main_loop_is_running (play->loop) == TRUE) {
+              g_main_loop_quit (play->loop);
+            }
+          }
+        }
       }
         break;
 
@@ -1496,13 +1503,6 @@ input_thread_fun (gpointer data)
     }
     fflush (stdout);
     fflush (stdin);
-  }
-  if (play->eos_found == FALSE) {
-    if (play->loop) {
-      if (g_main_loop_is_running (play->loop) == TRUE) {
-        g_main_loop_quit (play->loop);
-      }
-    }
   }
   gexit_main = TRUE;
   g_print ("Exit input thread\n");
