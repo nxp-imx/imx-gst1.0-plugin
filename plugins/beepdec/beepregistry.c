@@ -148,22 +148,11 @@ static GstCaps * beep_get_caps_from_entry(GstsutilsEntry * entry)
     if(!gstsutils_get_value_by_key(group,FSL_KEY_MIME,&mime)){
       continue;
     }
-
-    if (gstsutils_get_value_by_key(group,FSL_KEY_DSP_LIB,&libname)) {
-      dlhandle = dlopen (libname, RTLD_LAZY);
-      if (dlhandle) {
-        goto add_caps;
-      }
-    }
-
-    if (libname) {
-      g_free(libname);
-      libname = NULL;
-    }
-
     if(!gstsutils_get_value_by_key(group,FSL_KEY_LIB,&libname)){
-      g_free(mime);
-      continue;
+      if (!gstsutils_get_value_by_key(group,FSL_KEY_DSP_LIB,&libname)) {
+        g_free(mime);
+        continue;
+      }
     }
 
     dlhandle = dlopen (libname, RTLD_LAZY);
@@ -173,7 +162,6 @@ static GstCaps * beep_get_caps_from_entry(GstsutilsEntry * entry)
       continue;
     }
 
-add_caps:
     if (caps) {
       GstCaps *newcaps = gst_caps_from_string (mime);
       if (newcaps) {
