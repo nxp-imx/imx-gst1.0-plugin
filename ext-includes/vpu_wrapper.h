@@ -209,7 +209,7 @@ typedef struct {
 	VpuMemType MemType; /* Flag to indicate Static, Scratch or output data memory */
 	unsigned char* pVirtAddr;		/* virtual address:Pointer to the base memory , which will be allocated and filled by the application*/
 	unsigned char* pPhyAddr;		/* physical address: Pointer to the base memory , which will be allocated and filled by the application*/
-
+    int nFd;
 	int nReserved[3];				/*reserved for future extension*/
 } VpuMemSubBlockInfo;
 
@@ -274,6 +274,8 @@ typedef struct {
 
 
 typedef struct {
+    /* buffer id */
+    int nBufferId;
 	/* stride info */
 	unsigned int nStrideY;
 	unsigned int nStrideC;
