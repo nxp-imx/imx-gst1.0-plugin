@@ -1433,6 +1433,20 @@ static gint imxcompositor_pad_zorder_compare (gconstpointer a, gconstpointer b)
 }
 #endif
 
+static guint8 *
+_get_cached_phyaddr (GstMemory * mem)
+{
+    return gst_mini_object_get_qdata (GST_MINI_OBJECT (mem),
+              g_quark_from_static_string ("phyaddr"));
+}
+
+static void
+_set_cached_phyaddr (GstMemory * mem, guint8 * phyadd)
+{
+  return gst_mini_object_set_qdata (GST_MINI_OBJECT (mem),
+                g_quark_from_static_string ("phyaddr"), phyadd, NULL);
+}
+
 static GstFlowReturn
 gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
                                     GstBuffer * outbuf)
@@ -1508,10 +1522,24 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
       dst.crop.w = pad->dst_crop.w;
       dst.crop.h = pad->dst_crop.h;
 
+      if (!src.mem->paddr)
+        src.mem->paddr = _get_cached_phyaddr (gst_buffer_peek_memory (aggregated_frame->buffer, 0));
+      if (!src.mem->user_data && src.fd[1] >= 0)
+        src.mem->user_data = _get_cached_phyaddr (gst_buffer_peek_memory (aggregated_frame->buffer, 1));
+      if (!dst.mem->paddr)
+        dst.mem->paddr = _get_cached_phyaddr (gst_buffer_peek_memory (outbuf, 0));
+
       if (device->blend(device, &dst, &src) < 0) {
         GST_WARNING_OBJECT (pad, "frame blend fail");
         continue;
       }
+
+      if (!_get_cached_phyaddr (gst_buffer_peek_memory (aggregated_frame->buffer, 0)))
+        _set_cached_phyaddr (gst_buffer_peek_memory (aggregated_frame->buffer, 0), src.mem->paddr);
+      if (src.fd[1] >= 0 && !_get_cached_phyaddr (gst_buffer_peek_memory (aggregated_frame->buffer, 1)))
+        _set_cached_phyaddr (gst_buffer_peek_memory (aggregated_frame->buffer, 1), src.mem->user_data);
+      if (!_get_cached_phyaddr (gst_buffer_peek_memory (outbuf, 0)))
+        _set_cached_phyaddr (gst_buffer_peek_memory (outbuf, 0), dst.mem->paddr);
 
       aggregated++;
 
