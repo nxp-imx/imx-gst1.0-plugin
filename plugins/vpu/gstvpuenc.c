@@ -911,7 +911,10 @@ gst_vpu_enc_setup_internal_bufferpool (GstVpuEnc * enc)
   memset(&(enc->video_align), 0, sizeof(GstVideoAlignment));
 
   if (IS_HANTRO()) {
-    alignH = DEFAULT_FRAME_BUFFER_ALIGNMENT_H_HANTRO;
+    if (IS_IMX8MP() && GST_VIDEO_INFO_FORMAT(&enc->state->info) == GST_VIDEO_FORMAT_I420)
+      alignH = DEFAULT_FRAME_BUFFER_ALIGNMENT_H_I420_IMX8MP;
+    else
+      alignH = DEFAULT_FRAME_BUFFER_ALIGNMENT_H;
     alignV = DEFAULT_FRAME_BUFFER_ALIGNMENT_V_HANTRO;
   } else {
     alignH = DEFAULT_FRAME_BUFFER_ALIGNMENT_H;
@@ -922,8 +925,12 @@ gst_vpu_enc_setup_internal_bufferpool (GstVpuEnc * enc)
   if (enc->open_param.nPicHeight % alignV)
     enc->video_align.padding_bottom = alignV - enc->open_param.nPicHeight % alignV;
 
-  for (i = 0; i < GST_VIDEO_MAX_PLANES; i++)
-    enc->video_align.stride_align[i] = alignH - 1;
+  /* For hantro, with padding_right set, there is no need to set extra padded_width with
+  stride_align in gst_video_info_align() function, otherwise will cause stride incorrect */
+  if (!IS_HANTRO()) {
+    for (i = 0; i < GST_VIDEO_MAX_PLANES; i++)
+      enc->video_align.stride_align[i] = alignH - 1;
+  }
 
   config = gst_buffer_pool_get_config(enc->pool);
   gst_buffer_pool_config_add_option(config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
@@ -1299,9 +1306,9 @@ gst_vpu_enc_propose_allocation (GstVideoEncoder * benc, GstQuery * query)
 
     if (IS_HANTRO()) {
       if (IS_IMX8MP() && GST_VIDEO_INFO_FORMAT(&info) == GST_VIDEO_FORMAT_I420)
-        stride_align = 32;
+        stride_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_H_I420_IMX8MP;
       else
-        stride_align = 16;
+        stride_align = DEFAULT_FRAME_BUFFER_ALIGNMENT_H;
       if (info.width % stride_align) {
         GstVideoAlignment alignment;
         memset (&alignment, 0, sizeof (GstVideoAlignment));
