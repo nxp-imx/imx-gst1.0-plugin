@@ -831,6 +831,11 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
       vpu_dec_object->init_info.nPicWidth, vpu_dec_object->init_info.nPicHeight, \
       vpu_dec_object->width_paded, vpu_dec_object->height_paded);
 
+  GST_INFO_OBJECT (vpu_dec_object, "video output full range %d", vpu_dec_object->init_info.ColourDesc.fullRange);
+  if (vpu_dec_object->init_info.ColourDesc.fullRange != 0) {
+    state->info.colorimetry.range = GST_VIDEO_COLOR_RANGE_0_255;
+  }
+
   gst_video_decoder_negotiate (bdec);
 
   while (g_list_length (vpu_dec_object->gstbuffer_in_vpudec) \
