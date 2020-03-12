@@ -1415,6 +1415,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     return GST_FLOW_ERROR;
 
   if (gst_is_dmabuf_memory (gst_buffer_peek_memory (input_frame->buffer, 0))) {
+    src.fd[0] = src.fd[1] =src.fd[2] = src.fd[3] = -1;
     src.mem = &src_mem;
     n_mem = gst_buffer_n_memory (input_frame->buffer);
     for (i = 0; i < n_mem; i++)
@@ -1515,7 +1516,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
 
   if (!src.mem->paddr)
     src.mem->paddr = _get_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 0));
-  if (!src.mem->user_data && src.fd[1])
+  if (!src.mem->user_data && src.fd[1] >= 0)
     src.mem->user_data = _get_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 1));
   if (!dst.mem->paddr)
     dst.mem->paddr = _get_cached_phyaddr (gst_buffer_peek_memory (out->buffer, 0));
@@ -1526,7 +1527,7 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
 
     if (!_get_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 0)))
       _set_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 0), src.mem->paddr);
-    if (src.fd[1] && !_get_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 1)))
+    if (src.fd[1] >= 0 && !_get_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 1)))
       _set_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 1), src.mem->user_data);
     if (!_get_cached_phyaddr (gst_buffer_peek_memory (out->buffer, 0)))
       _set_cached_phyaddr (gst_buffer_peek_memory (out->buffer, 0), dst.mem->paddr);
