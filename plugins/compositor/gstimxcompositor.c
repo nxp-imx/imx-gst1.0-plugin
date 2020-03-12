@@ -1185,6 +1185,7 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
   }
 
   if (gst_is_dmabuf_memory (gst_buffer_peek_memory (aggregated_frame->buffer, 0))) {
+    src->fd[0] = src->fd[1] =src->fd[2] = src->fd[3] = -1;
     n_mem = gst_buffer_n_memory (aggregated_frame->buffer);
     for (i = 0; i < n_mem; i++)
       src->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (aggregated_frame->buffer, i));

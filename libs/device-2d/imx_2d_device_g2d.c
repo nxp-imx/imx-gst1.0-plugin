@@ -463,7 +463,7 @@ static gint imx_g2d_blit(Imx2DDevice *device,
     return -1;
   }
 
-  if (g2d->src.tiling == G2D_AMPHION_TILED && src->fd[1] >= 0)
+  if (src->fd[1] >= 0)
   {
     if (!src->mem->user_data)
       src->mem->user_data = g2d->src.base.planes[1] = phy_addr_from_fd (src->fd[1]);
