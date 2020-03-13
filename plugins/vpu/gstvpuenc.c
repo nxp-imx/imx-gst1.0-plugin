@@ -1083,6 +1083,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 		GstVideoMeta *video_meta;
     PhyMemBlock *input_phys_buffer;
     unsigned char *phys_ptr;
+    unsigned char *phys_ptr_dma[4];
 
 		/* Try to use plane offset and stride information from the video
 		 * metadata if present, since these can be more accurate than
@@ -1103,10 +1104,21 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
           n_mem = gst_buffer_n_memory (frame->input_buffer);
           for (i = 0; i < n_mem; i++) {
             fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (frame->input_buffer, i));
+            //query each plane's fd to get right physical address
+            if (fd[i] >= 0)
+              //workaround incorrect physical address of input buffer returned by phy_addr_from_fd (fd[i])
+              phys_ptr_dma[i] = (phy_addr_from_fd (fd[i]) & 0xFFFFFFFF);
           }
-          if (fd[0] >= 0) {
-            //workaround incorrect physical address of input buffer returned by phy_addr_from_fd (fd[0])
-            phys_ptr = (phy_addr_from_fd (fd[0]) & 0xFFFFFFFF);
+          input_framebuf.pbufY = phys_ptr_dma[0];
+          if (fd[1] >= 0) {
+            input_framebuf.pbufCb = phys_ptr_dma[1];
+            if (fd[2] >= 0)
+              input_framebuf.pbufCr = phys_ptr_dma[2];
+            else
+              input_framebuf.pbufCr = input_framebuf.pbufCb;
+          } else {
+            input_framebuf.pbufCb = input_framebuf.pbufY;
+            input_framebuf.pbufCr = input_framebuf.pbufY;
           }
         } else {
           input_phys_buffer = gst_buffer_query_phymem_block (input_buffer);
@@ -1116,11 +1128,11 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
             goto bail;
           }
           phys_ptr = (unsigned char*)(input_phys_buffer->paddr);
+          input_framebuf.pbufY = phys_ptr;
+          input_framebuf.pbufCb = phys_ptr + plane_offsets[1];
+          input_framebuf.pbufCr = phys_ptr + plane_offsets[2];
         }
 
-		input_framebuf.pbufY = phys_ptr;
-		input_framebuf.pbufCb = phys_ptr + plane_offsets[1];
-		input_framebuf.pbufCr = phys_ptr + plane_offsets[2];
 		input_framebuf.pbufMvCol = NULL; /* not used by the VPU encoder */
 		input_framebuf.nStrideY = plane_strides[0];
 		input_framebuf.nStrideC = plane_strides[1];
