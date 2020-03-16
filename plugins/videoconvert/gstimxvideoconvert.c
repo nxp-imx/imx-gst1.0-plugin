@@ -1414,8 +1414,8 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   if (ret != 0)
     return GST_FLOW_ERROR;
 
+  src.fd[0] = src.fd[1] =src.fd[2] = src.fd[3] = -1;
   if (gst_is_dmabuf_memory (gst_buffer_peek_memory (input_frame->buffer, 0))) {
-    src.fd[0] = src.fd[1] =src.fd[2] = src.fd[3] = -1;
     src.mem = &src_mem;
     n_mem = gst_buffer_n_memory (input_frame->buffer);
     for (i = 0; i < n_mem; i++)

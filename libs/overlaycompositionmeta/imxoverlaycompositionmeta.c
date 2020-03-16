@@ -567,6 +567,7 @@ gint imx_video_overlay_composition_composite(
       GST_LOG ("overlay input: %s, %dx%d", gst_video_format_to_string(t_fmt),
           src.info.w, src.info.h);
 
+      src.fd[0] = src.fd[1] = src.fd[2] = src.fd[3] = -1;
       if (gst_is_dmabuf_memory (gst_buffer_peek_memory (in_buf, 0))) {
         src.mem = &src_mem;
         n_mem = gst_buffer_n_memory (in_buf);

@@ -87,6 +87,7 @@ compositor_do_composite_surface (CompositorHandle *hcompositor, Surface *surface
   src.info.stride = src.info.w;
   src.info.tile_type = IMX_2D_TILE_NULL;
   src.mem = &surface->buffer.mem;
+  src.fd[0] = src.fd[1] = src.fd[2] = src.fd[3] = -1;
   if (!surface->buffer.mem.paddr) {
     for (i = 0; i < 4; i++)
       src.fd[i] = surface->buffer.fd[i];

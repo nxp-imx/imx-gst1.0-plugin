@@ -802,6 +802,9 @@ gst_overlay_sink_show_frame (GstBaseSink * bsink, GstBuffer * buffer)
 
   cropmeta = gst_buffer_get_video_crop_meta (buffer);
   surface_buffer.fd[0] = -1;
+  surface_buffer.fd[1] = -1;
+  surface_buffer.fd[2] = -1;
+  surface_buffer.fd[3] = -1;
 
   if (!(gst_buffer_is_phymem (buffer)
         || gst_is_dmabuf_memory (gst_buffer_peek_memory (buffer, 0))
