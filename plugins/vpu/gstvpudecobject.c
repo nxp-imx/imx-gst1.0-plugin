@@ -567,8 +567,12 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
     open_param->nChromaInterleave = 1;
     vpu_dec_object->chroma_interleaved = TRUE;
   }
-  open_param->nAdaptiveMode = 1;
+
   open_param->nReorderEnable = 1;
+  if (vpu_dec_object->disable_reorder) {
+      open_param->nReorderEnable = 0;
+  }
+  open_param->nAdaptiveMode = 1;
   open_param->nEnableFileMode = 0;
   open_param->nPicWidth = GST_VIDEO_INFO_WIDTH(info);
   open_param->nPicHeight = GST_VIDEO_INFO_HEIGHT(info);

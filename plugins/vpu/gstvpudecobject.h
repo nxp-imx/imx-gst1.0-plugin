@@ -49,6 +49,7 @@ typedef struct _GstVpuDecObjectClass GstVpuDecObjectClass;
 #define GST_VPU_DEC_ACTUAL_BUF_CNT(o)        ((o)->actual_buf_cnt)
 #define GST_VPU_DEC_BUF_ALIGNMENT(o)         ((o)->buf_align)
 #define GST_VPU_DEC_VIDEO_ALIGNMENT(o)       ((o)->video_align)
+#define GST_VPU_DEC_DISABLE_REORDER(o)       ((o)->disable_reorder)
  
 typedef enum {
   STATE_NULL    = 0,
@@ -111,6 +112,7 @@ struct _GstVpuDecObject {
   gboolean dropping;
   gboolean vpu_report_resolution_change; 
   gboolean vpu_need_reconfig;
+  gboolean disable_reorder;
   void *tsm;
   TSMGR_MODE tsm_mode;
   GstClockTime last_valid_ts;

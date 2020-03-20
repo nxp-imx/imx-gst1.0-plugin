@@ -55,13 +55,15 @@ enum
   PROP_OUTPUT_FORMAT,
   PROP_ADAPTIVE_FRAME_DROP,
   PROP_FRAMES_PLUS,
-  PROP_USE_VPU_MEMORY
+  PROP_USE_VPU_MEMORY,
+  PROP_DISABLE_REORDER
 };
 
 #define DEFAULT_LOW_LATENCY FALSE
 #define DEFAULT_OUTPUT_FORMAT 0
 #define DEFAULT_ADAPTIVE_FRAME_DROP TRUE
 #define DEFAULT_FRAMES_PLUS 3
+#define DEFAULT_DISABLE_REORDER FALSE
 /* Default to use VPU memory for video frame buffer as all video frame buffer
  * must registe to VPU. Change video frame buffer will cause close VPU which
  * will cause video stream lost.
@@ -141,6 +143,10 @@ gst_vpu_dec_class_init (GstVpuDecClass * klass)
       g_param_spec_boolean ("use-vpu-memory", "use vpu memory",
         "use vpu allocate video frame buffer", 
           DEFAULT_USE_VPU_MEMORY, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (gobject_class, PROP_DISABLE_REORDER,
+      g_param_spec_boolean ("disable-reorder", "disable reorder",
+        "disable vpu reorder when end to end streaming",
+          DEFAULT_DISABLE_REORDER, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
  
   gst_element_class_add_pad_template (element_class,
           gst_pad_template_new ("sink", GST_PAD_SINK, GST_PAD_ALWAYS,
@@ -180,6 +186,7 @@ gst_vpu_dec_init (GstVpuDec * dec)
   GST_VPU_DEC_FRAMES_PLUS (dec->vpu_dec_object) = DEFAULT_FRAMES_PLUS;
   GST_VPU_DEC_USE_VPU_MEMORY (dec->vpu_dec_object) = DEFAULT_USE_VPU_MEMORY;
   GST_VPU_DEC_MIN_BUF_CNT (dec->vpu_dec_object) = 0;
+  GST_VPU_DEC_DISABLE_REORDER (dec->vpu_dec_object) = DEFAULT_DISABLE_REORDER;
 
   /* As VPU can support stream mode. need call parser before decode */
   gst_video_decoder_set_packetized (GST_VIDEO_DECODER (dec), TRUE);
@@ -206,6 +213,9 @@ gst_vpu_dec_get_property (GObject * object, guint prop_id, GValue * value,
       break;
     case PROP_USE_VPU_MEMORY:
       g_value_set_boolean (value, GST_VPU_DEC_USE_VPU_MEMORY (dec->vpu_dec_object));
+      break;
+    case PROP_DISABLE_REORDER:
+      g_value_set_boolean (value, GST_VPU_DEC_DISABLE_REORDER (dec->vpu_dec_object));
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -234,6 +244,9 @@ gst_vpu_dec_set_property (GObject * object, guint prop_id,
       break;
     case PROP_USE_VPU_MEMORY:
       GST_VPU_DEC_USE_VPU_MEMORY (dec->vpu_dec_object) = g_value_get_boolean (value);
+      break;
+    case PROP_DISABLE_REORDER:
+      GST_VPU_DEC_DISABLE_REORDER (dec->vpu_dec_object) = g_value_get_boolean (value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
