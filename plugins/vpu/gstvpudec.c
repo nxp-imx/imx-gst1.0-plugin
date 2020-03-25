@@ -320,9 +320,16 @@ gst_vpu_dec_set_format (GstVideoDecoder * bdec, GstVideoCodecState * state)
 static GstFlowReturn
 gst_vpu_dec_handle_frame (GstVideoDecoder * bdec, GstVideoCodecFrame * frame)
 {
+  GstFlowReturn ret;
   GstVpuDec *dec = (GstVpuDec *) bdec;
-
-  return gst_vpu_dec_object_decode (dec->vpu_dec_object, bdec, frame);
+  /* As one frame of some special streams can be decoded to be two frames,
+  so ref the frame before we use it to avoid has been freed by others. */
+  if (frame)
+    gst_video_codec_frame_ref (frame);
+  ret = gst_vpu_dec_object_decode (dec->vpu_dec_object, bdec, frame);
+  if (frame)
+    gst_video_codec_frame_unref (frame);
+  return ret;
 }
 
 static GstFlowReturn
