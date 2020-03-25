@@ -338,14 +338,10 @@ static gint imx_g2d_set_src_plane(struct g2d_surface *g2d_src, gchar *paddr)
 {
   switch(g2d_src->format) {
     case G2D_I420:
+    case G2D_YV12:
       g2d_src->planes[0] = (gint)(paddr);
       g2d_src->planes[1] = (gint)(paddr + g2d_src->width * g2d_src->height);
       g2d_src->planes[2] = g2d_src->planes[1]+g2d_src->width*g2d_src->height/4;
-      break;
-    case G2D_YV12:
-      g2d_src->planes[0] = (gint)(paddr);
-      g2d_src->planes[2] = (gint)(paddr + g2d_src->width * g2d_src->height);
-      g2d_src->planes[1] = g2d_src->planes[2]+g2d_src->width*g2d_src->height/4;
       break;
     case G2D_NV12:
     case G2D_NV21:
