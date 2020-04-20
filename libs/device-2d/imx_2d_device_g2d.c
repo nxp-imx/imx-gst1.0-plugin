@@ -1,6 +1,6 @@
 /* GStreamer IMX G2D Device
  * Copyright (c) 2014-2016, Freescale Semiconductor, Inc. All rights reserved.
- * Copyright 2018 NXP
+ * Copyright 2018-2020 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -29,6 +29,7 @@ GST_DEBUG_CATEGORY_EXTERN (imx2ddevice_debug);
 
 typedef struct _Imx2DDeviceG2d {
   gint capabilities;
+  void *g2d_handle;
   struct g2d_surfaceEx src;
   struct g2d_surfaceEx dst;
 } Imx2DDeviceG2d;
@@ -86,12 +87,14 @@ static G2dFmtMap g2d_fmts_map_dpu[] = {
     //HAS_DPU
     {GST_VIDEO_FORMAT_UYVY,   G2D_UYVY,     16},
     {GST_VIDEO_FORMAT_YUY2,   G2D_YUYV,     16},
+    {GST_VIDEO_FORMAT_NV12,   G2D_NV12,     12},
 
     //this only for separate YUV format and RGB format
     {GST_VIDEO_FORMAT_UNKNOWN, -1,          1},
 
     {GST_VIDEO_FORMAT_I420,   G2D_I420,     12},
     {GST_VIDEO_FORMAT_NV12,   G2D_NV12,     12},
+    {GST_VIDEO_FORMAT_NV12_10LE,   G2D_NV12,     15},
 
     {GST_VIDEO_FORMAT_YV12,   G2D_YV12,     12},
     {GST_VIDEO_FORMAT_NV16,   G2D_NV16,     16},
@@ -138,6 +141,15 @@ static gint imx_g2d_open(Imx2DDevice *device)
   memset(g2d, 0, sizeof (Imx2DDeviceG2d));
   device->priv = (gpointer)g2d;
 
+  if (HAS_DPU()) {
+    if(g2d_open(&g2d->g2d_handle) == -1 || g2d->g2d_handle == NULL) {
+      GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
+      g_slice_free1(sizeof(Imx2DDeviceG2d), g2d);
+      device->priv = NULL;
+      return -1;
+    }
+  }
+
   return 0;
 }
 
@@ -148,8 +160,12 @@ static gint imx_g2d_close(Imx2DDevice *device)
 
   if (device) {
     Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
-    if (g2d)
+    if (g2d) {
+      if (HAS_DPU()) {
+        g2d_close (g2d->g2d_handle);
+      }
       g_slice_free1(sizeof(Imx2DDeviceG2d), g2d);
+    }
     device->priv = NULL;
   }
   return 0;
@@ -203,6 +219,9 @@ static gint imx_g2d_copy_mem(Imx2DDevice* device, PhyMemBlock *dst_mem,
   void *g2d_handle = NULL;
   struct g2d_buf src, dst;
 
+  if (!device || !device->priv)
+    return -1;
+
   dst_mem->size = src_mem->size;
 
   pbuf = g2d_alloc (dst_mem->size, 0);
@@ -214,9 +233,15 @@ static gint imx_g2d_copy_mem(Imx2DDevice* device, PhyMemBlock *dst_mem,
   dst_mem->paddr = (gchar*) pbuf->buf_paddr;
   dst_mem->user_data = (gpointer) pbuf;
 
-  if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
-    GST_ERROR ("Failed to open g2d device.");
-    return -1;
+  Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
+  if (HAS_DPU()) {
+    g2d_handle = g2d->g2d_handle;
+  } else {
+    if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
+      g2d_free (pbuf);
+      GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
+      return -1;
+    }
   }
 
   src.buf_handle = NULL;
@@ -233,7 +258,9 @@ static gint imx_g2d_copy_mem(Imx2DDevice* device, PhyMemBlock *dst_mem,
 
   g2d_copy (g2d_handle, &dst, &src, size);
   g2d_finish(g2d_handle);
-  g2d_close (g2d_handle);
+  if (!HAS_DPU()) {
+    g2d_close (g2d_handle);
+  }
 
   GST_DEBUG ("G2D copy from vaddr (%p), paddr (%p), size (%d) to "
       "vaddr (%p), paddr (%p), size (%d)",
@@ -247,18 +274,20 @@ static gint imx_g2d_frame_copy(Imx2DDevice *device,
                                PhyMemBlock *from, PhyMemBlock *to)
 {
   struct g2d_buf src, dst;
+  void *g2d_handle = NULL;
   gint ret = 0;
 
   if (!device || !device->priv || !from || !to)
     return -1;
 
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
-
-  void *g2d_handle = NULL;
-
-  if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
-    GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
-    return -1;
+  if (HAS_DPU()) {
+    g2d_handle = g2d->g2d_handle;
+  } else {
+    if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
+      GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
+      return -1;
+    }
   }
 
   src.buf_handle = NULL;
@@ -273,7 +302,9 @@ static gint imx_g2d_frame_copy(Imx2DDevice *device,
   ret = g2d_copy (g2d_handle, &dst, &src, dst.buf_size);
 
   g2d_finish(g2d_handle);
-  g2d_close(g2d_handle);
+  if (!HAS_DPU()) {
+    g2d_close (g2d_handle);
+  }
   GST_LOG("G2D frame memory (%p)->(%p)", from->paddr, to->paddr);
 
   return ret;
@@ -299,7 +330,10 @@ static gint imx_g2d_config_input(Imx2DDevice *device, Imx2DVideoInfo* in_info)
   g2d->src.base.bottom = in_info->h;
   if (in_info->tile_type == IMX_2D_TILE_AMHPION) {
     g2d->src.base.stride = in_info->stride / (in_map->bpp/8);
-    g2d->src.tiling = G2D_AMPHION_TILED;
+    if (in_info->fmt == GST_VIDEO_FORMAT_NV12_10LE)
+      g2d->src.tiling = G2D_AMPHION_TILED_10BIT;
+    else
+      g2d->src.tiling = G2D_AMPHION_TILED;
   } else
     g2d->src.tiling = G2D_LINEAR;
   GST_TRACE("input format = %s", gst_video_format_to_string(in_info->fmt));
@@ -391,13 +425,17 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
     return -1;
 
-  // Open g2d
-  if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
-    GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
-    return -1;
-  }
-
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
+  if (HAS_DPU()) {
+    g2d_handle = g2d->g2d_handle;
+  } else {
+    /* g2d_open () every frame as GPU 2D based g2d need all function call in
+     * same thread */
+    if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
+      GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
+      return -1;
+    }
+  }
 
   GST_DEBUG ("src paddr fd vaddr: %p %d %p dst paddr fd vaddr: %p %d %p",
       src->mem->paddr, src->fd[0], src->mem->vaddr, dst->mem->paddr,
@@ -411,13 +449,15 @@ static gint imx_g2d_blit(Imx2DDevice *device,
       paddr = phy_addr_from_vaddr (src->mem->vaddr, PAGE_ALIGN(src->mem->size));
     } else {
       GST_ERROR ("Invalid parameters.");
-      return -1;
+      ret = -1;
+      goto err;
     }
     if (paddr) {
       src->mem->paddr = paddr;
     } else {
       GST_ERROR ("Can't get physical address.");
-      return -1;
+      ret = -1;
+      goto err;
     }
   }
   if (!dst->mem->paddr) {
@@ -426,7 +466,8 @@ static gint imx_g2d_blit(Imx2DDevice *device,
       dst->mem->paddr = paddr;
     } else {
       GST_ERROR ("Can't get physical address.");
-      return -1;
+      ret = -1;
+      goto err;
     }
   }
   GST_DEBUG ("src paddr: %p dst paddr: %p", src->mem->paddr, dst->mem->paddr);
@@ -441,8 +482,8 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   if (g2d->src.base.left >= g2d->src.base.width || g2d->src.base.top >= g2d->src.base.height ||
       g2d->src.base.right <= 0 || g2d->src.base.bottom <= 0) {
     GST_WARNING("input crop outside of source");
-    g2d_close (g2d_handle);
-    return 0;
+    ret = -1;
+    goto err;
   }
 
   if (g2d->src.base.left < 0)
@@ -455,8 +496,8 @@ static gint imx_g2d_blit(Imx2DDevice *device,
     g2d->src.base.bottom = g2d->src.base.height;
 
   if (imx_g2d_set_src_plane (&g2d->src.base, src->mem->paddr) < 0) {
-    g2d_close (g2d_handle);
-    return -1;
+    ret = -1;
+    goto err;
   }
 
   if (src->fd[1] >= 0)
@@ -482,16 +523,19 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   // Set output
   g2d->dst.base.global_alpha = dst->alpha;
   g2d->dst.base.planes[0] = (gint)(dst->mem->paddr);
+  if (g2d->dst.base.format == G2D_NV12)
+    g2d->dst.base.planes[1] = (gint)(dst->mem->paddr + g2d->dst.base.width * g2d->dst.base.height);
   g2d->dst.base.left = dst->crop.x;
   g2d->dst.base.top = dst->crop.y;
   g2d->dst.base.right = dst->crop.x + dst->crop.w;
   g2d->dst.base.bottom = dst->crop.y + dst->crop.h;
+  g2d->dst.tiling = G2D_LINEAR;
 
   if (g2d->dst.base.left >= g2d->dst.base.width || g2d->dst.base.top >= g2d->dst.base.height ||
       g2d->dst.base.right <= 0 || g2d->dst.base.bottom <= 0) {
     GST_WARNING("output crop outside of destination");
-    g2d_close (g2d_handle);
-    return 0;
+    ret = -1;
+    goto err;
   }
 
   if (g2d->dst.base.left < 0)
@@ -539,8 +583,13 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   }
 
   ret |= g2d_finish(g2d_handle);
-  g2d_close (g2d_handle);
 
+err:
+  if (!HAS_DPU()) {
+    g2d_close (g2d_handle);
+  }
+
+  GST_TRACE ("finish\n");
   return ret;
 }
 
@@ -667,12 +716,17 @@ static gint imx_g2d_fill_color(Imx2DDevice *device, Imx2DFrame *dst,
   if (!device || !device->priv || !dst || !dst->mem)
     return -1;
 
-  if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
-    GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
-    return -1;
-  }
-
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
+  if (HAS_DPU()) {
+    g2d_handle = g2d->g2d_handle;
+  } else {
+    /* g2d_open () every frame as GPU 2D based g2d need all function call in
+     * same thread */
+    if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
+      GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
+      return -1;
+    }
+  }
 
   GST_DEBUG ("dst paddr: %p fd: %d", dst->mem->paddr, dst->fd[0]);
   unsigned long paddr = 0;
@@ -700,7 +754,9 @@ static gint imx_g2d_fill_color(Imx2DDevice *device, Imx2DFrame *dst,
 
   ret = g2d_clear(g2d_handle, &g2d->dst.base);
   ret |= g2d_finish(g2d_handle);
-  g2d_close(g2d_handle);
+  if (!HAS_DPU()) {
+    g2d_close (g2d_handle);
+  }
 
   return ret;
 }

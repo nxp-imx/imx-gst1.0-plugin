@@ -53,12 +53,13 @@ enum g2d_tiling
     G2D_AMPHION_TILED       = 0x8,
     G2D_AMPHION_INTERLACED  = 0x10,
     G2D_TILED_STATUS        = 0x20,
+    G2D_AMPHION_TILED_10BIT = 0x40,
 };
 
 struct g2d_surfaceEx
 {
     struct g2d_surface base;
-    enum g2d_tiling tiling;
+    enum   g2d_tiling tiling;
 
     struct g2d_tile_status ts;
     int reserved[8];

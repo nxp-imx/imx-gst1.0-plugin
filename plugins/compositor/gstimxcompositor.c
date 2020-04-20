@@ -1,6 +1,6 @@
 /* GStreamer IMX video compositor plugin
  * Copyright (c) 2015-2016, Freescale Semiconductor, Inc. All rights reserved.
- * Copyright 2018-2019 NXP
+ * Copyright 2018-2020 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -1574,13 +1574,20 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
   return GST_FLOW_OK;
 }
 
-static GstCaps* imx_compositor_caps_from_fmt_list(GList* list)
+static GstCaps* imx_compositor_caps_from_fmt_list(GList* list, gboolean is_input)
 {
   gint i;
   GstCaps *caps = NULL;
 
   for (i=0; i<g_list_length (list); i++) {
     GstVideoFormat fmt = (GstVideoFormat)g_list_nth_data(list, i);
+    /* OpenCL based g2d can't support multi instance. disable is for compositor */
+    if (HAS_DPU ()) {
+      if (is_input && fmt == GST_VIDEO_FORMAT_NV12_10LE)
+        continue;
+      if (!is_input && fmt == GST_VIDEO_FORMAT_NV12)
+        continue;
+    }
     if (caps) {
       GstCaps *newcaps = gst_caps_new_simple("video/x-raw",
           "format", G_TYPE_STRING, gst_video_format_to_string(fmt), NULL);
@@ -1714,7 +1721,7 @@ gst_imxcompositor_class_init (GstImxCompositorClass * klass)
       IMX_GST_PLUGIN_AUTHOR);
 
   GList *list = dev->get_supported_in_fmts(dev);
-  caps = imx_compositor_caps_from_fmt_list(list);
+  caps = imx_compositor_caps_from_fmt_list(list, TRUE);
   g_list_free(list);
 
   if (!caps) {
@@ -1730,7 +1737,7 @@ gst_imxcompositor_class_init (GstImxCompositorClass * klass)
 #endif
 
   list = dev->get_supported_out_fmts(dev);
-  caps = imx_compositor_caps_from_fmt_list(list);
+  caps = imx_compositor_caps_from_fmt_list(list, FALSE);
   g_list_free(list);
 
   if (!caps) {
