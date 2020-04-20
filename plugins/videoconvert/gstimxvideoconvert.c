@@ -1,6 +1,6 @@
 /* GStreamer IMX video convert plugin
  * Copyright (c) 2014-2016, Freescale Semiconductor, Inc. All rights reserved.
- * Copyright 2017-2018 NXP
+ * Copyright 2017-2020 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -343,6 +343,16 @@ static gint get_format_conversion_loss(GstBaseTransform * base,
 
   if (!in_info || !out_info)
     return G_MAXINT32;
+
+  /* Only OpenCL on DPU platform can convert NV12_10LE to NV12) */
+  if (HAS_DPU ()) {
+    if (in_name == GST_VIDEO_FORMAT_NV12_10LE
+        && out_name == GST_VIDEO_FORMAT_NV12)
+      return 0;
+    else if (in_name != GST_VIDEO_FORMAT_NV12_10LE
+        && out_name == GST_VIDEO_FORMAT_NV12)
+      return G_MAXINT32;
+  }
 
   /* accept input format immediately without loss */
   if (in_info == out_info) {
