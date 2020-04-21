@@ -1263,9 +1263,6 @@ static gboolean
 gst_vpu_dec_object_set_vpu_input_buf (GstVpuDecObject * vpu_dec_object, \
     GstVideoCodecFrame * frame, VpuBufferNode *vpu_buffer_node)
 {
-  GstBuffer * buffer;
-  GstMapInfo minfo;
-
   /* Hantro video decoder can output video frame even if only input one frame.
    * Needn't send EOS to drain it.
    */
@@ -1289,23 +1286,17 @@ gst_vpu_dec_object_set_vpu_input_buf (GstVpuDecObject * vpu_dec_object, \
   GST_DEBUG_OBJECT (vpu_dec_object, "vpu_dec_object received system_frame_number: %d\n", \
       frame->system_frame_number);
 
-  buffer = frame->input_buffer;
-  gst_buffer_map (buffer, &minfo, GST_MAP_READ);
+  gst_buffer_map (frame->input_buffer, &vpu_dec_object->input_minfo, GST_MAP_READ);
 
-  vpu_buffer_node->nSize = minfo.size;
+  vpu_buffer_node->nSize = vpu_dec_object->input_minfo.size;
   vpu_buffer_node->pPhyAddr = NULL;
-  vpu_buffer_node->pVirAddr = minfo.data;
+  vpu_buffer_node->pVirAddr = vpu_dec_object->input_minfo.data;
   if (vpu_dec_object->input_state && vpu_dec_object->input_state->codec_data) {
-    GstBuffer *buffer2 = vpu_dec_object->input_state->codec_data;
-    GstMapInfo minfo2;
-    gst_buffer_map (buffer2, &minfo2, GST_MAP_READ);
-    vpu_buffer_node->sCodecData.nSize = minfo2.size;
-    vpu_buffer_node->sCodecData.pData = minfo2.data;
-    GST_DEBUG_OBJECT (vpu_dec_object, "codec data size: %d\n", minfo2.size);
-    gst_buffer_unmap (buffer2, &minfo2);
+    gst_buffer_map (vpu_dec_object->input_state->codec_data, &vpu_dec_object->codec_data_minfo, GST_MAP_READ);
+    vpu_buffer_node->sCodecData.nSize = vpu_dec_object->codec_data_minfo.size;
+    vpu_buffer_node->sCodecData.pData = vpu_dec_object->codec_data_minfo.data;
+    GST_DEBUG_OBJECT (vpu_dec_object, "codec data size: %d\n", vpu_dec_object->codec_data_minfo.size);
   }
-
-  gst_buffer_unmap (buffer, &minfo);
 
   return TRUE;
 }
@@ -1341,6 +1332,7 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
 	VpuDecRetCode dec_ret;
 	VpuBufferNode in_data = {0};
 	int buf_ret;
+  int counter = 0;
 
   GST_LOG_OBJECT (vpu_dec_object, "GstVideoCodecFrame: 0x%x\n", frame);
   gst_vpu_dec_object_handle_input_time_stamp (vpu_dec_object, bdec, frame);
@@ -1360,6 +1352,14 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
     start_time = g_get_monotonic_time ();
 
     dec_ret = VPU_DecDecodeBuf(vpu_dec_object->handle, &in_data, &buf_ret);
+    /* To avoid input data virtual address has chance to be freed by unmap after
+    map at once, unmap it after being used. */
+    if (frame && (buf_ret & VPU_DEC_INPUT_USED) && (counter == 0)) {
+      counter = counter + 1;
+      gst_buffer_unmap (frame->input_buffer, &vpu_dec_object->input_minfo);
+      if (vpu_dec_object->input_state && vpu_dec_object->input_state->codec_data)
+        gst_buffer_unmap (vpu_dec_object->input_state->codec_data, &vpu_dec_object->codec_data_minfo);
+    }
     if (dec_ret != VPU_DEC_RET_SUCCESS) {
       GST_ERROR_OBJECT(vpu_dec_object, "failed to decode frame: %s", \
           gst_vpu_dec_object_strerror(dec_ret));

@@ -119,6 +119,8 @@ struct _GstVpuDecObject {
   GstClockTime last_received_ts;
   gint64 total_time;
   gint64 total_frames;
+  GstMapInfo input_minfo;
+  GstMapInfo codec_data_minfo;
 };
 
 struct _GstVpuDecObjectClass {
