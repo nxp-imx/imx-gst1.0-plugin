@@ -34,6 +34,7 @@ typedef struct{
 static AiurdemuxProtocalEntry aiurdemux_protocol_table[] = {
   {"file",0},
   {"http",FILE_FLAG_READ_IN_SEQUENCE},
+  {"https",FILE_FLAG_READ_IN_SEQUENCE},
   {"rtsp",FILE_FLAG_READ_IN_SEQUENCE},
   {"udp",FILE_FLAG_READ_IN_SEQUENCE},
   {"rtp",FILE_FLAG_READ_IN_SEQUENCE},
