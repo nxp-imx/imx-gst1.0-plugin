@@ -57,6 +57,7 @@ struct _AiurContent
     gchar *uri;
     gint64 length;
     gboolean seekable;
+    gboolean adaptive_playback;
 
     gboolean random_access;
     guint32 flags;
@@ -523,6 +524,41 @@ bail:
 
 }
 
+static void
+aiurcontent_check_adaptive_playback (AiurContent *pContent)
+{
+  size_t len;
+  gint find;
+
+  if (pContent->uri == NULL)
+    goto out;
+
+  GST_DEBUG ("finding extension of %s", pContent->uri);
+
+  len = strlen (pContent->uri);
+  find = len - 1;
+
+  while (find >= 0) {
+    if (pContent->uri[find] == '.')
+      break;
+    find--;
+  }
+  if (find < 0)
+    goto out;
+
+  GST_DEBUG ("found extension %s", &pContent->uri[find + 1]);
+
+  if (strcmp (&pContent->uri[find + 1], "m3u8") == 0
+    || strcmp (&pContent->uri[find + 1], "mpd") == 0
+    || strcmp (&pContent->uri[find + 1], "MPD") == 0) {
+    pContent->adaptive_playback = TRUE;
+    return;
+  }
+
+out:
+  pContent->adaptive_playback = FALSE;
+}
+
 static void aiurcontent_query_content_info (AiurContent *pContent)
 {
   GstQuery *q;
@@ -543,6 +579,8 @@ static void aiurcontent_query_content_info (AiurContent *pContent)
     }
   }
   gst_query_unref (q);
+
+  aiurcontent_check_adaptive_playback(pContent);
 
   q = gst_query_new_seeking (GST_FORMAT_BYTES);
   if (gst_pad_peer_query (pad, q)) {
@@ -743,6 +781,13 @@ gboolean aiurcontent_is_random_access(AiurContent * pContent)
         return FALSE;
 
     return pContent->random_access;
+}
+gboolean aiurcontent_is_adaptive_playback(AiurContent * pContent)
+{
+    if(!pContent)
+        return FALSE;
+
+    return pContent->adaptive_playback;
 }
 gchar* aiurcontent_get_url(AiurContent * pContent)
 {

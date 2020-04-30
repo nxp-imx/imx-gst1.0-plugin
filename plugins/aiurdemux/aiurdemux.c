@@ -748,10 +748,18 @@ gst_aiurdemux_handle_src_query (GstPad * pad, GstObject * parent, GstQuery * que
       if (fmt == GST_FORMAT_TIME) {
         gint64 duration = -1;
 
-        gst_aiurdemux_get_duration (demux, &duration);
-        if (duration > 0) {
-          gst_query_set_duration (query, GST_FORMAT_TIME, duration);
-          res = TRUE;
+        if (aiurcontent_is_adaptive_playback (demux->content_info)) {
+          GST_DEBUG_OBJECT (demux, "forward duration query when adaptive playback");
+          if (gst_pad_peer_query (demux->sinkpad, query))
+            res = TRUE;
+        }
+
+        if (!res) {
+          gst_aiurdemux_get_duration (demux, &duration);
+          if (duration > 0) {
+            gst_query_set_duration (query, GST_FORMAT_TIME, duration);
+            res = TRUE;
+          }
         }
       }
       break;
