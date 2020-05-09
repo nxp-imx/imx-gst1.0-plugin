@@ -326,10 +326,11 @@ aiurcontent_callback_read_push (FslFileHandle handle, void *buffer, uint32 size,
 
   if (handle) {
     AiurDemuxContentDesc *content = (AiurDemuxContentDesc *) handle;
+    AiurContent *pContent = (AiurContent *) context;
     if (size == 0)
       return ret;
 
-    if (content->offset != gst_aiur_stream_cache_get_position (content->cache)) {
+    if (!pContent->adaptive_playback && content->offset != gst_aiur_stream_cache_get_position (content->cache)) {
       gst_aiur_stream_cache_seek (content->cache, content->offset);
     }
     readsize =

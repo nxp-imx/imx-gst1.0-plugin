@@ -453,3 +453,22 @@ beach:
   return readsize;
 }
 
+void
+gst_aiur_stream_cache_flush (GstAiurStreamCache * cache)
+{
+  if (cache) {
+    g_mutex_lock (&cache->mutex);
+
+    cache->seeking = FALSE;
+    cache->start = 0;
+    cache->offset = 0;
+    cache->ignore_size = 0;
+    gst_adapter_clear (cache->adapter);
+    cache->eos = FALSE;
+
+    g_cond_signal (&cache->consume_cond);
+
+    g_mutex_unlock (&cache->mutex);
+  }
+}
+

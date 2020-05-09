@@ -909,6 +909,9 @@ typedef int32 (*FslParserGetAudioPresentationInfo)(FslParserHandle parserHandle,
                                                 uint32 * spokenSubtitlesAvailable,
                                                 uint32 * dialogueEnhancementAvailable);
 
+typedef int32 (*FslParserFlush)( FslParserHandle parserHandle,
+                                uint32 trackNum);
+
 
 /************************************************************************************************************
  *
@@ -993,7 +996,9 @@ enum /* API function ID */
 
     PARSER_API_GET_SAMPLE_CRYPTO_INFO = 117,
 
-    PARSER_API_SEEK  = 120
+    PARSER_API_SEEK  = 120,
+
+    PARSER_API_FLUSH_TRACK  = 121
 
 
 };

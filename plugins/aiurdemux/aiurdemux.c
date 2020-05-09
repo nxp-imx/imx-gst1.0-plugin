@@ -593,7 +593,24 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
           gst_aiur_stream_cache_set_segment (demux->stream_cache, segment->start, segment->stop);
         }
       } else if (segment->format == GST_FORMAT_TIME) {
-        GST_DEBUG_OBJECT (demux, "handling new segment from%lld", segment->start);
+        GST_DEBUG_OBJECT (demux, "handling new segment from %"GST_TIME_FORMAT, GST_TIME_ARGS (segment->start));
+        if (aiurcontent_is_adaptive_playback(demux->content_info)) {
+          gst_event_copy_segment (event, &demux->segment);
+
+          for (int n = 0; n < demux->n_streams; n++) {
+            AiurDemuxStream *stream = demux->streams[n];
+            aiurdemux_reset_stream (demux, stream);
+            stream->time_position = demux->segment.start;
+          }
+
+          if (!demux->thread) {
+            g_mutex_lock (&demux->runmutex);
+            gst_aiur_stream_cache_open (demux->stream_cache);
+            demux->loop_push = TRUE;
+            demux->thread = g_thread_new ("aiur_push",(GThreadFunc) aiurdemux_loop_push, (gpointer) demux);
+            g_mutex_unlock (&demux->runmutex);
+          }
+        }
         goto exit;
       } else {
         GST_DEBUG_OBJECT (demux, "unsupported segment format, ignoring");
@@ -629,6 +646,36 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
       /* reset flow return, e.g. following seek */
       for (i = 0; i < demux->n_streams; i++) {
         demux->streams[i]->last_ret = GST_FLOW_OK;
+      }
+
+      if (aiurcontent_is_adaptive_playback(demux->content_info)) {
+        gst_aiurdemux_push_event (demux, event);
+        if (GST_EVENT_TYPE (event) == GST_EVENT_FLUSH_START) {
+          AiurCoreInterface *IParser = demux->core_interface;
+          FslParserHandle handle = demux->core_handle;
+          demux->loop_push = FALSE;
+
+          /* stop src loop */
+          gst_aiur_stream_cache_close (demux->stream_cache);
+          /* make sure task is closed */
+          g_mutex_lock (&demux->runmutex);
+          g_mutex_unlock (&demux->runmutex);
+
+          if (demux->thread) {
+            g_thread_unref(demux->thread);
+            demux->thread = NULL;
+          }
+
+          gst_aiur_stream_cache_flush (demux->stream_cache);
+
+          if (IParser->flushTrack) {
+            for (int i = 0; i < demux->n_streams; i++) {
+              AiurDemuxStream *stream = demux->streams[i];
+              IParser->flushTrack (handle, stream->track_idx);
+            }
+          }
+        }
+        return TRUE;
       }
 
       gst_event_unref (event);
@@ -772,14 +819,20 @@ gst_aiurdemux_handle_src_query (GstPad * pad, GstObject * parent, GstQuery * que
       if (fmt == GST_FORMAT_TIME) {
         gint64 duration = -1;
 
-        gst_aiurdemux_get_duration (demux, &duration);
-
-        if (demux->seekable && aiurcontent_is_seelable(demux->content_info)) {
-          seekable = TRUE;
+        if (aiurcontent_is_adaptive_playback (demux->content_info)) {
+          if (gst_pad_peer_query (demux->sinkpad, query)) {
+            gst_query_parse_seeking (query, NULL, &seekable, NULL, NULL);
+            res = TRUE;
+          }
+          demux->seekable = seekable;
+        } else {
+          gst_aiurdemux_get_duration (demux, &duration);
+          if (demux->seekable && aiurcontent_is_seelable(demux->content_info)) {
+            seekable = TRUE;
+          }
+          gst_query_set_seeking (query, GST_FORMAT_TIME, seekable, 0, duration);
+          res = TRUE;
         }
-
-        gst_query_set_seeking (query, GST_FORMAT_TIME, seekable, 0, duration);
-        res = TRUE;
       }
       break;
     }

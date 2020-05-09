@@ -110,6 +110,8 @@ uint32 aiur_core_interface_id_table[] = {
   PARSER_API_GET_FILE_NEXT_SYNC_SAMPLE,
 
   PARSER_API_SEEK,
+
+  PARSER_API_FLUSH_TRACK,
 };
 
 

@@ -132,8 +132,8 @@ gint64
 gst_aiur_stream_cache_read (GstAiurStreamCache * cache, guint64 size,
     char *buffer);
 
-
-
+void
+gst_aiur_stream_cache_flush (GstAiurStreamCache * cache);
 
 
 

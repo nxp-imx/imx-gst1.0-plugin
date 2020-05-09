@@ -103,6 +103,8 @@ typedef struct
 
   FslParserSeek seek;
 
+  FslParserFlush flushTrack;
+
   /* add new interface here */
 
   void *dl_handle;              /* must be last, for dl handle */
