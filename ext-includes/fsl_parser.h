@@ -2,7 +2,7 @@
 
 /*
 * Copyright (c) 2009-2016, Freescale Semiconductor, Inc. 
-* Copyright 2017-2018 NXP
+* Copyright 2017-2020 NXP
  */
 
 /*
@@ -203,6 +203,8 @@ enum
                                              * size of the sei nalu in the h264 frame it belongs to */
 
 #define FLAG_SAMPLE_COMPRESSED_SAMPLE 0x200 //drm sample flag, need to call drm api to get drm info
+
+#define FLAG_SAMPLE_AUDIO_PRESENTATION_CHANGED 0x400 //audio presentation is changed , need to call getMetaData to update
 
 /*********************************************************************
  * seeking flags :
@@ -589,7 +591,10 @@ enum{
     FSL_PARSER_TRACKEXTTAG_CRPYTOKEY = 0,
     FSL_PARSER_TRACKEXTTAG_TX3G,
     FSL_PARSER_TRACKEXTTAG_CRPYTOMODE,
-    FSL_PARSER_TRACKEXTTAG_CRPYTODEFAULTIVSIZE
+    FSL_PARSER_TRACKEXTTAG_CRPYTODEFAULTIVSIZE,
+    FSL_PARSER_TRACKEXTTAG_CRYPTO_ENCRYPTED_BYTE_BLOCK,
+    FSL_PARSER_TRACKEXTTAG_CRYPTO_SKIP_BYTE_BLOCK,
+    FSL_PARSER_TRACKEXTTAG_CRYPTO_IV,
 }TrackExtTagIndex;
 
 typedef struct _SeiPosition
@@ -888,7 +893,21 @@ typedef int32 (*FslParserSeek)( FslParserHandle parserHandle,
                                 uint64 * usTime,
                                 uint32 flag);
 
+/* optional */
+typedef int32 (*FslParserGetAudioPresentationNum)(FslParserHandle parserHandle,
+                                                uint32 trackNum,
+                                                int32 * presentationNum);
 
+/* optional */
+typedef int32 (*FslParserGetAudioPresentationInfo)(FslParserHandle parserHandle,
+                                                uint32 trackNum,
+                                                int32  presentationNum,
+                                                int32* presentationId,
+                                                char ** language,
+                                                uint32 * masteringIndication,
+                                                uint32 * audioDescriptionAvailable,
+                                                uint32 * spokenSubtitlesAvailable,
+                                                uint32 * dialogueEnhancementAvailable);
 
 
 /************************************************************************************************************
@@ -951,6 +970,8 @@ enum /* API function ID */
     PARSER_API_GET_AUDIO_CHANNEL_MASK       = 66,
     PARSER_API_GET_AUDIO_BITS_PER_FRAME     = 67,
 
+    PARSER_API_GET_AUDIO_PRESENTATION_NUM   = 68,
+    PARSER_API_GET_AUDIO_PRESENTATION_INFO  = 69,
 
     /* text/subtitle properties */
     PARSER_API_GET_TEXT_TRACK_WIDTH = 80,

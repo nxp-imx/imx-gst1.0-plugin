@@ -110,6 +110,8 @@ typedef enum
     AUDIO_APE,   /*Monkey's audio*/
     AUDIO_WMS,  /* Windows Media Voice */
     AUDIO_DSD,
+    AUDIO_AC4,
+    AUDIO_ALAC, /* Apple lossless audio codec */
 }AudioCodecType;
 
 
