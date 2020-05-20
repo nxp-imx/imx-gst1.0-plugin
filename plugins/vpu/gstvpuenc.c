@@ -1031,6 +1031,9 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 	memset(&enc_enc_param, 0, sizeof(enc_enc_param));
 	memset(&input_framebuf, 0, sizeof(input_framebuf));
 
+  enc->open_param.nOrigWidth = enc->open_param.nPicWidth;
+  enc->open_param.nOrigHeight = enc->open_param.nPicHeight;
+
   cropmeta = gst_buffer_get_video_crop_meta (frame->input_buffer);
   if (cropmeta) {
     enc->open_param.nPicWidth = cropmeta->width;
@@ -1117,8 +1120,8 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
             else
               input_framebuf.pbufCr = input_framebuf.pbufCb;
           } else {
-            input_framebuf.pbufCb = input_framebuf.pbufY;
-            input_framebuf.pbufCr = input_framebuf.pbufY;
+            input_framebuf.pbufCb = input_framebuf.pbufY + plane_offsets[1];
+            input_framebuf.pbufCr = input_framebuf.pbufY + plane_offsets[2];
           }
         } else {
           input_phys_buffer = gst_buffer_query_phymem_block (input_buffer);
