@@ -799,6 +799,9 @@ gst_aiurdemux_handle_src_query (GstPad * pad, GstObject * parent, GstQuery * que
           GST_DEBUG_OBJECT (demux, "forward duration query when adaptive playback");
           if (gst_pad_peer_query (demux->sinkpad, query))
             res = TRUE;
+          else {
+            return FALSE;
+          }
         }
 
         if (!res) {
@@ -818,13 +821,20 @@ gst_aiurdemux_handle_src_query (GstPad * pad, GstObject * parent, GstQuery * que
       gst_query_parse_seeking (query, &fmt, NULL, NULL, NULL);
       if (fmt == GST_FORMAT_TIME) {
         gint64 duration = -1;
+        gint64 seek_start = 0;
+        gint64 seek_end = -1;
 
         if (aiurcontent_is_adaptive_playback (demux->content_info)) {
           if (gst_pad_peer_query (demux->sinkpad, query)) {
-            gst_query_parse_seeking (query, NULL, &seekable, NULL, NULL);
+            gst_query_parse_seeking (query, NULL, &seekable, &seek_start, &seek_end);
             res = TRUE;
           }
-          demux->seekable = seekable;
+          /*FIXME: disable none video on-demand seek because there is
+          no interface to tell player what is the seek range */
+          if (!aiurcontent_is_adaptive_vod (demux->content_info)) {
+            gst_query_set_seeking (query, GST_FORMAT_TIME, FALSE, seek_start, seek_end);
+            res = TRUE;
+          }
         } else {
           gst_aiurdemux_get_duration (demux, &duration);
           if (demux->seekable && aiurcontent_is_seelable(demux->content_info)) {
@@ -1439,7 +1449,8 @@ static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
 
   if((demux->seekable == FALSE)
       && !aiurcontent_is_seelable(demux->content_info)
-      && !aiurcontent_is_random_access(demux->content_info))
+      && !aiurcontent_is_random_access(demux->content_info)
+      && !aiurcontent_is_adaptive_playback (demux->content_info))
         aiurdemux_check_start_offset(demux, stream);
 
     aiurdemux_adjust_timestamp (demux, stream, stream->buffer);
@@ -3269,6 +3280,12 @@ aiurdemux_adjust_timestamp (GstAiurDemux * demux, AiurDemuxStream * stream,
   if ((demux->base_offset == 0)
       || (!GST_CLOCK_TIME_IS_VALID (stream->sample_stat.start))) {
     GST_BUFFER_TIMESTAMP (buffer) = stream->sample_stat.start;
+
+    if (aiurcontent_is_adaptive_playback(demux->content_info)
+        && !aiurcontent_is_adaptive_vod (demux->content_info)) {
+      demux->base_offset = stream->sample_stat.start;
+      GST_BUFFER_TIMESTAMP (buffer) = 0;
+    }
   } else {
     GST_BUFFER_TIMESTAMP (buffer) =
         ((stream->sample_stat.start >=

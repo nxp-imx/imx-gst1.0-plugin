@@ -58,6 +58,7 @@ struct _AiurContent
     gint64 length;
     gboolean seekable;
     gboolean adaptive_playback;
+    gboolean adaptive_vod;
 
     gboolean random_access;
     guint32 flags;
@@ -583,6 +584,19 @@ static void aiurcontent_query_content_info (AiurContent *pContent)
 
   aiurcontent_check_adaptive_playback(pContent);
 
+  /* check whether upstream is on-demand adaptive playback
+     1. duration query success means there is end for this playback
+     2. duration query fail means this url has no end time right now */
+  if (pContent->adaptive_playback) {
+    q = gst_query_new_duration (GST_FORMAT_TIME);
+    if (gst_pad_peer_query (pad, q))
+      pContent->adaptive_vod = TRUE;
+    else
+      pContent->adaptive_vod = FALSE;
+    GST_DEBUG ("adaptive playback %s video on-demand", pContent->adaptive_vod ? "is":"isn't");
+    gst_query_unref (q);
+  }
+
   q = gst_query_new_seeking (GST_FORMAT_BYTES);
   if (gst_pad_peer_query (pad, q)) {
     gst_query_parse_seeking (q, &fmt, &(pContent->seekable), NULL,
@@ -789,6 +803,13 @@ gboolean aiurcontent_is_adaptive_playback(AiurContent * pContent)
         return FALSE;
 
     return pContent->adaptive_playback;
+}
+gboolean aiurcontent_is_adaptive_vod(AiurContent * pContent)
+{
+    if(!pContent)
+        return FALSE;
+
+    return pContent->adaptive_vod;
 }
 gchar* aiurcontent_get_url(AiurContent * pContent)
 {
