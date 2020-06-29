@@ -47,7 +47,7 @@ GST_DEBUG_CATEGORY_STATIC (recorder_engine);
 #define TIME_FORMAT "02d.%09u"
 #define TIMEDIFF_FORMAT "0.6lf"
 
-#define ADD_DATE_TIME
+//#define ADD_DATE_TIME
 #ifdef ADD_DATE_TIME
 #define DATE_TIME "clockoverlay halignment=left valignment=top time-format=\"%Y/%m/%d  %H:%M:%S \" !" 
 #else
@@ -55,7 +55,7 @@ GST_DEBUG_CATEGORY_STATIC (recorder_engine);
 #endif
 
 // this is only for test purpose to measure end to end latency, defaul not enabled
-//#define ADD_TIME_OVERLAY 
+#define ADD_TIME_OVERLAY 
 #ifdef ADD_TIME_OVERLAY
 #define TIME_OVERLAY "timeoverlay halignment=right valignment=top text=\"Stream time:\" !"
 #define DATE_TIME "" //we only have one watermark to save performance
