@@ -400,7 +400,6 @@ static gboolean beep_dec_set_init_parameter(GstBeepDec * beep_dec,
         }
 
         //beep_dec->framed = parameter.framed;
-        parameter.framed = TRUE;
         GST_INFO ("Set framed %s", ((parameter.framed) ? "true" : "false"));
         rc = IDecoder->setDecoderPara(handle,UNIA_FRAMED, &parameter);
         if (rc != ACODEC_SUCCESS) {
@@ -827,7 +826,6 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
     inbuf = map.data;
     gst_buffer_unmap(buffer, &map);
     beepdec->in_cnt++;
-    GST_DEBUG ("got audio buffer sample %" GST_TIME_FORMAT, GST_TIME_ARGS (GST_BUFFER_TIMESTAMP (buffer)));
 
     GST_LOG_OBJECT (beepdec,"handle_frame [%d] BEGIN size=%d",beepdec->in_cnt,inbuf_size);
 
@@ -918,31 +916,24 @@ begin:
                 gst_adapter_clear (beepdec->adapter);
             }
             beep_dec_handle_output_changed(beepdec);
-            GST_DEBUG_OBJECT (beepdec, "output change finished");
         }
 
         if(outbuf && out_size > 0){
-            GST_LOG_OBJECT (beepdec,"out put avaiable");
 
            temp_buffer = gst_audio_decoder_allocate_output_buffer (GST_AUDIO_DECODER (dec),out_size);
-           GST_LOG_OBJECT (beepdec,"allocte output buffer");
            temp_buffer = gst_buffer_make_writable (temp_buffer);
            gst_buffer_fill (temp_buffer, 0, outbuf, out_size);
-           GST_LOG_OBJECT (beepdec,"fill buffer");
            gst_audio_buffer_reorder_channels (temp_buffer, beepdec->audio_format,
                beepdec->outputformat.channels, beepdec->core_layout, beepdec->out_layout);
-               GST_LOG_OBJECT (beepdec,"reorder");
 
            g_free(outbuf);
            if(beepdec->in_cnt > 1 )
            {
                 beepdec->in_cnt--;
-                GST_LOG_OBJECT (beepdec,"try finish frame");
                 ret = gst_audio_decoder_finish_frame (dec, temp_buffer, 1);
                   sent = TRUE;
                 GST_LOG_OBJECT (beepdec,"output one frame[%d] size=%d",beepdec->in_cnt,out_size);
            }else{
-               GST_LOG_OBJECT (beepdec,"push buffer to adapter in_cnt = %d", beepdec->in_cnt);
                 gst_adapter_push (beepdec->adapter, temp_buffer);
            }
            beepdec->err_cnt = 0;

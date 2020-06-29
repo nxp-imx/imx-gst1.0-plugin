@@ -1229,7 +1229,6 @@ static gboolean imx_video_convert_set_info(GstVideoFilter *filter,
       gst_caps_unref(copy_out);
     }
   }
-  gst_base_transform_set_passthrough((GstBaseTransform*)filter, FALSE);
 
   GST_DEBUG ("set info from %" GST_PTR_FORMAT " to %" GST_PTR_FORMAT, in, out);
 
