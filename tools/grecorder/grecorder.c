@@ -582,6 +582,7 @@ static void recorder_main_menu()
   printf("\t[n]Snapshot\n");
   printf("\t[t]Reset\n");
   printf("\t[s]Stop\n");
+  printf("\t[c]adjust camera controls\n");
   printf("\t[x]Exit\n\n");
 }
 
@@ -808,6 +809,7 @@ int main(int argc, char* argv[])
   REboolean bPause = RE_BOOLEAN_FALSE;
   REOptions options;
   char rep[128];
+  char ext_ctrls[64*1024];
   int ret = 0;
 
   struct sigaction act;
@@ -909,6 +911,15 @@ int main(int argc, char* argv[])
         STOP_SHOW_MEDIATIME_INFO;
         RECORDER_STOP;
         bexit = RE_BOOLEAN_TRUE;
+      }
+      else if(rep[0] == 'c')
+      {
+        printf ("Only supported when isp is enabled on 8mp\n");
+        printf ("example to enable Auto Expose: {<id>:<ae.s.en>;<enable>:false}\n");
+        printf ("Detail control string formats please refer to bsp isp v4l2 user guide\n");
+        printf ("Please input isp extra controls:\n");
+        scanf("%65536s", ext_ctrls);
+        recorder->set_ext_ctrls ((RecorderEngineHandle)recorder, ext_ctrls);
       }
       else if(rep[0] == '*') {
         sleep(1);

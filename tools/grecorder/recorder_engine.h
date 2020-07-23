@@ -242,6 +242,8 @@ typedef struct RecorderEngine_
   REresult (*get_media_time)(RecorderEngineHandle handle, REtime *pMediaTimeUs);
   REresult (*delete_it)(RecorderEngineHandle handle);
 
+  REresult (*set_ext_ctrls)(RecorderEngineHandle handle, const REchar *ext_ctrls);
+
   void * pData;
 }RecorderEngine;
 

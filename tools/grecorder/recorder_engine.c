@@ -166,6 +166,7 @@ typedef struct _gRecorderEngine
   GstElement *camerabin;
   GstElement *viewfinder_sink;
   GstElement *video_sink;
+  GstElement *video_src;
   gulong camera_probe_id;
   gulong viewfinder_probe_id;
   GMainLoop *loop;
@@ -831,6 +832,7 @@ setup_pipeline (gRecorderEngine *recorder)
   GstBus *bus;
   GstElement *sink = NULL, *ipp = NULL;
   GstEncodingProfile *prof = NULL;
+  GstElement *camerasrc;
 
   recorder->initial_time = gst_util_get_timestamp ();
 
@@ -858,7 +860,6 @@ setup_pipeline (gRecorderEngine *recorder)
     GstElement *wrapper;
     GstElement *videosrc_filter;
     GstElement *video_effect;
-    GstElement *camerasrc;
     GstElement *capsfilter;
     GstElement *actual_video_source;
     gchar *video_filter_str = NULL;
@@ -1082,6 +1083,35 @@ setup_pipeline (gRecorderEngine *recorder)
       gst_element_set_state (recorder->camerabin, GST_STATE_PLAYING)) {
     g_warning ("can't set camerabin to playing\n");
     goto error;
+  }
+
+  if (g_strcmp0(recorder->videosrc_name, "autovideosrc") == 0) {
+    GstElement *autosrc;
+    GValue item = G_VALUE_INIT;
+    /* get autovideosrc from bin */
+    GstIterator *it = gst_bin_iterate_sources ((GstBin*)camerasrc);
+    if (gst_iterator_next (it, &item) != GST_ITERATOR_OK)
+    {
+      g_warning("%s(): gst_iterator_next failed\n", __FUNCTION__);
+      gst_iterator_free (it);
+      return RE_RESULT_INTERNAL_ERROR;
+    }
+    autosrc = g_value_get_object (&item);
+    g_value_unset (&item);
+    gst_iterator_free (it);
+
+    /* get actual video src from autovideosrc */
+    it = gst_bin_iterate_sources ((GstBin*)autosrc);
+    if (gst_iterator_next (it, &item) != GST_ITERATOR_OK)
+    {
+      g_warning("%s(): gst_iterator_next failed\n", __FUNCTION__);
+      gst_iterator_free (it);
+      return RE_RESULT_INTERNAL_ERROR;
+    }
+    recorder->video_src = g_value_get_object (&item);
+    g_value_unset (&item);
+    gst_iterator_free (it);
+    GST_INFO_OBJECT ("camera source element is %s", gst_element_get_name (recorder->video_src));
   }
 
   GST_INFO_OBJECT (recorder->camerabin, "camera started");
@@ -1915,6 +1945,33 @@ static REresult set_snapshot_output_file(RecorderEngineHandle handle, const REch
   return RE_RESULT_SUCCESS;
 }
 
+static REresult set_ext_ctrls (RecorderEngineHandle handle, const REchar *ext_ctrls)
+{
+  RecorderEngine *h = (RecorderEngine *)(handle);
+  gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
+  GstStructure * ctrls;
+
+  if (!IS_IMX8MP()) {
+    g_printf ("only platform with isp support camera extra control\n");
+    return RE_RESULT_SUCCESS;
+  }
+
+  gchar *str =
+        g_strdup_printf ("ext_ctrls, viv_ext_ctrl=\"%s\"", ext_ctrls);
+
+  ctrls = gst_structure_new_from_string (str);
+
+  if (recorder->video_src &&
+      g_object_class_find_property (G_OBJECT_GET_CLASS (recorder->video_src),
+            "extra-controls"))
+    g_object_set (recorder->video_src, "extra-controls", ctrls, NULL);
+
+  gst_structure_free (ctrls);
+  g_free (str);
+
+  return RE_RESULT_SUCCESS;
+}
+
 static REresult take_snapshot(RecorderEngineHandle handle)
 {
   RecorderEngine *h = (RecorderEngine *)(handle);
@@ -1960,6 +2017,7 @@ static REresult init(RecorderEngineHandle handle)
   recorder->camerabin = NULL;
   recorder->viewfinder_sink = NULL;
   recorder->video_sink = NULL;
+  recorder->video_src = NULL;
   recorder->camera_probe_id = 0;
   recorder->viewfinder_probe_id = 0;
   recorder->loop = NULL;
@@ -2329,6 +2387,7 @@ RecorderEngine * recorder_engine_create()
   h->set_output_file_settings = set_output_file_settings;
   h->set_snapshot_output_format = set_snapshot_output_format;
   h->set_snapshot_output_file = set_snapshot_output_file;
+  h->set_ext_ctrls = set_ext_ctrls;
   h->take_snapshot = take_snapshot;
   h->init = init;
   h->register_event_handler = register_event_handler;
