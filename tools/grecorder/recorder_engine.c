@@ -379,8 +379,9 @@ create_encording_profile (gRecorderEngine *recorder)
   switch (recorder->audio_encoder_format) {
     case RE_AUDIO_ENCODER_DEFAULT:
     case RE_AUDIO_ENCODER_MP3:
+      /* make pipeline auto plug lamemp3enc as audio encoder */
       caps = gst_caps_new_simple ("audio/mpeg",
-          "mpegversion", G_TYPE_INT, 1, "layer", G_TYPE_INT, 2, NULL);
+          "mpegversion", G_TYPE_INT, 1, "layer", G_TYPE_INT, 3, NULL);
       gst_encoding_container_profile_add_profile (container, (GstEncodingProfile *)
           gst_encoding_audio_profile_new (caps, NULL, NULL, 1));
       gst_caps_unref (caps);
