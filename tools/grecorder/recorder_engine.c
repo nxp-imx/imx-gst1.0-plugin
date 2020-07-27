@@ -1111,7 +1111,8 @@ setup_pipeline (gRecorderEngine *recorder)
     recorder->video_src = g_value_get_object (&item);
     g_value_unset (&item);
     gst_iterator_free (it);
-    GST_INFO_OBJECT ("camera source element is %s", gst_element_get_name (recorder->video_src));
+    GST_INFO_OBJECT (recorder->camerabin, "camera source element is %s",
+        gst_element_get_name (recorder->video_src));
   }
 
   GST_INFO_OBJECT (recorder->camerabin, "camera started");
