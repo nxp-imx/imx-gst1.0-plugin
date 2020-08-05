@@ -53,6 +53,7 @@ typedef struct _GstImxVideoConvert {
   GstImxVideoOverlayComposition video_comp;
   gboolean composition_meta_enable;
   gboolean in_place;
+  gboolean videocrop_meta_enable;
 } GstImxVideoConvert;
 
 typedef struct _GstImxVideoConvertClass {

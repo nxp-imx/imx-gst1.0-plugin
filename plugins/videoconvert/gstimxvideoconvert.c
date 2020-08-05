@@ -41,6 +41,7 @@
 #define GST_IMX_VIDEO_DEINTERLACE_DEFAULT   IMX_2D_DEINTERLACE_NONE
 #define GST_IMX_VIDEO_COMPOMETA_DEFAULT              FALSE
 #define GST_IMX_VIDEO_COMPOMETA_IN_PLACE_DEFAULT     FALSE
+#define GST_IMX_VIDEO_VIDEOCROP_META_DEFAULT         FALSE
 
 #define GST_IMX_CONVERT_UNREF_BUFFER(buffer) {\
     if (buffer) {                             \
@@ -65,7 +66,8 @@ enum {
   PROP_OUTPUT_ROTATE,
   PROP_DEINTERLACE_MODE,
   PROP_COMPOSITION_META_ENABLE,
-  PROP_COMPOSITION_META_IN_PLACE
+  PROP_COMPOSITION_META_IN_PLACE,
+  PROP_VIDEOCROP_META_ENABLE
 };
 
 static GstElementClass *parent_class = NULL;
@@ -141,6 +143,9 @@ static void gst_imx_video_convert_set_property (GObject * object,
     case PROP_COMPOSITION_META_IN_PLACE:
       imxvct->in_place = g_value_get_boolean(value);
       break;
+    case PROP_VIDEOCROP_META_ENABLE:
+      imxvct->videocrop_meta_enable = g_value_get_boolean(value);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -171,6 +176,9 @@ static void gst_imx_video_convert_get_property (GObject * object,
       break;
     case PROP_COMPOSITION_META_IN_PLACE:
       g_value_set_boolean(value, imxvct->in_place);
+      break;
+    case PROP_VIDEOCROP_META_ENABLE:
+      g_value_set_boolean(value, imxvct->videocrop_meta_enable);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1230,6 +1238,10 @@ static gboolean imx_video_convert_set_info(GstVideoFilter *filter,
     }
   }
 
+  /* FIXME: find a way to detect videocrop meta */
+  if (imxvct->videocrop_meta_enable)
+    gst_base_transform_set_passthrough((GstBaseTransform*)filter, FALSE);
+
   GST_DEBUG ("set info from %" GST_PTR_FORMAT " to %" GST_PTR_FORMAT, in, out);
 
   return TRUE;
@@ -1443,13 +1455,13 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   if (in_crop != NULL) {
     GST_LOG ("input crop meta: (%d, %d, %d, %d).", in_crop->x, in_crop->y,
         in_crop->width, in_crop->height);
-    if ((in_crop->x >= info.width) || (in_crop->y >= info.height))
+    if ((in_crop->x >= in->info.width) || (in_crop->y >= in->info.height))
       return GST_FLOW_ERROR;
 
     src.crop.x += in_crop->x;
     src.crop.y += in_crop->y;
-    src.crop.w = MIN(in_crop->width, (info.width - in_crop->x));
-    src.crop.h = MIN(in_crop->height, (info.height - in_crop->y));
+    src.crop.w = MIN(in_crop->width, (in->info.width - in_crop->x));
+    src.crop.h = MIN(in_crop->height, (in->info.height - in_crop->y));
   }
 
   //rotate and de-interlace setting
@@ -1798,6 +1810,13 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
         GST_IMX_VIDEO_COMPOMETA_IN_PLACE_DEFAULT,
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class,
+      PROP_VIDEOCROP_META_ENABLE,
+      g_param_spec_boolean("videocrop-meta-enable", "process buffer's videocrop meta",
+        "Enable videocrop meta processing",
+        GST_IMX_VIDEO_VIDEOCROP_META_DEFAULT,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   in_plugin->destroy(dev);
 
   base_transform_class->src_event =
@@ -1844,6 +1863,7 @@ gst_imx_video_convert_init (GstImxVideoConvert * imxvct)
       imxvct->deinterlace = IMX_2D_DEINTERLACE_NONE;
       imxvct->composition_meta_enable = GST_IMX_VIDEO_COMPOMETA_DEFAULT;
       imxvct->in_place = GST_IMX_VIDEO_COMPOMETA_IN_PLACE_DEFAULT;
+      imxvct->videocrop_meta_enable = GST_IMX_VIDEO_VIDEOCROP_META_DEFAULT;
       imx_video_overlay_composition_init(&imxvct->video_comp, imxvct->device);
     }
   } else {
