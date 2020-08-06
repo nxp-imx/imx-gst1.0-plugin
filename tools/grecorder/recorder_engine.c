@@ -924,15 +924,6 @@ setup_pipeline (gRecorderEngine *recorder)
 
     g_object_set (recorder->camerabin, "camera-source", wrapper, NULL);
     g_object_unref (wrapper);
-
-    g_object_get (wrapper, "video-source", &camerasrc, NULL);
-    if (camerasrc && recorder->videodevice_name &&
-        g_object_class_find_property (G_OBJECT_GET_CLASS (camerasrc),
-            "device")) {
-      GST_INFO_OBJECT (recorder->camerabin, "video device string: %s",
-          recorder->videodevice_name);
-      g_object_set (camerasrc, "device", recorder->videodevice_name, NULL);
-    }
   }
 
   if (recorder->video_detect_name) {
@@ -1113,6 +1104,14 @@ setup_pipeline (gRecorderEngine *recorder)
     gst_iterator_free (it);
     GST_INFO_OBJECT (recorder->camerabin, "camera source element is %s",
         gst_element_get_name (recorder->video_src));
+
+    if (recorder->video_src && recorder->videodevice_name &&
+        g_object_class_find_property (G_OBJECT_GET_CLASS (recorder->video_src),
+            "device")) {
+      GST_INFO_OBJECT (recorder->camerabin, "video device string: %s",
+          recorder->videodevice_name);
+      g_object_set (recorder->video_src, "device", recorder->videodevice_name, NULL);
+    }
   }
 
   GST_INFO_OBJECT (recorder->camerabin, "camera started");
@@ -1554,18 +1553,20 @@ static REresult set_camera_id(RecorderEngineHandle handle, REuint32 cameraId)
   return RE_RESULT_SUCCESS;
 }
 
-static REresult get_camera_capabilities(RecorderEngineHandle handle, REuint32 index, RERawVideoSettings *videoProperty)
+static REresult get_camera_capabilities(RecorderEngineHandle handle, REuint32 index)
 {
   RecorderEngine *h = (RecorderEngine *)(handle);
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
-  gint framerate_numerator, framerate_denominator;
-  const gchar *format;
 
   if (!recorder->camera_caps) {
     GstElement *wrapper;
     GstElement *videosrc;
-    g_object_get (recorder->camerabin, "camera-source", &wrapper, NULL);
-    g_object_get (wrapper, "video-source", &videosrc, NULL);
+    if (!recorder->video_src) {
+      g_object_get (recorder->camerabin, "camera-source", &wrapper, NULL);
+      g_object_get (wrapper, "video-source", &videosrc, NULL);
+    } else {
+      videosrc = recorder->video_src;
+    }
     if (videosrc) {
       GstPad *pad;
       const gchar *padname;
@@ -1594,41 +1595,16 @@ static REresult get_camera_capabilities(RecorderEngineHandle handle, REuint32 in
   }
 
   if (recorder->camera_caps) {
-    GstStructure *str;
-    const GValue *value_list;
-    const GValue *value;
+    GstCaps * tmp;
 
     GST_DEBUG ("index: %d caps size: %d\n", index, gst_caps_get_size (recorder->camera_caps));
     if (index >= gst_caps_get_size (recorder->camera_caps)) {
       return RE_RESULT_NO_MORE;
     }
-    str = gst_caps_get_structure (recorder->camera_caps, index);
-    if (!gst_structure_get_int (str, "width", (gint *)(&videoProperty->width))) {
-      value_list = gst_structure_get_value (str, "width");
-      value = gst_value_list_get_value (value_list, 0);
 
-      videoProperty->width = g_value_get_int (value);
-    }
-    if (!gst_structure_get_int (str, "height", (gint *)(&videoProperty->height))) {
-      value_list = gst_structure_get_value (str, "height");
-      value = gst_value_list_get_value (value_list, 0);
-
-      videoProperty->height = g_value_get_int (value);
-    }
-    if (!gst_structure_get_fraction (str, "framerate",
-          &framerate_numerator, &framerate_denominator)) {
-      value_list = gst_structure_get_value (str, "framerate");
-      value = gst_value_list_get_value (value_list, 0);
-
-      framerate_numerator = gst_value_get_fraction_numerator (value);
-      framerate_denominator = gst_value_get_fraction_denominator (value);
-    }
-
-    GST_DEBUG ("framerate_numerator: %d framerate_denominator: %d",
-        framerate_numerator, framerate_denominator);
-    if (framerate_denominator) {
-      videoProperty->framesPerSecond = framerate_numerator / framerate_denominator;
-    } 
+    tmp = gst_caps_copy_nth (recorder->camera_caps, index);
+    g_print ("%s\n", gst_caps_to_string (tmp));
+    gst_caps_unref (tmp);
   } else {
     return RE_RESULT_NO_MORE;
   }
@@ -1653,6 +1629,9 @@ static REresult set_camera_output_settings(RecorderEngineHandle handle, RERawVid
     { RE_COLORFORMAT_YUV420SEMIPLANAR, (REchar *)"NV12" },
     { RE_COLORFORMAT_YUVY, (REchar *)"YUY2" },
     { RE_COLORFORMAT_UYVY, (REchar *)"UYVY" },
+    { RE_COLORFORMAT_BGRA, (REchar *)"BGRA" },
+    { RE_COLORFORMAT_BGRx, (REchar *)"BGRx" },
+    { RE_COLORFORMAT_RGB16, (REchar *)"RGB16" },
   };
 
   video_format_name = key_value_pair (recorder->image_format, kKeyMap, sizeof(kKeyMap));

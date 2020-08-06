@@ -533,14 +533,10 @@ static void list_camera_capabilities (RecorderEngine* recorder)
 
   for (index = 0; ; index ++) {
     ret = recorder->get_camera_capabilities((RecorderEngineHandle)recorder, 
-        index, &videoProperty);
+        index);
     if (ret == RE_RESULT_NO_MORE) {
       break;
     }
-
-    LOG_INFO ("width: %d height: %d frame rate: %d\n", \
-        videoProperty.width, videoProperty.height, \
-        videoProperty.framesPerSecond);
   }
 }
 
@@ -606,7 +602,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"audio channel"},
       {"video input: 0->default(camera), 1->camera, 2->videotestsrc"},
       {"camera id: 0->/dev/video0, 1->/dev/video1"},
-      {"camera output video format: 0->default(I420), 1->I420, 2->NV12, 3->YUYV, 4->UYVY"},
+      {"camera output video format: 0->default(I420), 1->I420, 2->NV12, 3->YUYV, 4->UYVY, 5->BGRA, 6->BGRx, 7->RGB16"},
       {"camera output video width"},
       {"camera output video height"},
       {"camera output video FPS"},

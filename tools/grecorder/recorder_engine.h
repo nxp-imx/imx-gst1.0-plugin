@@ -77,7 +77,10 @@ typedef REuint32    REresult;
 #define RE_COLORFORMAT_YUV420SEMIPLANAR     ((REuint32) 0x00000002)
 #define RE_COLORFORMAT_YUVY                 ((REuint32) 0x00000003)
 #define RE_COLORFORMAT_UYVY                 ((REuint32) 0x00000004)
-#define RE_COLORFORMAT_LIST_END             ((REuint32) 0x00000005)
+#define RE_COLORFORMAT_BGRA                 ((REuint32) 0x00000005)
+#define RE_COLORFORMAT_BGRx                 ((REuint32) 0x00000006)
+#define RE_COLORFORMAT_RGB16                ((REuint32) 0x00000007)
+#define RE_COLORFORMAT_LIST_END             ((REuint32) 0x00000008)
 
 #define RE_VIDEO_EFFECT_DEFAULT             ((REuint32) 0x00000000)
 #define RE_VIDEO_EFFECT_CUBE                ((REuint32) 0x00000001)
@@ -190,7 +193,7 @@ typedef struct RecorderEngine_
   /* Camera interface */
   REresult (*set_video_source)(RecorderEngineHandle handle, REuint32 vs);
   REresult (*set_camera_id)(RecorderEngineHandle handle, REuint32 cameraId);
-  REresult (*get_camera_capabilities)(RecorderEngineHandle handle, REuint32 index, RERawVideoSettings *videoProperty);
+  REresult (*get_camera_capabilities)(RecorderEngineHandle handle, REuint32 index);
   REresult (*set_camera_output_settings)(RecorderEngineHandle handle, RERawVideoSettings *videoProperty);
 
   /* View finder interface */
