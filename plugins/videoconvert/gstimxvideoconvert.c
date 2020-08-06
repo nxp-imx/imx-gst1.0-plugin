@@ -1810,12 +1810,14 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
         GST_IMX_VIDEO_COMPOMETA_IN_PLACE_DEFAULT,
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class,
-      PROP_VIDEOCROP_META_ENABLE,
-      g_param_spec_boolean("videocrop-meta-enable", "process buffer's videocrop meta",
-        "Enable videocrop meta processing",
-        GST_IMX_VIDEO_VIDEOCROP_META_DEFAULT,
-        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  if (in_plugin->device_type == IMX_2D_DEVICE_G2D) {
+    g_object_class_install_property (gobject_class,
+        PROP_VIDEOCROP_META_ENABLE,
+        g_param_spec_boolean("videocrop-meta-enable", "process buffer's videocrop meta",
+          "Enable videocrop meta processing",
+          GST_IMX_VIDEO_VIDEOCROP_META_DEFAULT,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  }
 
   in_plugin->destroy(dev);
 
