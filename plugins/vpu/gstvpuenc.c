@@ -803,7 +803,13 @@ gst_vpu_enc_set_format (GstVideoEncoder * benc, GstVideoCodecState * state)
 	enc->open_param.sMirror = VPU_ENC_MIRDIR_NONE;
   enc->open_param.nBitRate = enc->bitrate;
   enc->open_param.nGOPSize = enc->gop_size;
-  enc->open_param.nFullRange = state->info.colorimetry.range;              /* 1:full range, 2:none full range*/
+  /* videoinfo's range is 1:full range, 2:none full range, so convert 2 -> 0, 1 -> 1 for sColorAspects define*/
+  enc->open_param.sColorAspects.nFullRange = state->info.colorimetry.range == 1 ? 1 : 0;
+  if (enc->open_param.sColorAspects.nFullRange) {
+    enc->open_param.sColorAspects.nVideoSignalPresentFlag = 1;
+  } else {
+    enc->open_param.sColorAspects.nVideoSignalPresentFlag = 0;
+  }
   enc->open_param.nColorConversionType = state->info.colorimetry.matrix; /* 3:BT.709, 4:BT.601 */
   enc->open_param.nStreamSliceCount = enc->stream_slice_count;
   enc->open_param.nChromaInterleave = 0;
