@@ -68,9 +68,10 @@ typedef REuint32    REresult;
 
 #define RE_VIDEO_SOURCE_DEFAULT             ((REuint32) 0x00000000)
 #define RE_VIDEO_SOURCE_CAMERA              ((REuint32) 0x00000001)
-#define RE_VIDEO_SOURCE_TEST                ((REuint32) 0x00000002)
-#define RE_VIDEO_SOURCE_SCREEN              ((REuint32) 0x00000003)
-#define RE_VIDEO_SOURCE_LIST_END            ((REuint32) 0x00000004)
+#define RE_VIDEO_SOURCE_IMXCAMERA           ((REuint32) 0x00000002)
+#define RE_VIDEO_SOURCE_TEST                ((REuint32) 0x00000003)
+#define RE_VIDEO_SOURCE_SCREEN              ((REuint32) 0x00000004)
+#define RE_VIDEO_SOURCE_LIST_END            ((REuint32) 0x00000005)
 
 #define RE_COLORFORMAT_DEFAULT              ((REuint32) 0x00000000)
 #define RE_COLORFORMAT_YUV420PLANAR         ((REuint32) 0x00000001)

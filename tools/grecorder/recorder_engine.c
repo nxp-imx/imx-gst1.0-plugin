@@ -886,6 +886,24 @@ setup_pipeline (gRecorderEngine *recorder)
       g_object_set (actual_video_source, "is-live", TRUE, NULL);
     }
 
+    if (g_strcmp0(recorder->videosrc_name, "v4l2src") == 0
+      || g_strcmp0(recorder->videosrc_name, "imxv4l2src") == 0) {
+      GValue item = G_VALUE_INIT;
+      GstIterator *it = gst_bin_iterate_sources ((GstBin*)camerasrc);
+      if (gst_iterator_next (it, &item) != GST_ITERATOR_OK)
+      {
+        g_warning("%s(): gst_iterator_next failed\n", __FUNCTION__);
+        gst_iterator_free (it);
+        return RE_RESULT_INTERNAL_ERROR;
+      }
+      recorder->video_src = g_value_get_object (&item);
+      g_value_unset (&item);
+      gst_iterator_free (it);
+
+      if (recorder->video_src && recorder->videodevice_name )
+        g_object_set (recorder->video_src, "device", recorder->videodevice_name, NULL);
+    }
+
     g_object_set (wrapper, "video-source", camerasrc, NULL);
     g_object_set (wrapper, "post-previews", FALSE, NULL);
     g_object_unref (camerasrc);
@@ -1105,12 +1123,8 @@ setup_pipeline (gRecorderEngine *recorder)
     GST_INFO_OBJECT (recorder->camerabin, "camera source element is %s",
         gst_element_get_name (recorder->video_src));
 
-    if (recorder->video_src && recorder->videodevice_name &&
-        g_object_class_find_property (G_OBJECT_GET_CLASS (recorder->video_src),
-            "device")) {
-      GST_INFO_OBJECT (recorder->camerabin, "video device string: %s",
-          recorder->videodevice_name);
-      g_object_set (recorder->video_src, "device", recorder->videodevice_name, NULL);
+    if (recorder->video_src && recorder->videodevice_name) {
+      g_print ("autovideosrc don't support set camera id\n");
     }
   }
 
@@ -1525,7 +1539,8 @@ static REresult set_video_source(RecorderEngineHandle handle, REuint32 vs)
 
   static KeyMap kKeyMap[] = {
     { RE_VIDEO_SOURCE_DEFAULT, (REchar *)"autovideosrc" },
-    { RE_VIDEO_SOURCE_CAMERA, (REchar *)"autovideosrc" },
+    { RE_VIDEO_SOURCE_CAMERA, (REchar *)"v4l2src" },
+    { RE_VIDEO_SOURCE_IMXCAMERA, (REchar *)"imxv4l2src" },
     { RE_VIDEO_SOURCE_TEST, (REchar *)"videotestsrc" },
     { RE_VIDEO_SOURCE_SCREEN, (REchar *)"ximagesrc ! queue ! imxcompositor_ipu" },
   };
