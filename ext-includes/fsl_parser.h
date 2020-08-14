@@ -768,6 +768,7 @@ typedef    int32 (*FslParserGetVideoDisplayHeight)(FslParserHandle parserHandle,
 
 typedef    int32 (*FslParserGetVideoFrameCount)(FslParserHandle parserHandle, uint32 trackNum, uint32 *count);
 
+typedef    int32 (*FslParserGetVideoThumbnailTime)(FslParserHandle parserHandle, uint32 trackNum, uint64 *outTs);
 
 /************************************************************************************************************
  *
@@ -963,6 +964,7 @@ enum /* API function ID */
     PARSER_API_GET_VIDEO_DISPLAY_WIDTH      = 56,
     PARSER_API_GET_VIDEO_DISPLAY_HEIGHT     = 57,
     PARSER_API_GET_VIDEO_FRAME_COUNT        = 58,
+    PARSER_API_GET_VIDEO_FRAME_THUMBNAIL_TIME = 59,
 
     /* audio properties */
     PARSER_API_GET_AUDIO_NUM_CHANNELS       = 60,
