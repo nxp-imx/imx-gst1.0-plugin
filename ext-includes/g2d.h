@@ -145,11 +145,18 @@ enum g2d_status
     G2D_STATUS_NOT_SUPPORTED  = 1,
 };
 
+#if defined(__QNX__)
+#include <sys/types.h>
+typedef off64_t g2d_phys_addr_t;
+#else
+typedef int     g2d_phys_addr_t;
+#endif
+
 struct g2d_surface
 {
     enum g2d_format format;
 
-    int planes[3];//surface buffer addresses are set in physical planes separately
+    g2d_phys_addr_t planes[3];//surface buffer addresses are set in physical planes separately
                   //RGB:  planes[0] - RGB565/RGBA8888/RGBX8888/BGRA8888/BRGX8888
                   //NV12: planes[0] - Y, planes[1] - packed UV
                   //I420: planes[0] - Y, planes[1] - U, planes[2] - V
