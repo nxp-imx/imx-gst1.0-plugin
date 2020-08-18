@@ -1345,8 +1345,9 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
       GstStructure *config = gst_buffer_pool_get_config (imxvct->in_pool);
       memset (&imxvct->in_video_align, 0, sizeof(GstVideoAlignment));
 
-      if (gst_buffer_pool_config_has_option (config,
-          GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
+      if (gst_buffer_pool_is_active (imxvct->in_pool)
+          && gst_buffer_pool_config_has_option (config,
+                GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
         gst_buffer_pool_config_get_video_alignment (config,
             &imxvct->in_video_align);
         GST_DEBUG ("input pool has alignment (%d, %d) , (%d, %d)",
@@ -1363,8 +1364,9 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
       GstStructure *config = gst_buffer_pool_get_config (imxvct->out_pool);
       memset (&imxvct->out_video_align, 0, sizeof(GstVideoAlignment));
 
-      if (gst_buffer_pool_config_has_option (config,
-          GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
+      if (gst_buffer_pool_is_active (imxvct->out_pool)
+          && gst_buffer_pool_config_has_option (config,
+                GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
         gst_buffer_pool_config_get_video_alignment (config,
             &imxvct->out_video_align);
         GST_DEBUG ("output pool has alignment (%d, %d) , (%d, %d)",
@@ -1393,12 +1395,12 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   gst_video_info_from_caps(&info, caps);
   gst_caps_unref (caps);
 
-  src.info.fmt = GST_VIDEO_INFO_FORMAT(&(in->info));
-  src.info.w = in->info.width + imxvct->in_video_align.padding_left +
+  src.info.fmt = GST_VIDEO_INFO_FORMAT(&(input_frame->info));
+  src.info.w = input_frame->info.width + imxvct->in_video_align.padding_left +
               imxvct->in_video_align.padding_right;
-  src.info.h = in->info.height + imxvct->in_video_align.padding_top +
+  src.info.h = input_frame->info.height + imxvct->in_video_align.padding_top +
               imxvct->in_video_align.padding_bottom;
-  src.info.stride = in->info.stride[0];
+  src.info.stride = input_frame->info.stride[0];
 
   dmabuf_meta = gst_buffer_get_dmabuf_meta (in->buffer);
   if (dmabuf_meta) {
