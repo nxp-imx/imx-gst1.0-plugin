@@ -113,6 +113,7 @@ enum g2d_feature
     G2D_SRC_YUV,
     G2D_DST_YUV,
     G2D_MULTI_SOURCE_BLT,
+    G2D_FAST_CLEAR,
 };
 
 enum g2d_rotation
