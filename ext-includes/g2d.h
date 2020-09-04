@@ -37,6 +37,7 @@
  *	2018-04-24         Yuchou Gan        1.3            Add AMPHION_TILED support
  *	2019-12-30         Yong Gan          1.4            Add G2D_TILED_STATUS support
  *	2020-01-08         Li Xianzhong      1.5            support BT_601 and BT_709
+ *	2020-08-25         Petr Cach         1.6            support BGR888, support BT_601FR, BT_709FR
 */
 
 #ifndef __G2D_H__
@@ -47,36 +48,37 @@ extern "C"  {
 #endif
 
 #define G2D_VERSION_MAJOR   1
-#define G2D_VERSION_MINOR   2
+#define G2D_VERSION_MINOR   6
 #define G2D_VERSION_PATCH   0
 
 enum g2d_format
 {
 //rgb formats
-     G2D_RGB565               = 0,
-     G2D_RGBA8888             = 1,
-     G2D_RGBX8888             = 2,
-     G2D_BGRA8888             = 3,
-     G2D_BGRX8888             = 4,
-     G2D_BGR565               = 5,
+     G2D_RGB565               = 0,    /* [0:4] Blue;  [5:10] Green; [11:15] Red                      */
+     G2D_RGBA8888             = 1,    /* [0:7] Red;   [8:15] Green; [16:23] Blue; [23:31] Alpha      */
+     G2D_RGBX8888             = 2,    /* [0:7] Red;   [8:15] Green; [16:23] Blue; [23:31] don't care */
+     G2D_BGRA8888             = 3,    /* [0:7] Blue;  [8:15] Green; [16:23] Red; [23:31] Alpha       */
+     G2D_BGRX8888             = 4,    /* [0:7] Blue;  [8:15] Green; [16:23] Red; [23:31] don't care  */
+     G2D_BGR565               = 5,    /* [0:4] Red;   [5:10] Green; [11:15] Blue                     */
 
-     G2D_ARGB8888             = 6,
-     G2D_ABGR8888             = 7,
-     G2D_XRGB8888             = 8,
-     G2D_XBGR8888             = 9,
-     G2D_RGB888               = 10,
+     G2D_ARGB8888             = 6,    /* [0:7] Alpha; [8:15] Red;   [16:23] Green; [23:31] Blue      */
+     G2D_ABGR8888             = 7,    /* [0:7] Alpha; [8:15] Blue;  [16:23] Green; [23:31] Red       */
+     G2D_XRGB8888             = 8,    /* [0:7] don't care; [8:15] Red;  [16:23] Green; [23:31] Blue  */
+     G2D_XBGR8888             = 9,    /* [0:7] don't care; [8:15] Blue; [16:23] Green; [23:31] Red   */
+     G2D_RGB888               = 10,   /* [0:7] Red;   [8:15] Green; [16:23] Blue                     */
+     G2D_BGR888               = 11,   /* [0:7] Blue;  [8:15] Green; [16:23] Red                      */
 
 //yuv formats
-     G2D_NV12                 = 20,
-     G2D_I420                 = 21,
-     G2D_YV12                 = 22,
-     G2D_NV21                 = 23,
-     G2D_YUYV                 = 24,
-     G2D_YVYU                 = 25,
-     G2D_UYVY                 = 26,
-     G2D_VYUY                 = 27,
-     G2D_NV16                 = 28,
-     G2D_NV61                 = 29,
+     G2D_NV12                 = 20,   /* 2 plane 420 format; plane 1: [0:7] Y ; plane 2: [0:7] U; [8:15] V */
+     G2D_I420                 = 21,   /* 3 plane 420 format; plane 1: [0:7] Y ; plane 2: [0:7] U; plane 3: [0:7] V */
+     G2D_YV12                 = 22,   /* 3 plane 420 format; plane 1: [0:7] Y ; plane 2: [0:7] V; plane 3: [0:7] U */
+     G2D_NV21                 = 23,   /* 2 plane 420 format; plane 1: [0:7] Y ; plane 2: [0:7] V; [8:15] U */
+     G2D_YUYV                 = 24,   /* 1 plane 422 format; [0:7] Y; [8:15; U; [16:23] Y; [24:31] V */
+     G2D_YVYU                 = 25,   /* 1 plane 422 format; [0:7] Y; [8:15; V; [16:23] Y; [24:31] U */
+     G2D_UYVY                 = 26,   /* 1 plane 422 format; [0:7] U; [8:15; Y; [16:23] V; [24:31] Y */
+     G2D_VYUY                 = 27,   /* 1 plane 422 format; [0:7] V; [8:15; Y; [16:23] U; [24:31] Y */
+     G2D_NV16                 = 28,   /* 2 plane 422 format; plane 1: [0:7] Y ; plane 2: [0:7] U; [8:15] V */
+     G2D_NV61                 = 29,   /* 2 plane 422 format; plane 1: [0:7] Y ; plane 2: [0:7] V; [8:15] U */
 };
 
 enum g2d_blend_func
@@ -104,6 +106,8 @@ enum g2d_cap_mode
     G2D_BLUR                  = 4,//blur effect
     G2D_YUV_BT_601            = 5,//yuv BT.601
     G2D_YUV_BT_709            = 6,//yuv BT.709
+    G2D_YUV_BT_601FR          = 7,//yuv BT.601 Full Range
+    G2D_YUV_BT_709FR          = 8,//yuv BT.709 Full Range
 };
 
 enum g2d_feature
