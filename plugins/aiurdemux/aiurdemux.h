@@ -82,6 +82,7 @@ GST_DEBUG_CATEGORY_EXTERN (aiurdemux_debug);
 #define AIURDEMUX_MIN_OUTPUT_BUFFER_SIZE 8
 #define AIURDEMUX_TIMESTAMP_DISCONT_MAX_GAP   (10*GST_SECOND)
 #define AIURDEMUX_TIMESTAMP_LAG_MAX_TIME      (10*GST_SECOND)
+#define AIURDEMUX_PIPELINE_LATENCY            120000000
 
 #define GST_BUFFER_TIMESTAMP GST_BUFFER_PTS
 
@@ -324,6 +325,7 @@ struct _GstAiurDemux
     GstClockTime base_offset;
     GstClockTime clock_offset;//clock running time when first buffer arrives
     GstClockTime start_time;//first buffer timestamp
+    GstClockTime pipeline_latency;//latency value setting from pipeline
     GstClockTimeDiff media_offset;
     GstClockTimeDiff avg_diff;
 

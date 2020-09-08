@@ -468,6 +468,8 @@ static void gst_aiurdemux_init (GstAiurDemux * demux)
   demux->core_handle = NULL;
   demux->thread = NULL;
 
+  demux->pipeline_latency = AIURDEMUX_PIPELINE_LATENCY;
+
   demux->stream_cache = gst_aiur_stream_cache_new (AIUR_STREAM_CACHE_SIZE,
     AIUR_STREAM_CACHE_SIZE_MAX, demux);
 
@@ -735,6 +737,8 @@ drop:
 }
 static gboolean gst_aiurdemux_handle_src_event (GstPad * pad, GstObject * parent, GstEvent * event)
 {
+  GstClockTime latency;
+
   gboolean res = TRUE;
   GstAiurDemux *demux = GST_AIURDEMUX (parent);
   switch (GST_EVENT_TYPE (event)) {
@@ -762,8 +766,15 @@ static gboolean gst_aiurdemux_handle_src_event (GstPad * pad, GstObject * parent
       res = FALSE;
       gst_event_unref (event);
       break;
+    case GST_EVENT_LATENCY:
+      gst_event_parse_latency (event, &latency);
+      demux->pipeline_latency = latency;
+      GST_LOG_OBJECT(demux,"set pipeline latency to %lld", latency);
+
+      res = gst_pad_event_default (pad,parent, event);
+      break;
     default:
-      GST_LOG_OBJECT(demux,"gst_aiurdemux_handle_src_event event=%x",GST_EVENT_TYPE (event));
+      GST_LOG_OBJECT(demux,"gst_aiurdemux_handle_src_event event=%s",GST_EVENT_TYPE_NAME (event));
       res = gst_pad_event_default (pad,parent, event);
       break;
   }
@@ -3240,7 +3251,7 @@ aiurdemux_check_start_offset (GstAiurDemux * demux, AiurDemuxStream * stream)
         && (GST_CLOCK_TIME_IS_VALID (demux->start_time))
         && (GST_CLOCK_TIME_IS_VALID (stream->sample_stat.start))){
         stream->sample_stat.start = stream->sample_stat.start - demux->start_time
-          + demux->clock_offset + demux->media_offset + (GST_MSECOND * demux->option.streaming_latency);
+          + demux->clock_offset + demux->media_offset + (GST_MSECOND * demux->option.streaming_latency) - demux->pipeline_latency;
 
         GST_LOG_OBJECT (demux,"***start=%"GST_TIME_FORMAT,GST_TIME_ARGS (stream->sample_stat.start));
     }
