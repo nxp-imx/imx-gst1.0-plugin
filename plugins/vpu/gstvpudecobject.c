@@ -21,7 +21,11 @@
 #include <string.h>
 #include <libdrm/drm_fourcc.h>
 #include <gst/video/gstvideometa.h>
+
+#if !GST_CHECK_VERSION(1, 18, 0)
 #include <gst/video/gstvideohdr10meta.h>
+#endif
+
 #include "gstimxcommon.h"
 #include <gst/allocators/gstphymemmeta.h>
 #include "gstvpuallocator.h"
@@ -842,6 +846,33 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
 
   gst_video_decoder_negotiate (bdec);
 
+#if GST_CHECK_VERSION(1, 18, 0)
+  if ((vpu_dec_object->init_info.hasHdr10Meta || vpu_dec_object->init_info.hasColorDesc)
+      && (vpu_dec_object->init_info.ColourDesc.transferCharacteristics == 16
+          || vpu_dec_object->init_info.ColourDesc.transferCharacteristics ==18)
+      && fmt == GST_VIDEO_FORMAT_NV12_10LE) {
+    GstVideoMasteringDisplayInfo minfo;
+    GstVideoContentLightLevel cll;
+    minfo.display_primaries[0].x = vpu_dec_object->init_info.Hdr10Meta.redPrimary[0];
+    minfo.display_primaries[0].y = vpu_dec_object->init_info.Hdr10Meta.redPrimary[1];
+    minfo.display_primaries[1].x = vpu_dec_object->init_info.Hdr10Meta.greenPrimary[0];
+    minfo.display_primaries[1].y = vpu_dec_object->init_info.Hdr10Meta.greenPrimary[1];
+    minfo.display_primaries[2].x = vpu_dec_object->init_info.Hdr10Meta.bluePrimary[0];
+    minfo.display_primaries[2].y = vpu_dec_object->init_info.Hdr10Meta.bluePrimary[1];
+    minfo.white_point.x = vpu_dec_object->init_info.Hdr10Meta.whitePoint[0];
+    minfo.white_point.y = vpu_dec_object->init_info.Hdr10Meta.whitePoint[1];
+    minfo.max_display_mastering_luminance = vpu_dec_object->init_info.Hdr10Meta.maxMasteringLuminance;
+    minfo.min_display_mastering_luminance = vpu_dec_object->init_info.Hdr10Meta.minMasteringLuminance;
+    cll.max_content_light_level = vpu_dec_object->init_info.Hdr10Meta.maxContentLightLevel;
+    cll.max_frame_average_light_level = vpu_dec_object->init_info.Hdr10Meta.maxFrameAverageLightLevel;
+    if (state->caps) {
+      state->caps = gst_caps_make_writable (state->caps);
+      gst_video_mastering_display_info_add_to_caps (&minfo, state->caps);
+      gst_video_content_light_level_add_to_caps (&cll, state->caps);
+    }
+  }
+#endif
+
   while (g_list_length (vpu_dec_object->gstbuffer_in_vpudec) \
           < vpu_dec_object->actual_buf_cnt) {
     GST_DEBUG_OBJECT (vpu_dec_object, "gst_video_decoder_allocate_output_buffer before");
@@ -1106,7 +1137,8 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
     pmeta->rfc_luma_offset = out_frame_info.pExtInfo->rfc_luma_offset;
     pmeta->rfc_chroma_offset = out_frame_info.pExtInfo->rfc_chroma_offset;
   }
-  
+
+#if !GST_CHECK_VERSION(1, 18, 0)
   if (vpu_dec_object->init_info.hasHdr10Meta || vpu_dec_object->init_info.hasColorDesc) {
     GstVideoHdr10Meta *meta = gst_buffer_add_video_hdr10_meta (out_frame->output_buffer);
     meta->hdr10meta.redPrimary[0] = vpu_dec_object->init_info.Hdr10Meta.redPrimary[0];
@@ -1128,6 +1160,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
     meta->hdr10meta.chromaSampleLocTypeTopField = vpu_dec_object->init_info.ChromaLocInfo.chromaSampleLocTypeTopField;
     meta->hdr10meta.chromaSampleLocTypeBottomField = vpu_dec_object->init_info.ChromaLocInfo.chromaSampleLocTypeTopField;
   }
+#endif
 
   if (vpu_dec_object->tsm_mode == MODE_FIFO) {
     if (!GST_CLOCK_TIME_IS_VALID(out_frame->pts))
