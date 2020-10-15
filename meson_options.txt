@@ -1,0 +1,3 @@
+option('platform', type : 'array',
+       choices : ['MX6', 'MX6QP', 'MX6SL', 'MX6SLL', 'MX6SX', 'MX6UL', 'MX7D', 'MX7ULP', 'MX8'], value : ['MX8'],
+       description : 'build target platform')
