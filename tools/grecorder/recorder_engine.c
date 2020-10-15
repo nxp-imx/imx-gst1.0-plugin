@@ -832,7 +832,7 @@ setup_pipeline (gRecorderEngine *recorder)
   GstBus *bus;
   GstElement *sink = NULL, *ipp = NULL;
   GstEncodingProfile *prof = NULL;
-  GstElement *camerasrc;
+  GstElement *camerasrc = NULL;
 
   recorder->initial_time = gst_util_get_timestamp ();
 
@@ -906,7 +906,6 @@ setup_pipeline (gRecorderEngine *recorder)
 
     g_object_set (wrapper, "video-source", camerasrc, NULL);
     g_object_set (wrapper, "post-previews", FALSE, NULL);
-    g_object_unref (camerasrc);
 
     if (recorder->camera_output_caps) {
       video_filter_str = g_strdup_printf ("%s\"%s\"", "capsfilter caps=",
@@ -1094,7 +1093,7 @@ setup_pipeline (gRecorderEngine *recorder)
     goto error;
   }
 
-  if (g_strcmp0(recorder->videosrc_name, "autovideosrc") == 0) {
+  if (g_strcmp0(recorder->videosrc_name, "autovideosrc") == 0 && camerasrc) {
     GstElement *autosrc;
     GValue item = G_VALUE_INIT;
     /* get autovideosrc from bin */
@@ -1126,6 +1125,9 @@ setup_pipeline (gRecorderEngine *recorder)
     if (recorder->video_src && recorder->videodevice_name) {
       g_print ("autovideosrc don't support set camera id\n");
     }
+  }
+  if (camerasrc) {
+    g_object_unref (camerasrc);
   }
 
   GST_INFO_OBJECT (recorder->camerabin, "camera started");
@@ -1266,10 +1268,8 @@ run_pipeline (gRecorderEngine *recorder)
         g_object_set (video_source, "colour-tone-mode", recorder->color_mode, NULL);
     }
 #endif
-    g_object_unref (video_source);
   } else {
     video_source = gst_bin_get_by_name (GST_BIN (recorder->camerabin), "camerasrc");
-    gst_object_unref (video_source);
   }
   g_object_set (recorder->camerabin, "zoom", recorder->zoom / 100.0f, NULL);
 
@@ -1288,6 +1288,8 @@ run_pipeline (gRecorderEngine *recorder)
 
     gst_object_unref (pad);
   }
+  gst_object_unref (video_source);
+
   timing->start_capture = gst_util_get_timestamp ();
   g_signal_emit_by_name (recorder->camerabin, "start-capture", 0);
 

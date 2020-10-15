@@ -1172,6 +1172,7 @@ gpointer gst_imx_v4l2_open_device (gchar *device, int type)
   if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
     if (gst_imx_v4l2capture_set_function (handle) < 0) {
       GST_ERROR ("v4l2 capture set function failed.\n");
+      g_slice_free1 (sizeof(IMXV4l2Handle), handle);
       close (fd);
       return NULL;
     }
