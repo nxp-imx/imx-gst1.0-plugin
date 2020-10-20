@@ -883,10 +883,19 @@ gst_vpu_enc_open_vpu (GstVideoEncoder * benc)
 		return FALSE;
 	}
 
+#if !GST_CHECK_VERSION(1, 18, 0)
   if (!gst_vpu_enc_set_caps(benc, NULL, 0)) {
     GST_ERROR_OBJECT(enc, "gst_vpu_enc_set_caps fail.");
     return FALSE;
   }
+#else
+  if (enc->open_param.eFormat != VPU_V_AVC) {
+    if (!gst_vpu_enc_set_caps(benc, NULL, 0)) {
+      GST_ERROR_OBJECT(enc, "gst_vpu_enc_set_caps fail.");
+      return FALSE;
+    }
+  }
+#endif
 
 	return TRUE;
 }
