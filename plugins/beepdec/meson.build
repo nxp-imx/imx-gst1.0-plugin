@@ -1,10 +1,15 @@
+beepdec_cflags = []
+if platform_is_aarch64 == 'no'
+  beepdec_cflags += ['-D_ARM12']
+endif
+
 gst_audio_dep = cc.find_library('gstaudio-' + api_version)
 
 beepdec_sources = [ 'beep.c', 'beepdec.c', 'beepregistry.c', 'beeptypefind.c']
 beepdec_headers = ['beepdec.h', 'beepregistry.h']
 gstbeepdec = library('gstbeepdec',
   beepdec_sources + beepdec_headers,
-  c_args: version_flags,
+  c_args: version_flags + beepdec_cflags,
   link_args : gst_plugin_ldflags + ['-ldl'],
   include_directories : [extinc, libsinc],
   dependencies : [gst_dep, gst_base_dep, gst_plugins_base_dep, gsttag_dep, gstriff_dep, gstfsl_dep, gst_audio_dep],

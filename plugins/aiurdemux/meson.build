@@ -1,7 +1,12 @@
+aiurdemux_cflags = []
+if platform_is_aarch64 == 'no'
+  aiurdemux_cflags += ['-D_ARM11']
+endif
+
 aiurdemux_sources = [ 'aiur.c', 'aiurregistry.c', 'aiurstreamcache.c', 'aiuridxtab.c', 'aiurdemux.c', 'aiurtypefind.c', 'aiurcontent.c']
 gstaiurdemux = library('gstaiurdemux',
   aiurdemux_sources,
-  c_args: version_flags,
+  c_args: version_flags + aiurdemux_cflags,
   link_args : gst_plugin_ldflags + ['-ldl'],
   include_directories : [extinc, libsinc],
   dependencies : [gst_dep, gst_base_dep, gst_plugins_base_dep, gsttag_dep, gstriff_dep, gstfsl_dep],
