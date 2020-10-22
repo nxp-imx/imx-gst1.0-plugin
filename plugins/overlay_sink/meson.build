@@ -32,4 +32,4 @@ gstoverlaysink = library('gstoverlaysink',
 
 overlaysink_config_install_dir = '@0@/share'.format(get_option('prefix'))
 config_files = ['imx_6q_display_config', 'imx_6sx_display_config', 'imx_7ulp_display_config', 'imx_8dv_display_config']
-install_data(sources: config_files, dir: overlaysink_config_install_dir)
+install_data(sources: config_files, install_dir: overlaysink_config_install_dir)
