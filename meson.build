@@ -21,6 +21,14 @@ endif
 
 gst_dep = dependency('gstreamer-' + api_version, version : gst_req)
 
+#meson automaticaly add _FILE_OFFSET_BITS=64 to gcc, this will make ipu test
+#case fail when do mmap on 6q, autoconf didn't add this define, so undef it
+add_project_arguments('-U_FILE_OFFSET_BITS', language: 'c')
+
+#below two marcos are defined in autoconf
+add_project_arguments ('-DARM', language: 'c')
+add_project_arguments ('-D_GUNC_', language: 'c')
+
 build_MX6 = 'no'
 build_MX6QP = 'no'
 build_MX6SL = 'no'
