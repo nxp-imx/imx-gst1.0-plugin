@@ -250,6 +250,8 @@ enum
 #define FLAG_OUTPUT_PCR  0x20
 //if set the flag, output sei position data in a sample buffer
 #define FLAG_OUTPUT_H264_SEI_POS_DATA 0x40
+//if set the flag, ts parser MUST parse return CSD/ESDS for aac adts even in live mode
+#define FLAG_FETCH_AAC_ADTS_CSD 0x80
 
 /*********************************************************************
  * User data ID
