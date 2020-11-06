@@ -2322,7 +2322,7 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
         codec = "AC3";
         mime =
             g_strdup_printf
-            ("%s, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld, framed=(boolean)true",
+            ("%s, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld",
             codec_mime, stream->info.audio.n_channels, stream->info.audio.rate,
             stream->bitrate);
         break;
