@@ -589,9 +589,14 @@ static void aiurcontent_query_content_info (AiurContent *pContent)
      2. duration query fail means this url has no end time right now */
   if (pContent->adaptive_playback) {
     q = gst_query_new_duration (GST_FORMAT_TIME);
-    if (gst_pad_peer_query (pad, q))
-      pContent->adaptive_vod = TRUE;
-    else
+    if (gst_pad_peer_query (pad, q)) {
+      gint64 duration = -1;
+      gst_query_parse_duration (q, &fmt, &duration);
+      if (duration == -1)
+        pContent->adaptive_vod = FALSE;
+      else
+        pContent->adaptive_vod = TRUE;
+    } else
       pContent->adaptive_vod = FALSE;
     GST_DEBUG ("adaptive playback %s video on-demand", pContent->adaptive_vod ? "is":"isn't");
     gst_query_unref (q);
@@ -655,6 +660,9 @@ static void aiurcontent_set_flag (AiurContent *pContent)
   }else{
     pContent->flags = FILE_FLAG_NON_SEEKABLE|FILE_FLAG_READ_IN_SEQUENCE;
   }
+
+  if (pContent->adaptive_playback)
+    pContent->flags |= FILE_FLAG_READ_IN_SEQUENCE;
 
   if(!pContent->seekable)
       pContent->flags |= FILE_FLAG_NON_SEEKABLE;

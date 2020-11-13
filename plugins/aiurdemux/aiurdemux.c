@@ -3292,8 +3292,7 @@ aiurdemux_adjust_timestamp (GstAiurDemux * demux, AiurDemuxStream * stream,
       || (!GST_CLOCK_TIME_IS_VALID (stream->sample_stat.start))) {
     GST_BUFFER_TIMESTAMP (buffer) = stream->sample_stat.start;
 
-    if (aiurcontent_is_adaptive_playback(demux->content_info)
-        && !aiurcontent_is_adaptive_vod (demux->content_info)) {
+    if (aiurcontent_is_adaptive_playback(demux->content_info)) {
       demux->base_offset = stream->sample_stat.start;
       GST_BUFFER_TIMESTAMP (buffer) = 0;
     }
