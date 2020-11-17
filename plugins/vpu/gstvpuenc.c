@@ -692,7 +692,8 @@ gst_vpu_enc_decide_output_video_format (GstVideoEncoder * benc)
     return FALSE;
   }
 
-  if (enc->open_param.eFormat == VPU_V_AVC && enc->quant == -1) {
+  if ((enc->open_param.eFormat == VPU_V_AVC || enc->open_param.eFormat == VPU_V_HEVC
+        || enc->open_param.eFormat == VPU_V_VP8) && enc->quant == -1) {
     enc->quant = DEFAULT_H264_QUANT;
   } else if (enc->quant == -1) {
     enc->quant = DEFAULT_MPEG4_QUANT;
@@ -812,6 +813,7 @@ gst_vpu_enc_set_format (GstVideoEncoder * benc, GstVideoCodecState * state)
   }
   enc->open_param.nColorConversionType = state->info.colorimetry.matrix; /* 3:BT.709, 4:BT.601 */
   enc->open_param.nStreamSliceCount = enc->stream_slice_count;
+  enc->open_param.nIntraQP = enc->quant;
   enc->open_param.nChromaInterleave = 0;
   enc->open_param.nMapType = 0;
   enc->open_param.nLinear2TiledEnable = 0;
