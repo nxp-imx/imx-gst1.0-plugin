@@ -1014,7 +1014,16 @@ static GList* imx_ipu_get_supported_in_fmts(Imx2DDevice* device)
 
 static GList* imx_ipu_get_supported_out_fmts(Imx2DDevice* device)
 {
-  return imx_ipu_get_supported_in_fmts(device);
+  GList* list = NULL;
+  const IpuFmtMap *map = ipu_fmts_map;
+  while (map->gst_video_format != GST_VIDEO_FORMAT_UNKNOWN) {
+    /* ipu don't support output alpha channel */
+    if (!is_format_has_alpha (map->ipu_format))
+      list = g_list_append(list, (gpointer)(map->gst_video_format));
+    map++;
+  }
+
+  return list;
 }
 
 Imx2DDevice * imx_ipu_create(Imx2DDeviceType  device_type)
