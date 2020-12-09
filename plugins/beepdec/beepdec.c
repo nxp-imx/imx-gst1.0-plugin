@@ -791,6 +791,7 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
     uint32 core_ret;
     GstBuffer *out = NULL;
     GstBuffer * temp_buffer = NULL;
+    GstBuffer * codec_data = NULL;
     uint32 adapter_size = 0;
     GstMapInfo map;
     gboolean twice = FALSE;
@@ -840,14 +841,12 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
             gst_buffer_fill (temp_buffer, 0, inbuf, inbuf_size);
             gst_adapter_push (beepdec->adapter, temp_buffer);
             beepdec->frame_cnt ++;
-            buffer = NULL;
             beepdec->in_cnt--;
             sent=TRUE;
             ret = gst_audio_decoder_finish_frame (dec, NULL, 1);
             goto bail;
         }else if(beepdec->frame_cnt == VORBIS_HEADER_FRAME){
             UniACodecParameter parameter;
-            GstBuffer *codec_data;
             GstMapInfo map;
 
             adapter_size = gst_adapter_available(beepdec->adapter);
@@ -979,6 +978,9 @@ begin:
 bail:
     if (buffer) {
         gst_buffer_unref (buffer);
+    }
+    if (codec_data) {
+        gst_buffer_unref (codec_data);
     }
     return ret;
 
