@@ -15,7 +15,7 @@ endif
 
 gstimxv4l2 = library('gstimxv4l2',
   imxv4l2_sources + imxv4l2_headers,
-  c_args: version_flags + ionallocator_flags,
+  c_args: version_flags + ionallocator_flags + dmabufheapsallocator_flags,
   link_args : gst_plugin_ldflags,
   include_directories : [libsinc, libs_device_g2d_inc, libs_v4l2_core_inc, libs_overlaycompositionmeta_inc, libs_video_overlay_inc],
   dependencies : [gst_dep, gst_base_dep, gst_plugins_base_dep, gst_video_dep, allocator_dep, gstfsl_dep],

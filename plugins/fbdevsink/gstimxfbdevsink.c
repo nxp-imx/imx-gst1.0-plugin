@@ -35,10 +35,12 @@
 #include <gst/allocators/gstdmabuf.h>
 #include <gst/allocators/gstallocatorphymem.h>
 #include <gst/allocators/gstphysmemory.h>
+#ifdef USE_DMABUFHEAPS
+#include <gst/allocators/gstdmabufheaps.h>
+#endif
 #ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
-
 #include "gstimxfbdevsink.h"
 #include "gstimxcommon.h"
 #include "gstimx.h"
@@ -361,8 +363,13 @@ gst_imx_fbdevsink_setup_buffer_pool (GstImxFBDEVSink *fbdevsink, GstCaps *caps)
   GST_DEBUG_OBJECT (fbdevsink, "create buffer pool (%p)", fbdevsink->pool);
 
   if (!fbdevsink->allocator) {
+#ifdef USE_DMABUFHEAPS
+    fbdevsink->allocator = gst_dmabufheaps_allocator_obtain ();
+#endif
 #ifdef USE_ION
-    fbdevsink->allocator = gst_ion_allocator_obtain ();
+    if (!fbdevsink->allocator) {
+      fbdevsink->allocator = gst_ion_allocator_obtain ();
+    }
 #endif
     if (!fbdevsink->allocator) {
       GST_ERROR_OBJECT (fbdevsink, "New allocator failed");

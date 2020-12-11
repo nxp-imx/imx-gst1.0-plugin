@@ -27,6 +27,9 @@
 #include <gst/allocators/gstdmabufmeta.h>
 #include <libdrm/drm_fourcc.h>
 #include <gst/allocators/gstallocatorphymem.h>
+#ifdef USE_DMABUFHEAPS
+#include <gst/allocators/gstdmabufheaps.h>
+#endif
 #ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
@@ -977,8 +980,13 @@ gst_imx_video_convert_create_bufferpool(GstImxVideoConvert *imxvct,
   pool = gst_video_buffer_pool_new ();
   if (pool) {
     if (!imxvct->allocator) {
+#ifdef USE_DMABUFHEAPS
+      imxvct->allocator = gst_dmabufheaps_allocator_obtain ();
+#endif
 #ifdef USE_ION
-      imxvct->allocator = gst_ion_allocator_obtain ();
+      if (!imxvct->allocator) {
+        imxvct->allocator = gst_ion_allocator_obtain ();
+      }
 #endif
     }
 

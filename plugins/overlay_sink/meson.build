@@ -22,7 +22,7 @@ endif
 
 gstoverlaysink = library('gstoverlaysink',
   overlaysink_sources + overlaysink_headers,
-  c_args: version_flags + ionallocator_flags,
+  c_args: version_flags + ionallocator_flags + dmabufheapsallocator_flags,
   link_args : gst_plugin_ldflags + ['-lg2d'],
   include_directories : [extinc, libsinc, libs_device_g2d_inc, libs_v4l2_core_inc, libs_overlaycompositionmeta_inc, libs_video_overlay_inc, libs_gstsutils_inc],
   dependencies : [gst_dep, gst_base_dep, gst_plugins_base_dep, gst_video_dep, allocator_dep, gstfsl_dep],

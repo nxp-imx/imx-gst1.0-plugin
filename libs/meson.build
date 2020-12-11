@@ -59,7 +59,7 @@ endif
 
 gstfsl = library('gstfsl-@0@'.format(api_version),
   gstfsl_sources + gstfsl_headers + v4l2core_sources + v4l2core_headers,
-  c_args : ionallocator_flags + gstfsl_cflags,
+  c_args : ionallocator_flags + dmabufheapsallocator_flags + gstfsl_cflags,
   link_args : gstfsl_ldflags,
   version : '0.0.0',
   soversion : 0,

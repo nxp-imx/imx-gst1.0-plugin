@@ -27,6 +27,9 @@
 #include "gstosink.h"
 #include "osink_object.h"
 #include "gstosinkallocator.h"
+#ifdef USE_DMABUFHEAPS
+#include <gst/allocators/gstdmabufheaps.h>
+#endif
 #ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
@@ -460,8 +463,13 @@ gst_overlay_sink_setup_buffer_pool (GstOverlaySink *sink, GstCaps *caps)
   GST_DEBUG_OBJECT (sink, "create buffer pool(%p).", sink->pool);
 
   if (!sink->allocator) {
+#ifdef USE_DMABUFHEAPS
+    sink->allocator = gst_dmabufheaps_allocator_obtain ();
+#endif
 #ifdef USE_ION
-    sink->allocator = gst_ion_allocator_obtain ();
+    if (!sink->allocator) {
+      sink->allocator = gst_ion_allocator_obtain ();
+    }
 #endif
     if (!sink->allocator) {
       sink->allocator = gst_osink_allocator_new (sink->osink_obj);

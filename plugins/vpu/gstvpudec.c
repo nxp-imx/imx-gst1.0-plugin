@@ -41,6 +41,9 @@
 #include <gst/video/gstvideopool.h>
 #include <gst/allocators/gstphysmemory.h>
 #include <gst/allocators/gstdmabufmeta.h>
+#ifdef USE_DMABUFHEAPS
+#include <gst/allocators/gstdmabufheaps.h>
+#endif
 #ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
@@ -535,8 +538,13 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
       gst_object_unref (allocator);
     }
     GST_DEBUG_OBJECT (dec, "using vpu allocator.\n");
+#ifdef USE_DMABUFHEAPS
+    allocator = gst_dmabufheaps_allocator_obtain ();
+#endif
 #ifdef USE_ION
-    allocator = gst_ion_allocator_obtain ();
+    if (!allocator) {
+      allocator = gst_ion_allocator_obtain ();
+    }
 #endif
     if (!allocator) {
       allocator = gst_vpu_allocator_obtain();

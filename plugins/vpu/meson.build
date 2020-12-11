@@ -33,7 +33,7 @@ endif
 
 gstvpu = library('gstvpu',
   gstvpu_sources + gstvpu_headers,
-  c_args: version_flags + ionallocator_flags + hantro_flags,
+  c_args: version_flags + ionallocator_flags + dmabufheapsallocator_flags + hantro_flags,
   link_args : gst_plugin_ldflags,
   include_directories : [extinc, libsinc],
   dependencies : [gst_dep, gst_base_dep, gst_plugins_base_dep, gst_video_dep, allocator_dep, vpuwrap_dep, gstfsl_dep],

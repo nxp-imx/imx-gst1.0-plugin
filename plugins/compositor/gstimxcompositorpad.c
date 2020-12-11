@@ -25,6 +25,9 @@
 #include <string.h>
 #include <gst/allocators/gstphymemmeta.h>
 #include <gst/allocators/gstdmabuf.h>
+#ifdef USE_DMABUFHEAPS
+#include <gst/allocators/gstdmabufheaps.h>
+#endif
 #ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
@@ -550,8 +553,13 @@ gst_imxcompositor_pad_prepare_frame (GstVideoAggregatorPad * pad, GstVideoAggreg
     gst_caps_unref(caps);
 
     if (!imxcomp->allocator) {
+#ifdef USE_DMABUFHEAPS
+      imxcomp->allocator = gst_dmabufheaps_allocator_obtain ();
+#endif
 #ifdef USE_ION
-      imxcomp->allocator = gst_ion_allocator_obtain ();
+      if (!imxcomp->allocator) {
+        imxcomp->allocator = gst_ion_allocator_obtain ();
+      }
 #endif
     }
 
@@ -796,8 +804,13 @@ gst_imxcompositor_pad_prepare_frame (GstVideoAggregatorPad * pad,
     gst_caps_unref(caps);
 
     if (!imxcomp->allocator) {
+#ifdef USE_DMABUFHEAPS
+      imxcomp->allocator = gst_dmabufheaps_allocator_obtain ();
+#endif
 #ifdef USE_ION
-      imxcomp->allocator = gst_ion_allocator_obtain ();
+      if (!imxcomp->allocator) {
+        imxcomp->allocator = gst_ion_allocator_obtain ();
+      }
 #endif
     }
 

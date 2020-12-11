@@ -122,6 +122,11 @@ if cc.has_header('linux/ion.h') and cc.has_header('gst/allocators/gstionmemory.h
   ionallocator_flags += ['-DUSE_ION']
 endif
 
+dmabufheapsallocator_flags = []
+if cc.has_header('linux/dma-heap.h') and cc.has_header('gst/allocators/gstdmabufheaps.h', dependencies: gst_allocator_dep)
+  dmabufheapsallocator_flags += ['-DUSE_DMABUFHEAPS']
+endif
+
 #gst_plugin_ldflags=['-module', '-avoid-version', '-export-symbols-regex']
 gst_plugin_ldflags=[]
 plugins_install_dir = join_paths(get_option('libdir'), 'gstreamer-1.0')

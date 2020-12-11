@@ -30,6 +30,9 @@
 #include <gst/allocators/gstdmabuf.h>
 #include "imxoverlaycompositionmeta.h"
 #include <gst/allocators/gstphymemmeta.h>
+#ifdef USE_DMABUFHEAPS
+#include <gst/allocators/gstdmabufheaps.h>
+#endif
 #ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
@@ -450,8 +453,13 @@ gint imx_video_overlay_composition_composite(
       if (t_fmt != vmeta->format || !gst_buffer_is_phymem(ovbuf)) {
         // need copy buffer
         if (!vcomp->allocator) {
+#ifdef USE_DMABUFHEAPS
+          vcomp->allocator = gst_dmabufheaps_allocator_obtain ();
+#endif
 #ifdef USE_ION
-          vcomp->allocator = gst_ion_allocator_obtain ();
+          if (!vcomp->allocator) {
+            vcomp->allocator = gst_ion_allocator_obtain ();
+          }
 #endif
         }
 

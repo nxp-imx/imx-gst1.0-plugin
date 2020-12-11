@@ -124,6 +124,9 @@
 #include <libdrm/drm_fourcc.h>
 #include <gst/allocators/gstallocatorphymem.h>
 #include <gst/allocators/gstphymemmeta.h>
+#ifdef USE_DMABUFHEAPS
+#include <gst/allocators/gstdmabufheaps.h>
+#endif
 #ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
@@ -309,8 +312,13 @@ gst_imxcompositor_create_bufferpool(GstImxCompositor *imxcomp,
   pool = gst_video_buffer_pool_new ();
   if (pool) {
     if (!imxcomp->allocator) {
+#ifdef USE_DMABUFHEAPS
+      imxcomp->allocator = gst_dmabufheaps_allocator_obtain ();
+#endif
 #ifdef USE_ION
-      imxcomp->allocator = gst_ion_allocator_obtain ();
+      if (!imxcomp->allocator) {
+        imxcomp->allocator = gst_ion_allocator_obtain ();
+      }
 #endif
     }
 
