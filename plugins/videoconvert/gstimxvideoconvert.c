@@ -1412,14 +1412,19 @@ static GstFlowReturn imx_video_convert_transform_frame(GstBaseTransform * trans,
   gst_caps_unref (caps);
 
   src.info.fmt = GST_VIDEO_INFO_FORMAT(&(filter->in_info));
-  src.info.w = filter->in_info.width + imxvct->in_video_align.padding_left +
-              imxvct->in_video_align.padding_right;
-  src.info.h = filter->in_info.height + imxvct->in_video_align.padding_top +
-              imxvct->in_video_align.padding_bottom;
-  if (video_meta)
+  if (video_meta) {
+    src.info.w = video_meta->width + imxvct->in_video_align.padding_left +
+                imxvct->in_video_align.padding_right;
+    src.info.h = video_meta->height + imxvct->in_video_align.padding_top +
+                imxvct->in_video_align.padding_bottom;
     src.info.stride = video_meta->stride[0];
-  else
+  } else {
+    src.info.w = filter->in_info.width + imxvct->in_video_align.padding_left +
+                imxvct->in_video_align.padding_right;
+    src.info.h = filter->in_info.height + imxvct->in_video_align.padding_top +
+                imxvct->in_video_align.padding_bottom;
     src.info.stride = filter->in_info.stride[0];
+  }
 
   dmabuf_meta = gst_buffer_get_dmabuf_meta (inbuf);
   if (dmabuf_meta) {
