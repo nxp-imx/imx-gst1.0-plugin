@@ -1269,7 +1269,13 @@ _set_cached_phyaddr (GstMemory * mem, guint8 * phyadd)
                 g_quark_from_static_string ("phyaddr"), phyadd, NULL);
 }
 
-static GstFlowReturn imx_video_convert_transform_frame(GstBaseTransform * trans, GstBuffer * inbuf,
+static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
+    GstVideoFrame *in, GstVideoFrame *out)
+{
+    return GST_FLOW_OK;
+}
+
+static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBuffer * inbuf,
     GstBuffer * outbuf)
 {
   GstVideoFilter *filter = GST_VIDEO_FILTER_CAST(trans);
@@ -1634,7 +1640,13 @@ static GstFlowReturn imx_video_convert_transform_frame(GstBaseTransform * trans,
 }
 
 static GstFlowReturn
-imx_video_convert_transform_frame_ip(GstBaseTransform * trans, GstBuffer * buf)
+imx_video_convert_transform_frame_ip(GstVideoFilter *filter, GstVideoFrame *in)
+{
+    return GST_FLOW_OK;
+}
+
+static GstFlowReturn
+imx_video_convert_transform_ip(GstBaseTransform * trans, GstBuffer * buf)
 {
   GstVideoFilter *filter = GST_VIDEO_FILTER_CAST(trans);
   GstImxVideoConvert *imxvct = (GstImxVideoConvert *)(trans);
@@ -1867,10 +1879,14 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
       GST_DEBUG_FUNCPTR(imx_video_convert_decide_allocation);
   video_filter_class->set_info =
       GST_DEBUG_FUNCPTR(imx_video_convert_set_info);
+  video_filter_class->transform_frame =
+       GST_DEBUG_FUNCPTR(imx_video_convert_transform_frame);
+  video_filter_class->transform_frame_ip =
+       GST_DEBUG_FUNCPTR(imx_video_convert_transform_frame_ip);
   base_transform_class->transform =
-      GST_DEBUG_FUNCPTR(imx_video_convert_transform_frame);
+      GST_DEBUG_FUNCPTR(imx_video_convert_transform);
   base_transform_class->transform_ip =
-      GST_DEBUG_FUNCPTR(imx_video_convert_transform_frame_ip);
+      GST_DEBUG_FUNCPTR(imx_video_convert_transform_ip);
 
   base_transform_class->passthrough_on_same_caps = TRUE;
 }
