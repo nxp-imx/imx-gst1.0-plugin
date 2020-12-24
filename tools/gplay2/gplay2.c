@@ -731,6 +731,7 @@ print_menu ()
   g_print ("\t[u]Select the video track\n");
   g_print ("\t[d]Select the audio track\n");
   g_print ("\t[b]Select the subtitle track\n");
+  g_print ("\t[n]Select adaptive playback track\n");
   g_print ("\t[f]Set full screen\n");
   g_print ("\t[z]resize the width and height\n");
   g_print ("\t[t]Rotate\n");
@@ -1091,6 +1092,26 @@ input_thread_fun (gpointer data)
       {
         gboolean mute_status = gst_player_get_mute (player);
         gst_player_set_mute (player, mute_status);
+      }
+        break;
+
+      case 'n':
+      {
+        guint64 connection_speed = 0;
+        g_print ("Set adaptive playback connection speed in bps:");
+        gDisable_display = TRUE;
+        if (scanf ("%lu", &connection_speed) != 1) {
+          gDisable_display = FALSE;
+          break;
+        }
+        gDisable_display = FALSE;
+        connection_speed = (connection_speed - 1) / 1000 + 1;
+        if (connection_speed <= 0) {
+          g_print ("Invalid connection speed\n");
+        } else {
+          gst_player_set_connection_speed (player, connection_speed);
+          g_print ("connection speed update done\n");
+        }
       }
         break;
 
