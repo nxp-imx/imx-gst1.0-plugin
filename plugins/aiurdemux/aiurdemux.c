@@ -575,6 +575,26 @@ static GstFlowReturn gst_aiurdemux_chain (GstPad * sinkpad, GstObject * parent,
   return GST_FLOW_OK;
 
 }
+
+static void
+gst_aiurdemux_dump_stream_collections (GstStreamCollection *collection)
+{
+  gint i = 0;
+  guint num_streams = gst_stream_collection_get_size (collection);
+
+  g_printf ("------------------------\n");
+  g_printf ("    adaptive streams collections info:\n");
+  for (i = 0; i < num_streams; i++) {
+    GstStream *stream = gst_stream_collection_get_stream (collection, i);
+    GstCaps *caps = gst_stream_get_caps (stream);
+    if (caps) {
+      g_print ("        stream %d caps: %s\n", i, gst_caps_to_string (caps));
+      gst_caps_unref (caps);
+    }
+  }
+  g_printf ("------------------------\n");
+}
+
 static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * parent,
     GstEvent * event)
 {
@@ -715,6 +735,13 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
         goto drop;
         break;
         }
+    case GST_EVENT_STREAM_COLLECTION:
+    {
+      GstStreamCollection *collection;
+      gst_event_parse_stream_collection (event, &collection);
+      gst_aiurdemux_dump_stream_collections (collection);
+      break;
+    }
     case GST_EVENT_CUSTOM_DOWNSTREAM_STICKY:
     {
       /* drop this event to avoid typefind push event error */
@@ -723,7 +750,7 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
       goto drop;
     }
     default:
-        GST_LOG_OBJECT(demux,"gst_aiurdemux_handle_sink_event event=%x",GST_EVENT_TYPE (event));
+        GST_LOG_OBJECT(demux,"gst_aiurdemux_handle_sink_event event=%s",GST_EVENT_TYPE_NAME (event));
       break;
   }
 
