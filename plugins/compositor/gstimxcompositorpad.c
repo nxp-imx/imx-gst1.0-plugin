@@ -538,17 +538,19 @@ gst_imxcompositor_pad_prepare_frame (GstVideoAggregatorPad * pad, GstVideoAggreg
   }
 #endif
 
-  if (!gst_video_frame_map (&frame, &pad->info, buffer, GST_MAP_READ)) {
-    GST_WARNING_OBJECT (vagg, "Could not map input buffer");
-    return FALSE;
-  }
-
   /* Check if need copy input frame */
   if (!(gst_buffer_is_phymem(buffer)
         || gst_is_dmabuf_memory (gst_buffer_peek_memory (buffer, 0)))) {
     GST_DEBUG_OBJECT (pad, "copy input frame to physical continues memory");
     GstVideoInfo info;
-    GstCaps *caps = gst_video_info_to_caps(&frame.info);
+    GstCaps *caps;
+
+    if (!gst_video_frame_map (&frame, &pad->info, buffer, GST_MAP_READ)) {
+      GST_WARNING_OBJECT (vagg, "Could not map input buffer");
+      return FALSE;
+    }
+
+    caps = gst_video_info_to_caps(&frame.info);
     gst_video_info_from_caps(&info, caps); //update the size info
     gst_caps_unref(caps);
 
@@ -601,6 +603,7 @@ gst_imxcompositor_pad_prepare_frame (GstVideoAggregatorPad * pad, GstVideoAggreg
       gst_video_frame_unmap (&frame);
       return TRUE;
     }
+    *prepared_frame = frame;
   }
 
   if (cpad->sink_pool_update) {
@@ -635,8 +638,6 @@ gst_imxcompositor_pad_prepare_frame (GstVideoAggregatorPad * pad, GstVideoAggreg
   /* sync object properties on stream time */
   if (GST_CLOCK_TIME_IS_VALID (stream_time))
     gst_object_sync_values (GST_OBJECT (pad), stream_time);
-
-  *prepared_frame = frame;
 
   return TRUE;
 }
