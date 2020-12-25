@@ -1054,19 +1054,13 @@ gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps)
 static gint gst_imxcompositor_config_dst(GstImxCompositor *imxcomp,
     GstBuffer * outbuf, Imx2DFrame *dst)
 {
-  GstVideoFrame out_frame;
   GstPhyMemMeta *phymemmeta = NULL;
+  GstVideoInfo *out_info = &((GstVideoAggregator*)imxcomp)->info;
   guint i, n_mem;
 
   if (!(gst_buffer_is_phymem(outbuf)
         || gst_is_dmabuf_memory (gst_buffer_peek_memory (outbuf, 0)))) {
     GST_ERROR ("out buffer is not phy memory or DMA Buf");
-    return -1;
-  }
-
-  if (!gst_video_frame_map (&out_frame, &((GstVideoAggregator*)imxcomp)->info,
-      outbuf, GST_MAP_WRITE|GST_VIDEO_FRAME_MAP_FLAG_NO_REF)) {
-    GST_WARNING_OBJECT (imxcomp, "Could not map output buffer");
     return -1;
   }
 
@@ -1087,8 +1081,8 @@ static gint gst_imxcompositor_config_dst(GstImxCompositor *imxcomp,
 
     /* set physical memory padding info */
     if (imxcomp->self_out_pool
-        && gst_buffer_is_writable (out_frame.buffer)) {
-      phymemmeta = GST_PHY_MEM_META_ADD (out_frame.buffer);
+        && gst_buffer_is_writable (outbuf)) {
+      phymemmeta = GST_PHY_MEM_META_ADD (outbuf);
       phymemmeta->x_padding = imxcomp->out_align.padding_right;
       phymemmeta->y_padding = imxcomp->out_align.padding_bottom;
       GST_DEBUG_OBJECT (imxcomp, "out physical memory meta x_padding: %d "
@@ -1098,55 +1092,52 @@ static gint gst_imxcompositor_config_dst(GstImxCompositor *imxcomp,
     imxcomp->out_pool_update = FALSE;
   }
 
-  dst->info.fmt = GST_VIDEO_INFO_FORMAT(&(out_frame.info));
-  dst->info.w = out_frame.info.width +
+  dst->info.fmt = GST_VIDEO_INFO_FORMAT(out_info);
+  dst->info.w = out_info->width +
       imxcomp->out_align.padding_left + imxcomp->out_align.padding_right;
-  dst->info.h = out_frame.info.height +
+  dst->info.h = out_info->height +
       imxcomp->out_align.padding_top + imxcomp->out_align.padding_bottom;
-  dst->info.stride = out_frame.info.stride[0];
+  dst->info.stride = out_info->stride[0];
 
   GST_LOG ("Output: %s, %dx%d",
-      GST_VIDEO_FORMAT_INFO_NAME(out_frame.info.finfo),
-      out_frame.info.width, out_frame.info.height);
+      GST_VIDEO_FORMAT_INFO_NAME(out_info->finfo),
+      out_info->width, out_info->height);
 
   if (imxcomp->device->config_output(imxcomp->device, &dst->info) < 0) {
     GST_ERROR ("config output failed");
-    gst_video_frame_unmap (&out_frame);
     return -1;
   }
 
-  if (gst_is_dmabuf_memory (gst_buffer_peek_memory (out_frame.buffer, 0))) {
-    n_mem = gst_buffer_n_memory (out_frame.buffer);
+  if (gst_is_dmabuf_memory (gst_buffer_peek_memory (outbuf, 0))) {
+    n_mem = gst_buffer_n_memory (outbuf);
     for (i = 0; i < n_mem; i++)
-      dst->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (out_frame.buffer, i));
+      dst->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (outbuf, i));
   } else 
-    dst->mem = gst_buffer_query_phymem_block (out_frame.buffer);
+    dst->mem = gst_buffer_query_phymem_block (outbuf);
   dst->alpha = 0xFF; //TODO how to use destination alpha?
   dst->rotate = IMX_2D_ROTATION_0;
   dst->interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
   dst->crop.x = 0;
   dst->crop.y = 0;
-  dst->crop.w = out_frame.info.width;
-  dst->crop.h = out_frame.info.height;
+  dst->crop.w = out_info->width;
+  dst->crop.h = out_info->height;
 
   GstVideoCropMeta *out_crop = NULL;
-  out_crop = gst_buffer_get_video_crop_meta(out_frame.buffer);
+  out_crop = gst_buffer_get_video_crop_meta(outbuf);
   if (out_crop != NULL) {
     GST_LOG ("output crop meta: (%d, %d, %d, %d)", out_crop->x, out_crop->y,
         out_crop->width, out_crop->height);
-    if ((out_crop->x >= out_frame.info.width)
-        || (out_crop->y >= out_frame.info.height)) {
-      gst_video_frame_unmap (&out_frame);
+    if ((out_crop->x >= out_info->width)
+        || (out_crop->y >= out_info->height)) {
       return -1;
     }
 
     dst->crop.x += out_crop->x;
     dst->crop.y += out_crop->y;
-    dst->crop.w = MIN(out_crop->width, (out_frame.info.width - out_crop->x));
-    dst->crop.h = MIN(out_crop->height,(out_frame.info.height-out_crop->y));
+    dst->crop.w = MIN(out_crop->width, (out_info->width - out_crop->x));
+    dst->crop.h = MIN(out_crop->height,(out_info->height-out_crop->y));
   }
 
-  gst_video_frame_unmap (&out_frame);
   return 0;
 }
 
@@ -1154,24 +1145,42 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
     GstImxCompositorPad *pad, Imx2DFrame *src)
 {
   GstVideoAggregatorPad *ppad = (GstVideoAggregatorPad *)pad;
+  GstVideoMeta *video_meta;
+  GstBuffer *pad_buffer = NULL;
   guint i, n_mem;
   GstDmabufMeta *dmabuf_meta;
   gint64 drm_modifier = 0;
 
 #if GST_CHECK_VERSION(1, 16, 0)
   GstVideoFrame * aggregated_frame = gst_video_aggregator_pad_get_prepared_frame (ppad);
+  if (!aggregated_frame) {
+    pad_buffer = gst_video_aggregator_pad_get_current_buffer (ppad);
+  } else {
+    pad_buffer = aggregated_frame->buffer;
+  }
 #else
   GstVideoFrame * aggregated_frame = ppad->aggregated_frame;
+  pad_buffer = aggregated_frame->buffer;
 #endif
 
-  src->info.fmt = GST_VIDEO_INFO_FORMAT(&(aggregated_frame->info));
-  src->info.w = aggregated_frame->info.width +
+  video_meta = gst_buffer_get_video_meta (pad_buffer);
+  if (video_meta) {
+  src->info.fmt = GST_VIDEO_INFO_FORMAT(&(ppad->info));
+  src->info.w = video_meta->width +
                 pad->align.padding_left + pad->align.padding_right;
-  src->info.h = aggregated_frame->info.height +
+  src->info.h = video_meta->height +
                 pad->align.padding_top + pad->align.padding_bottom;
-  src->info.stride = aggregated_frame->info.stride[0];
+  src->info.stride = video_meta->stride[0];
+  } else {
+  src->info.fmt = GST_VIDEO_INFO_FORMAT(&(ppad->info));
+  src->info.w = ppad->info.width +
+                pad->align.padding_left + pad->align.padding_right;
+  src->info.h = ppad->info.height +
+                pad->align.padding_top + pad->align.padding_bottom;
+  src->info.stride = ppad->info.stride[0];
+  }
 
-  dmabuf_meta = gst_buffer_get_dmabuf_meta (aggregated_frame->buffer);
+  dmabuf_meta = gst_buffer_get_dmabuf_meta (pad_buffer);
   if (dmabuf_meta)
     drm_modifier = dmabuf_meta->drm_modifier;
 
@@ -1183,7 +1192,7 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
     src->info.tile_type = IMX_2D_TILE_NULL;
 
   GST_LOG_OBJECT (pad, "Input: %s, %dx%d(%d), crop(%d,%d,%d,%d)",
-      GST_VIDEO_FORMAT_INFO_NAME(aggregated_frame->info.finfo),
+      GST_VIDEO_FORMAT_INFO_NAME(ppad->info.finfo),
       src->info.w, src->info.h, src->info.stride,
       pad->src_crop.x, pad->src_crop.y, pad->src_crop.w, pad->src_crop.h);
 
@@ -1193,12 +1202,12 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
   }
 
   src->fd[0] = src->fd[1] =src->fd[2] = src->fd[3] = -1;
-  if (gst_is_dmabuf_memory (gst_buffer_peek_memory (aggregated_frame->buffer, 0))) {
-    n_mem = gst_buffer_n_memory (aggregated_frame->buffer);
+  if (gst_is_dmabuf_memory (gst_buffer_peek_memory (pad_buffer, 0))) {
+    n_mem = gst_buffer_n_memory (pad_buffer);
     for (i = 0; i < n_mem; i++)
-      src->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (aggregated_frame->buffer, i));
+      src->fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (pad_buffer, i));
   } else 
-    src->mem = gst_buffer_query_phymem_block (aggregated_frame->buffer);
+    src->mem = gst_buffer_query_phymem_block (pad_buffer);
   src->alpha = (gint)(pad->alpha * 255);
   src->rotate = pad->rotate;
   src->interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
@@ -1501,16 +1510,24 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
   for (l = pads; l; l = l->next) {
     GstVideoAggregatorPad *ppad = l->data;
     GstImxCompositorPad *pad = GST_IMXCOMPOSITOR_PAD (ppad);
+    GstBuffer *pad_buffer = NULL;
 
 #if GST_CHECK_VERSION(1, 16, 0)
     GstVideoFrame * aggregated_frame = gst_video_aggregator_pad_get_prepared_frame (ppad);
+    if (!aggregated_frame) {
+      pad_buffer = gst_video_aggregator_pad_get_current_buffer (ppad);
+    } else {
+      pad_buffer = aggregated_frame->buffer;
+    }
 #else
     GstVideoFrame * aggregated_frame = ppad->aggregated_frame;
+    pad_buffer = aggregated_frame->buffer;
 #endif
 
-    if (aggregated_frame != NULL) {
+    if (pad_buffer != NULL) {
       src.mem = &src_mem;
       memset (src.mem, 0, sizeof(PhyMemBlock));
+        GST_WARNING_OBJECT (pad, "set rotate failed %p\n", pad_buffer);
       if (gst_imxcompositor_config_src(imxcomp, pad, &src) < 0) {
         continue;
       }
@@ -1531,9 +1548,9 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
       dst.crop.h = pad->dst_crop.h;
 
       if (!src.mem->paddr)
-        src.mem->paddr = _get_cached_phyaddr (gst_buffer_peek_memory (aggregated_frame->buffer, 0));
+        src.mem->paddr = _get_cached_phyaddr (gst_buffer_peek_memory (pad_buffer, 0));
       if (!src.mem->user_data && src.fd[1] >= 0)
-        src.mem->user_data = _get_cached_phyaddr (gst_buffer_peek_memory (aggregated_frame->buffer, 1));
+        src.mem->user_data = _get_cached_phyaddr (gst_buffer_peek_memory (pad_buffer, 1));
       if (!dst.mem->paddr)
         dst.mem->paddr = _get_cached_phyaddr (gst_buffer_peek_memory (outbuf, 0));
 
@@ -1542,21 +1559,21 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
         continue;
       }
 
-      if (!_get_cached_phyaddr (gst_buffer_peek_memory (aggregated_frame->buffer, 0)))
-        _set_cached_phyaddr (gst_buffer_peek_memory (aggregated_frame->buffer, 0), src.mem->paddr);
-      if (src.fd[1] >= 0 && !_get_cached_phyaddr (gst_buffer_peek_memory (aggregated_frame->buffer, 1)))
-        _set_cached_phyaddr (gst_buffer_peek_memory (aggregated_frame->buffer, 1), src.mem->user_data);
+      if (!_get_cached_phyaddr (gst_buffer_peek_memory (pad_buffer, 0)))
+        _set_cached_phyaddr (gst_buffer_peek_memory (pad_buffer, 0), src.mem->paddr);
+      if (src.fd[1] >= 0 && !_get_cached_phyaddr (gst_buffer_peek_memory (pad_buffer, 1)))
+        _set_cached_phyaddr (gst_buffer_peek_memory (pad_buffer, 1), src.mem->user_data);
       if (!_get_cached_phyaddr (gst_buffer_peek_memory (outbuf, 0)))
         _set_cached_phyaddr (gst_buffer_peek_memory (outbuf, 0), dst.mem->paddr);
 
       aggregated++;
 
       if (imxcomp->composition_meta_enable &&
-        imx_video_overlay_composition_has_meta(aggregated_frame->buffer)) {
+        imx_video_overlay_composition_has_meta(pad_buffer)) {
         VideoCompositionVideoInfo in_v, out_v;
         memset (&in_v, 0, sizeof(VideoCompositionVideoInfo));
         memset (&out_v, 0, sizeof(VideoCompositionVideoInfo));
-        in_v.buf = aggregated_frame->buffer;
+        in_v.buf = pad_buffer;
         in_v.fmt = src.info.fmt;
         in_v.width = src.info.w;
         in_v.height = src.info.h;
