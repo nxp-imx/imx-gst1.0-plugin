@@ -652,8 +652,13 @@ display_thread_fun (gpointer data)
       playback_rate = gst_player_get_rate (player);
       gstplayer_state = play->gstPlayerState;
 
-      if (duration == GST_CLOCK_TIME_NONE || elapsed == GST_CLOCK_TIME_NONE)
+      /* when play rtsp streaming, gplay cannot get duration, need add sleep
+         here to reduce while loop cpu loading. Avoid performance issue on
+         single core soc, eg. 6sll*/
+      if (duration == GST_CLOCK_TIME_NONE || elapsed == GST_CLOCK_TIME_NONE) {
+        usleep (100000);
         continue;
+      }
 
       hour = (elapsed / (gint64) 3600000000000);
       minute = (elapsed / (guint64) 60000000000) - (hour * 60);
