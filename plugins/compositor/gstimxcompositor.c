@@ -1524,7 +1524,7 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
     pad_buffer = aggregated_frame->buffer;
 #endif
 
-    if (pad_buffer != NULL) {
+    if (pad_buffer != NULL && !pad->ignore_composite) {
       src.mem = &src_mem;
       memset (src.mem, 0, sizeof(PhyMemBlock));
         GST_WARNING_OBJECT (pad, "set rotate failed %p\n", pad_buffer);

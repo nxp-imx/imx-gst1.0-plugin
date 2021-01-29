@@ -70,6 +70,7 @@ struct _GstImxCompositorPad
   gint rotate;
   gdouble alpha;
   gboolean keep_ratio;
+  gboolean ignore_composite;
 };
 
 struct _GstImxCompositorPadClass
