@@ -417,6 +417,8 @@ gst_imxcompositor_pad_prepare_frame (GstVideoAggregatorPad * pad, GstVideoAggreg
   gint o_width, o_height;
   GstVideoCropMeta *in_crop = NULL;
 
+  cpad->ignore_composite = TRUE;
+
   gst_imxcompositor_pad_get_output_size (vagg, cpad, &width, &height);
 
   if (cpad->alpha == 0.0) {
@@ -639,6 +641,8 @@ gst_imxcompositor_pad_prepare_frame (GstVideoAggregatorPad * pad, GstVideoAggreg
   if (GST_CLOCK_TIME_IS_VALID (stream_time))
     gst_object_sync_values (GST_OBJECT (pad), stream_time);
 
+  cpad->ignore_composite = FALSE;
+
   return TRUE;
 }
 #else
@@ -657,6 +661,8 @@ gst_imxcompositor_pad_prepare_frame (GstVideoAggregatorPad * pad,
 
   if (!pad->buffer)
     return TRUE;
+
+  cpad->ignore_composite = FALSE;
 
   gst_imxcompositor_pad_get_output_size (vagg, cpad, &width, &height);
 
