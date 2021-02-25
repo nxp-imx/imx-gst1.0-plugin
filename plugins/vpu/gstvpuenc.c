@@ -55,6 +55,7 @@
 #define DEFAULT_H264_QUANT 35
 #define DEFAULT_MPEG4_QUANT 15
 #define DEFAULT_STREAM_SLICE_COUNT 1
+#define DEFAULT_FORCE_IDR 0
 
 #define GST_VPU_ENC_PARAMS_QDATA   g_quark_from_static_string("vpuenc-params")
 
@@ -112,6 +113,7 @@ enum
   PROP_GOP_SIZE,
   PROP_QUANT,
   PROP_STREAM_SLICE_COUNT,
+  PROP_FORCE_IDR,
 };
 
 static GstStaticPadTemplate static_sink_template = GST_STATIC_PAD_TEMPLATE(
@@ -322,6 +324,10 @@ gst_vpu_enc_class_init (GstVpuEncClass * klass)
       g_param_spec_int ("stream-multislice", "stream multislice",
         "the number of slices a picture contains",
         1, G_MAXINT, DEFAULT_STREAM_SLICE_COUNT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+    g_object_class_install_property (gobject_class, PROP_FORCE_IDR,
+      g_param_spec_int ("force-idr", "force idr",
+        "force incoming frame to be encoded as IDR frame",
+        0, G_MAXINT,  DEFAULT_FORCE_IDR, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   }
 
  if (in_plugin->std == VPU_V_AVC) {
@@ -400,6 +406,7 @@ gst_vpu_enc_init (GstVpuEnc * enc)
   enc->handle = NULL;
   enc->state = NULL;
   enc->bitrate_updated = FALSE;
+  enc->force_idr = DEFAULT_FORCE_IDR;
 }
 
 static void
@@ -420,6 +427,9 @@ gst_vpu_enc_get_property (GObject * object, guint prop_id, GValue * value,
       break;
     case PROP_STREAM_SLICE_COUNT:
       g_value_set_int (value, enc->stream_slice_count);
+      break;
+    case PROP_FORCE_IDR:
+      g_value_set_int (value, enc->force_idr);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -446,6 +456,9 @@ gst_vpu_enc_set_property (GObject * object, guint prop_id,
       break;
     case PROP_STREAM_SLICE_COUNT:
       enc->stream_slice_count = g_value_get_int (value);
+      break;
+    case PROP_FORCE_IDR:
+      enc->force_idr = g_value_get_int (value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1194,6 +1207,11 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 
   GST_DEBUG_OBJECT(enc, "VPU enc width: %d, height: %d, fps: %d", \
     enc_enc_param.nPicWidth, enc_enc_param.nPicHeight, enc_enc_param.nFrameRate);
+
+  if (enc->total_frames == enc->force_idr) {
+      GST_INFO_OBJECT(enc, "forcing IDR at %d", enc->force_idr);
+      enc->gop_count = 0;
+  }
 
   if (GST_VIDEO_CODEC_FRAME_IS_FORCE_KEYFRAME(frame) \
       || GST_VIDEO_CODEC_FRAME_IS_FORCE_KEYFRAME_HEADERS(frame) \
