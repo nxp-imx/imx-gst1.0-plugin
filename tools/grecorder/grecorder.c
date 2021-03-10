@@ -858,6 +858,7 @@ int main(int argc, char* argv[])
 
   while(bexit == RE_BOOLEAN_FALSE) {
     {
+      memset (rep, 0, strlen(rep));
       if (read_input){
         recorder_main_menu();
         scanf("%128s", rep);
