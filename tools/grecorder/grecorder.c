@@ -601,7 +601,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {"audio sample rate"},
       {"audio channel"},
       {"video input: 0->default(autoplug), 1->v4l2src, 2->imxv4l2src, 3->videotestsrc"},
-      {"camera id: 0->/dev/video0, 1->/dev/video1, 2->/dev/video2"},
+      {"camera id: 0->/dev/video0, 1->/dev/video1, 2->/dev/video2 ... $N->/dev/video$N"},
       {"camera output video format: 0->default(I420), 1->I420, 2->NV12, 3->YUYV, 4->UYVY, 5->BGRA, 6->BGRx, 7->RGB16"},
       {"camera output video width"},
       {"camera output video height"},

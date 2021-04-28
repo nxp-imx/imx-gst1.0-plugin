@@ -1556,16 +1556,15 @@ static REresult set_camera_id(RecorderEngineHandle handle, REuint32 cameraId)
 {
   RecorderEngine *h = (RecorderEngine *)(handle);
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
-  CHECK_PARAM (cameraId, 4);
 
-  static KeyMap kKeyMap[] = {
-    { 0, (REchar *)"/dev/video0" },
-    { 1, (REchar *)"/dev/video1" },
-    { 2, (REchar *)"/dev/video2" },
-    { 3, (REchar *)"/dev/video3" },
-  };
+  if (recorder->videodevice_name) {
+    g_free (recorder->videodevice_name);
+    recorder->videodevice_name = NULL;
+  }
 
-  recorder->videodevice_name = key_value_pair (cameraId, kKeyMap, sizeof(kKeyMap));
+  recorder->videodevice_name = g_strdup_printf ("/dev/video%d", cameraId);
+
+  GST_INFO ("chose video device %s", recorder->videodevice_name);
 
   return RE_RESULT_SUCCESS;
 }
@@ -2325,6 +2324,11 @@ static REresult delete_it(RecorderEngineHandle handle)
   if (recorder->host) {
     g_free (recorder->host);
     recorder->host = NULL;
+  }
+
+  if (recorder->videodevice_name) {
+    g_free (recorder->videodevice_name);
+    recorder->videodevice_name = NULL;
   }
 
   g_mutex_clear (&recorder->lock);
