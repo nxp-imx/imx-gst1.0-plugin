@@ -995,6 +995,9 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   GstBuffer *output_buffer = NULL;
   GstClockTime output_pts = 0;
   gint frame_number;
+  GstClockTime latency;
+  GstQuery *query;
+  gboolean is_live = FALSE;
 #if 0
   GList *l;
 
@@ -1013,6 +1016,21 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
       frame_number, g_list_length (vpu_dec_object->system_frame_number_in_vpu));
   vpu_dec_object->system_frame_number_in_vpu = g_list_remove ( \
       vpu_dec_object->system_frame_number_in_vpu, frame_number);
+
+  /* Set latency for live-mode */
+  query = gst_query_new_latency ();
+  if (gst_pad_peer_query (GST_VIDEO_DECODER_SINK_PAD (bdec), query)) {
+    gst_query_parse_latency (query, &is_live, NULL, NULL);
+  }
+  gst_query_unref (query);
+
+  if (is_live && frame_number == 0 && vpu_dec_object->framerate_d > 0
+      && vpu_dec_object->framerate_n > 0) {
+    latency = gst_util_uint64_scale_int (GST_SECOND,vpu_dec_object->framerate_d,
+        vpu_dec_object->framerate_n) * g_list_length (vpu_dec_object->system_frame_number_in_vpu);
+    gst_video_decoder_set_latency (bdec, latency, latency);
+    GST_DEBUG_OBJECT(vpu_dec_object, "Setting latency: %" GST_TIME_FORMAT, GST_TIME_ARGS (latency));
+  }
 
   out_frame = gst_video_decoder_get_frame (bdec, frame_number);
   GST_LOG_OBJECT (vpu_dec_object, "gst_video_decoder_get_frame: 0x%x\n", \
