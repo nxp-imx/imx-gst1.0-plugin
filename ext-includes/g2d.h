@@ -68,6 +68,11 @@ enum g2d_format
      G2D_RGB888               = 10,   /* [0:7] Red;   [8:15] Green; [16:23] Blue                     */
      G2D_BGR888               = 11,   /* [0:7] Blue;  [8:15] Green; [16:23] Red                      */
 
+     G2D_RGBA5551             = 12,    /* [0:4] Red;   [5:9] Green; [10:14] Blue; [15] Alpha      */
+     G2D_RGBX5551             = 13,    /* [0:4] Red;   [5:9] Green; [10:14] Blue; [15] don't care */
+     G2D_BGRA5551             = 14,    /* [0:4] Blue;  [5:9] Green; [10:14] Red;  [15] Alpha       */
+     G2D_BGRX5551             = 15,    /* [0:4] Blue;  [5:9] Green; [10:14] Red;  [15] don't care  */
+
 //yuv formats
      G2D_NV12                 = 20,   /* 2 plane 420 format; plane 1: [0:7] Y ; plane 2: [0:7] U; [8:15] V */
      G2D_I420                 = 21,   /* 3 plane 420 format; plane 1: [0:7] Y ; plane 2: [0:7] U; plane 3: [0:7] V */
