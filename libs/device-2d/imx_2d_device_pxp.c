@@ -404,12 +404,18 @@ static gint imx_pxp_blend_without_alpha(Imx2DDevice *device,
                                         Imx2DFrame *dst, Imx2DFrame *src)
 {
   gint ret = 0;
+  guint BPP = 4;
+  const PxpFmtMap *fmt_map = NULL;
 
   if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
     return -1;
 
   Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
   memset(&pxp->config.ol_param[0], 0, sizeof(struct pxp_layer_param));
+
+  fmt_map = imx_pxp_get_format(dst->info.fmt, pxp_out_fmts_map);
+  if (fmt_map)
+    BPP = fmt_map->bpp/8 + (fmt_map->bpp%8 ? 1 : 0);
 
   if (pxp->first_frame_done == FALSE) {
     pxp->config.proc_data.drect.left = dst->crop.x;
@@ -426,8 +432,7 @@ static gint imx_pxp_blend_without_alpha(Imx2DDevice *device,
     pxp->config.proc_data.drect.width = dst->crop.w;
     pxp->config.proc_data.drect.height = dst->crop.h;
     pxp->config.out_param.paddr = (dma_addr_t)dst->mem->paddr +
-        (dst->crop.y * dst->info.stride +
-            dst->crop.x*(dst->info.stride/dst->info.w));
+        (dst->crop.y * dst->info.w + dst->crop.x) * BPP;
 
     pxp->config.out_param.width = pxp->config.proc_data.drect.width;
     pxp->config.out_param.height = pxp->config.proc_data.drect.height;
@@ -764,7 +769,7 @@ static gint imx_pxp_overlay(Imx2DDevice *device,
   pxp->config.proc_data.drect.width = dst->crop.w;
   pxp->config.proc_data.drect.height = dst->crop.h;
   pxp->config.out_param.paddr = (dma_addr_t)dst->mem->paddr +
-                        (dst->crop.y * dst->info.stride + dst->crop.x * BPP);
+                        (dst->crop.y * dst->info.w + dst->crop.x) * BPP;
   pxp->config.out_param.width = pxp->config.proc_data.drect.width;
   pxp->config.out_param.height = pxp->config.proc_data.drect.height;
 

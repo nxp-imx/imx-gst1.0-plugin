@@ -166,7 +166,7 @@
     }                                         \
   }
 
-GST_DEBUG_CATEGORY_STATIC (gst_imxcompositor_debug);
+GST_DEBUG_CATEGORY (gst_imxcompositor_debug);
 #define GST_CAT_DEFAULT gst_imxcompositor_debug
 
 /* properties utility*/
@@ -1001,11 +1001,6 @@ gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps)
 
     if (width == 0 || height == 0)
       continue;
-
-    if (pad->width)
-      width = pad->width;
-    if (pad->height)
-      height = pad->height;
 
     this_width = width + MAX (pad->xpos, 0);
     this_height = height + MAX (pad->ypos, 0);

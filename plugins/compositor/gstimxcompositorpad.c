@@ -47,6 +47,7 @@
 #define SINK_TEMP_BUFFER_INIT_SIZE              (1920*1088*2)
 
 GST_DEBUG_CATEGORY_EXTERN (gst_imxcompositor_debug);
+#define GST_CAT_DEFAULT gst_imxcompositor_debug
 
 GType gst_imx_compositor_rotation_get_type(void) {
   static GType gst_imx_compositor_rotation_type = 0;
