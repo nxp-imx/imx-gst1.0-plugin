@@ -87,6 +87,7 @@ endif
 
 if build_MX8 == 'yes' or build_MX7ULP == 'yes'
   build_g2d = true
+  build_pxp = true
 endif
 
 gst_base_dep = dependency('gstreamer-base-' + api_version, version : gst_req)

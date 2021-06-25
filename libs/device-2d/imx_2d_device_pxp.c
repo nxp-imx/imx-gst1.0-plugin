@@ -351,12 +351,49 @@ static gint imx_pxp_do_channel(Imx2DDevicePxp *pxp)
   return ret;
 }
 
+static gint imx_pxp_check_frame_paddr (Imx2DFrame *dst, Imx2DFrame *src)
+{
+  unsigned long paddr = 0;
+
+  if (!src->mem->paddr) {
+    /* FIXME: handle multi plane has different fd case */
+    if (src->fd[0] >= 0) {
+      paddr = phy_addr_from_fd (src->fd[0]);
+    } else {
+      GST_ERROR ("Invalid parameters.");
+      return -1;
+    }
+    if (paddr) {
+      src->mem->paddr = paddr;
+    } else {
+      GST_ERROR ("Can't get physical address.");
+      return -1;
+    }
+  }
+  if (!dst->mem->paddr) {
+    paddr = phy_addr_from_fd (dst->fd[0]);
+    if (paddr) {
+      dst->mem->paddr = paddr;
+    } else {
+      GST_ERROR ("Can't get physical address.");
+      return -1;
+    }
+  }
+  GST_DEBUG ("src paddr: %p dst paddr: %p", src->mem->paddr, dst->mem->paddr);
+
+  return 0;
+}
+
 static gint imx_pxp_convert(Imx2DDevice *device,
                             Imx2DFrame *dst, Imx2DFrame *src)
 {
   gint ret = 0;
 
   if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
+    return -1;
+
+  ret = imx_pxp_check_frame_paddr (dst, src);
+  if (ret < 0)
     return -1;
 
   Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
@@ -789,7 +826,13 @@ static gboolean is_format_has_alpha(guint pxp_format) {
 
 static gint imx_pxp_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
 {
+  gint ret = 0;
+
   if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
+    return -1;
+
+  ret = imx_pxp_check_frame_paddr (dst, src);
+  if (ret < 0)
     return -1;
 
   Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
