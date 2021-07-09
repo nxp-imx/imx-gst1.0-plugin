@@ -378,7 +378,7 @@ if test "x$PLATFORM" = "xMX6SL" || test "x$PLATFORM" = "xMX6SX"; then
 	 HAVE_DEVICE_PXP=yes
 fi
 
-if test "x$PLATFORM" = "xMX6UL" || test "x$PLATFORM" = "xMX7D" || test "x$PLATFORM" = "xMX6SLL" ; then
+if test "x$PLATFORM" = "xMX6UL" || test "x$PLATFORM" = "xMX7D" || test "x$PLATFORM" = "xMX6SLL" || test "x$PLATFORM" = "xMX8"; then
 	 HAVE_DEVICE_PXP=yes
 fi
 
