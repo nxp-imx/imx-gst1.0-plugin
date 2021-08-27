@@ -1762,7 +1762,7 @@ static REresult add_video_effect(RecorderEngineHandle handle, REuint32 videoEffe
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
   CHECK_PARAM (videoEffect, RE_VIDEO_EFFECT_LIST_END);
 
-  if (IS_IMX8MM() || IS_IMX8MP()) {
+  if (!IS_IMX6Q()) {
       g_print("***Video effect is not supported!\n");
       return RE_RESULT_FEATURE_UNSUPPORTED;
   }
