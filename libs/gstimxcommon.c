@@ -32,13 +32,13 @@ const char *dev_ion = "/dev/ion";
 
 unsigned long phy_addr_from_fd(int dmafd)
 {
-#ifdef USE_ION
   int ret, fd;
 
   if (dmafd < 0)
     return NULL;
   
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#ifdef USE_ION
   fd = open(dev_ion, O_RDWR);
   if(fd < 0) {
     return NULL;
@@ -62,6 +62,9 @@ unsigned long phy_addr_from_fd(int dmafd)
 
   return data.phys;
 #else
+  return NULL;
+#endif /* USE_ION */
+#else
   struct dma_buf_phys dma_phys;
 
   ret = ioctl(dmafd, DMA_BUF_IOCTL_PHYS, &dma_phys);
@@ -69,9 +72,6 @@ unsigned long phy_addr_from_fd(int dmafd)
     return NULL;
 
   return dma_phys.phys;
-#endif
-#else
-  return NULL;
 #endif
 }
 
