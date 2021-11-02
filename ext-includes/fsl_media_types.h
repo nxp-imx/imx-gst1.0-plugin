@@ -4,7 +4,7 @@
 * All modifications are confidential and proprietary information
 * of Freescale Semiconductor, Inc. 
 *
-* Copyright 2017-2020 NXP
+* Copyright 2017-2021 NXP
 ***********************************************************************/
 /*
 * This library is free software; you can redistribute it and/or
@@ -112,6 +112,8 @@ typedef enum
     AUDIO_DSD,
     AUDIO_AC4,
     AUDIO_ALAC, /* Apple lossless audio codec */
+    AUDIO_MPEGH_MHA1,
+    AUDIO_MPEGH_MHM1,
 }AudioCodecType;
 
 

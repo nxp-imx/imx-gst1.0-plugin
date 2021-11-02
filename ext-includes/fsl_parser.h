@@ -2,7 +2,7 @@
 
 /*
 * Copyright (c) 2009-2016, Freescale Semiconductor, Inc. 
-* Copyright 2017-2020 NXP
+* Copyright 2017-2021 NXP
  */
 
 /*
@@ -802,6 +802,12 @@ typedef int32 (*FslParserGetAudioBitsPerFrame)( FslParserHandle parserHandle,
 typedef int32 (*FslParserGetAudioChannelMask)(  FslParserHandle parserHandle,
                                                 uint32 trackNum,
                                                 uint32 * channelMask); /* for WMA audio */
+typedef int32 (*FslParserGetAudioMpeghInfo)( FslParserHandle parserHandle,
+                                                uint32 trackNum,
+                                                uint32 * profileLevelIndication,
+                                                uint32 * referenceChannelLayout,
+                                                uint32 * compatibleSetsSize,
+                                                uint8 ** compatibleSets);
 
 
 /************************************************************************************************************
@@ -979,6 +985,7 @@ enum /* API function ID */
 
     PARSER_API_GET_AUDIO_PRESENTATION_NUM   = 68,
     PARSER_API_GET_AUDIO_PRESENTATION_INFO  = 69,
+    PARSER_API_GET_AUDIO_MPEGH_INFO         = 70,
 
     /* text/subtitle properties */
     PARSER_API_GET_TEXT_TRACK_WIDTH = 80,
