@@ -25,7 +25,6 @@ if cc.has_header('mp3_enc_interface.h', dependencies: fslaudiocodec_dep)
   subdir('mp3enc')
 endif
 
-
 have_g2d = false
 have_vpuwrapper = false
 have_v4l2 = false
@@ -90,6 +89,7 @@ elif build_MX7ULP == 'yes'
     subdir('overlay_sink')
   endif
 elif build_MX8 == 'yes'
+  subdir('spdifdemux')
   if have_vpuwrapper
     subdir('vpu')
   endif
