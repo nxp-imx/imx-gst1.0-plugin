@@ -2590,6 +2590,14 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
             stream->info.audio.n_channels, stream->info.audio.rate,
             stream->bitrate);
         break;
+      case AUDIO_ALAC:
+          codec_mime = "audio/x-alac";
+          codec = "ALAC";
+          mime =
+              g_strdup_printf
+              ("%s, channels=(int)%ld, rate=(int)%ld, samplesize=(int)%ld", codec_mime,
+              stream->info.audio.n_channels, stream->info.audio.rate, stream->info.audio.sample_width);
+        break;
       default:
         break;
     }
