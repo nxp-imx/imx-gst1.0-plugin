@@ -1363,12 +1363,11 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
       imxvct->in_video_align.padding_bottom = phymemmeta->y_padding;
       GST_DEBUG_OBJECT (imxvct, "physical memory meta x_padding: %d y_padding: %d",
           phymemmeta->x_padding, phymemmeta->y_padding);
-    } else if (imxvct->in_pool) {
+    } else if (imxvct->in_pool && gst_buffer_pool_is_active (imxvct->in_pool)) {
       GstStructure *config = gst_buffer_pool_get_config (imxvct->in_pool);
       memset (&imxvct->in_video_align, 0, sizeof(GstVideoAlignment));
 
-      if (gst_buffer_pool_is_active (imxvct->in_pool)
-          && gst_buffer_pool_config_has_option (config,
+      if (gst_buffer_pool_config_has_option (config,
                 GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
         gst_buffer_pool_config_get_video_alignment (config,
             &imxvct->in_video_align);
@@ -1380,6 +1379,13 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
       }
 
       gst_structure_free (config);
+    } else if (video_meta){
+      GST_DEBUG_OBJECT (imxvct, "videometa has alignment (%d, %d) , (%d, %d)",
+          video_meta->alignment.padding_left,
+          video_meta->alignment.padding_top,
+          video_meta->alignment.padding_right,
+          video_meta->alignment.padding_bottom);
+      imxvct->in_video_align = video_meta->alignment;
     }
 
     if (imxvct->out_pool) {
