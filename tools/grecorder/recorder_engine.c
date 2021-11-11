@@ -1740,7 +1740,8 @@ static REresult add_time_stamp(RecorderEngineHandle handle, REboolean bAddTimeSt
   gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
 
   if (bAddTimeStamp) {
-      if (IS_IMX8MM() || IS_IMX8MP()) {
+      /* INFO: cannot use HAS_G2D, encoder on 8qm/qxp only support NV12 */
+      if (IS_IMX8MM() || IS_IMX8MP() || IS_IMX8ULP()) {
           recorder->date_time = DATE_TIME TIME_OVERLAY HW_COMPOSITOR "queue";
       }
       else if (IS_IMX8Q()) {
