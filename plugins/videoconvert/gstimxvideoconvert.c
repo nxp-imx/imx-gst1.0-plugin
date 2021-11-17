@@ -1498,8 +1498,8 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
 
     src.crop.x += in_crop->x;
     src.crop.y += in_crop->y;
-    src.crop.w = MIN(in_crop->width, (filter->in_info.width - in_crop->x));
-    src.crop.h = MIN(in_crop->height, (filter->in_info.height - in_crop->y));
+    src.crop.w = MIN(in_crop->width, filter->in_info.width);
+    src.crop.h = MIN(in_crop->height, filter->in_info.height);
   }
 
   //rotate and de-interlace setting
@@ -1569,8 +1569,8 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
 
     dst.crop.x += out_crop->x;
     dst.crop.y += out_crop->y;
-    dst.crop.w = MIN(out_crop->width, (filter->out_info.width - out_crop->x));
-    dst.crop.h = MIN(out_crop->height, (filter->out_info.height - out_crop->y));
+    dst.crop.w = MIN(out_crop->width, filter->out_info.width);
+    dst.crop.h = MIN(out_crop->height, filter->out_info.height);
   }
 
   if (!src.mem->paddr)
@@ -1717,8 +1717,8 @@ imx_video_convert_transform_ip(GstBaseTransform * trans, GstBuffer * buf)
         if ((in_crop->x < filter->in_info.width) && (in_crop->y < filter->in_info.height)) {
           crop_x += in_crop->x;
           crop_y += in_crop->y;
-          crop_w = MIN(in_crop->width, (filter->in_info.width - in_crop->x));
-          crop_h = MIN(in_crop->height, (filter->in_info.height - in_crop->y));
+          crop_w = MIN(in_crop->width, filter->in_info.width);
+          crop_h = MIN(in_crop->height, filter->in_info.height);
         }
       }
 
