@@ -1250,6 +1250,8 @@ static gboolean imx_video_convert_set_info(GstVideoFilter *filter,
   if (imxvct->videocrop_meta_enable)
     gst_base_transform_set_passthrough((GstBaseTransform*)filter, FALSE);
 
+  imxvct->pool_config_update = TRUE;
+
   GST_DEBUG ("set info from %" GST_PTR_FORMAT " to %" GST_PTR_FORMAT, in, out);
 
   return TRUE;
