@@ -808,6 +808,10 @@ typedef int32 (*FslParserGetAudioMpeghInfo)( FslParserHandle parserHandle,
                                                 uint32 * referenceChannelLayout,
                                                 uint32 * compatibleSetsSize,
                                                 uint8 ** compatibleSets);
+typedef int32 (*FslParserGetSampleInfo)( FslParserHandle parserHandle,
+                                                uint32 trackNum,
+                                                uint64 * sampleFileOffset,
+                                                uint64 * lastSampleIndexInChunk);
 
 
 /************************************************************************************************************
@@ -1006,6 +1010,7 @@ enum /* API function ID */
     PARSER_API_GET_FILE_NEXT_SYNC_SAMPLE = 116,
 
     PARSER_API_GET_SAMPLE_CRYPTO_INFO = 117,
+    PARSER_API_GET_SAMPLE_INFO = 118,
 
     PARSER_API_SEEK  = 120,
 
