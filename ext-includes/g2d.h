@@ -38,6 +38,7 @@
  *	2019-12-30         Yong Gan          1.4            Add G2D_TILED_STATUS support
  *	2020-01-08         Li Xianzhong      1.5            support BT_601 and BT_709
  *	2020-08-25         Petr Cach         1.6            support BGR888, support BT_601FR, BT_709FR
+ *	2021-12-02         Li Xianzhong      2.0            Add g2d fence sync extension
 */
 
 #ifndef __G2D_H__
@@ -47,8 +48,8 @@
 extern "C"  {
 #endif
 
-#define G2D_VERSION_MAJOR   1
-#define G2D_VERSION_MINOR   6
+#define G2D_VERSION_MAJOR   2
+#define G2D_VERSION_MINOR   0
 #define G2D_VERSION_PATCH   0
 
 enum g2d_format
