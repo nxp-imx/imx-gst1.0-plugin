@@ -1178,16 +1178,21 @@ input_thread_fun (gpointer data)
 
       case 'x':                // eXit
       {
-        //gst_player_stop (player);
-        gst_player_stop_sync (player, options->timeout);
-        clear_pending_trackselect (play);
         g_print ("Ready to exit this app!\n");
-        gexit_input_thread = TRUE;
-        gexit_display_thread = TRUE;
+        /* just ignore this case if eos has been found before entering 'x' */
         if (play->eos_found == FALSE) {
-          if (play->loop) {
-            if (g_main_loop_is_running (play->loop) == TRUE) {
-              g_main_loop_quit (play->loop);
+          //gst_player_stop (player);
+          gst_player_stop_sync (player, options->timeout);
+          clear_pending_trackselect (play);
+          gexit_input_thread = TRUE;
+          gexit_display_thread = TRUE;
+          /* add protection before quit main loop to avoid critical info
+          'g_atomic_int_get (&loop->ref_count) > 0' if clip has reached eos*/
+          if (play->eos_found == FALSE) {
+            if (play->loop) {
+              if (g_main_loop_is_running (play->loop) == TRUE) {
+                g_main_loop_quit (play->loop);
+              }
             }
           }
         }
