@@ -1747,8 +1747,10 @@ static REresult add_time_stamp(RecorderEngineHandle handle, REboolean bAddTimeSt
       else if (IS_IMX8Q()) {
           recorder->date_time = DATE_TIME TIME_OVERLAY "queue";
       }
-      else {
+      else if (IS_IMX6Q()){
           recorder->date_time = DATE_TIME TIME_OVERLAY "queue ! imxvideoconvert_ipu composition-meta-enable=true in-place=true ! queue";
+      } else {
+          recorder->date_time = NULL;
       }
   } else {
     recorder->date_time = NULL;
