@@ -292,6 +292,11 @@ static GstCaps* imx_video_convert_transform_caps(GstBaseTransform *transform,
 
     gst_structure_remove_fields(st, "format", NULL);
 
+    /* workaround to avoid v4l2h264dec ! imxvideoconvert_g2d ! v4l2h264enc
+     * negotiation fail */
+    if (gst_structure_has_field (st, "colorimetry"))
+      gst_structure_remove_field (st, "colorimetry");
+
     /* if pixel aspect ratio, make a range of it*/
     if (gst_structure_has_field(st, "pixel-aspect-ratio")) {
       gst_structure_set(st, "pixel-aspect-ratio",
