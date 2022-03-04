@@ -612,7 +612,7 @@ gst_imx_fbdevsink_start (GstBaseSink * bsink)
   }
 
   if (ioctl (fd, FBIOGET_VSCREENINFO, &scrinfo) < 0) {
-    GST_ERROR_OBJECT ("Get var of %s failed", BG_DEVICE);
+    GST_ERROR_OBJECT (fbdevsink, "Get var of %s failed", BG_DEVICE);
     close (fd);
     return FALSE;
   }

@@ -68,7 +68,7 @@ gst_vpu_allocate_internal_mem (VpuInternalMem * vpu_internal_mem)
 	for (i = 0; i < vpu_internal_mem->mem_info.nSubBlockNum; ++i) {
 		size = vpu_internal_mem->mem_info.MemSubBlock[i].nAlignment \
            + vpu_internal_mem->mem_info.MemSubBlock[i].nSize;
-		GST_DEBUG_OBJECT(vpu_internal_mem, "sub block %d  type: %s  size: %d", i, \
+		GST_DEBUG ("sub block %d  type: %s  size: %d", i, \
         (vpu_internal_mem->mem_info.MemSubBlock[i].MemType == VPU_MEM_VIRT) ? \
         "virtual" : "phys", size);
  
