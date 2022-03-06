@@ -892,6 +892,7 @@ gst_imx_v4l2output_set_default_res (IMXV4l2Handle *handle)
   rect.top = 0;
   rect.width = handle->disp_w;
   rect.height = handle->disp_h;
+  memcpy (&handle->in_crop, &rect, sizeof(IMXV4l2Rect));
   gst_imx_v4l2out_config_output (handle, &rect, TRUE);
 
   return;
