@@ -141,13 +141,11 @@ static gint imx_g2d_open(Imx2DDevice *device)
   memset(g2d, 0, sizeof (Imx2DDeviceG2d));
   device->priv = (gpointer)g2d;
 
-  if (HAS_DPU()) {
-    if(g2d_open(&g2d->g2d_handle) == -1 || g2d->g2d_handle == NULL) {
-      GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
-      g_slice_free1(sizeof(Imx2DDeviceG2d), g2d);
-      device->priv = NULL;
-      return -1;
-    }
+  if(g2d_open(&g2d->g2d_handle) == -1 || g2d->g2d_handle == NULL) {
+    GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
+    g_slice_free1(sizeof(Imx2DDeviceG2d), g2d);
+    device->priv = NULL;
+    return -1;
   }
 
   return 0;
@@ -161,9 +159,7 @@ static gint imx_g2d_close(Imx2DDevice *device)
   if (device) {
     Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
     if (g2d) {
-      if (HAS_DPU()) {
-        g2d_close (g2d->g2d_handle);
-      }
+      g2d_close (g2d->g2d_handle);
       g_slice_free1(sizeof(Imx2DDeviceG2d), g2d);
     }
     device->priv = NULL;
@@ -234,15 +230,7 @@ static gint imx_g2d_copy_mem(Imx2DDevice* device, PhyMemBlock *dst_mem,
   dst_mem->user_data = (gpointer) pbuf;
 
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
-  if (HAS_DPU()) {
-    g2d_handle = g2d->g2d_handle;
-  } else {
-    if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
-      g2d_free (pbuf);
-      GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
-      return -1;
-    }
-  }
+  g2d_handle = g2d->g2d_handle;
 
   src.buf_handle = NULL;
   src.buf_vaddr = src_mem->vaddr + offset;
@@ -258,9 +246,6 @@ static gint imx_g2d_copy_mem(Imx2DDevice* device, PhyMemBlock *dst_mem,
 
   g2d_copy (g2d_handle, &dst, &src, size);
   g2d_finish(g2d_handle);
-  if (!HAS_DPU()) {
-    g2d_close (g2d_handle);
-  }
 
   GST_DEBUG ("G2D copy from vaddr (%p), paddr (%p), size (%d) to "
       "vaddr (%p), paddr (%p), size (%d)",
@@ -281,14 +266,7 @@ static gint imx_g2d_frame_copy(Imx2DDevice *device,
     return -1;
 
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
-  if (HAS_DPU()) {
-    g2d_handle = g2d->g2d_handle;
-  } else {
-    if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
-      GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
-      return -1;
-    }
-  }
+  g2d_handle = g2d->g2d_handle;
 
   src.buf_handle = NULL;
   src.buf_vaddr = (void*)(from->vaddr);
@@ -302,9 +280,6 @@ static gint imx_g2d_frame_copy(Imx2DDevice *device,
   ret = g2d_copy (g2d_handle, &dst, &src, dst.buf_size);
 
   g2d_finish(g2d_handle);
-  if (!HAS_DPU()) {
-    g2d_close (g2d_handle);
-  }
   GST_LOG("G2D frame memory (%p)->(%p)", from->paddr, to->paddr);
 
   return ret;
@@ -426,16 +401,7 @@ static gint imx_g2d_blit(Imx2DDevice *device,
     return -1;
 
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
-  if (HAS_DPU()) {
-    g2d_handle = g2d->g2d_handle;
-  } else {
-    /* g2d_open () every frame as GPU 2D based g2d need all function call in
-     * same thread */
-    if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
-      GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
-      return -1;
-    }
-  }
+  g2d_handle = g2d->g2d_handle;
 
   GST_DEBUG ("src paddr fd vaddr: %p %d %p dst paddr fd vaddr: %p %d %p",
       src->mem->paddr, src->fd[0], src->mem->vaddr, dst->mem->paddr,
@@ -585,9 +551,6 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   ret |= g2d_finish(g2d_handle);
 
 err:
-  if (!HAS_DPU()) {
-    g2d_close (g2d_handle);
-  }
 
   GST_TRACE ("finish\n");
   return ret;
@@ -717,16 +680,7 @@ static gint imx_g2d_fill_color(Imx2DDevice *device, Imx2DFrame *dst,
     return -1;
 
   Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
-  if (HAS_DPU()) {
-    g2d_handle = g2d->g2d_handle;
-  } else {
-    /* g2d_open () every frame as GPU 2D based g2d need all function call in
-     * same thread */
-    if(g2d_open(&g2d_handle) == -1 || g2d_handle == NULL) {
-      GST_ERROR ("%s Failed to open g2d device.",__FUNCTION__);
-      return -1;
-    }
-  }
+  g2d_handle = g2d->g2d_handle;
 
   GST_DEBUG ("dst paddr: %p fd: %d", dst->mem->paddr, dst->fd[0]);
   unsigned long paddr = 0;
@@ -754,9 +708,6 @@ static gint imx_g2d_fill_color(Imx2DDevice *device, Imx2DFrame *dst,
 
   ret = g2d_clear(g2d_handle, &g2d->dst.base);
   ret |= g2d_finish(g2d_handle);
-  if (!HAS_DPU()) {
-    g2d_close (g2d_handle);
-  }
 
   return ret;
 }
