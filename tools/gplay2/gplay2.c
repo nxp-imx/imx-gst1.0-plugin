@@ -141,8 +141,19 @@ set_alarm (guint seconds)
   alarm (seconds);
 }
 
+void
+reset_playdata (GstPlayData * sPlay)
+{
+  sPlay->gstPlayState = GST_PLAY_STATE_STOPPED;
+  sPlay->seek_finished = FALSE;
+  sPlay->error_found = FALSE;
+  sPlay->eos_found = FALSE;
+  sPlay->pending_audio_track = -1;
+  sPlay->pending_sub_track = -1;
+}
+
 gint
-playlist_next (GstPlay * play, gplay_pconfigions * options)
+playlist_next (GstPlay * play, gplay_pconfigions * options, GstPlayData * sPlay)
 {
   gchar *uri = NULL;
   if (options->repeat > PLAY_REPEAT_CURRENT
@@ -157,6 +168,7 @@ playlist_next (GstPlay * play, gplay_pconfigions * options)
       options->current = getNextItem (options->pl);
       if (options->current) {
         g_print ("Now Playing: %s\n", options->current);
+        reset_playdata (sPlay);
         uri = filename2uri (options->current);
         gst_play_set_uri (play, uri);
         //gst_play_play (play);
@@ -180,6 +192,7 @@ playlist_next (GstPlay * play, gplay_pconfigions * options)
       options->current = getNextItem (options->pl);
       if (options->current) {
         printf ("Now Playing: %s\n", options->current);
+        reset_playdata (sPlay);
         uri = filename2uri (options->current);
         gst_play_set_uri (play, uri);
         //gst_play_play (play);
@@ -199,6 +212,7 @@ playlist_next (GstPlay * play, gplay_pconfigions * options)
           options->current = getFirstItem (options->pl);
           if (options->current) {
             printf ("Now Playing: %s\n", options->current);
+            reset_playdata (sPlay);
             uri = filename2uri (options->current);
             gst_play_set_uri (play, uri);
             //gst_play_play (play);
@@ -216,6 +230,7 @@ playlist_next (GstPlay * play, gplay_pconfigions * options)
     case PLAY_REPEAT_CURRENT:
     {
       //gst_play_play (play);
+      reset_playdata (sPlay);
       gst_play_play_sync (play, options->timeout);
     }
       break;
@@ -227,7 +242,7 @@ playlist_next (GstPlay * play, gplay_pconfigions * options)
 }
 
 gint
-playlist_previous (GstPlay * play, gplay_pconfigions * options)
+playlist_previous (GstPlay * play, gplay_pconfigions * options, GstPlayData * sPlay)
 {
   gchar *uri = NULL;
   if (options->repeat > PLAY_REPEAT_CURRENT
@@ -242,6 +257,7 @@ playlist_previous (GstPlay * play, gplay_pconfigions * options)
       options->current = getPrevItem (options->pl);
       if (options->current) {
         g_print ("Now Playing: %s\n", options->current);
+        reset_playdata (sPlay);
         uri = filename2uri (options->current);
         gst_play_set_uri (play, uri);
         //gst_play_play (play);
@@ -265,6 +281,7 @@ playlist_previous (GstPlay * play, gplay_pconfigions * options)
       options->current = getPrevItem (options->pl);
       if (options->current) {
         printf ("Now Playing: %s\n", options->current);
+        reset_playdata (sPlay);
         uri = filename2uri (options->current);
         gst_play_set_uri (play, uri);
         //gst_play_play (play);
@@ -285,6 +302,7 @@ playlist_previous (GstPlay * play, gplay_pconfigions * options)
           options->current = getLastItem (options->pl);
           if (options->current) {
             printf ("Now Playing: %s\n", options->current);
+            reset_playdata (sPlay);
             uri = filename2uri (options->current);
             gst_play_set_uri (play, uri);
             //gst_play_play (play);
@@ -302,6 +320,7 @@ playlist_previous (GstPlay * play, gplay_pconfigions * options)
     case PLAY_REPEAT_CURRENT:
     {
       //gst_play_play (play);
+      reset_playdata (sPlay);
       gst_play_play_sync (play, options->timeout);
     }
       break;
@@ -860,7 +879,7 @@ error_cb (GstPlay * play, GError * err, GstPlayData * sPlay)
 
   /* try next item in list then */
   if (!options->no_auto_next) {
-    if (playlist_next (play, options) != RET_SUCCESS) {
+    if (playlist_next (play, options, sPlay) != RET_SUCCESS) {
       gexit_input_thread = TRUE;
       gexit_display_thread = TRUE;
     } else {
@@ -894,7 +913,7 @@ eos_cb (GstPlay * play, GstPlayData * sPlay)
   clear_pending_trackselect (sPlay);
 
   if (!options->no_auto_next) {
-    if (playlist_next (play, options) != RET_SUCCESS) {
+    if (playlist_next (play, options, sPlay) != RET_SUCCESS) {
       gexit_input_thread = TRUE;
       gexit_display_thread = TRUE;
     } else {
@@ -1225,7 +1244,7 @@ input_thread_fun (gpointer data)
         //gst_play_stop (play);
         gst_play_stop_sync (play, options->timeout);
         clear_pending_trackselect (sPlay);
-        if (playlist_next (play, options) != RET_SUCCESS) {
+        if (playlist_next (play, options, sPlay) != RET_SUCCESS) {
           gexit_input_thread = TRUE;
           gexit_display_thread = TRUE;
           set_alarm (1);
@@ -1239,7 +1258,7 @@ input_thread_fun (gpointer data)
         //gst_play_stop (play);
         gst_play_stop_sync (play, options->timeout);
         clear_pending_trackselect (sPlay);
-        if (playlist_previous (play, options) != RET_SUCCESS) {
+        if (playlist_previous (play, options, sPlay) != RET_SUCCESS) {
           gexit_input_thread = TRUE;
           gexit_display_thread = TRUE;
           set_alarm (1);
