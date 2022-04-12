@@ -21,7 +21,7 @@ mime= video/quicktime; audio/x-m4a; application/x-3gp
 library = @mp4_arm_SONAME@
 
 [Matroska]
-mime= video/x-matroska ; video/webm
+mime= video/x-matroska; video/webm; audio/x-matroska; audio/webm
 library = @mkv_arm_SONAME@
 
 [OGG]

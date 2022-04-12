@@ -511,6 +511,7 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
 
 
       demux->clock_offset = GST_CLOCK_TIME_NONE;
+      demux->base_offset = GST_CLOCK_TIME_NONE;
       demux->media_offset = 0;
       demux->avg_diff = 0;
       demux->start_time = GST_CLOCK_TIME_NONE;
@@ -696,6 +697,9 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
               IParser->flushTrack (handle, stream->track_idx);
             }
           }
+
+          //demux->base_offset = 0;
+          GST_DEBUG ("flush start");
         }
         return TRUE;
       }
@@ -3319,11 +3323,11 @@ aiurdemux_adjust_timestamp (GstAiurDemux * demux, AiurDemuxStream * stream,
     GstBuffer * buffer)
 {
 
-  //g_print("adjust orig %"GST_TIME_FORMAT" base %"GST_TIME_FORMAT" pos %"GST_TIME_FORMAT"\n",
-  //     GST_TIME_ARGS(stream->sample_stat.start), GST_TIME_ARGS(demux->base_offset), GST_TIME_ARGS(stream->time_position));
+  GST_DEBUG_OBJECT(demux, "adjust orig %"GST_TIME_FORMAT" base %"GST_TIME_FORMAT" pos %"GST_TIME_FORMAT"\n",
+       GST_TIME_ARGS(stream->sample_stat.start), GST_TIME_ARGS(demux->base_offset), GST_TIME_ARGS(stream->time_position));
   buffer = gst_buffer_make_writable (buffer);
 
-  if ((demux->base_offset == 0)
+  if ((demux->base_offset == GST_CLOCK_TIME_NONE)
       || (!GST_CLOCK_TIME_IS_VALID (stream->sample_stat.start))) {
     GST_BUFFER_TIMESTAMP (buffer) = stream->sample_stat.start;
 
@@ -3337,8 +3341,10 @@ aiurdemux_adjust_timestamp (GstAiurDemux * demux, AiurDemuxStream * stream,
             demux->base_offset) ? (stream->sample_stat.start -
             demux->base_offset) : 0);
 
-    if ((GST_BUFFER_TIMESTAMP (buffer) < (stream->time_position))) {
-      GST_BUFFER_TIMESTAMP (buffer) = stream->time_position;
+    if (!aiurcontent_is_adaptive_playback(demux->content_info)) {
+      if ((GST_BUFFER_TIMESTAMP (buffer) < (stream->time_position))) {
+        GST_BUFFER_TIMESTAMP (buffer) = stream->time_position;
+      }
     }
   }
 
@@ -3348,7 +3354,7 @@ aiurdemux_adjust_timestamp (GstAiurDemux * demux, AiurDemuxStream * stream,
   GST_BUFFER_OFFSET (buffer) = -1;
   GST_BUFFER_OFFSET_END (buffer) = -1;
 
-
+  GST_DEBUG_OBJECT(demux, "adjust ts = %"GST_TIME_FORMAT"\n", GST_TIME_ARGS(GST_BUFFER_TIMESTAMP (buffer)));
 }
 static void
 aiurdemux_update_stream_position (GstAiurDemux * demux,
