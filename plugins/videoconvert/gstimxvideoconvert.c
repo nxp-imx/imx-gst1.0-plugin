@@ -362,6 +362,8 @@ static gint get_format_conversion_loss(GstBaseTransform * base,
 
   /* Only OpenCL on DPU platform can convert NV12_10LE to NV12) */
   if (HAS_DPU ()) {
+    if (in_name == GST_VIDEO_FORMAT_NV12_10BE_8L128 && out_name == GST_VIDEO_FORMAT_NV12)
+      return 0;
     if (in_name == GST_VIDEO_FORMAT_NV12_10LE
         && out_name == GST_VIDEO_FORMAT_NV12)
       return 0;
@@ -1444,6 +1446,10 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
                 imxvct->in_video_align.padding_bottom;
     src.info.stride = filter->in_info.stride[0];
   }
+  if (GST_VIDEO_FORMAT_INFO_IS_TILED(filter->in_info.finfo)) {
+    gint ws = GST_VIDEO_FORMAT_INFO_TILE_WS (filter->in_info.finfo);
+    src.info.stride = GST_VIDEO_TILE_X_TILES(src.info.stride) << ws;
+  }
 
   dmabuf_meta = gst_buffer_get_dmabuf_meta (inbuf);
   if (dmabuf_meta) {
@@ -1458,6 +1464,14 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
 
   GST_INFO_OBJECT (imxvct, "buffer modifier type %d", drm_modifier);
 
+  switch (GST_VIDEO_FORMAT_INFO_FORMAT(filter->in_info.finfo)) {
+  case GST_VIDEO_FORMAT_NV12_8L128:
+  case GST_VIDEO_FORMAT_NV12_10BE_8L128:
+    src.info.tile_type = IMX_2D_TILE_AMHPION;
+    break;
+  default:
+    break;
+  }
   if (drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED)
     src.info.tile_type = IMX_2D_TILE_AMHPION;
 
