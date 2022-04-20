@@ -80,7 +80,7 @@ typedef struct
   gint display_refresh_frq;
   gboolean no_auto_next;
   gboolean handle_buffering;
-
+  guint64 connection_speed;
 } gplay_pconfigions;
 
 typedef struct
@@ -360,6 +360,10 @@ print_help ()
   g_print ("    --suburi          Set subtitle path\n");
   g_print ("                      Use below option to input your pathname\n");
   g_print ("                      --suburi=pathname\n\n");
+  g_print
+      ("    --connection-speed Specify the default adaptive playback connection speed in bps\n");
+  g_print ("                      Use below option to specify your connection speed\n");
+  g_print ("                      --connection-speed=BPS\n\n");
 }
 
 gint
@@ -447,6 +451,19 @@ parse_pconfigions (gplay_pconfigions * pconfig, gint32 argc, gchar * argv[])
 
         if ((strcmp (argv[i], "--handle-buffering") == 0)) {
           pconfig->handle_buffering = TRUE;
+          continue;
+        }
+
+        if (strncmp (argv[i], "--connection-speed", 18) == 0) {
+          if (argv[i][18] == '=') {
+            gint64 connection_speed = atoi(&(argv[i][19]));
+            if (connection_speed <= 0) {
+              g_print ("Invalid connection speed\n");
+              pconfig->connection_speed = 0;
+            } else {
+              pconfig->connection_speed = (connection_speed - 1) / 1000 + 1;
+            }
+          }
           continue;
         }
 
@@ -1129,6 +1146,9 @@ input_thread_fun (gpointer data)
           break;
         }
         gDisable_display = FALSE;
+        /* + 1: Get the value which greater than the current value and */
+        /* + 1: closet to multiples of 1000 when multiplied by 1000 */
+        /* - 1: Avoid adding 1 when the value equal to multiples of 1000 */
         connection_speed = (connection_speed - 1) / 1000 + 1;
         if (connection_speed <= 0) {
           g_print ("Invalid connection speed\n");
@@ -1686,11 +1706,8 @@ main (int argc, char *argv[])
     gst_play_set_text_sink (play, text_sink);
   } else if (gplay_checkfeature (VPU)
       && (gplay_checkfeature (DCSS) || gplay_checkfeature (DPU))) {
-    options.text_sink_name = "fakesink";
-    g_print ("Set TextSink %s\n", options.text_sink_name);
-    text_sink =
-        gst_parse_bin_from_description (options.text_sink_name, TRUE, NULL);
-    gst_play_set_text_sink (play, text_sink);
+    g_print ("Disable subtitle rendering\n");
+    gst_play_set_subtitle_track_enabled (play, FALSE);
   }
 
   sPlay.options = &options;
@@ -1724,6 +1741,11 @@ main (int argc, char *argv[])
   } else {
     /* if there is dafault subtitle file, try to load - not support now */
 
+  }
+
+  if (options.connection_speed) {
+    gst_play_set_connection_speed (play, options.connection_speed);
+    g_print ("connection speed update done, value: %ld\n", options.connection_speed);
   }
 
   if (options.display_refresh_frq != 0) {
