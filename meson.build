@@ -38,6 +38,7 @@ build_MX6UL = 'no'
 build_MX7D = 'no'
 build_MX7ULP = 'no'
 build_MX8 = 'no'
+build_MX9 = 'no'
 platforms = get_option('platform')
 platform_is_aarch64 = 'no'
 foreach platform : platforms
@@ -60,6 +61,9 @@ foreach platform : platforms
   elif platform == 'MX8'
     build_MX8 = 'yes'
     platform_is_aarch64 = 'yes'
+  elif platform == 'MX9'
+    build_MX9 = 'yes'
+    platform_is_aarch64 = 'yes'
   else
     error('Unsupported platform provided :' + platform)
   endif
@@ -81,7 +85,7 @@ if build_MX6SL == 'yes' or build_MX6SX == 'yes'
   build_pxp = true
 endif
 
-if build_MX6UL == 'yes' or build_MX7D == 'yes' or build_MX6SLL == 'yes' or build_MX8 == 'yes'
+if build_MX6UL == 'yes' or build_MX7D == 'yes' or build_MX6SLL == 'yes' or build_MX8 == 'yes' or build_MX9 == 'yes'
   build_pxp = true
 endif
 

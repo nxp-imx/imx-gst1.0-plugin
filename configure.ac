@@ -127,11 +127,11 @@ if test "x$HAVE_PKGCONFIG" = "xno"; then
 fi
 
 dnl check target type
-if  test "$PLATFORM" = "MX6" || test "$PLATFORM" = "MX6SL" || test "$PLATFORM" = "MX6SX" || test "$PLATFORM" = "MX7D" || test "$PLATFORM" = "MX6UL" || test "$PLATFORM" = "MX6SLL" || test "$PLATFORM" = "MX6QP" || test "$PLATFORM" = "MX8" || test "$PLATFORM" = "MX7ULP";
+if  test "$PLATFORM" = "MX6" || test "$PLATFORM" = "MX6SL" || test "$PLATFORM" = "MX6SX" || test "$PLATFORM" = "MX7D" || test "$PLATFORM" = "MX6UL" || test "$PLATFORM" = "MX6SLL" || test "$PLATFORM" = "MX6QP" || test "$PLATFORM" = "MX8" || test "$PLATFORM" = "MX7ULP" || test "$PLATFORM" = "MX9";
 then
   AC_MSG_NOTICE(build for $PLATFORM)
 else
-  AC_MSG_ERROR(No target platform specified! Use ./configure PLATFORM=(MX6/MX6QP/MX6SL/MX6SX/MX6UL/MX7D/MX6SLL/MX8/MX7ULP) to retry)
+  AC_MSG_ERROR(No target platform specified! Use ./configure PLATFORM=(MX6/MX6QP/MX6SL/MX6SX/MX6UL/MX7D/MX6SLL/MX8/MX7ULP/MX9) to retry)
 fi
 
 AC_SUBST(PLATFORM)
@@ -363,6 +363,7 @@ AM_CONDITIONAL(PLATFORM_IS_MX7D, test "x$PLATFORM" = "xMX7D")
 AM_CONDITIONAL(PLATFORM_IS_MX7ULP, test "x$PLATFORM" = "xMX7ULP")
 AM_CONDITIONAL(PLATFORM_IS_ARCH32, test "x$PLATFORM" = "xMX7D" || test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6" || test "x$PLATFORM" = "xMX6SL" || test "x$PLATFORM" = "xMX6SX" || test "x$PLATFORM" = "xMX6SLL" || test "x$PLATFORM" = "xMX6UL" || test "x$PLATFORM" = "xMX6QP" || test "x$PLATFORM" = "xMX7ULP")
 AM_CONDITIONAL(PLATFORM_IS_MX8, test "x$PLATFORM" = "xMX8")
+AM_CONDITIONAL(PLATFORM_IS_MX9, test "x$PLATFORM" = "xMX9")
 
 AM_CONDITIONAL(USE_FB_DISPLAY, test "x$PLATFORM" = "xMX8" || test "x$PLATFORM" = "xMX7ULP")
 
@@ -378,7 +379,7 @@ if test "x$PLATFORM" = "xMX6SL" || test "x$PLATFORM" = "xMX6SX"; then
 	 HAVE_DEVICE_PXP=yes
 fi
 
-if test "x$PLATFORM" = "xMX6UL" || test "x$PLATFORM" = "xMX7D" || test "x$PLATFORM" = "xMX6SLL" || test "x$PLATFORM" = "xMX8"; then
+if test "x$PLATFORM" = "xMX6UL" || test "x$PLATFORM" = "xMX7D" || test "x$PLATFORM" = "xMX6SLL" || test "x$PLATFORM" = "xMX8" || test "x$PLATFORM" = "xMX9"; then
 	 HAVE_DEVICE_PXP=yes
 fi
 

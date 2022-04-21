@@ -88,7 +88,7 @@ elif build_MX7ULP == 'yes'
   if have_g2d
     subdir('overlay_sink')
   endif
-elif build_MX8 == 'yes'
+elif build_MX8 == 'yes' or build_MX9 == 'yes'
   subdir('spdifdemux')
   if have_vpuwrapper
     subdir('vpu')
