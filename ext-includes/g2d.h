@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 2013-2016 Freescale Semiconductor, Inc.
- *  Copyright 2017-2019 NXP
+ *  Copyright 2017-2022 NXP
  */
 /*
 * This library is free software; you can redistribute it and/or
@@ -49,7 +49,7 @@ extern "C"  {
 #endif
 
 #define G2D_VERSION_MAJOR   2
-#define G2D_VERSION_MINOR   0
+#define G2D_VERSION_MINOR   1
 #define G2D_VERSION_PATCH   0
 
 enum g2d_format
@@ -114,6 +114,7 @@ enum g2d_cap_mode
     G2D_YUV_BT_709            = 6,//yuv BT.709
     G2D_YUV_BT_601FR          = 7,//yuv BT.601 Full Range
     G2D_YUV_BT_709FR          = 8,//yuv BT.709 Full Range
+    G2D_WARPING               = 9,//can perform warp/dewarp operations
 };
 
 enum g2d_feature
@@ -124,6 +125,7 @@ enum g2d_feature
     G2D_DST_YUV,
     G2D_MULTI_SOURCE_BLT,
     G2D_FAST_CLEAR,
+    G2D_WARP_DEWARP,
 };
 
 enum g2d_rotation
@@ -229,9 +231,6 @@ int g2d_disable(void *handle, enum g2d_cap_mode cap);
 
 int g2d_cache_op(struct g2d_buf *buf, enum g2d_cache_mode op);
 struct g2d_buf *g2d_alloc(int size, int cacheable);
-struct g2d_buf *g2d_buf_from_fd(int fd);
-int g2d_buf_export_fd(struct g2d_buf *);
-struct g2d_buf *g2d_buf_from_virt_addr(void *vaddr, int size);
 int g2d_free(struct g2d_buf *buf);
 
 int g2d_flush(void *handle);
