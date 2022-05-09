@@ -1722,7 +1722,6 @@ main (int argc, char *argv[])
 
   bus = gst_play_get_message_bus (play);
   gst_bus_add_watch (bus, bus_callback, &sPlay);
-  gst_object_unref (bus);
 
   sPlay.loop = g_main_loop_new (NULL, FALSE);
   gloop = sPlay.loop;
@@ -1793,6 +1792,11 @@ main (int argc, char *argv[])
   if (options.pl)
     destroyPlayList (options.pl);
   options.pl = NULL;
+
+  /* Fix gplay cannot dispose gstplay object */
+  gst_bus_set_flushing (bus, TRUE);
+  gst_object_unref (bus);
+
   gst_object_unref (play);
   g_main_loop_unref (sPlay.loop);
 
