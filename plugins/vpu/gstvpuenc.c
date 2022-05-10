@@ -56,6 +56,8 @@
 #define DEFAULT_MPEG4_QUANT 15
 #define DEFAULT_STREAM_SLICE_COUNT 1
 #define DEFAULT_FORCE_IDR 0
+#define DEFAULT_QPMIN 0
+#define DEFAULT_QPMAX 0
 
 #define GST_VPU_ENC_PARAMS_QDATA   g_quark_from_static_string("vpuenc-params")
 
@@ -114,6 +116,8 @@ enum
   PROP_QUANT,
   PROP_STREAM_SLICE_COUNT,
   PROP_FORCE_IDR,
+  PROP_QPMIN,
+  PROP_QPMAX,
 };
 
 static GstStaticPadTemplate static_sink_template = GST_STATIC_PAD_TEMPLATE(
@@ -328,6 +332,34 @@ gst_vpu_enc_class_init (GstVpuEncClass * klass)
       g_param_spec_int ("force-idr", "force idr",
         "force incoming frame to be encoded as IDR frame",
         0, G_MAXINT,  DEFAULT_FORCE_IDR, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+    g_object_class_install_property (gobject_class, PROP_QPMIN,
+      g_param_spec_int ("qp-min", "qp min",
+        "minimum QP for any picture",
+        0, 51, DEFAULT_QPMIN, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+    g_object_class_install_property (gobject_class, PROP_QPMAX,
+      g_param_spec_int ("qp-max", "qp max",
+        "maximum QP for any picture, default 0 makes wrapper to set 51",
+        0, 51,  DEFAULT_QPMAX, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  }
+
+  if ((in_plugin->std == VPU_V_AVC) && IS_IMX8MM()) {
+    g_object_class_install_property (gobject_class, PROP_QPMIN,
+      g_param_spec_int ("qp-min", "qp min",
+        "minimum QP for any picture",
+        0, 51, DEFAULT_QPMIN, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+    g_object_class_install_property (gobject_class, PROP_QPMAX,
+      g_param_spec_int ("qp-max", "qp max",
+        "maximum QP for any picture, default 0 makes wrapper to set 51",
+        0, 51,  DEFAULT_QPMAX, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  } else if ((in_plugin->std == VPU_V_VP8) && IS_IMX8MM()) {
+    g_object_class_install_property (gobject_class, PROP_QPMIN,
+      g_param_spec_int ("qp-min", "qp min",
+        "minimum QP for any picture",
+        0, 127, DEFAULT_QPMIN, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+    g_object_class_install_property (gobject_class, PROP_QPMAX,
+      g_param_spec_int ("qp-max", "qp max",
+        "maximum QP for any picture, default 0 makes wapper to set 127",
+        0, 127,  DEFAULT_QPMAX, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   }
 
  if (in_plugin->std == VPU_V_AVC) {
@@ -407,6 +439,8 @@ gst_vpu_enc_init (GstVpuEnc * enc)
   enc->state = NULL;
   enc->bitrate_updated = FALSE;
   enc->force_idr = DEFAULT_FORCE_IDR;
+  enc->qpmin = DEFAULT_QPMIN;
+  enc->qpmax = DEFAULT_QPMAX;
 }
 
 static void
@@ -430,6 +464,12 @@ gst_vpu_enc_get_property (GObject * object, guint prop_id, GValue * value,
       break;
     case PROP_FORCE_IDR:
       g_value_set_int (value, enc->force_idr);
+      break;
+    case PROP_QPMIN:
+      g_value_set_int (value, enc->qpmin);
+      break;
+    case PROP_QPMAX:
+      g_value_set_int (value, enc->qpmax);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -459,6 +499,12 @@ gst_vpu_enc_set_property (GObject * object, guint prop_id,
       break;
     case PROP_FORCE_IDR:
       enc->force_idr = g_value_get_int (value);
+      break;
+    case PROP_QPMIN:
+      enc->qpmin = g_value_get_int (value);
+      break;
+    case PROP_QPMAX:
+      enc->qpmax = g_value_get_int (value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -831,6 +877,8 @@ gst_vpu_enc_set_format (GstVideoEncoder * benc, GstVideoCodecState * state)
   enc->open_param.nMapType = 0;
   enc->open_param.nLinear2TiledEnable = 0;
   enc->gop_count = 0;
+  enc->open_param.nUserQpMin = enc->qpmin;
+  enc->open_param.nUserQpMax = enc->qpmax;
 
   if (enc->open_param.nFrameRate == 0)
     enc->open_param.nFrameRate = 30;
