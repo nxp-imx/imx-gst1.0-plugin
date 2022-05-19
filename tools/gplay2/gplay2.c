@@ -877,6 +877,16 @@ gplay_get_fullscreen_size (gint32 * pfullscreen_width,
   return TRUE;
 }
 
+static void gplay_set_subtitle_track_enabled (GstPlay * play, gboolean enabled) 
+{
+  if (gplay_checkfeature (VPU)
+      && (gplay_checkfeature (DCSS) || gplay_checkfeature (DPU))) {
+    gst_play_set_subtitle_track_enabled (play, FALSE);
+  } else {
+    gst_play_set_subtitle_track_enabled (play, enabled);
+  }
+}
+
 static void
 error_cb (GstPlay * play, GError * err, GstPlayData * sPlay)
 {
@@ -891,7 +901,7 @@ error_cb (GstPlay * play, GError * err, GstPlayData * sPlay)
     gexit_display_thread = TRUE;
   }
 
-  gst_play_set_subtitle_track_enabled (play, TRUE);
+  gplay_set_subtitle_track_enabled (play, TRUE);
   clear_pending_trackselect (sPlay);
 
   /* try next item in list then */
@@ -924,7 +934,7 @@ eos_cb (GstPlay * play, GstPlayData * sPlay)
   g_print ("EOS Found\n");
   sPlay->eos_found = TRUE;
   gst_play_set_rate (play, 1.0);
-  gst_play_set_subtitle_track_enabled (play, TRUE);
+  gplay_set_subtitle_track_enabled (play, TRUE);
   //gst_play_stop (play);
   gst_play_stop_sync (play, options->timeout);
   clear_pending_trackselect (sPlay);
@@ -1028,7 +1038,7 @@ input_thread_fun (gpointer data)
       case 's':                // Stop
       {
         //gst_play_stop (play);
-        gst_play_set_subtitle_track_enabled (play, TRUE);
+        gplay_set_subtitle_track_enabled (play, TRUE);
         gst_play_stop_sync (play, options->timeout);
         clear_pending_trackselect (sPlay);
       }
@@ -1189,9 +1199,9 @@ input_thread_fun (gpointer data)
         gst_play_set_rate (play, playback_rate);
         wait_for_seek_done (sPlay, options->timeout);
         if (playback_rate > 2.0 || playback_rate < 0){
-          gst_play_set_subtitle_track_enabled (play, FALSE);
+          gplay_set_subtitle_track_enabled (play, FALSE);
         } else {
-          gst_play_set_subtitle_track_enabled (play, TRUE);
+          gplay_set_subtitle_track_enabled (play, TRUE);
         }
         if (playback_rate > 0 && playback_rate <= 2.0){
           /* now do pending track select */
@@ -1260,7 +1270,7 @@ input_thread_fun (gpointer data)
       case '>':                // Play next file
         g_print ("next\n");
         gst_play_set_rate (play, 1.0);
-        gst_play_set_subtitle_track_enabled (play, TRUE);
+        gplay_set_subtitle_track_enabled (play, TRUE);
         //gst_play_stop (play);
         gst_play_stop_sync (play, options->timeout);
         clear_pending_trackselect (sPlay);
@@ -1274,7 +1284,7 @@ input_thread_fun (gpointer data)
       case '<':                // Play previous file
         g_print ("previous\n");
         gst_play_set_rate (play, 1.0);
-        gst_play_set_subtitle_track_enabled (play, TRUE);
+        gplay_set_subtitle_track_enabled (play, TRUE);
         //gst_play_stop (play);
         gst_play_stop_sync (play, options->timeout);
         clear_pending_trackselect (sPlay);
