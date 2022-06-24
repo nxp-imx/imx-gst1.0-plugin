@@ -38,6 +38,9 @@ if cc.has_header('pxp_lib.h') and build_pxp
   gstfsl_sources += ['device-2d/imx_2d_device_pxp.c']
   gstfsl_cflags += ['-DUSE_PXP']
   gstfsl_ldflags += ['-lpxp']
+  if build_MX8 == 'yes' or build_MX9 == 'yes'
+    gstfsl_cflags += ['-DENABLE_EXTRA_PXP_FORMATS']
+  endif
 endif
 
 if cc.has_header('linux/ipu.h') and build_ipu

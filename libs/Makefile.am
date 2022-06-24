@@ -57,4 +57,10 @@ if USE_IMX_2DDEVICE_PXP
 libgstfsl_@GST_API_VERSION@_la_SOURCES += device-2d/imx_2d_device_pxp.c
 libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DUSE_PXP
 libgstfsl_@GST_API_VERSION@_la_LIBADD += -lpxp
+if PLATFORM_IS_MX8
+libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DENABLE_EXTRA_PXP_FORMATS
+endif
+if PLATFORM_IS_MX9
+libgstfsl_@GST_API_VERSION@_la_CFLAGS += -DENABLE_EXTRA_PXP_FORMATS
+endif
 endif

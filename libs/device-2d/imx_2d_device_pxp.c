@@ -92,11 +92,13 @@ static PxpFmtMap pxp_out_fmts_map[] = {
     {GST_VIDEO_FORMAT_BGR,    PXP_PIX_FMT_RGB24,    24},
     {GST_VIDEO_FORMAT_RGB16,  PXP_PIX_FMT_RGB565,   16},
     {GST_VIDEO_FORMAT_GRAY8,  PXP_PIX_FMT_GREY,     8},
-#ifdef ENABLE_ALL_PXP_FORMATS
-    {GST_VIDEO_FORMAT_RGB15,  PXP_PIX_FMT_RGB555,   16},
+#ifdef ENABLE_EXTRA_PXP_FORMATS
     {GST_VIDEO_FORMAT_UYVY,   PXP_PIX_FMT_UYVY,     16},
+#endif
+#ifdef ENABLE_ALL_PXP_FORMATS
     {GST_VIDEO_FORMAT_NV12,   PXP_PIX_FMT_NV12,     12},
     {GST_VIDEO_FORMAT_NV21,   PXP_PIX_FMT_NV21,     12},
+    {GST_VIDEO_FORMAT_RGB15,  PXP_PIX_FMT_RGB555,   16},
     {GST_VIDEO_FORMAT_NV16,   PXP_PIX_FMT_NV16,     16},
 #endif
 
@@ -356,7 +358,6 @@ static gint imx_pxp_check_frame_paddr (Imx2DFrame *dst, Imx2DFrame *src)
   unsigned long paddr = 0;
 
   if (!src->mem->paddr) {
-    /* FIXME: handle multi plane has different fd case */
     if (src->fd[0] >= 0) {
       paddr = phy_addr_from_fd (src->fd[0]);
     } else {
@@ -370,6 +371,17 @@ static gint imx_pxp_check_frame_paddr (Imx2DFrame *dst, Imx2DFrame *src)
       return -1;
     }
   }
+
+  if (!src->mem->user_data && src->fd[1] >= 0) {
+    paddr = phy_addr_from_fd (src->fd[1]);
+    if (paddr) {
+      src->mem->user_data = paddr;
+    } else {
+      GST_ERROR ("Can't get physical address for second plane");
+      return -1;
+    }
+  }
+
   if (!dst->mem->paddr) {
     paddr = phy_addr_from_fd (dst->fd[0]);
     if (paddr) {
@@ -408,6 +420,8 @@ static gint imx_pxp_convert(Imx2DDevice *device,
       MIN(src->crop.h, pxp->config.proc_data.srect.height);
 
   pxp->config.s0_param.paddr = (dma_addr_t)src->mem->paddr;
+  if (src->fd[1] >= 0)
+    pxp->config.s0_param.paddr_u = (dma_addr_t)src->mem->user_data;
 
   GST_TRACE ("pxp src : %dx%d,%d(%d,%d-%d,%d), format=%x",
       pxp->config.s0_param.width, pxp->config.s0_param.height,
@@ -480,6 +494,8 @@ static gint imx_pxp_blend_without_alpha(Imx2DDevice *device,
   pxp->config.proc_data.srect.width = MIN(src->crop.w, src->info.w);
   pxp->config.proc_data.srect.height = MIN(src->crop.h, src->info.h);
   pxp->config.s0_param.paddr = (dma_addr_t)src->mem->paddr;
+  if (src->fd[1] >= 0)
+    pxp->config.s0_param.paddr_u = (dma_addr_t)src->mem->user_data;
 
   GST_TRACE ("pxp dest : %dx%d,%d(%d,%d-%d,%d), format=%x",
       pxp->config.out_param.width, pxp->config.out_param.height,
@@ -723,6 +739,8 @@ static gint imx_pxp_overlay(Imx2DDevice *device,
     }
 
     pxp->config.s0_param.paddr = (dma_addr_t)src->mem->paddr;
+    if (src->fd[1] >= 0)
+      pxp->config.s0_param.paddr_u = (dma_addr_t)src->mem->user_data;
     pxp->config.s0_param.pixel_fmt = orig_src_fmt;
     pxp->config.s0_param.width = src->info.w;
     pxp->config.s0_param.height = src->info.h;
