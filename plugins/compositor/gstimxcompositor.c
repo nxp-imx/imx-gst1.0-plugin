@@ -1175,6 +1175,12 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
   src->info.stride = ppad->info.stride[0];
   }
 
+  /* For tiled format, the stride value is the tile number and need to convert to the byte size */
+  if (GST_VIDEO_FORMAT_INFO_IS_TILED(ppad->info.finfo)) {
+    gint ws = GST_VIDEO_FORMAT_INFO_TILE_WS (ppad->info.finfo);
+    src->info.stride = GST_VIDEO_TILE_X_TILES(src->info.stride) << ws;
+  }
+
   dmabuf_meta = gst_buffer_get_dmabuf_meta (pad_buffer);
   if (dmabuf_meta)
     drm_modifier = dmabuf_meta->drm_modifier;
@@ -1185,6 +1191,15 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
     src->info.tile_type = IMX_2D_TILE_AMHPION;
   else
     src->info.tile_type = IMX_2D_TILE_NULL;
+
+  switch (src->info.fmt) {
+  case GST_VIDEO_FORMAT_NV12_8L128:
+  case GST_VIDEO_FORMAT_NV12_10BE_8L128:
+    src->info.tile_type = IMX_2D_TILE_AMHPION;
+    break;
+  default:
+    break;
+  }
 
   GST_LOG_OBJECT (pad, "Input: %s, %dx%d(%d), crop(%d,%d,%d,%d)",
       GST_VIDEO_FORMAT_INFO_NAME(ppad->info.finfo),
