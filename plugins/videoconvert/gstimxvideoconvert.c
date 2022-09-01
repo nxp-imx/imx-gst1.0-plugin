@@ -1299,7 +1299,7 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
   guint i, n_mem;
   GstVideoCropMeta *in_crop = NULL, *out_crop = NULL;
   GstVideoMeta *video_meta = gst_buffer_get_video_meta (inbuf);
-  GstVideoInfo info;
+  GstVideoInfo in_info;
   GstDmabufMeta *dmabuf_meta;
   gint64 drm_modifier = 0;
 
@@ -1312,19 +1312,31 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
     return GST_FLOW_ERROR;
   }
 
+  in_info = filter->in_info;
+  if (video_meta) {
+    gint i;
+
+    for (i = 0; i < video_meta->n_planes; i++) {
+      in_info.offset[i] = video_meta->offset[i];
+      in_info.stride[i] = video_meta->stride[i];
+    }
+    in_info.width = video_meta->width;
+    in_info.height = video_meta->height;
+  }
+
   /* Check if need copy input frame */
   if (!(gst_buffer_is_phymem(inbuf)
         || gst_is_dmabuf_memory (gst_buffer_peek_memory (inbuf, 0)))) {
     GST_DEBUG ("copy input frame to physical continues memory");
-    caps = gst_video_info_to_caps(&(filter->in_info));
-    gst_video_info_from_caps(&info, caps); //update the size info
+    caps = gst_video_info_to_caps(&in_info);
+    gst_video_info_from_caps(&in_info, caps); //update the size info
 
     if (!imxvct->in_pool ||
-        !imx_video_convert_buffer_pool_is_ok(imxvct->in_pool, caps,info.size)) {
+        !imx_video_convert_buffer_pool_is_ok(imxvct->in_pool, caps, in_info.size)) {
       GST_IMX_CONVERT_UNREF_POOL(imxvct->in_pool);
       GST_DEBUG_OBJECT(imxvct, "creating new input pool");
       imxvct->in_pool = gst_imx_video_convert_create_bufferpool(imxvct, caps,
-          info.size, 1, IMX_VCT_IN_POOL_MAX_BUFFERS);
+          in_info.size, 1, IMX_VCT_IN_POOL_MAX_BUFFERS);
     }
 
     gst_caps_unref (caps);
@@ -1342,10 +1354,10 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
     if (imxvct->in_buf) {
       GstVideoFrame in_frame;
 
-      gst_video_frame_map (&in_frame, &filter->in_info, inbuf,
+      gst_video_frame_map (&in_frame, &in_info, inbuf,
         GST_MAP_READ | GST_VIDEO_FRAME_MAP_FLAG_NO_REF);
 
-      gst_video_frame_map(&temp_in_frame, &info, imxvct->in_buf, GST_MAP_WRITE);
+      gst_video_frame_map(&temp_in_frame, &in_info, imxvct->in_buf, GST_MAP_WRITE);
       gst_video_frame_copy(&temp_in_frame, &in_frame);
       input_buf = temp_in_frame.buffer;
       gst_video_frame_unmap(&temp_in_frame);
@@ -1355,7 +1367,7 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
               && imx_video_overlay_composition_has_meta(inbuf)) {
         imx_video_overlay_composition_remove_meta(imxvct->in_buf);
         imx_video_overlay_composition_copy_meta(imxvct->in_buf, inbuf,
-            filter->in_info.width, filter->in_info.height, filter->in_info.width, filter->in_info.height);
+            in_info.width, in_info.height, in_info.width, in_info.height);
       }
     } else {
       GST_ERROR ("Can't get input buffer");
@@ -1428,11 +1440,7 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
     imxvct->pool_config_update = FALSE;
   }
 
-  caps = gst_pad_get_current_caps (GST_BASE_TRANSFORM_SINK_PAD(imxvct));
-  gst_video_info_from_caps(&info, caps);
-  gst_caps_unref (caps);
-
-  src.info.fmt = GST_VIDEO_INFO_FORMAT(&(filter->in_info));
+  src.info.fmt = GST_VIDEO_INFO_FORMAT(&in_info);
   if (video_meta) {
     src.info.w = video_meta->width + imxvct->in_video_align.padding_left +
                 imxvct->in_video_align.padding_right;
@@ -1440,14 +1448,14 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
                 imxvct->in_video_align.padding_bottom;
     src.info.stride = video_meta->stride[0];
   } else {
-    src.info.w = filter->in_info.width + imxvct->in_video_align.padding_left +
+    src.info.w = in_info.width + imxvct->in_video_align.padding_left +
                 imxvct->in_video_align.padding_right;
-    src.info.h = filter->in_info.height + imxvct->in_video_align.padding_top +
+    src.info.h = in_info.height + imxvct->in_video_align.padding_top +
                 imxvct->in_video_align.padding_bottom;
-    src.info.stride = filter->in_info.stride[0];
+    src.info.stride = in_info.stride[0];
   }
-  if (GST_VIDEO_FORMAT_INFO_IS_TILED(filter->in_info.finfo)) {
-    gint ws = GST_VIDEO_FORMAT_INFO_TILE_WS (filter->in_info.finfo);
+  if (GST_VIDEO_FORMAT_INFO_IS_TILED(in_info.finfo)) {
+    gint ws = GST_VIDEO_FORMAT_INFO_TILE_WS (in_info.finfo);
     src.info.stride = GST_VIDEO_TILE_X_TILES(src.info.stride) << ws;
   }
 
@@ -1464,7 +1472,7 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
 
   GST_INFO_OBJECT (imxvct, "buffer modifier type %d", drm_modifier);
 
-  switch (GST_VIDEO_FORMAT_INFO_FORMAT(filter->in_info.finfo)) {
+  switch (GST_VIDEO_FORMAT_INFO_FORMAT(in_info.finfo)) {
   case GST_VIDEO_FORMAT_NV12_8L128:
   case GST_VIDEO_FORMAT_NV12_10BE_8L128:
     src.info.tile_type = IMX_2D_TILE_AMHPION;
@@ -1477,7 +1485,7 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
 
   gint ret = device->config_input(device, &src.info);
 
-  GST_LOG ("Input: %s, %dx%d(%d)", GST_VIDEO_FORMAT_INFO_NAME(filter->in_info.finfo),
+  GST_LOG ("Input: %s, %dx%d(%d)", GST_VIDEO_FORMAT_INFO_NAME(in_info.finfo),
       src.info.w, src.info.h, src.info.stride);
 
   dst.info.fmt = GST_VIDEO_INFO_FORMAT(&(filter->out_info));
@@ -1506,21 +1514,21 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
   src.alpha = 0xFF;
   src.crop.x = 0;
   src.crop.y = 0;
-  src.crop.w = info.width;
-  src.crop.h = info.height;
+  src.crop.w = in_info.width;
+  src.crop.h = in_info.height;
   src.rotate = imxvct->rotate;
 
   in_crop = gst_buffer_get_video_crop_meta(inbuf);
   if (in_crop != NULL) {
     GST_LOG ("input crop meta: (%d, %d, %d, %d).", in_crop->x, in_crop->y,
         in_crop->width, in_crop->height);
-    if ((in_crop->x >= filter->in_info.width) || (in_crop->y >= filter->in_info.height))
+    if ((in_crop->x >= in_info.width) || (in_crop->y >= in_info.height))
       return GST_FLOW_ERROR;
 
     src.crop.x += in_crop->x;
     src.crop.y += in_crop->y;
-    src.crop.w = MIN(in_crop->width, filter->in_info.width);
-    src.crop.h = MIN(in_crop->height, filter->in_info.height);
+    src.crop.w = MIN(in_crop->width, in_info.width);
+    src.crop.h = MIN(in_crop->height, in_info.height);
   }
 
   //rotate and de-interlace setting
@@ -1534,7 +1542,7 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
     return GST_FLOW_ERROR;
   }
 
-  switch (filter->in_info.interlace_mode) {
+  switch (in_info.interlace_mode) {
     case GST_VIDEO_INTERLACE_MODE_INTERLEAVED:
       GST_TRACE("input stream is interleaved");
       src.interlace_type = IMX_2D_INTERLACE_INTERLEAVED;
