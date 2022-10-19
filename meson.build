@@ -1,5 +1,5 @@
 project('imx-gst1.0-plugin', 'c',
-  version : '4.7.2',
+  version : '4.7.3',
   meson_version : '>= 0.48',
 )
 
