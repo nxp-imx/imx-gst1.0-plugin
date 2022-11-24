@@ -774,6 +774,13 @@ static gboolean gst_aiurdemux_handle_src_event (GstPad * pad, GstObject * parent
   GstAiurDemux *demux = GST_AIURDEMUX (parent);
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_SEEK:
+
+      if (aiurcontent_is_adaptive_playback (demux->content_info)) {
+        GST_DEBUG_OBJECT (demux, "receive seek in adaptive playback");
+        res = gst_pad_event_default (pad, parent, event);
+        break;
+      }
+
       if (!demux->seekable || !aiurcontent_is_seelable(demux->content_info)) {
         goto not_support;
       }
