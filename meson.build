@@ -169,5 +169,5 @@ foreach p : pkg_files
     install_dir : pkg_install_dir)
 endforeach
 
-license_files = ['COPYING-LGPL-2', 'COPYING-LGPL-2.1']
+license_files = ['LICENSE.txt']
 install_data(sources: license_files)
