@@ -2,7 +2,7 @@
 
 /*
 * Copyright (c) 2009-2016, Freescale Semiconductor, Inc. 
-* Copyright 2017-2021 NXP
+* Copyright 2017-2023 NXP
  */
 
 /*
@@ -252,6 +252,8 @@ enum
 #define FLAG_OUTPUT_H264_SEI_POS_DATA 0x40
 //if set the flag, ts parser MUST parse return CSD/ESDS for aac adts even in live mode
 #define FLAG_FETCH_AAC_ADTS_CSD 0x80
+// if set the flag, parser must insert a 16-bytes header for every sequence/picture/slice
+#define FLAG_VIDEO_INSERT_HEADER 0x100
 
 /*********************************************************************
  * User data ID
