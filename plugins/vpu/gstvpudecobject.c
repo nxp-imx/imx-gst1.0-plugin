@@ -779,7 +779,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
     fmt = vpu_dec_object->output_format_decided;
 
   if (fmt ==  GST_VIDEO_FORMAT_NV12 && vpu_dec_object->init_info.nBitDepth == 10){
-    fmt = GST_VIDEO_FORMAT_NV12_10LE;
+    fmt = GST_VIDEO_FORMAT_NV12_10LE40;
   }
   if (IS_HANTRO() && vpu_dec_object->init_info.nInterlace
       && vpu_dec_object->implement_config) {
@@ -850,7 +850,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
   if ((vpu_dec_object->init_info.hasHdr10Meta || vpu_dec_object->init_info.hasColorDesc)
       && (vpu_dec_object->init_info.ColourDesc.transferCharacteristics == 16
           || vpu_dec_object->init_info.ColourDesc.transferCharacteristics ==18)
-      && fmt == GST_VIDEO_FORMAT_NV12_10LE) {
+      && fmt == GST_VIDEO_FORMAT_NV12_10LE40) {
     GstVideoMasteringDisplayInfo minfo;
     GstVideoContentLightLevel cll;
     minfo.display_primaries[0].x = vpu_dec_object->init_info.Hdr10Meta.redPrimary[0];

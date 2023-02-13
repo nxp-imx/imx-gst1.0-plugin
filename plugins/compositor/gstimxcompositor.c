@@ -1646,7 +1646,7 @@ static GstCaps* imx_compositor_caps_from_fmt_list(GList* list, gboolean is_input
     GstVideoFormat fmt = (GstVideoFormat)g_list_nth_data(list, i);
     /* OpenCL based g2d can't support multi instance. disable is for compositor */
     if (HAS_DPU ()) {
-      if (is_input && fmt == GST_VIDEO_FORMAT_NV12_10LE)
+      if (is_input && fmt == GST_VIDEO_FORMAT_NV12_10LE40)
         continue;
       if (!is_input && fmt == GST_VIDEO_FORMAT_NV12)
         continue;

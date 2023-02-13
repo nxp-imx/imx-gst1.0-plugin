@@ -94,7 +94,7 @@ static G2dFmtMap g2d_fmts_map_dpu[] = {
 
     {GST_VIDEO_FORMAT_I420,   G2D_I420,     12},
     {GST_VIDEO_FORMAT_NV12,   G2D_NV12,     12},
-    {GST_VIDEO_FORMAT_NV12_10LE,   G2D_NV12,     15},
+    {GST_VIDEO_FORMAT_NV12_10LE40,   G2D_NV12,     15},
     {GST_VIDEO_FORMAT_NV12_8L128,     G2D_NV12,12},
     {GST_VIDEO_FORMAT_NV12_10BE_8L128,  G2D_NV12,15},
 
@@ -307,7 +307,7 @@ static gint imx_g2d_config_input(Imx2DDevice *device, Imx2DVideoInfo* in_info)
   g2d->src.base.bottom = in_info->h;
   if (in_info->tile_type == IMX_2D_TILE_AMHPION) {
     g2d->src.base.stride = in_info->stride / (in_map->bpp/8);
-    if (in_info->fmt == GST_VIDEO_FORMAT_NV12_10LE)
+    if (in_info->fmt == GST_VIDEO_FORMAT_NV12_10LE40)
       g2d->src.tiling = G2D_AMPHION_TILED_10BIT;
     else
       g2d->src.tiling = G2D_AMPHION_TILED;

@@ -364,10 +364,10 @@ static gint get_format_conversion_loss(GstBaseTransform * base,
   if (HAS_DPU ()) {
     if (in_name == GST_VIDEO_FORMAT_NV12_10BE_8L128 && out_name == GST_VIDEO_FORMAT_NV12)
       return 0;
-    if (in_name == GST_VIDEO_FORMAT_NV12_10LE
+    if (in_name == GST_VIDEO_FORMAT_NV12_10LE40
         && out_name == GST_VIDEO_FORMAT_NV12)
       return 0;
-    else if (in_name != GST_VIDEO_FORMAT_NV12_10LE
+    else if (in_name != GST_VIDEO_FORMAT_NV12_10LE40
         && out_name == GST_VIDEO_FORMAT_NV12)
       return G_MAXINT32;
   }
