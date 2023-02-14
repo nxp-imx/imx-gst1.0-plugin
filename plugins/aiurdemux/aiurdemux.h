@@ -274,7 +274,7 @@ struct _AiurDemuxStream
     gint64 last_timestamp;
     gint64 lag_time;
     GstFlowReturn last_ret;
-
+    gboolean send_gap_event;
     
 
 };

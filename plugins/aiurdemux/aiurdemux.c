@@ -506,6 +506,10 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
   GstStateChangeReturn result = GST_STATE_CHANGE_FAILURE;
 
   switch (transition) {
+    case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
+      GST_DEBUG_OBJECT(demux,"change_state PLAYING_TO_PAUSED");
+      aiurdemux_handle_eos_stream (demux, NULL, GST_CLOCK_TIME_NONE);
+      break;
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       GST_DEBUG_OBJECT(demux,"change_state READY_TO_PAUSED");
 
@@ -1460,6 +1464,211 @@ static GstFlowReturn aiurdemux_loop_state_header (GstAiurDemux * demux)
   return ret;
 }
 
+gboolean aiurdemux_update_eos_stream_position (GstAiurDemux * demux, GstClockTime *duration)
+{
+  guint8 idx = 0;
+  AiurDemuxStream *stream;
+  GstClockTime ts_start = GST_CLOCK_TIME_NONE;
+  GstClockTime ts_stop = GST_CLOCK_TIME_NONE;
+
+
+  /* 1.Check all tracks eos status */
+  for (idx = 0; idx < demux->n_streams; idx++) {
+    stream = demux->streams[idx];
+    if ((!stream->valid) && stream->type != MEDIA_TEXT) {
+      break;
+    }
+  }
+
+  if (idx >= demux->n_streams) {
+    GST_LOG_OBJECT(demux, "No stream is EOS");
+    *duration = GST_CLOCK_TIME_NONE;
+    return FALSE;
+  }
+
+  /* 2.Get the current time position for EOS stream */
+  if (demux->valid_mask) {
+    for (idx = 0; idx < demux->n_streams; idx++) {
+      stream = demux->streams[idx];
+
+      if (stream->type == MEDIA_TEXT) {
+        continue;
+      }
+
+      if (stream->valid) {
+        if (!GST_CLOCK_TIME_IS_VALID (stream->last_start)) {
+          continue;
+        }
+
+        if (demux->segment.rate > 0.0) {
+          /* Get the maximum time position */
+          if (!GST_CLOCK_TIME_IS_VALID (ts_start)) {
+            ts_start = stream->last_start;
+            ts_stop = stream->last_stop;
+          } else {
+            if (ts_start < stream->last_start) {
+              ts_start = stream->last_start;
+              ts_stop = stream->last_stop;
+            }
+          }
+        } else {
+          /* Get the minimum time position */
+          if (!GST_CLOCK_TIME_IS_VALID (ts_start)) {
+            ts_start = stream->last_start;
+            ts_stop = stream->last_stop;
+          } else {
+            if (ts_start > stream->last_start) {
+              ts_start = stream->last_start;
+              ts_stop = stream->last_stop;
+            }
+          }
+        }
+      }
+    }
+
+    /* 3.Check the time position value */
+    if (!GST_CLOCK_TIME_IS_VALID (ts_start)) {
+      GST_LOG_OBJECT(demux, "No valid ts");
+      for (idx = 0; idx < demux->n_streams; idx++) {
+        stream = demux->streams[idx];
+        if ((!stream->valid) && stream->type != MEDIA_TEXT) {
+          stream->send_gap_event = TRUE;
+        }
+      }
+      *duration = GST_CLOCK_TIME_NONE;
+      return TRUE;
+    } else {
+      if (GST_CLOCK_TIME_IS_VALID (ts_stop)) {
+        if (ts_stop > ts_start) {
+          *duration = ts_stop - ts_start;
+        } else {
+          *duration = GST_CLOCK_TIME_NONE;
+        }
+      } else {
+        *duration = GST_CLOCK_TIME_NONE;
+      }
+    }
+
+    /* 4.update position */
+    for (idx = 0; idx < demux->n_streams; idx++) {
+      stream = demux->streams[idx];
+      if ((!stream->valid) && stream->type != MEDIA_TEXT) {
+        if (demux->segment.rate > 0.0) {
+          if (GST_CLOCK_TIME_IS_VALID (stream->last_start)) {
+            if (stream->last_start < ts_start) {
+              stream->last_start = ts_start;
+              stream->time_position = ts_start;
+              stream->send_gap_event = TRUE;
+            }
+          } else {
+            if (!GST_CLOCK_TIME_IS_VALID (stream->time_position)
+              || (stream->time_position < ts_start)) {
+              stream->last_start = ts_start;
+              stream->time_position = ts_start;
+              stream->send_gap_event = TRUE;
+            }
+          }
+        } else {
+          if (GST_CLOCK_TIME_IS_VALID (stream->last_start)) {
+            if (stream->last_start > ts_start) {
+              stream->last_start = ts_start;
+              stream->time_position = ts_start;
+              stream->send_gap_event = TRUE;
+            }
+          } else {
+            if (!GST_CLOCK_TIME_IS_VALID (stream->time_position)
+              || (stream->time_position > ts_start)) {
+              stream->last_start = ts_start;
+              stream->time_position = ts_start;
+              stream->send_gap_event = TRUE;
+            }
+          }
+        }
+
+        GST_DEBUG_OBJECT (demux, "pad: %s, update position: %" GST_TIME_FORMAT,
+        GST_OBJECT_NAME (stream->pad), GST_TIME_ARGS(stream->time_position));
+      }
+    }
+  }
+
+  return TRUE;
+}
+GstFlowReturn aiurdemux_handle_eos_stream (GstAiurDemux * demux, AiurDemuxStream * select_stream, GstClockTime duration)
+{
+  guint8 idx = 0;
+  AiurDemuxStream *stream;
+  GstFlowReturn ret = GST_FLOW_OK;
+  GstClockTime new_duration = GST_CLOCK_TIME_NONE;
+
+  /* Send gap event to the specified stream */
+  if (select_stream && demux->valid_mask) {
+    if (GST_CLOCK_TIME_IS_VALID (select_stream->last_start)) {
+      /* Has sent data before, use it */
+      select_stream->time_position = select_stream->last_start;
+    }
+    gst_pad_push_event (select_stream->pad,
+    gst_event_new_gap (select_stream->time_position, duration));
+    return ret;
+  }
+
+  if (demux->valid_mask) {
+    /* Check and Update position for all the EOS stream when playing */
+    if (!select_stream && GST_CLOCK_TIME_IS_VALID (duration)) {
+      if (!aiurdemux_update_eos_stream_position (demux, &new_duration)) {
+        return ret;
+      }
+    }
+
+    /* Send gap event downstream if the stream reach EOS */
+    for (idx = 0; idx < demux->n_streams; idx++) {
+      stream = demux->streams[idx];
+
+      if (stream->valid || (stream->type == MEDIA_TEXT)) {
+        continue;
+      }
+
+      if (!GST_CLOCK_TIME_IS_VALID (duration)
+        || (stream->send_gap_event)) {
+        gst_pad_push_event (stream->pad,
+        gst_event_new_gap (stream->time_position, GST_CLOCK_TIME_NONE));
+        stream->send_gap_event = FALSE;
+
+        GST_LOG_OBJECT(demux, "pad: %s, position: %" GST_TIME_FORMAT
+        ", last_start: %" GST_TIME_FORMAT
+        ", last_stop: %" GST_TIME_FORMAT,
+        GST_OBJECT_NAME (stream->pad),
+        GST_TIME_ARGS(stream->time_position),
+        GST_TIME_ARGS (stream->last_start),
+        GST_TIME_ARGS (stream->last_stop));
+      }
+    }
+  } else {
+    GST_LOG_OBJECT(demux, "All streams are EOS");
+
+    /* recheck stream */
+    for (idx = 0; idx < demux->n_streams; idx++) {
+      stream = demux->streams[idx];
+      if (stream->valid) {
+        GST_DEBUG_OBJECT(demux,"pad: %s, not EOS stream",
+        GST_OBJECT_NAME (stream->pad));
+        return ret;
+      }
+    }
+
+    GstEvent *eos = gst_event_new_eos ();
+    for (idx = 0; idx < demux->n_streams; idx++) {
+      stream = demux->streams[idx];
+      if (!GST_PAD_IS_EOS (stream->pad)) {
+        ret = gst_pad_push_event (stream->pad, gst_event_ref (eos));
+        GST_LOG_OBJECT(demux,"pad: %s, send EOS, ret: %d \n",
+        GST_OBJECT_NAME (stream->pad), ret);
+      }
+    }
+    gst_event_unref (eos);
+  }
+  return ret;
+}
+
 static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
 {
 
@@ -1557,10 +1766,14 @@ static GstFlowReturn aiurdemux_loop_state_movie (GstAiurDemux * demux)
   GST_LOG_OBJECT (demux, "STATE MOVIE END ret=%d",ret);
 
 bail:
+  aiurdemux_handle_eos_stream (demux, NULL, 0);
+
   return ret;
 
 
 beach:
+  aiurdemux_handle_eos_stream (demux, NULL, 0);
+
   if (stream) {
   if (stream->buffer) {
     gst_buffer_unref (stream->buffer);
@@ -3412,7 +3625,7 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
 
   if (demux->segment.rate >= 0) {
     if (demux->play_mode == AIUR_PLAY_MODE_TRICK_FORWARD &&
-        (stream->type == MEDIA_AUDIO || stream->type == MEDIA_TEXT)) {
+      stream->type == MEDIA_TEXT) {
       stream->new_segment = FALSE;
       return;
     }
@@ -3447,9 +3660,9 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
     GST_DEBUG ("segment event %" GST_SEGMENT_FORMAT, &segment);
     gst_pad_push_event (stream->pad, gst_event_new_segment (&segment));
   } else {
-    if(stream->type == MEDIA_AUDIO || stream->type == MEDIA_TEXT){
-        stream->new_segment = FALSE;
-        return;
+    if(stream->type == MEDIA_TEXT){
+      stream->new_segment = FALSE;
+      return;
     }
     if (stream->buffer) {
       GST_WARNING ("Pad %s: Send newseg %" GST_TIME_FORMAT " first buffer %"
@@ -3478,12 +3691,14 @@ aiurdemux_send_stream_eos (GstAiurDemux * demux, AiurDemuxStream * stream)
       aiurdemux_send_stream_newsegment (demux, stream);
     }
 
-    ret = gst_pad_push_event (stream->pad, gst_event_new_eos ());
+    //ret = gst_pad_push_event (stream->pad, gst_event_new_eos ());
 
     stream->valid = FALSE;
     demux->valid_mask &= (~stream->mask);
+    aiurdemux_handle_eos_stream (demux, stream, GST_CLOCK_TIME_NONE);
 
-    GST_WARNING ("Pad %s: Send eos. ", AIUR_MEDIATYPE2STR (stream->type));
+    //GST_WARNING ("Pad %s: Send eos. ", AIUR_MEDIATYPE2STR (stream->type));
+    GST_WARNING ("Pad %s: demux->valid_mask: %d", AIUR_MEDIATYPE2STR (stream->type), demux->valid_mask);
   }
 
   return ret;
