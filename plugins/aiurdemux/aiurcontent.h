@@ -37,7 +37,7 @@ int aiurcontent_get_memory_callback(AiurContent * pContent,ParserMemoryOps *mem_
 int aiurcontent_get_buffer_callback(AiurContent * pContent,ParserOutputBufferOps *file_cbks);
 
 int aiurcontent_init(AiurContent * pContent,GstPad *sinkpad,GstAiurStreamCache *stream_cache);
-
+void aiurcontent_set_adaptive_playback (AiurContent *pContent);
 gboolean aiurcontent_is_live(AiurContent * pContent);
 gboolean aiurcontent_is_seelable(AiurContent * pContent);
 gboolean aiurcontent_is_random_access(AiurContent * pContent);

@@ -526,6 +526,11 @@ bail:
 
 }
 
+void
+aiurcontent_set_adaptive_playback (AiurContent *pContent) {
+  pContent->adaptive_playback = TRUE;
+}
+
 static void
 aiurcontent_check_adaptive_playback (AiurContent *pContent)
 {
@@ -582,7 +587,9 @@ static void aiurcontent_query_content_info (AiurContent *pContent)
   }
   gst_query_unref (q);
 
-  aiurcontent_check_adaptive_playback(pContent);
+  if (!aiurcontent_is_adaptive_playback(pContent)) {
+    aiurcontent_check_adaptive_playback(pContent);
+  }
 
   /* check whether upstream is on-demand adaptive playback
      1. duration query success means there is end for this playback

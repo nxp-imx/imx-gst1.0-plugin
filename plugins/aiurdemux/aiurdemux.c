@@ -753,6 +753,19 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
       gst_event_unref (event);
       goto drop;
     }
+    case GST_EVENT_STREAM_START:
+    {
+      const gchar *stream_id;
+      const gchar *adaptive_stream_id = "bogus";
+
+      gst_event_parse_stream_start(event, &stream_id);
+      if (!g_strcmp0 (adaptive_stream_id, stream_id)) {
+        aiurcontent_set_adaptive_playback (demux->content_info);
+        GST_LOG_OBJECT (demux, "playbin3 adaptive playback: receive stream start event");
+      }
+
+      break;
+    }
     default:
         GST_LOG_OBJECT(demux,"gst_aiurdemux_handle_sink_event event=%s",GST_EVENT_TYPE_NAME (event));
       break;
@@ -880,6 +893,7 @@ gst_aiurdemux_handle_src_query (GstPad * pad, GstObject * parent, GstQuery * que
           }
           /*FIXME: disable none video on-demand seek because there is
           no interface to tell player what is the seek range */
+          /* playbin3 will handle this event in adaptivedemux2 */
           if (!aiurcontent_is_adaptive_vod (demux->content_info)) {
             gst_query_set_seeking (query, GST_FORMAT_TIME, FALSE, seek_start, seek_end);
             res = TRUE;
