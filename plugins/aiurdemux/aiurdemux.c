@@ -520,6 +520,8 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
       demux->avg_diff = 0;
       demux->start_time = GST_CLOCK_TIME_NONE;
       demux->tag_list = gst_tag_list_new_empty ();
+      demux->presentation_offset = 0;
+      demux->is_need_update_segment = FALSE;
       aiurcontent_new(&demux->content_info);
       break;
     default:
@@ -624,10 +626,24 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
         if (aiurcontent_is_adaptive_playback(demux->content_info)) {
           gst_event_copy_segment (event, &demux->segment);
 
-          for (int n = 0; n < demux->n_streams; n++) {
-            AiurDemuxStream *stream = demux->streams[n];
-            aiurdemux_reset_stream (demux, stream);
-            stream->time_position = demux->segment.start;
+          /* For the adaptive playback, the presentation offset
+           * may not be 0. Need record it and convert the buffer
+           * timestamp by it such as mpeg-ts stream with hlsdemux2. */
+          if (demux->segment.start && (!demux->segment.time)) {
+            demux->presentation_offset =
+            demux->segment.start - demux->segment.time;
+            GST_DEBUG_OBJECT (demux, "demux->presentation_offset = %ld \n",
+            demux->presentation_offset);
+          }
+
+          if (demux->n_streams == 0) {
+            demux->is_need_update_segment = TRUE;
+          } else {
+            for (int n = 0; n < demux->n_streams; n++) {
+              AiurDemuxStream *stream = demux->streams[n];
+              aiurdemux_reset_stream (demux, stream);
+              stream->time_position = demux->segment.start;
+            }
           }
 
           if (!demux->thread) {
@@ -3582,6 +3598,14 @@ aiurdemux_adjust_timestamp (GstAiurDemux * demux, AiurDemuxStream * stream,
     }
   }
 
+  /* For the adaptive playback, the presentation offset
+   * may not be 0, need convert the buffer timestamp. */
+  if (aiurcontent_is_adaptive_playback(demux->content_info)) {
+    if (demux->presentation_offset) {
+      GST_BUFFER_TIMESTAMP (buffer) += demux->presentation_offset;
+    }
+  }
+
   GST_BUFFER_DTS(buffer) = GST_BUFFER_TIMESTAMP (buffer);
 
   GST_BUFFER_DURATION (buffer) = stream->sample_stat.duration;
@@ -3623,6 +3647,18 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
     GstSegment segment;
     gst_segment_init (&segment, GST_FORMAT_TIME);
 
+  /* For the adaptive playback, aiurdemux can't update time position
+   * of the streams when recevie the first segment event at the start
+   * because the streams has not been created yet */
+  if (demux->is_need_update_segment &&
+      aiurcontent_is_adaptive_playback(demux->content_info)) {
+    for (int n = 0; n < demux->n_streams; n++) {
+      AiurDemuxStream *stream = demux->streams[n];
+      stream->time_position = demux->segment.start;
+    }
+    demux->is_need_update_segment = FALSE;
+  }
+
   if (demux->segment.rate >= 0) {
     if (demux->play_mode == AIUR_PLAY_MODE_TRICK_FORWARD &&
       stream->type == MEDIA_TEXT) {
@@ -3657,6 +3693,15 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
       segment.duration = stream->track_duration;
     }
     segment.position = segment.time = stream->time_position;
+
+    /* For some adaptive playback, the time of some streams may not be equal
+     * the position, need update it such as mpeg-ts stream with hlsdemux2 */
+    if (aiurcontent_is_adaptive_playback(demux->content_info)) {
+      segment.time = demux->segment.time;
+      /* Update by the raw segment information */
+      segment.position = demux->segment.position;
+    }
+
     GST_DEBUG ("segment event %" GST_SEGMENT_FORMAT, &segment);
     gst_pad_push_event (stream->pad, gst_event_new_segment (&segment));
   } else {

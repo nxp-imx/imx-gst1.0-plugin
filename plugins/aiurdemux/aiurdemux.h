@@ -328,6 +328,9 @@ struct _GstAiurDemux
     GstClockTime pipeline_latency;//latency value setting from pipeline
     GstClockTimeDiff media_offset;
     GstClockTimeDiff avg_diff;
+    /* adaptive playback */
+    GstClockTime presentation_offset;
+    gboolean is_need_update_segment;
 
     AiurDemuxOption option;
 
