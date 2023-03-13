@@ -1699,7 +1699,7 @@ gint gst_imx_v4l2_register_buffer (gpointer v4l2handle, PhyMemBlock *memblk)
   v4l2buf->type = handle->type;
   v4l2buf->memory = handle->memory_mode;
   v4l2buf->index = handle->allocated;
-  v4l2buf->m.userptr = memblk->paddr;
+  v4l2buf->m.userptr = (unsigned long)memblk->paddr;
   v4l2buf->length = memblk->size;
   handle->buffer_pair[handle->allocated].vaddr = memblk->vaddr;
 
