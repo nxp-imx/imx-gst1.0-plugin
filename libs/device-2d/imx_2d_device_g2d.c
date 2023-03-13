@@ -425,7 +425,7 @@ static gint imx_g2d_blit(Imx2DDevice *device,
       goto err;
     }
     if (paddr) {
-      src->mem->paddr = paddr;
+      src->mem->paddr = (guint8*)paddr;
     } else {
       GST_ERROR ("Can't get physical address.");
       ret = -1;
@@ -435,7 +435,7 @@ static gint imx_g2d_blit(Imx2DDevice *device,
   if (!dst->mem->paddr) {
     paddr = phy_addr_from_fd (dst->fd[0]);
     if (paddr) {
-      dst->mem->paddr = paddr;
+      dst->mem->paddr = (guint8*)paddr;
     } else {
       GST_ERROR ("Can't get physical address.");
       ret = -1;
@@ -474,10 +474,11 @@ static gint imx_g2d_blit(Imx2DDevice *device,
 
   if (src->fd[1] >= 0)
   {
-    if (!src->mem->user_data)
-      src->mem->user_data = g2d->src.base.planes[1] = phy_addr_from_fd (src->fd[1]);
-    else
-      g2d->src.base.planes[1] = src->mem->user_data;
+    if (!src->mem->user_data) {
+      g2d->src.base.planes[1] = (gint)phy_addr_from_fd (src->fd[1]);
+      src->mem->user_data = (gpointer *)g2d->src.base.planes[1];
+    } else
+      g2d->src.base.planes[1] = (unsigned long)src->mem->user_data;
   }
   switch (src->interlace_type) {
     case IMX_2D_INTERLACE_INTERLEAVED:
@@ -693,7 +694,7 @@ static gint imx_g2d_fill_color(Imx2DDevice *device, Imx2DFrame *dst,
   if (!dst->mem->paddr) {
     paddr = phy_addr_from_fd (dst->fd[0]);
     if (paddr) {
-      dst->mem->paddr = paddr;
+      dst->mem->paddr = (guint8*)paddr;
     } else {
       GST_ERROR ("Can't get physical address.");
       return -1;
