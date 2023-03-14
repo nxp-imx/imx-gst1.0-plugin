@@ -41,6 +41,8 @@
 #include "aiurdemux.h"
 #include "gstimxcommon.h"
 
+extern gboolean aiur_register_external_typefinders (GstPlugin * plugin);
+
 static gboolean
 plugin_init (GstPlugin * plugin)
 {

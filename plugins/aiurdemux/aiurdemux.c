@@ -195,7 +195,7 @@ static AiurDemuxTagEntry g_user_data_entry[] = {
       "Track Number : %s\n"},
   {USER_DATA_TOTALTRACKNUMBER, USER_DATA_FORMAT_UTF8, GST_TAG_TRACK_COUNT,
       "Track Count : %s\n"},
-  {USER_DATA_LOCATION, USER_DATA_FORMAT_UTF8, -1,
+  {USER_DATA_LOCATION, USER_DATA_FORMAT_UTF8, (const gchar*)-1,
       "Location : %s\n"},
   {USER_DATA_KEYWORDS, USER_DATA_FORMAT_UTF8, GST_TAG_KEYWORDS,
       "Keywords : %s\n"},

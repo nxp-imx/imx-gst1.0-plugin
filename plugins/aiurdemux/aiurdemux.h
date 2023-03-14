@@ -39,7 +39,7 @@
 #include <gst/gst.h>
 #include <gst/base/gstadapter.h>
 #include <gst/tag/tag.h>
-
+#include <glib/gprintf.h>
 //#include "mfw_gst_utils.h"
 
 #include "fsl_parser.h"
