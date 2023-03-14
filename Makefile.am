@@ -165,8 +165,8 @@ noinst_HEADERS = \
     ext-includes/vpu_wrapper.h		 \
     ext-includes/fsl_unia.h        \
     ext-includes/mp3_enc_interface.h \
-    ext-includes/spdif_parser/spdifparser_types.h \
-    ext-includes/spdif_parser/spdifparser.h  
+    ext-includes/spdifparser_types.h \
+    ext-includes/spdifparser.h  
     
 
 fslmmdocdir = $(docdir)/imx-mm/gstreamer-1.0
