@@ -37,7 +37,7 @@
 #endif
 #include "beepdec.h"
 #include "gstimxcommon.h"
-
+extern gboolean beep_register_external_typefinders (GstPlugin * plugin);
 static gboolean
 plugin_init (GstPlugin * plugin)
 {
