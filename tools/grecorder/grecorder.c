@@ -23,10 +23,11 @@
 #include <semaphore.h>
 #include <pthread.h>
 #include <signal.h>
+#include <unistd.h> /* sleep */
 #include <getopt.h>
 #define __USE_LARGEFILE64
 #include <sys/statvfs.h>
-
+#include <glib/gprintf.h> /* g_print */
 #include "recorder_engine.h"
 
 #define LOG_ERROR printf
@@ -167,6 +168,8 @@ static sem_t grecordersem;
 static RecorderMessage latest_message = MESSAGE_NULL;
 
 static volatile sig_atomic_t quit_flag = 0;
+
+static void post_message (RecorderMessage message);
 
 static void signal_handler(int signum)
 {
