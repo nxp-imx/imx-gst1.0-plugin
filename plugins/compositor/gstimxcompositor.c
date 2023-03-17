@@ -951,6 +951,7 @@ gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps)
   GstCaps *ret = caps;
   GstAggregator *agg = (GstAggregator*)vagg;
 
+  gst_video_info_init (&info);
   if (!gst_caps_is_fixed (caps)) {
     GstCaps *tmp = gst_caps_fixate (gst_caps_ref (caps));
     gst_video_info_from_caps (&info, tmp);
