@@ -1622,8 +1622,9 @@ GstFlowReturn aiurdemux_handle_eos_stream (GstAiurDemux * demux, AiurDemuxStream
       /* Has sent data before, use it */
       select_stream->time_position = select_stream->last_start;
     }
-    gst_pad_push_event (select_stream->pad,
-    gst_event_new_gap (select_stream->time_position, duration));
+    GstEvent *gap = gst_event_new_gap (select_stream->time_position, duration);
+    gst_event_set_gap_flags (gap, GST_GAP_FLAG_MISSING_DATA);
+    gst_pad_push_event (select_stream->pad, gap);
     return ret;
   }
 
@@ -1645,8 +1646,9 @@ GstFlowReturn aiurdemux_handle_eos_stream (GstAiurDemux * demux, AiurDemuxStream
 
       if (!GST_CLOCK_TIME_IS_VALID (duration)
         || (stream->send_gap_event)) {
-        gst_pad_push_event (stream->pad,
-        gst_event_new_gap (stream->time_position, GST_CLOCK_TIME_NONE));
+        GstEvent *gap = gst_event_new_gap (stream->time_position, GST_CLOCK_TIME_NONE);
+        gst_event_set_gap_flags (gap, GST_GAP_FLAG_MISSING_DATA);
+        gst_pad_push_event (stream->pad, gap);
         stream->send_gap_event = FALSE;
 
         GST_LOG_OBJECT(demux, "pad: %s, position: %" GST_TIME_FORMAT
