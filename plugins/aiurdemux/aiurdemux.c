@@ -470,6 +470,9 @@ static void gst_aiurdemux_init (GstAiurDemux * demux)
 
   demux->pipeline_latency = AIURDEMUX_PIPELINE_LATENCY;
 
+  demux->have_group_id = FALSE;
+  demux->group_id = G_MAXUINT;
+
   demux->stream_cache = gst_aiur_stream_cache_new (AIUR_STREAM_CACHE_SIZE,
     AIUR_STREAM_CACHE_SIZE_MAX, demux);
 
@@ -557,6 +560,8 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
       demux->n_sub_streams = 0;
       demux->sub_read_cnt = 0;
       demux->sub_read_ready = 0;
+      demux->have_group_id = FALSE;
+      demux->group_id = G_MAXUINT;
 
       break;
     }
@@ -777,6 +782,7 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
     {
       const gchar *stream_id;
       const gchar *adaptive_stream_id = "bogus";
+      GST_DEBUG_OBJECT (demux, "Handling %" GST_PTR_FORMAT, event);
 
       gst_event_parse_stream_start(event, &stream_id);
       if (!g_strcmp0 (adaptive_stream_id, stream_id)) {
@@ -2294,6 +2300,7 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
     if (stream->pad) {
       //gboolean padRet = TRUE;
       gchar *stream_id;
+      GstEvent *event;
       GST_PAD_ELEMENT_PRIVATE (stream->pad) = stream;
       gst_pad_use_fixed_caps (stream->pad);
       gst_pad_set_event_function (stream->pad, gst_aiurdemux_handle_src_event);
@@ -2308,13 +2315,32 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
       stream_id =
           gst_pad_create_stream_id_printf (stream->pad,
           GST_ELEMENT_CAST (demux), "%u", stream->track_idx);
-      gst_pad_push_event (stream->pad, gst_event_new_stream_start (stream_id));
+
+      event =
+          gst_pad_get_sticky_event (demux->sinkpad, GST_EVENT_STREAM_START,
+          0);
+      if (event) {
+        if (gst_event_parse_group_id (event, &demux->group_id))
+          demux->have_group_id = TRUE;
+        else
+          demux->have_group_id = FALSE;
+        gst_event_unref (event);
+      } else if (!demux->have_group_id) {
+        demux->have_group_id = TRUE;
+        demux->group_id = gst_util_group_id_next ();
+      }
+
+      event = gst_event_new_stream_start (stream_id);
+      if (demux->have_group_id)
+        gst_event_set_group_id (event, demux->group_id);
+
+      gst_pad_push_event (stream->pad, event);
       g_free (stream_id);
 
       gst_pad_set_caps (stream->pad, stream->caps);
 
-      GST_INFO_OBJECT (demux, "adding pad %s %p to demux %p, caps string=%s",
-            GST_OBJECT_NAME (stream->pad), stream->pad, demux,gst_caps_to_string(stream->caps));
+      GST_INFO_OBJECT (demux, "adding pad %s %p to demux %p, caps string=%s group-id=%d",
+            GST_OBJECT_NAME (stream->pad), stream->pad, demux,gst_caps_to_string(stream->caps), demux->group_id);
       gst_element_add_pad (GST_ELEMENT_CAST (demux), stream->pad);
 
       // global tags go on each pad anyway

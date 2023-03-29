@@ -337,6 +337,11 @@ struct _GstAiurDemux
     GThread *thread;  // for push mode thread
     GMutex seekmutex;
 
+    /* Incoming stream group-id to set on downstream STREAM_START events.
+     * If upstream doesn't contain one, a global one will be generated */
+    gboolean have_group_id;
+    guint group_id;
+
 };
 
 struct _GstAiurDemuxClass
