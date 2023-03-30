@@ -549,6 +549,7 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
       gst_aiurdemux_close_core (demux);
       aiurcontent_release(demux->content_info);
       demux->content_info = NULL;
+      gst_aiur_stream_cache_enable_update_status (demux->stream_cache, FALSE);
 
       gst_segment_init (&demux->segment, GST_FORMAT_TIME);
 
@@ -787,6 +788,10 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
       gst_event_parse_stream_start(event, &stream_id);
       if (!g_strcmp0 (adaptive_stream_id, stream_id)) {
         aiurcontent_set_adaptive_playback (demux->content_info);
+        /* need synchronize the receiving thread with the parsing thread by
+         * cache status to guarantee the timing of eos event and any other
+         * data transmission in adaptivedemux2 */
+        gst_aiur_stream_cache_enable_update_status (demux->stream_cache, TRUE);
         GST_LOG_OBJECT (demux, "playbin3 adaptive playback: receive stream start event");
       }
 

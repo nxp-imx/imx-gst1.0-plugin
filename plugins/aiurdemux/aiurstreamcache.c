@@ -78,6 +78,12 @@ GType aiur_stream_cache_type = 0;
 
 static GTimeVal timeout = { 1, 0 };
 
+static void
+gst_aiur_stream_cache_set_status (GstAiurStreamCache * cache, AIUR_CAHCE_STATUS status);
+
+static void
+gst_aiur_stream_cache_wait_process (GstAiurStreamCache * cache);
+
 void
 gst_aiur_stream_cache_finalize (GstAiurStreamCache * cache)
 {
@@ -95,8 +101,10 @@ gst_aiur_stream_cache_finalize (GstAiurStreamCache * cache)
 
   g_cond_clear (&cache->produce_cond);
   g_cond_clear (&cache->consume_cond);
+  g_cond_clear (&cache->cache_status_cond);
 
   g_mutex_clear (&cache->mutex);
+  g_mutex_clear (&cache->cache_status_mutex);
 
 }
 
@@ -105,6 +113,7 @@ gst_aiur_stream_cache_close (GstAiurStreamCache * cache)
 {
 
   if (cache) {
+    gst_aiur_stream_cache_set_status (cache, AIUR_CACHE_STATUS_CLOSE);
     cache->closed = TRUE;
   }
 }
@@ -113,6 +122,7 @@ void
 gst_aiur_stream_cache_open (GstAiurStreamCache * cache)
 {
   if (cache) {
+    gst_aiur_stream_cache_set_status (cache, AIUR_CACHE_STATUS_OPEN);
     cache->closed = FALSE;
   }
 }
@@ -134,8 +144,10 @@ gst_aiur_stream_cache_new (guint64 threshold_max, guint64 threshold_pre,
 
   cache->adapter = gst_adapter_new ();
   g_mutex_init (&cache->mutex);
+  g_mutex_init (&cache->cache_status_mutex);
   g_cond_init (&cache->consume_cond);
   g_cond_init (&cache->produce_cond);
+  g_cond_init (&cache->cache_status_cond);
 
   cache->threshold_max = threshold_max;
   cache->threshold_pre = threshold_pre;
@@ -149,6 +161,8 @@ gst_aiur_stream_cache_new (guint64 threshold_max, guint64 threshold_pre,
   cache->closed = FALSE;
 
   cache->context = context;
+  cache->cache_status = AIUR_CACHE_STATUS_INIT;
+  cache->is_update_status = FALSE;
 
   return cache;
 }
@@ -254,6 +268,8 @@ gst_aiur_stream_cache_add_buffer (GstAiurStreamCache * cache,
   }else{
     gst_adapter_push (cache->adapter, buffer);
   }
+
+  gst_aiur_stream_cache_set_status (cache, AIUR_CACHE_STATUS_WRITE);
   g_cond_signal (&cache->produce_cond);
 
   buffer = NULL;
@@ -282,6 +298,11 @@ gst_aiur_stream_cache_add_buffer (GstAiurStreamCache * cache,
 
 
   g_mutex_unlock (&cache->mutex);
+
+  /* need synchronize the receiving thread with the parsing thread by
+   * cache status to guarantee the timing of eos event and any other
+   * data transmission in adaptivedemux2 */
+  gst_aiur_stream_cache_wait_process (cache);
 
   return;
 
@@ -429,6 +450,7 @@ try_read:
       if (readsize) {
         READ_BYTES (cache, buffer, readsize);
       }
+      gst_aiur_stream_cache_set_status (cache, AIUR_CACHE_STATUS_FINISH);
       goto beach;
     }
     goto not_enough_bytes;
@@ -436,12 +458,13 @@ try_read:
 
   readsize = size;
   READ_BYTES (cache, buffer, readsize);
-
+  gst_aiur_stream_cache_set_status (cache, AIUR_CACHE_STATUS_READ);
   goto beach;
 
 
 not_enough_bytes:
   //g_print("not enough %lld, try %d\n", size, retrycnt++);
+  gst_aiur_stream_cache_set_status (cache, AIUR_CACHE_STATUS_WAITING);
   WAIT_COND_TIMEOUT (&cache->produce_cond, &cache->mutex, 1000000);
   g_mutex_unlock (&cache->mutex);
 
@@ -470,5 +493,47 @@ gst_aiur_stream_cache_flush (GstAiurStreamCache * cache)
 
     g_mutex_unlock (&cache->mutex);
   }
+}
+
+void gst_aiur_stream_cache_enable_update_status (GstAiurStreamCache * cache, gboolean is_update)
+{
+  if (cache) {
+    g_mutex_lock (&cache->mutex);
+    cache->is_update_status = is_update;
+    g_mutex_unlock (&cache->mutex);
+  }
+}
+
+static void
+gst_aiur_stream_cache_set_status (GstAiurStreamCache * cache, AIUR_CAHCE_STATUS status)
+{
+  if (!cache || !cache->is_update_status) {
+    return ;
+  }
+
+  g_mutex_lock (&cache->cache_status_mutex);
+  if (status != cache->cache_status) {
+    cache->cache_status = status;
+    if ((status != AIUR_CACHE_STATUS_WRITE)
+      && (status != AIUR_CACHE_STATUS_READ)) {
+      g_cond_signal (&cache->cache_status_cond);
+    }
+  }
+  g_mutex_unlock (&cache->cache_status_mutex);
+}
+
+static void
+gst_aiur_stream_cache_wait_process (GstAiurStreamCache * cache)
+{
+  if (!cache || !cache->is_update_status) {
+    return ;
+  }
+
+  g_mutex_lock (&cache->cache_status_mutex);
+  while (((cache->cache_status == AIUR_CACHE_STATUS_WRITE)
+    || (cache->cache_status == AIUR_CACHE_STATUS_READ))) {
+    g_cond_wait (&cache->cache_status_cond, &cache->cache_status_mutex);
+  }
+  g_mutex_unlock (&cache->cache_status_mutex);
 }
 

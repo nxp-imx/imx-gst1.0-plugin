@@ -58,6 +58,15 @@
 #endif
 typedef struct _GstAiurStreamCache GstAiurStreamCache;
 //typedef struct _GstAiurStreamCacheClass GstAiurStreamCacheClass;
+typedef enum {
+  AIUR_CACHE_STATUS_OPEN,
+  AIUR_CACHE_STATUS_INIT,
+  AIUR_CACHE_STATUS_WRITE,
+  AIUR_CACHE_STATUS_READ,
+  AIUR_CACHE_STATUS_WAITING,
+  AIUR_CACHE_STATUS_FINISH,
+  AIUR_CACHE_STATUS_CLOSE
+} AIUR_CAHCE_STATUS;
 
 struct _GstAiurStreamCache
 {
@@ -69,6 +78,11 @@ struct _GstAiurStreamCache
   GCond consume_cond;
   GCond produce_cond;
 
+  gboolean is_update_status;
+  GMutex cache_status_mutex;
+  GCond cache_status_cond;
+  AIUR_CAHCE_STATUS cache_status;
+ 
   guint64 start;
   guint64 offset;
 
@@ -135,17 +149,7 @@ gst_aiur_stream_cache_read (GstAiurStreamCache * cache, guint64 size,
 void
 gst_aiur_stream_cache_flush (GstAiurStreamCache * cache);
 
-
-
-
-
-
-
-
-
-
-
-
-
+void 
+gst_aiur_stream_cache_enable_update_status (GstAiurStreamCache * cache, gboolean is_update);
 
 #endif
