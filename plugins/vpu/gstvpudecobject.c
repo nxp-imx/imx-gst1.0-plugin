@@ -135,8 +135,7 @@ gst_vpu_dec_object_get_sink_caps (void)
             && (map->std == VPU_V_DIVX3 || map->std == VPU_V_DIVX4
               || map->std == VPU_V_DIVX56)) || (IS_HANTRO()
               && (map->std == VPU_V_VP9 || map->std == VPU_V_HEVC
-                || map->std == VPU_V_RV || map->std == VPU_V_DIVX3
-                || map->std == VPU_V_DIVX4 || map->std == VPU_V_DIVX56
+                || map->std == VPU_V_RV
                 || map->std == VPU_V_AVS || map->std == VPU_V_VP6
                 || map->std == VPU_V_SORENSON || map->std == VPU_V_WEBP))
           || (IS_AMPHION() && (map->std == VPU_V_HEVC))) {
