@@ -81,6 +81,7 @@ typedef struct
   gboolean no_auto_next;
   gboolean handle_buffering;
   guint64 connection_speed;
+  gboolean use_playbin3;
 } gplay_pconfigions;
 
 typedef struct
@@ -364,6 +365,8 @@ print_help ()
       ("    --connection-speed Specify the default adaptive playback connection speed in bps\n");
   g_print ("                      Use below option to specify your connection speed\n");
   g_print ("                      --connection-speed=BPS\n\n");
+  g_print
+      ("    --disable-playbin3 swicth playback backend to playbin2, default is playbin3\n\n");
 }
 
 gint
@@ -451,6 +454,11 @@ parse_pconfigions (gplay_pconfigions * pconfig, gint32 argc, gchar * argv[])
 
         if ((strcmp (argv[i], "--handle-buffering") == 0)) {
           pconfig->handle_buffering = TRUE;
+          continue;
+        }
+
+        if ((strcmp (argv[i], "--disable-playbin3") == 0)) {
+          pconfig->use_playbin3 = FALSE;
           continue;
         }
 
@@ -1662,6 +1670,7 @@ main (int argc, char *argv[])
   options.no_auto_next = FALSE;
   options.handle_buffering = FALSE;
   options.display_refresh_frq = 1;
+  options.use_playbin3 = TRUE;
 
   if (parse_pconfigions (&options, argc, argv) != RET_SUCCESS) {
     return RET_FAILURE;
@@ -1669,6 +1678,14 @@ main (int argc, char *argv[])
 
   if (options.timeout == 0) {
     options.timeout = DEFAULT_TIME_OUT;
+  }
+
+  if (options.use_playbin3) {
+    g_print ("playbin3 is enabled\n");
+    g_setenv ("GST_PLAY_USE_PLAYBIN3", "1", TRUE);
+  } else {
+    g_print ("playbin3 is disabled\n");
+    g_setenv ("GST_PLAY_USE_PLAYBIN3", "0", TRUE);
   }
 
   if (!options.video_sink_name) {
