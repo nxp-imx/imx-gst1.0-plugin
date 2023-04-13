@@ -1735,6 +1735,8 @@ main (int argc, char *argv[])
       && (gplay_checkfeature (DCSS) || gplay_checkfeature (DPU))) {
     g_print ("Disable subtitle rendering\n");
     gst_play_set_subtitle_track_enabled (play, FALSE);
+    /* clear subtitle uri */
+    options.suburi = NULL;
   }
 
   sPlay.options = &options;
