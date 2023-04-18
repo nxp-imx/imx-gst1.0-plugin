@@ -38,7 +38,7 @@
 #include <string.h>
 
 #include "aiurdemux.h"
-
+#include "gstimxcommon.h"
 
 GST_DEBUG_CATEGORY (aiurdemux_debug);
 
@@ -72,6 +72,8 @@ static AiurdemuxCodecStruct aiurdemux_videocodec_tab[] ={
   {VIDEO_WMV, VIDEO_WMV9, "WMV9", "video/x-wmv, wmvversion=(int)3, format=(string)WMV3"},
   {VIDEO_WMV, VIDEO_WVC1, "VC1", "video/x-wmv, wmvversion=(int)3, format=(string)WVC1"},
   {VIDEO_WMV, 0, NULL, NULL},
+  {VIDEO_REAL, REAL_VIDEO_RV30, "RealVideo", "video/x-pn-realvideo, version=(int)3"},
+  {VIDEO_REAL, REAL_VIDEO_RV40, "RealVideo", "video/x-pn-realvideo, version=(int)4"},
   {VIDEO_REAL, 0, "RealVideo", "video/x-pn-realvideo"},
   {VIDEO_SORENSON_H263, 0, "Sorenson H.263", "video/x-flash-video, flvversion=(int)1"},
   {VIDEO_FLV_SCREEN, 0, "Flash Screen", "video/x-flash-screen"},
@@ -1348,6 +1350,11 @@ aiurdemux_loop_state_init (GstAiurDemux * demux)
     if(isLive){
         flag |= FILE_FLAG_NON_SEEKABLE;
         flag |= FILE_FLAG_READ_IN_SEQUENCE;
+    }
+
+    if (!strcmp (demux->core_interface->name, "realmedia") && IS_AMPHION()) {
+      GST_DEBUG_OBJECT(demux, "real media parser: need insert header");
+      flag |= FLAG_VIDEO_INSERT_HEADER;
     }
     parser_result = IParser->createParser2(flag ,file_cbks, mem_cbks,
       buf_cbks, (void *)(demux->content_info), &core_handle);
