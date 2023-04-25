@@ -513,7 +513,7 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
   switch (transition) {
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
       GST_DEBUG_OBJECT(demux,"change_state PLAYING_TO_PAUSED");
-      aiurdemux_handle_eos_stream (demux, NULL, GST_CLOCK_TIME_NONE);
+      aiurdemux_check_stream_status (demux);
       break;
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       GST_DEBUG_OBJECT(demux,"change_state READY_TO_PAUSED");
@@ -1627,6 +1627,43 @@ gboolean aiurdemux_update_eos_stream_position (GstAiurDemux * demux, GstClockTim
 
   return TRUE;
 }
+
+void aiurdemux_check_stream_status (GstAiurDemux * demux)
+{
+  guint8 idx = 0;
+  AiurDemuxStream *stream;
+  gboolean ret;
+
+  if (demux->valid_mask) {
+    for (idx = 0; idx < demux->n_streams; idx++) {
+      stream = demux->streams[idx];
+      if (!stream->valid && (stream->type != MEDIA_TEXT)) {
+        GstQuery *query;
+        gboolean busy;
+        gint percent = 0;
+        #define GAP_SENDING_THRESHOLD_PERCENT 10
+
+        /* query current queue status in multiqueue */
+        query = gst_query_new_buffering (GST_FORMAT_TIME);
+        if (gst_pad_peer_query (stream->pad, query)) {
+          gst_query_parse_buffering_percent (query, &busy, &percent);
+        }
+        gst_query_unref (query);
+        /* send GAP event to sink to finished pre-roll. The reason is data
+        * sending task may be blocked in other track, so can't trigger the track
+        * which reach EOS to send GAP event. */
+        if (percent < GAP_SENDING_THRESHOLD_PERCENT) {
+          GstEvent *gap = gst_event_new_gap (stream->time_position, GST_CLOCK_TIME_NONE);
+          gst_event_set_gap_flags (gap, GST_GAP_FLAG_MISSING_DATA);
+          gst_pad_push_event (stream->pad, gap);
+        }
+
+        continue;
+      }
+    }
+  }
+}
+
 GstFlowReturn aiurdemux_handle_eos_stream (GstAiurDemux * demux, AiurDemuxStream * select_stream, GstClockTime duration)
 {
   guint8 idx = 0;
