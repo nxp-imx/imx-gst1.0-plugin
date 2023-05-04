@@ -3881,6 +3881,91 @@ aiurdemux_send_stream_eos_all (GstAiurDemux * demux)
   return ret;
 }
 
+void aiurdemux_check_buffer_sending_status (GstAiurDemux * demux, AiurDemuxStream *stream)
+{
+  gboolean ret;
+  GstQuery *query;
+  GstFormat format;
+  gboolean use_interleave;
+  gint percent = 0;
+  gint64 start, stop;
+  GstClockTime gap_position = GST_CLOCK_TIME_NONE;
+  GstClockTime gap_duration = 0;
+  #define GAP_SENDING_THRESHOLD_TIME  (500 * GST_MSECOND)
+
+  /* This function is applied for playbin3.
+   * adaptivedemux2 has own queue and ignore it */
+  if (aiurcontent_is_adaptive_playback (demux->content_info)) {
+    return ;
+  }
+
+  /* No need check buffer sending status in trick mode or pure video stream */
+  if (demux->segment.rate > 2 || demux->segment.rate < 0
+    || demux->n_audio_streams == 0) {
+    return ;
+  }
+
+  /* For playbin3, the buffer may be discarded by h265parse or other parser, need check it */
+  if (stream->valid && (stream->type == MEDIA_VIDEO)) {
+    /* query current queue status in multiqueue */
+    query = gst_query_new_buffering (GST_FORMAT_TIME);
+    if (gst_pad_peer_query (stream->pad, query)) {
+      gst_query_parse_buffering_percent (query, &use_interleave, &percent);
+      gst_query_parse_buffering_range (query, &format, &start, &stop, NULL);
+      gst_query_unref (query);
+
+      if (!use_interleave) {
+        GST_LOG_OBJECT(demux, "byapss check status");
+        return ;
+      }
+
+      GST_LOG_OBJECT(demux, "pad: %s, use_interleave %d"
+      ", buffering start: %" GST_TIME_FORMAT
+      ", buffering stop: %" GST_TIME_FORMAT
+      ", last_start: %" GST_TIME_FORMAT
+      ", last_stop: %" GST_TIME_FORMAT,
+      GST_OBJECT_NAME (stream->pad),
+      use_interleave,
+      GST_TIME_ARGS(start),
+      GST_TIME_ARGS(stop),
+      GST_TIME_ARGS (stream->last_start),
+      GST_TIME_ARGS (stream->last_stop));
+
+      /* Check the latest buffer sending status whether it has been sended to multiqueue */
+      gap_duration = GAP_SENDING_THRESHOLD_TIME;
+      if (GST_CLOCK_TIME_IS_VALID (stream->last_stop)) {
+        if (GST_CLOCK_TIME_IS_VALID (stop)) {
+          if (demux->segment.rate > 0) {
+            if (stream->last_stop > (stop + gap_duration)) {
+              gap_position = stop;
+              GstEvent *gap = gst_event_new_gap (gap_position, gap_duration);
+              ret = gst_pad_push_event (stream->pad, gap);
+            }
+          } else {
+            if (stop > (stream->last_stop + gap_duration)) {
+              gap_position = stream->last_stop;
+              GstEvent *gap = gst_event_new_gap (gap_position, gap_duration);
+              ret = gst_pad_push_event (stream->pad, gap);
+            }
+          }
+
+          if (GST_CLOCK_TIME_IS_VALID (gap_position)) {
+            GST_LOG_OBJECT(demux, "pad: %s"
+            ", pushing GAP event, position: %" GST_TIME_FORMAT
+            ", duration: %" GST_TIME_FORMAT
+            ", ret: %d",
+            GST_OBJECT_NAME (stream->pad),
+            GST_TIME_ARGS(gap_position),
+            GST_TIME_ARGS (gap_duration),
+            ret);
+          }
+        } else {
+          GST_LOG_OBJECT(demux, "pad: %s, buffering position is invalid");
+        }
+      }
+    }
+  }
+}
 
 static GstFlowReturn aiurdemux_push_pad_buffer (GstAiurDemux * demux, AiurDemuxStream * stream,
     GstBuffer * buffer)
@@ -3924,6 +4009,8 @@ static GstFlowReturn aiurdemux_push_pad_buffer (GstAiurDemux * demux, AiurDemuxS
     if (ret < GST_FLOW_EOS) {
         goto bail;
     }
+  } else {
+    aiurdemux_check_buffer_sending_status (demux, stream);
   }
 
   ret = GST_FLOW_OK;
