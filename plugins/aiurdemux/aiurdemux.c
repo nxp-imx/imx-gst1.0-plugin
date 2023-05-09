@@ -1673,6 +1673,10 @@ GstFlowReturn aiurdemux_handle_eos_stream (GstAiurDemux * demux, AiurDemuxStream
 
   /* Send gap event to the specified stream */
   if (select_stream && demux->valid_mask) {
+    if (select_stream->type == MEDIA_TEXT) {
+      return ;
+    }
+
     if (GST_CLOCK_TIME_IS_VALID (select_stream->last_start)) {
       /* Has sent data before, use it */
       select_stream->time_position = select_stream->last_start;
