@@ -260,6 +260,7 @@ imx_video_convert_src_event(GstBaseTransform *transform, GstEvent *event)
 static GstCaps* imx_video_convert_transform_caps(GstBaseTransform *transform,
                      GstPadDirection direction, GstCaps *caps, GstCaps *filter)
 {
+  GstImxVideoConvert *imxvct = (GstImxVideoConvert *) (transform);
   GstCaps *tmp, *tmp2, *result;
   GstStructure *st;
   gint i, n;
@@ -286,8 +287,13 @@ static GstCaps* imx_video_convert_transform_caps(GstBaseTransform *transform,
       gst_structure_set(st, "width", GST_TYPE_INT_RANGE, 8, G_MAXINT32,
           "height", GST_TYPE_INT_RANGE, 8, G_MAXINT32, NULL);
     } else {
-      gst_structure_set(st, "width", GST_TYPE_INT_RANGE, 64, G_MAXINT32,
-          "height", GST_TYPE_INT_RANGE, 64, G_MAXINT32, NULL);
+      if (imxvct->device->device_type == IMX_2D_DEVICE_G2D ||
+          imxvct->device->device_type == IMX_2D_DEVICE_PXP)
+        gst_structure_set(st, "width", GST_TYPE_INT_RANGE, 16, G_MAXINT32,
+            "height", GST_TYPE_INT_RANGE, 16, G_MAXINT32, NULL);
+      else
+        gst_structure_set(st, "width", GST_TYPE_INT_RANGE, 64, G_MAXINT32,
+            "height", GST_TYPE_INT_RANGE, 64, G_MAXINT32, NULL);
     }
 
     gst_structure_remove_fields(st, "format", NULL);
@@ -305,8 +311,6 @@ static GstCaps* imx_video_convert_transform_caps(GstBaseTransform *transform,
 
     gst_caps_append_structure(tmp, st);
   }
-
-  GstImxVideoConvert *imxvct = (GstImxVideoConvert *) (transform);
 
   imx_video_overlay_composition_add_caps(tmp);
 
