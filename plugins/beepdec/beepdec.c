@@ -549,8 +549,9 @@ static gboolean beep_dec_start (GstAudioDecoder * dec)
     beepdec->frame_cnt = 0;
     beepdec->set_codec_data = FALSE;
     beepdec->in_cnt = 0;
-    beepdec->eos_sent = FALSE;
+    beepdec->decoding_error = FALSE;
     beepdec->dsp_dec = FALSE;
+    beepdec->last_timestamp = 0;
 
     gst_audio_decoder_set_estimate_rate(dec, TRUE);
 
@@ -869,7 +870,7 @@ static GstFlowReturn beep_dec_handle_frame (GstAudioDecoder * dec,
 begin:
 
     do{
-        if (beepdec->eos_sent == TRUE) {
+        if (beepdec->decoding_error == TRUE) {
           break;
         }
         outbuf = NULL;
@@ -897,8 +898,8 @@ begin:
         } else if(core_ret==ACODEC_INIT_ERR){
             /* ACODEC_INIT_ERR is a fatal error, no need to try decoding again. */
             ret = GST_FLOW_EOS;
-            beepdec->eos_sent = TRUE;
-            gst_pad_push_event (dec->srcpad, gst_event_new_eos ());
+            beepdec->decoding_error = TRUE;
+            gst_pad_push_event (dec->srcpad, gst_event_new_gap (beepdec->last_timestamp, GST_CLOCK_TIME_NONE));
             GST_ERROR("core ret = ACODEC_INIT_ERR\n", core_ret);
             goto bail;
         }
@@ -912,6 +913,7 @@ begin:
                 out = gst_adapter_take_buffer (beepdec->adapter, adapter_size);
                 sent=TRUE;
                 ret = gst_audio_decoder_finish_frame (dec, out, 1);
+                beepdec->last_timestamp = GST_BUFFER_PTS (out);
                 gst_adapter_clear (beepdec->adapter);
             }
             beep_dec_handle_output_changed(beepdec);
@@ -930,7 +932,8 @@ begin:
            {
                 beepdec->in_cnt--;
                 ret = gst_audio_decoder_finish_frame (dec, temp_buffer, 1);
-                  sent = TRUE;
+                beepdec->last_timestamp = GST_BUFFER_PTS (temp_buffer);
+                sent = TRUE;
                 GST_LOG_OBJECT (beepdec,"output one frame[%d] size=%d",beepdec->in_cnt,out_size);
            }else{
                 gst_adapter_push (beepdec->adapter, temp_buffer);
@@ -960,6 +963,7 @@ begin:
         beepdec->in_cnt--;
         sent=TRUE;
         ret = gst_audio_decoder_finish_frame (dec, out, 1);
+        beepdec->last_timestamp = GST_BUFFER_PTS (out);
         gst_adapter_clear (beepdec->adapter);
         GST_LOG_OBJECT (beepdec,"output frames[%d] size=%d",beepdec->in_cnt,adapter_size);
     }else if (sent == FALSE && (!strcmp(IDecoder->name,"wma") ) ){
@@ -970,8 +974,8 @@ begin:
     }
 
     if(beepdec->err_cnt > MAX_PROFILE_ERROR_COUNT) {
-        gst_pad_push_event (dec->srcpad, gst_event_new_eos ());
-        beepdec->eos_sent = TRUE;
+        gst_pad_push_event (dec->srcpad, gst_event_new_gap (beepdec->last_timestamp, GST_CLOCK_TIME_NONE));
+        beepdec->decoding_error = TRUE;
         ret = GST_FLOW_EOS;
     }
 
@@ -997,7 +1001,7 @@ static void beep_dec_flush (GstAudioDecoder * dec, gboolean hard)
         }
     }
     beepdec->in_cnt = 0;
-    beepdec->eos_sent = FALSE;
+    beepdec->decoding_error = FALSE;
 
     GST_LOG_OBJECT (beepdec,"beep_dec_flush called ");
 }
