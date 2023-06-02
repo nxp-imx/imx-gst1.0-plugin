@@ -43,7 +43,8 @@ typedef enum
     MEDIA_VIDEO,
     MEDIA_AUDIO,
     MEDIA_TEXT, /* subtitle text or stand-alone application, string-based or bitmap-based */
-    MEDIA_MIDI    
+    MEDIA_MIDI,
+    MEDIA_IMAGE,
 }MediaType;
 
 
@@ -80,6 +81,7 @@ typedef enum
     VIDEO_HEVC,
     VIDEO_AVS,
     VIDEO_AV1,
+    VIDEO_DOLBY_VISION,
 }VideoCodecType;
 
 

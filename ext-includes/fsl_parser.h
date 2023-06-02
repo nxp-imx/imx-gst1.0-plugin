@@ -624,6 +624,33 @@ typedef struct
     float LuminanceMin;
 }VideoHDRColorInfo;
 
+typedef struct
+{
+    uint32 isDefault;
+    uint32 csdSize;
+    uint8 *hvcc;
+    uint8 *av1c;
+    uint32 iccSize;
+    uint8 *icc;
+    // for thumbnail
+    uint32 thumbnailWidth;
+    uint32 thumbnailHeight;
+    uint32 thumbnailCsdSize;
+    uint8 *thumbnailHvcc;
+    uint8 *thumbnailAv1c;
+    // for grid image
+    bool isGrid;
+    uint32 rows;
+    uint32 columns;
+    uint32 tileWidth;
+    uint32 tileHeight;
+    // for primary image
+    uint64 exifOffset;
+    uint32 exifSize;
+    uint64 xmpOffset;
+    uint32 xmpSize;
+}ImageInfo;
+
 /*********************************************************************************************************
  *                  API Function Prototypes List
  *
@@ -833,6 +860,15 @@ typedef int32 (*FslParserGetTextTrackHeight)(   FslParserHandle parserHandle,
 typedef int32 (*FslParserGetTextTrackMime)(   FslParserHandle parserHandle,
                                                 uint32 trackNum,
                                                 uint8 ** sampleBuffer,uint32 * dataSize);
+
+
+/************************************************************************************************************
+ *
+ *               Image Properties
+ *
+ ************************************************************************************************************/
+typedef    int32 (*FslParserGetImageInfo)(FslParserHandle parserHandle, uint32 trackNum, ImageInfo **pInfo);
+
 /************************************************************************************************************
  *
  *               Sample Reading, Seek & Trick Mode
@@ -997,6 +1033,9 @@ enum /* API function ID */
     PARSER_API_GET_TEXT_TRACK_WIDTH = 80,
     PARSER_API_GET_TEXT_TRACK_HEIGHT= 81,
     PARSER_API_GET_TEXT_TRACK_MIME = 82,
+
+    /* image propertyies */
+    PARSER_API_GET_IMAGE_INFO = 90,
 
     /* sample reading, seek & trick mode */
     PARSER_API_GET_READ_MODE = 100,
