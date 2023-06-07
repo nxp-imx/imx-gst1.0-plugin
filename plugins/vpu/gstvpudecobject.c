@@ -746,6 +746,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
   GstVideoFormat fmt;
   gint height_align;
   gint width_align;
+  gint output_width, output_height;
   GstBuffer *buffer;
   guint i;
 
@@ -789,17 +790,49 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
   GST_INFO_OBJECT(vpu_dec_object, "using %s as video output format", gst_video_format_to_string(fmt));
 
   /* Create the output state */
+  /* If the resulting frame needs cropping only at the right and bottom we can
+     achieve that by using different caps for allocation and output. We always
+     allocate memory for the uncropped frame, then set the output dimensions and
+     strides so that cropping happens when downstream maps the frame. This covers
+     virtually all cases of video with non standard dimensions. Encoders that
+     generate top and left side cropping regions are virtually unheard of. If
+     encountered we negotiate the uncropped frame size and downstream must take
+     our set cropping rectangle into account.
+  */
+  if (vpu_dec_object->init_info.PicCropRect.nLeft > 0 ||
+      vpu_dec_object->init_info.PicCropRect.nTop > 0) {
+    output_width = vpu_dec_object->init_info.nPicWidth;
+    output_height = vpu_dec_object->init_info.nPicHeight;
+    GST_INFO_OBJECT(vpu_dec_object, "Must use crop meta, %d x %d -> (%d, %d, %d, %d)",
+      vpu_dec_object->init_info.nPicWidth,
+      vpu_dec_object->init_info.nPicHeight,
+      vpu_dec_object->init_info.PicCropRect.nLeft,
+      vpu_dec_object->init_info.PicCropRect.nTop,
+      vpu_dec_object->init_info.PicCropRect.nRight,
+      vpu_dec_object->init_info.PicCropRect.nBottom);
+  } else {
+    output_width = vpu_dec_object->init_info.PicCropRect.nRight;
+    output_height = vpu_dec_object->init_info.PicCropRect.nBottom;
+    GST_INFO_OBJECT(vpu_dec_object, "Frame crop, %d x %d -> %d x %d",
+      vpu_dec_object->init_info.nPicWidth,
+      vpu_dec_object->init_info.nPicHeight,
+      output_width,
+      output_height);
+  }
   //FIXME: set max resolution to avoid buffer reallocate when resolution change.
   vpu_dec_object->output_state = state =
-    gst_video_decoder_set_output_state (bdec, fmt, vpu_dec_object->init_info.nPicWidth, \
-        vpu_dec_object->init_info.nPicHeight, vpu_dec_object->input_state);
+      gst_video_decoder_set_output_state (bdec, fmt, output_width, output_height,
+      vpu_dec_object->input_state);
+  state->allocation_caps = gst_video_info_to_caps (&state->info);
+  gst_caps_set_simple(state->allocation_caps,
+    "width", G_TYPE_INT, vpu_dec_object->init_info.nPicWidth,
+    "height", G_TYPE_INT, vpu_dec_object->init_info.nPicHeight,
+    NULL);
 
   vpu_dec_object->min_buf_cnt = vpu_dec_object->init_info.nMinFrameBufferCount;
   vpu_dec_object->frame_size = vpu_dec_object->init_info.nFrameSize;
   vpu_dec_object->init_info.nBitDepth;
   GST_INFO_OBJECT(vpu_dec_object, "video bit depth: %d", vpu_dec_object->init_info.nBitDepth);
-  GST_VIDEO_INFO_WIDTH (&(state->info)) = vpu_dec_object->init_info.nPicWidth;
-  GST_VIDEO_INFO_HEIGHT (&(state->info)) = vpu_dec_object->init_info.nPicHeight;
   GST_VIDEO_INFO_INTERLACE_MODE(&(state->info)) = \
     vpu_dec_object->init_info.nInterlace ? GST_VIDEO_INTERLACE_MODE_INTERLEAVED \
     : GST_VIDEO_INTERLACE_MODE_PROGRESSIVE;
@@ -1105,6 +1138,13 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
         vpu_dec_object->output_state->info.width, \
         vpu_dec_object->output_state->info.height);
 
+  /* Buffer pool may have different dimensions than our real output.
+     We always want its strides and offsets, but width and height must
+     be equal to our negotiated output state.
+  */
+  vmeta->width = vpu_dec_object->output_state->info.width;
+  vmeta->height = vpu_dec_object->output_state->info.height;
+
   /* set field info */
   switch (out_frame_info.eFieldType) {
     case VPU_FIELD_NONE: vmeta->flags = GST_VIDEO_FRAME_FLAG_NONE; break;
@@ -1117,11 +1157,13 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   GST_DEBUG_OBJECT(vpu_dec_object, "field type: %d\n", out_frame_info.eFieldType);
 
   /* set crop info */
-  cmeta = gst_buffer_add_video_crop_meta (out_frame->output_buffer);
-  cmeta->x = out_frame_info.pExtInfo->FrmCropRect.nLeft;
-  cmeta->y = out_frame_info.pExtInfo->FrmCropRect.nTop;
-  cmeta->width = out_frame_info.pExtInfo->FrmCropRect.nRight-out_frame_info.pExtInfo->FrmCropRect.nLeft;
-  cmeta->height = out_frame_info.pExtInfo->FrmCropRect.nBottom-out_frame_info.pExtInfo->FrmCropRect.nTop;
+  if (out_frame_info.pExtInfo->FrmCropRect.nLeft || out_frame_info.pExtInfo->FrmCropRect.nTop) {
+    cmeta = gst_buffer_add_video_crop_meta (out_frame->output_buffer);
+    cmeta->x = out_frame_info.pExtInfo->FrmCropRect.nLeft;
+    cmeta->y = out_frame_info.pExtInfo->FrmCropRect.nTop;
+    cmeta->width = out_frame_info.pExtInfo->FrmCropRect.nRight-out_frame_info.pExtInfo->FrmCropRect.nLeft;
+    cmeta->height = out_frame_info.pExtInfo->FrmCropRect.nBottom-out_frame_info.pExtInfo->FrmCropRect.nTop;
+  }
 
   if (vpu_dec_object->drm_modifier) {
     gst_buffer_add_dmabuf_meta(out_frame->output_buffer, vpu_dec_object->drm_modifier);
