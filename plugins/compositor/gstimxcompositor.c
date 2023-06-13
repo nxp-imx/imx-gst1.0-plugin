@@ -1486,6 +1486,8 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
   Imx2DFrame src = {0}, dst = {0};
   PhyMemBlock src_mem = {0}, dst_mem = {0};
   guint aggregated = 0;
+  GstMapInfo map;
+  gboolean need_unmap = FALSE;
 
   if (!device)
     return GST_FLOW_ERROR;
@@ -1493,6 +1495,15 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
   dst.mem = &dst_mem;
   if (gst_imxcompositor_config_dst(imxcomp, outbuf, &dst) < 0)
     return GST_FLOW_ERROR;
+
+  if (!dst.mem->vaddr && device->device_type == IMX_2D_DEVICE_PXP) {
+    if(gst_buffer_map (outbuf, &map, GST_MAP_WRITE)) {
+      dst.mem->vaddr = map.data;
+      dst.mem->size = map.size;
+      need_unmap = TRUE;
+      GST_LOG("map background buffer %p size %d", dst.mem->vaddr, dst.mem->size);
+    }
+  }
 
   GST_OBJECT_LOCK (vagg);
 
@@ -1631,6 +1642,9 @@ gst_imxcompositor_aggregate_frames (GstVideoAggregator * vagg,
     /* fill the background color by software */
     gst_imxcompositor_fill_background(&dst, imxcomp->background);
   }
+
+  if (need_unmap)
+    gst_buffer_unmap (outbuf, &map);
 
   GST_LOG("Aggregated %d frames", aggregated);
   if (aggregated > 0 && device->blend_finish(device) < 0) {
