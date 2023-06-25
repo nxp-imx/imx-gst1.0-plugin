@@ -2387,6 +2387,8 @@ static int aiurdemux_parse_streams (GstAiurDemux * demux)
       if (demux->have_group_id)
         gst_event_set_group_id (event, demux->group_id);
 
+      if (stream->type == MEDIA_TEXT)
+        gst_event_set_stream_flags (event, GST_STREAM_FLAG_SPARSE);
       gst_pad_push_event (stream->pad, event);
       g_free (stream_id);
 
