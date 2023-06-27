@@ -49,7 +49,7 @@ GST_DEBUG_CATEGORY_STATIC (recorder_engine);
 
 #define ADD_DATE_TIME
 #ifdef ADD_DATE_TIME
-#define DATE_TIME "clockoverlay halignment=left valignment=top time-format=\"%Y/%m/%d  %H:%M:%S \" !" 
+#define DATE_TIME "clockoverlay halignment=left valignment=top time-format=\"%Y/%m/%d  %H:%M:%S \" ! "
 #else
 #define DATE_TIME ""
 #endif
@@ -57,7 +57,7 @@ GST_DEBUG_CATEGORY_STATIC (recorder_engine);
 // this is only for test purpose to measure end to end latency, defaul not enabled
 //#define ADD_TIME_OVERLAY 
 #ifdef ADD_TIME_OVERLAY
-#define TIME_OVERLAY "timeoverlay halignment=right valignment=top text=\"Stream time:\" !"
+#define TIME_OVERLAY "timeoverlay halignment=right valignment=top text=\"Stream time:\" ! "
 #define DATE_TIME "" //we only have one watermark to save performance
 #else
 #define TIME_OVERLAY ""
@@ -65,7 +65,7 @@ GST_DEBUG_CATEGORY_STATIC (recorder_engine);
 
 #define USE_HW_COMPOSITOR
 #ifdef USE_HW_COMPOSITOR
-#define HW_COMPOSITOR "queue ! imxvideoconvert_g2d composition-meta-enable=true in-place=true !"
+#define HW_COMPOSITOR "queue ! imxvideoconvert_g2d composition-meta-enable=true in-place=true ! "
 #else
 #define HW_COMPOSITOR ""
 #endif
@@ -912,23 +912,28 @@ setup_pipeline (gRecorderEngine *recorder)
           gst_caps_to_string (recorder->camera_output_caps));
     }
     if (recorder->date_time) {
+      gchar *temp = NULL;
       if (video_filter_str) {
-        video_filter_str = g_strdup_printf ("%s ! %s", video_filter_str,
-            recorder->date_time);
+        temp = g_strdup_printf ("%s ! %s", video_filter_str, recorder->date_time);
+        g_free (video_filter_str);
+        video_filter_str = temp;
       } else {
         video_filter_str = g_strdup_printf ("%s", recorder->date_time);
       }
     }
     if (recorder->video_effect_name) {
+      gchar *temp = NULL;
       if (video_filter_str) {
-        video_filter_str = g_strdup_printf ("%s ! %s", video_filter_str,
-            recorder->video_effect_name);
+        temp = g_strdup_printf ("%s ! %s ! capsfilter caps=\"%s\" ! %s ! capsfilter caps=\"%s\"",
+            video_filter_str, recorder->video_effect_name, "video/x-raw, format=(string)RGBA",
+            "queue ! imxvideoconvert_ipu", "video/x-raw, format=(string)NV12");
+        g_free (video_filter_str);
+        video_filter_str = temp;
       } else {
-        video_filter_str = g_strdup_printf ("%s", recorder->video_effect_name);
+        video_filter_str = g_strdup_printf ("%s ! capsfilter caps=\"%s\" ! %s ! capsfilter caps=\"%s\"",
+            recorder->video_effect_name, "video/x-raw, format=(string)RGBA",
+            "queue ! imxvideoconvert_ipu", "video/x-raw, format=(string)NV12");
       }
-      video_filter_str = g_strdup_printf ("%s ! capsfilter caps=\"%s\" ! %s ! capsfilter caps=\"%s\"",
-          video_filter_str, "video/x-raw, format=(string)RGBA",
-          "queue ! imxvideoconvert_ipu", "video/x-raw, format=(string)NV12");
     }
     if (video_filter_str) {
       GST_INFO_OBJECT (recorder->camerabin, "video filter string: %s", video_filter_str);
@@ -2360,6 +2365,7 @@ RecorderEngine * recorder_engine_create()
   recorder = g_slice_new0 (gRecorderEngine);
   if (!recorder) {
     GST_ERROR ("allocate memory error.");
+    g_slice_free (RecorderEngine, h);
     return NULL;
   }
 
