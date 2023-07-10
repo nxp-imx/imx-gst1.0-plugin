@@ -525,6 +525,7 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
       demux->avg_diff = 0;
       demux->start_time = GST_CLOCK_TIME_NONE;
       demux->tag_list = gst_tag_list_new_empty ();
+      gst_tag_list_set_scope (demux->tag_list, GST_TAG_SCOPE_GLOBAL);
       demux->presentation_offset = 0;
       demux->is_need_update_segment = FALSE;
       aiurcontent_new(&demux->content_info);
