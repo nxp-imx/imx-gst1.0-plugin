@@ -58,6 +58,12 @@
 #define DEFAULT_FORCE_IDR 0
 #define DEFAULT_QPMIN 0
 #define DEFAULT_QPMAX 0
+#define DEFAULT_PROFILE -1
+#define DEFAULT_H264_PROFILE 9  // VCENC_H264_BASE_PROFILE
+#define DEFAULT_HEVC_PROFILE 0  // VCENC_HEVC_MAIN_PROFILE
+#define DEFAULT_LEVEL -1
+#define DEFAULT_H264_LEVEL 31   // VCENC_H264_LEVEL_3_1
+#define DEFAULT_HEVC_LEVEL 153  // VCENC_HEVC_LEVEL_5_1
 
 #define GST_VPU_ENC_PARAMS_QDATA   g_quark_from_static_string("vpuenc-params")
 
@@ -118,6 +124,8 @@ enum
   PROP_FORCE_IDR,
   PROP_QPMIN,
   PROP_QPMAX,
+  PROP_PROFILE,
+  PROP_LEVEL,
 };
 
 static GstStaticPadTemplate static_sink_template = GST_STATIC_PAD_TEMPLATE(
@@ -340,6 +348,25 @@ gst_vpu_enc_class_init (GstVpuEncClass * klass)
       g_param_spec_int ("qp-max", "qp max",
         "maximum QP for any picture, default 0 makes wrapper to set 51",
         0, 51,  DEFAULT_QPMAX, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+    if (in_plugin->std == VPU_V_AVC) {
+      g_object_class_install_property (gobject_class, PROP_PROFILE,
+        g_param_spec_int ("profile", "H264 profile",
+          "VC8000E/H.264 supports Baseline, Main, High, High 10 profiles, default -1 makes wrapper to set 9:Baseline",
+          9, 12, DEFAULT_H264_PROFILE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+      g_object_class_install_property (gobject_class, PROP_LEVEL,
+        g_param_spec_int ("level", "H264 level",
+          "VC8000E/H.264 level. 51 = Level 5.1 [51], default -1 makes wrapper to calculate h264 level",
+          10, 99, DEFAULT_H264_LEVEL, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+    } else {
+      g_object_class_install_property (gobject_class, PROP_PROFILE,
+        g_param_spec_int ("profile", "HEVC profile",
+          "VC8000E/HEVC supports Main, Main Still Picture, Main 10, default -1 makes wrapper to set 0:Main",
+          0, 2, DEFAULT_HEVC_PROFILE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+      g_object_class_install_property (gobject_class, PROP_LEVEL,
+        g_param_spec_int ("level", "HEVC level",
+          "VC8000E/HEVC level. 180 = level 6.0*30 [180], default -1 makes wrapper to set 153:LEVEL_5_1",
+          30, 180, DEFAULT_HEVC_LEVEL, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+    }
   }
 
   if ((in_plugin->std == VPU_V_AVC) && IS_IMX8MM()) {
@@ -441,6 +468,8 @@ gst_vpu_enc_init (GstVpuEnc * enc)
   enc->force_idr = DEFAULT_FORCE_IDR;
   enc->qpmin = DEFAULT_QPMIN;
   enc->qpmax = DEFAULT_QPMAX;
+  enc->profile = DEFAULT_PROFILE;
+  enc->level = DEFAULT_LEVEL;
 }
 
 static void
@@ -470,6 +499,12 @@ gst_vpu_enc_get_property (GObject * object, guint prop_id, GValue * value,
       break;
     case PROP_QPMAX:
       g_value_set_int (value, enc->qpmax);
+      break;
+    case PROP_PROFILE:
+      g_value_set_int (value, enc->profile);
+      break;
+    case PROP_LEVEL:
+      g_value_set_int (value, enc->level);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -505,6 +540,12 @@ gst_vpu_enc_set_property (GObject * object, guint prop_id,
       break;
     case PROP_QPMAX:
       enc->qpmax = g_value_get_int (value);
+      break;
+    case PROP_PROFILE:
+      enc->profile = g_value_get_int (value);
+      break;
+    case PROP_LEVEL:
+      enc->level = g_value_get_int (value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -879,6 +920,8 @@ gst_vpu_enc_set_format (GstVideoEncoder * benc, GstVideoCodecState * state)
   enc->gop_count = 0;
   enc->open_param.nUserQpMin = enc->qpmin;
   enc->open_param.nUserQpMax = enc->qpmax;
+  enc->open_param.nProfile = enc->profile;
+  enc->open_param.nLevel = enc->level;
 
   if (enc->open_param.nFrameRate == 0)
     enc->open_param.nFrameRate = 30;

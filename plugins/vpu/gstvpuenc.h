@@ -40,6 +40,8 @@ struct _GstVpuEnc {
   guint force_idr;
   guint qpmin;
   guint qpmax;
+  gint profile;
+  gint level;
 
 	VpuEncHandle handle;
 	VpuEncInitInfo init_info;
