@@ -973,9 +973,11 @@ begin:
         GST_LOG_OBJECT (beepdec,"beep_dec_parse_and_decode ret=%x",ret);
     }
 
-    if(!beepdec->decoding_error && beepdec->err_cnt > MAX_PROFILE_ERROR_COUNT) {
-        gst_pad_push_event (dec->srcpad, gst_event_new_gap (beepdec->last_timestamp, GST_CLOCK_TIME_NONE));
-        beepdec->decoding_error = TRUE;
+    if(beepdec->err_cnt > MAX_PROFILE_ERROR_COUNT) {
+        if (!beepdec->decoding_error) {
+            gst_pad_push_event (dec->srcpad, gst_event_new_gap (beepdec->last_timestamp, GST_CLOCK_TIME_NONE));
+            beepdec->decoding_error = TRUE;
+        }
         ret = GST_FLOW_EOS;
     }
 
