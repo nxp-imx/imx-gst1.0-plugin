@@ -3,7 +3,7 @@ AC_PREREQ(2.59)
 dnl initialize autoconf
 dnl releases only do -Wall, git and prerelease does -Werror too
 dnl use a three digit version number for releases, and four for git/prerelease
-AC_INIT(GStreamer i.MX Plug-ins, 4.8.1, http://www.freescale.com, imx-gst1.0-plugin)
+AC_INIT(GStreamer i.MX Plug-ins, 4.8.2, http://www.freescale.com, imx-gst1.0-plugin)
 
 dnl initialize automake
 AM_INIT_AUTOMAKE([foreign])
