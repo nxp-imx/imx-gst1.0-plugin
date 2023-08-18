@@ -73,6 +73,7 @@ endforeach
 build_ipu = false
 build_g2d = false
 build_pxp = false
+build_ocl = false
 if build_MX6 == 'yes' or build_MX6QP == 'yes'
   build_ipu = true
   build_g2d = true
@@ -91,6 +92,10 @@ endif
 
 if build_MX8 == 'yes' or build_MX7ULP == 'yes'
   build_g2d = true
+endif
+
+if build_MX8 == 'yes'
+  build_ocl = true
 endif
 
 gst_base_dep = dependency('gstreamer-base-' + api_version, version : gst_req)

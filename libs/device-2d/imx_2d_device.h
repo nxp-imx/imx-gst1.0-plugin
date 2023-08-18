@@ -34,6 +34,7 @@ typedef enum {
   IMX_2D_DEVICE_G2D,
   IMX_2D_DEVICE_IPU,
   IMX_2D_DEVICE_PXP,
+  IMX_2D_DEVICE_OCL,
   IMX_2D_DEVICE_GLES2,
 } Imx2DDeviceType;
 
@@ -75,6 +76,25 @@ typedef enum {
   IMX_2D_INTERLACE_FIELDS
 } Imx2DInterlaceType;
 
+typedef enum {
+  IMX_2D_COLOR_RANGE_DEFAULT = 0,
+  IMX_2D_COLOR_RANGE_FULL,
+  IMX_2D_COLOR_RANGE_LIMITED
+} Imx2DColorRangeType;
+
+typedef enum {
+  IMX_2D_COLOR_MATRIX_DEFAULT = 0,
+  IMX_2D_COLOR_MATRIX_BT601_625,
+  IMX_2D_COLOR_MATRIX_BT601_525,
+  IMX_2D_COLOR_MATRIX_BT709,
+  IMX_2D_COLOR_MATRIX_BT2020
+} Imx2DColorMatrixType;
+
+typedef struct {
+  Imx2DColorRangeType range;
+  Imx2DColorMatrixType matrix;
+} Imx2DColorimetry;
+
 typedef struct {
   GstVideoFormat in_fmt;
   GstVideoFormat out_fmt;
@@ -95,6 +115,7 @@ typedef struct _Imx2DVideoInfo {
   guint h;
   guint stride;
   Imx2DTileType tile_type;
+  Imx2DColorimetry colorimetry;
 } Imx2DVideoInfo;
 
 typedef struct _Imx2DFrame {

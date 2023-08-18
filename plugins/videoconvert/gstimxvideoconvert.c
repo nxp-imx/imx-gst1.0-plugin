@@ -360,6 +360,8 @@ static gint get_format_conversion_loss(GstBaseTransform * base,
   GstVideoFormatFlags in_flags, out_flags;
   const GstVideoFormatInfo *in_info = gst_video_format_get_info(in_name);
   const GstVideoFormatInfo *out_info = gst_video_format_get_info(out_name);
+  GstImxVideoConvert *imxvct = (GstImxVideoConvert *)(base);
+  Imx2DDevice *device = imxvct->device;
 
   if (!in_info || !out_info)
     return G_MAXINT32;
@@ -372,8 +374,11 @@ static gint get_format_conversion_loss(GstBaseTransform * base,
         && out_name == GST_VIDEO_FORMAT_NV12)
       return 0;
     else if (in_name != GST_VIDEO_FORMAT_NV12_10LE40
-        && out_name == GST_VIDEO_FORMAT_NV12)
-      return G_MAXINT32;
+        && out_name == GST_VIDEO_FORMAT_NV12) {
+      if (device->device_type != IMX_2D_DEVICE_OCL) {
+        return G_MAXINT32;
+      }
+    }
   }
 
   /* accept input format immediately without loss */
@@ -1288,6 +1293,40 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     return GST_FLOW_OK;
 }
 
+static void imx_video_convert_update_colorimetry (GstVideoInfo * info, Imx2DVideoInfo * imx_info)
+{
+  if (!info || !imx_info)
+    return;
+
+  Imx2DColorRangeType imx_color_range = IMX_2D_COLOR_RANGE_DEFAULT;
+  Imx2DColorMatrixType imx_color_matrix = IMX_2D_COLOR_MATRIX_DEFAULT;
+
+  switch (info->colorimetry.range) {
+    case GST_VIDEO_COLOR_RANGE_0_255:
+      imx_color_range = IMX_2D_COLOR_RANGE_FULL;
+      break;
+    case GST_VIDEO_COLOR_RANGE_16_235:
+      imx_color_range = IMX_2D_COLOR_RANGE_LIMITED;
+      break;
+    default:
+      break;
+  }
+
+  switch (info->colorimetry.matrix) {
+    case GST_VIDEO_COLOR_MATRIX_BT709:
+      imx_color_matrix = IMX_2D_COLOR_MATRIX_BT709;
+      break;
+    case GST_VIDEO_COLOR_MATRIX_BT601:
+      imx_color_matrix = IMX_2D_COLOR_MATRIX_BT601_625;
+      break;
+    default:
+      break;
+  }
+
+  imx_info->colorimetry.range = imx_color_range;
+  imx_info->colorimetry.matrix = imx_color_matrix;
+}
+
 static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBuffer * inbuf,
     GstBuffer * outbuf)
 {
@@ -1486,6 +1525,11 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
   }
   if (drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED)
     src.info.tile_type = IMX_2D_TILE_AMHPION;
+
+  if (device->device_type == IMX_2D_DEVICE_OCL) {
+    imx_video_convert_update_colorimetry (&filter->in_info, &src.info);
+    imx_video_convert_update_colorimetry (&filter->out_info, &dst.info);
+  }
 
   gint ret = device->config_input(device, &src.info);
 
@@ -1879,19 +1923,22 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   }
 
-  g_object_class_install_property (gobject_class, PROP_COMPOSITION_META_ENABLE,
-      g_param_spec_boolean("composition-meta-enable", "Enable composition meta",
-        "Enable overlay composition meta processing",
-        GST_IMX_VIDEO_COMPOMETA_DEFAULT,
-        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  if (capabilities & IMX_2D_DEVICE_CAP_BLEND ||
+      capabilities & IMX_2D_DEVICE_CAP_OVERLAY) {
+    g_object_class_install_property (gobject_class, PROP_COMPOSITION_META_ENABLE,
+        g_param_spec_boolean("composition-meta-enable", "Enable composition meta",
+          "Enable overlay composition meta processing",
+          GST_IMX_VIDEO_COMPOMETA_DEFAULT,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class,
-      PROP_COMPOSITION_META_IN_PLACE,
-      g_param_spec_boolean("in-place", "Handle composition meta in place",
-        "Handle composition meta in place in pass through mode, "
-        "video overlay composition will blended onto input buffer",
-        GST_IMX_VIDEO_COMPOMETA_IN_PLACE_DEFAULT,
-        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+    g_object_class_install_property (gobject_class,
+    PROP_COMPOSITION_META_IN_PLACE,
+    g_param_spec_boolean("in-place", "Handle composition meta in place",
+      "Handle composition meta in place in pass through mode, "
+      "video overlay composition will blended onto input buffer",
+      GST_IMX_VIDEO_COMPOMETA_IN_PLACE_DEFAULT,
+      G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  }
 
   if (in_plugin->device_type == IMX_2D_DEVICE_G2D) {
     g_object_class_install_property (gobject_class,

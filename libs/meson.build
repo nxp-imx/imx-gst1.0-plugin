@@ -55,6 +55,12 @@ if cc.has_header('X11/Xlib.h')
   gstfsl_ldflags += ['-lX11']
 endif
 
+if cc.has_header('imx_opencl_converter.h') and build_ocl
+  gstfsl_sources += ['device-2d/imx_2d_device_ocl.c']
+  gstfsl_cflags += ['-DUSE_OCL']
+  gstfsl_ldflags += ['-limxoclconvert']
+endif
+
 bad_allocator_dep = unneeded_dep
 if have_bad_allocator
   bad_allocator_dep = gst_bad_allocator_dep

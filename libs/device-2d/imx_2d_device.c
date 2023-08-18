@@ -40,6 +40,12 @@ extern gint imx_pxp_destroy(Imx2DDevice *device);
 extern gboolean imx_pxp_is_exist (void);
 #endif
 
+#ifdef USE_OCL
+extern Imx2DDevice * imx_ocl_create(Imx2DDeviceType  device_type);
+extern gint imx_ocl_destroy(Imx2DDevice *device);
+extern gboolean imx_ocl_is_exist (void);
+#endif
+
 static const Imx2DDeviceInfo Imx2DDevices[] = {
 #ifdef USE_IPU
     { .name                     ="ipu",
@@ -65,6 +71,15 @@ static const Imx2DDeviceInfo Imx2DDevices[] = {
       .create                   =imx_pxp_create,
       .destroy                  =imx_pxp_destroy,
       .is_exist                 =imx_pxp_is_exist
+    },
+#endif
+
+#ifdef USE_OCL
+    { .name                     ="ocl",
+      .device_type              =IMX_2D_DEVICE_OCL,
+      .create                   =imx_ocl_create,
+      .destroy                  =imx_ocl_destroy,
+      .is_exist                 =imx_ocl_is_exist
     },
 #endif
     {
