@@ -1948,6 +1948,22 @@ static gboolean gst_imx_compositor_register (GstPlugin * plugin)
       continue;
     }
 
+    /* Check devices capabilities */
+    Imx2DDevice* dev = in_plugin->create(in_plugin->device_type);
+    if (!dev)
+      return;
+
+    gint capabilities = dev->get_capabilities(dev);
+    if (!(capabilities & IMX_2D_DEVICE_CAP_BLEND) &&
+      !(capabilities & IMX_2D_DEVICE_CAP_OVERLAY)) {
+      in_plugin->destroy(dev);
+      GST_LOG ("%s don't support blend or overlay.", in_plugin->name);
+      in_plugin++;
+      continue;
+    } else {
+      in_plugin->destroy(dev);
+    }
+
     t_name = g_strdup_printf ("imxcompositor_%s", in_plugin->name);
     type = g_type_from_name (t_name);
 
