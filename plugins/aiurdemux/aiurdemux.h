@@ -320,6 +320,7 @@ struct _GstAiurDemux
     guint32 interleave_queue_size;
 
     GstSegment segment;
+    guint32 segment_seqnum;
     GstTagList *tag_list;
 
     GstClockTime base_offset;

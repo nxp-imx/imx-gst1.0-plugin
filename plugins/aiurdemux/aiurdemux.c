@@ -474,6 +474,7 @@ static void gst_aiurdemux_init (GstAiurDemux * demux)
 
   demux->have_group_id = FALSE;
   demux->group_id = G_MAXUINT;
+  demux->segment_seqnum = GST_SEQNUM_INVALID;
 
   demux->stream_cache = gst_aiur_stream_cache_new (AIUR_STREAM_CACHE_SIZE,
     AIUR_STREAM_CACHE_SIZE_MAX, demux);
@@ -566,6 +567,7 @@ static GstStateChangeReturn gst_aiurdemux_change_state (GstElement * element,
       demux->sub_read_ready = 0;
       demux->have_group_id = FALSE;
       demux->group_id = G_MAXUINT;
+      demux->segment_seqnum = GST_SEQNUM_INVALID;
 
       break;
     }
@@ -633,6 +635,7 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
       } else if (segment->format == GST_FORMAT_TIME) {
         GST_DEBUG_OBJECT (demux, "handling new segment from %"GST_TIME_FORMAT, GST_TIME_ARGS (segment->start));
         if (aiurcontent_is_adaptive_playback(demux->content_info)) {
+          demux->segment_seqnum = gst_event_get_seqnum (event);
           gst_event_copy_segment (event, &demux->segment);
 
           /* For the adaptive playback, the presentation offset
@@ -3728,6 +3731,7 @@ static void
 aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
     AiurDemuxStream * stream)
 {
+    GstEvent *segment_event;
     GstSegment segment;
     gst_segment_init (&segment, GST_FORMAT_TIME);
 
@@ -3787,7 +3791,10 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
     }
 
     GST_DEBUG ("segment event %" GST_SEGMENT_FORMAT, &segment);
-    gst_pad_push_event (stream->pad, gst_event_new_segment (&segment));
+    segment_event = gst_event_new_segment (&segment);
+    if (demux->segment_seqnum != GST_SEQNUM_INVALID)
+      gst_event_set_seqnum (segment_event, demux->segment_seqnum);
+    gst_pad_push_event (stream->pad, segment_event);
   } else {
     if(stream->type == MEDIA_TEXT){
       stream->new_segment = FALSE;
@@ -3805,7 +3812,10 @@ aiurdemux_send_stream_newsegment (GstAiurDemux * demux,
     segment.stop = stream->time_position;
     segment.position = segment.time = 0;
     GST_DEBUG ("segment event %" GST_SEGMENT_FORMAT, &segment);
-    gst_pad_push_event (stream->pad, gst_event_new_segment (&segment));
+    segment_event = gst_event_new_segment (&segment);
+    if (demux->segment_seqnum != GST_SEQNUM_INVALID)
+      gst_event_set_seqnum (segment_event, demux->segment_seqnum);
+    gst_pad_push_event (stream->pad, segment_event);
   }
   stream->new_segment = FALSE;
 
