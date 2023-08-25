@@ -635,7 +635,7 @@ gst_imx_v4l2src_acquire_buffer (GstImxV4l2Src * v4l2src, GstBuffer ** buf)
         v4l2src->gstbuffer_in_v4l2, buffer);
   }
  
-  if (gst_imx_v4l2_dequeue_gstbuffer (v4l2src->v4l2handle, buf, &flags) < 0) {
+  if (gst_imx_v4l2_dequeue_gstbuffer (v4l2src->v4l2handle, buf, &flags, FALSE) < 0) {
     GST_ERROR_OBJECT (v4l2src, "Dequeue buffer failed.");
     return GST_FLOW_ERROR;
   }

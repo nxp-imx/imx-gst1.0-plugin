@@ -63,6 +63,10 @@ GST_DEBUG_CATEGORY (imxv4l2_debug);
 #define MXC_V4L2_CAPTURE_TVIN_VADC_NAME "vadc"
 #define PXP_V4L2_CAPTURE_NAME "csi_v4l2"
 
+#define TRY_TIMEOUT (500000) //500ms
+#define TRY_INTERVAL (1000) //1ms
+#define MAX_TRY_CNT (TRY_TIMEOUT/TRY_INTERVAL)
+
 typedef struct {
   struct v4l2_buffer v4l2buffer;
   PhyMemBlock *v4l2memblk;
@@ -1187,8 +1191,27 @@ gint gst_imx_v4l2_reset_device (gpointer v4l2handle)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
   gint i;
+  gint trycnt = 0;
 
   if (handle && handle->v4l2_fd) {
+    if (!gst_imx_v4l2_support_deinterlace (V4L2_BUF_TYPE_VIDEO_OUTPUT)) {
+      while (handle->queued_count) {
+        GstBuffer *v4l2_buffer = NULL;
+        GstVideoFrameFlags *flags;
+        trycnt ++;
+
+        if (trycnt >= MAX_TRY_CNT || gst_imx_v4l2_dequeue_gstbuffer (handle, &v4l2_buffer, &flags, TRUE) < 0) {
+          GST_ERROR ("Dequeue buffer failed.");
+          handle->queued_count = 0;
+          return -1;
+        }
+        if (v4l2_buffer) {
+          GST_DEBUG ("unref v4l held gstbuffer(%p).", v4l2_buffer);
+          gst_buffer_unref (v4l2_buffer);
+        }
+      }
+    }
+
     if (handle->streamon) {
       if (ioctl (handle->v4l2_fd, VIDIOC_STREAMOFF, &handle->type) < 0) {
         GST_ERROR ("stream off failed\n");
@@ -1900,18 +1923,14 @@ gint gst_imx_v4l2_queue_gstbuffer (gpointer v4l2handle, GstBuffer *buffer, GstVi
   return 0;
 }
 
-#define TRY_TIMEOUT (500000) //500ms
-#define TRY_INTERVAL (1000) //1ms
-#define MAX_TRY_CNT (TRY_TIMEOUT/TRY_INTERVAL)
-
 gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk,
-    GstVideoFrameFlags * flags)
+    GstVideoFrameFlags * flags, gboolean drain)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
   struct v4l2_buffer v4l2buf;
   gint trycnt = 0;
 
-  if (handle->queued_count <= MAX(handle->v4l2_hold_buf_num, handle->streamon_count)) {
+  if (!drain && (handle->queued_count <= MAX(handle->v4l2_hold_buf_num, handle->streamon_count))) {
     GST_DEBUG ("current queued %d", handle->queued_count);
     *memblk = NULL;
     return 0;
@@ -1966,7 +1985,7 @@ gint gst_imx_v4l2_dequeue_v4l2memblk (gpointer v4l2handle, PhyMemBlock **memblk,
 }
 
 gint gst_imx_v4l2_dequeue_gstbuffer (gpointer v4l2handle, GstBuffer **buffer,
-    GstVideoFrameFlags * flags)
+    GstVideoFrameFlags * flags, gboolean drain)
 {
   IMXV4l2Handle *handle = (IMXV4l2Handle*)v4l2handle;
   PhyMemBlock *memblk = NULL;
@@ -1976,7 +1995,7 @@ gint gst_imx_v4l2_dequeue_gstbuffer (gpointer v4l2handle, GstBuffer **buffer,
     return 0;
   }
 
-  if (gst_imx_v4l2_dequeue_v4l2memblk (handle, &memblk, flags) < 0) {
+  if (gst_imx_v4l2_dequeue_v4l2memblk (handle, &memblk, flags, drain) < 0) {
     GST_ERROR ("dequeue memblk failed.");
     return -1;
   }

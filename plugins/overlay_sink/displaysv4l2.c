@@ -344,7 +344,7 @@ gint get_next_display_buffer (gpointer display, SurfaceBuffer *buffer)
     hdisplay->first_request ++;
   }
   else {
-    if (gst_imx_v4l2_dequeue_v4l2memblk (hdisplay->v4l2handle, &memblk, &flags) < 0) {
+    if (gst_imx_v4l2_dequeue_v4l2memblk (hdisplay->v4l2handle, &memblk, &flags, FALSE) < 0) {
       GST_ERROR ("get buffer from %s failed.", hdisplay->device);
       return -1;
     }
