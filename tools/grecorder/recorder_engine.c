@@ -226,6 +226,7 @@ typedef struct _gRecorderEngine
   gint port;
   gint max_files;
   gint64 max_file_size;
+  gint64 max_file_duration;
 
   gchar *preview_caps_name;
 
@@ -986,6 +987,19 @@ setup_pipeline (gRecorderEngine *recorder)
     g_object_set (recorder->video_sink, "next-file", 4, NULL);
     g_object_set (recorder->video_sink, "max-file-size", recorder->max_file_size, NULL);
     g_object_set (recorder->video_sink, "max-files", recorder->max_files, NULL);
+    g_object_set (recorder->video_sink, "async", FALSE, NULL);
+  } else if (recorder->max_file_duration) {
+    if (recorder->container_format != RE_OUTPUT_FORMAT_TS) {
+      g_print ("set_max_file_duration() only supported for TS container.");
+      return RE_RESULT_PARAMETER_INVALID;
+    }
+
+    res &=
+      setup_pipeline_element (recorder->camerabin, "video-sink", "multifilesink",
+          NULL);
+    g_object_get (recorder->camerabin, "video-sink", &recorder->video_sink, NULL);
+    g_object_set (recorder->video_sink, "next-file", 5, NULL);
+    g_object_set (recorder->video_sink, "max-file-duration", recorder->max_file_duration * GST_SECOND, NULL);
     g_object_set (recorder->video_sink, "async", FALSE, NULL);
   } else if (recorder->host) {
     if (recorder->container_format != RE_OUTPUT_FORMAT_TS) {
@@ -1918,6 +1932,9 @@ static REresult set_file_count(RecorderEngineHandle handle, REuint32 fileCount)
 static REresult set_max_file_duration(RecorderEngineHandle handle, REtime timeUs)
 {
   RecorderEngine *h = (RecorderEngine *)(handle);
+  gRecorderEngine *recorder = (gRecorderEngine *)(h->pData);
+
+  recorder->max_file_duration = timeUs;
   return RE_RESULT_SUCCESS;
 }
 
@@ -2079,6 +2096,7 @@ static REresult init(RecorderEngineHandle handle)
   recorder->port = 0;
   recorder->max_files = 0;
   recorder->max_file_size = 0;
+  recorder->max_file_duration = 0;
 
   recorder->preview_caps_name = NULL;
 

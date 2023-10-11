@@ -670,7 +670,7 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       {0, 0, 0, 0}
     };
 
-    c = getopt_long (argc, argv, "a:s:w:e:u:f:k:t:q:i:v:n:z:o:r:x:g:",
+    c = getopt_long (argc, argv, "a:s:w:e:u:f:k:t:q:i:v:n:z:o:r:x:g:d:",
         long_options, &option_index);
 
     /* Detect the end of the options. */
@@ -755,6 +755,10 @@ static int recorder_parse_options(int argc, char* argv[], REOptions * pOpt)
       case 'g':
         if (optarg)
           pOpt->audio_encoder = atoi (optarg);
+        break;
+      case 'd':
+        if (optarg)
+          pOpt->duration = atoi (optarg);
         break;
       case 'h':
         printf ("Usage: grecorder-1.0 [OPTION]\n");
