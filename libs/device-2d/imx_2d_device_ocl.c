@@ -103,7 +103,7 @@ static gint imx_ocl_open (Imx2DDevice *device)
 
   memset (ocl, 0, sizeof (Imx2DDeviceOcl));
   device->priv = (gpointer) ocl;
-  if (OCL_Open (OCL_OPEN_FLAG_PROFILE, &ocl->ocl_handle) || ocl->ocl_handle == NULL) {
+  if (OCL_Open (OCL_OPEN_FLAG_DEFAULT, &ocl->ocl_handle) || ocl->ocl_handle == NULL) {
     GST_ERROR ("%s Failed to open ocl device.",__FUNCTION__);
     g_slice_free1 (sizeof(Imx2DDeviceOcl), ocl);
     device->priv = NULL;
