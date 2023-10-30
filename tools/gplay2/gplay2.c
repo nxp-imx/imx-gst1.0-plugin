@@ -35,6 +35,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <errno.h>
+#include <poll.h>
 #include <gstimxcommon.h>
 
 #include <gst/play/play.h>
@@ -1015,14 +1016,19 @@ input_thread_fun (gpointer data)
   GstPlay *play = sPlay->play;
   GstPlayVideoRenderer *VideoRender = sPlay->VideoRender;
   gplay_pconfigions *options = sPlay->options;
+  struct pollfd stdin_poll = { STDIN_FILENO, POLLIN|POLLPRI };
 
   while (gexit_input_thread == FALSE) {
     sCommand[0] = ' ';
     errno = 0;
-    if (scanf ("%256s", sCommand) != 1) {
-      // need to seek in case read to EOF
-      fseek (stdin, 0, SEEK_CUR);
-      usleep (100000);
+    if (poll (&stdin_poll, 1, 500)) {
+      if (scanf ("%1c", sCommand) != 1) {
+        // need to seek in case read to EOF
+        fseek (stdin, 0, SEEK_CUR);
+        usleep (100000);
+        continue;
+      }
+    } else {
       continue;
     }
 
@@ -1814,7 +1820,7 @@ main (int argc, char *argv[])
   }
 
   if (input_thread) {
-    g_thread_unref (input_thread);
+    g_thread_join (input_thread);
     input_thread = NULL;
   }
 
