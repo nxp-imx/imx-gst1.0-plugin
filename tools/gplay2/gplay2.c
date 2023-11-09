@@ -1695,7 +1695,7 @@ main (int argc, char *argv[])
   }
 
   if (!options.video_sink_name) {
-    if (gplay_checkfeature (VPU) && gplay_checkfeature (DPU)) {
+    if (IS_AMPHION () && gplay_checkfeature (DPU)) {
       options.video_sink_name = "imxvideoconvert_g2d ! queue ! waylandsink";
       g_print ("Set VideoSink %s \n", options.video_sink_name);
       video_sink =
@@ -1737,8 +1737,8 @@ main (int argc, char *argv[])
     text_sink =
         gst_parse_bin_from_description (options.text_sink_name, TRUE, NULL);
     gst_play_set_text_sink (play, text_sink);
-  } else if (gplay_checkfeature (VPU)
-      && (gplay_checkfeature (DCSS) || gplay_checkfeature (DPU))) {
+  } else if ((IS_AMPHION () && gplay_checkfeature (DPU))
+      || (gplay_checkfeature (VPU) && gplay_checkfeature (DCSS))) {
     g_print ("Disable subtitle rendering\n");
     gst_play_set_subtitle_track_enabled (play, FALSE);
     /* clear subtitle uri */
