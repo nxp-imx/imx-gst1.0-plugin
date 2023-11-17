@@ -90,11 +90,11 @@ if build_MX6UL == 'yes' or build_MX7D == 'yes' or build_MX6SLL == 'yes' or build
   build_pxp = true
 endif
 
-if build_MX8 == 'yes' or build_MX7ULP == 'yes'
+if build_MX8 == 'yes' or build_MX7ULP == 'yes' or build_MX9 == 'yes'
   build_g2d = true
 endif
 
-if build_MX8 == 'yes'
+if build_MX8 == 'yes' or build_MX9 == 'yes'
   build_ocl = true
 endif
 
