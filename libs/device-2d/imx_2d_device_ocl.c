@@ -32,6 +32,7 @@ typedef struct {
   OCL_FORMAT dst_fmt;
   OCL_BUFFER src_buf;
   OCL_BUFFER dst_buf;
+  OCL_MEMORY_TYPE mem_type;
 } Imx2DDeviceOcl;
 
 typedef struct {
@@ -108,6 +109,13 @@ static gint imx_ocl_open (Imx2DDevice *device)
     g_slice_free1 (sizeof(Imx2DDeviceOcl), ocl);
     device->priv = NULL;
     return -1;
+  }
+
+  /* Configure OCL memory type */
+  if (IS_IMX95()) {
+    ocl->mem_type = OCL_MEM_TYPE_DEVICE;
+  } else {
+    ocl->mem_type = OCL_MEM_TYPE_GPU;
   }
 
   return 0;
@@ -256,7 +264,7 @@ static gint imx_ocl_config_output(Imx2DDevice *device, Imx2DVideoInfo* out_info)
   return 0;
 }
 
-static gint imx_ocl_set_plane (void *handle, OCL_BUFFER *buf, OCL_FORMAT *ocl_format, guint8 *paddr)
+static gint imx_ocl_set_plane (void *handle, OCL_BUFFER *buf, OCL_FORMAT *ocl_format, guint8 *paddr, Imx2DFrame *frame)
 {
   guint i = 0;
   OCL_FORMAT_PLANE_INFO plane_info;
@@ -271,22 +279,28 @@ static gint imx_ocl_set_plane (void *handle, OCL_BUFFER *buf, OCL_FORMAT *ocl_fo
     return -1;
   }
 
-  buf->mem_type = OCL_MEM_TYPE_DEVICE;
   buf->plane_num = plane_info.plane_num;
   buf->planes[i].size = plane_info.plane_size[i];
   buf->planes[i].paddr = (long long) paddr;
-  GST_TRACE ("ocl : plane num: %d , planes[%d].size: 0x%x, planes[%d].paddr: %p",
-    buf->plane_num, i, buf->planes[i].size, i, (guint8 *)buf->planes[i].paddr);
+  buf->planes[i].fd = frame->fd[0];
+  buf->planes[i].offset = 0;
+  GST_TRACE ("ocl : plane num: %d , planes[%d].size: 0x%x, planes[%d].paddr: %p, planes[%d].fd: 0x%x",
+    buf->plane_num, i, buf->planes[i].size, i, (guint8 *)buf->planes[i].paddr, buf->planes[i].fd);
   i++;
   if (plane_info.plane_num <= 1) {
     return 0;
   }
 
   while (i < plane_info.plane_num) {
+    buf->planes[i].offset = buf->planes[i-1].offset + buf->planes[i-1].size;
     buf->planes[i].size = plane_info.plane_size[i];
     buf->planes[i].paddr = (long long) (buf->planes[i-1].paddr + buf->planes[i-1].size);
-    GST_TRACE ("ocl : plane num: %d , planes[%d].size: 0x%x, planes[%d].paddr: %p",
-    buf->plane_num, i, buf->planes[i].size, i, (guint8 *)buf->planes[i].paddr);
+    if (frame->fd[i] >= 0)
+      buf->planes[i].fd = frame->fd[i];
+    else
+      buf->planes[i].fd = frame->fd[0];
+    GST_TRACE ("ocl : plane num: %d , planes[%d].size: 0x%x, planes[%d].paddr: %p, planes[%d].fd: 0x%x",
+    buf->plane_num, i, buf->planes[i].size, i, (guint8 *)buf->planes[i].paddr, buf->planes[i].fd);
     i++;
   }
 
@@ -363,7 +377,9 @@ static gint imx_ocl_convert (Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *s
     ocl->src_fmt.right = ocl->src_fmt.width;
   if (ocl->src_fmt.bottom > ocl->src_fmt.height)
     ocl->src_fmt.bottom = ocl->src_fmt.height;
-  imx_ocl_set_plane (ocl->ocl_handle, &ocl->src_buf, &ocl->src_fmt, src->mem->paddr);
+  imx_ocl_set_plane (ocl->ocl_handle, &ocl->src_buf, &ocl->src_fmt, src->mem->paddr, src);
+  /* Update input OCL buffer type */
+  ocl->src_buf.mem_type = ocl->mem_type;
 
   if (src->fd[1] >= 0) {
     if (!src->mem->user_data) {
@@ -430,7 +446,9 @@ static gint imx_ocl_convert (Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *s
       ocl->dst_fmt.top, ocl->dst_fmt.right, ocl->dst_fmt.bottom, ocl->dst_fmt.stride,
       ocl->dst_fmt.alpha, ocl->dst_fmt.format);
 
-  imx_ocl_set_plane (ocl->ocl_handle, &ocl->dst_buf, &ocl->dst_fmt, dst->mem->paddr);
+  imx_ocl_set_plane (ocl->ocl_handle, &ocl->dst_buf, &ocl->dst_fmt, dst->mem->paddr, dst);
+  /* Update output OCL buffer type */
+  ocl->dst_buf.mem_type = ocl->mem_type;
 
   /* Check destination fd[1] */
   if (dst->fd[1] >= 0) {
