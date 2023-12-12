@@ -1623,6 +1623,7 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
     GST_BUFFER_FLAG_UNSET (outbuf, GST_VIDEO_BUFFER_FLAG_INTERLACED);
   }
 
+  dst.fd[0] = dst.fd[1] = dst.fd[2] = dst.fd[3] = -1;
   if (gst_is_dmabuf_memory (gst_buffer_peek_memory (outbuf, 0))) {
     dst.mem = &dst_mem;
     n_mem = gst_buffer_n_memory (outbuf);
