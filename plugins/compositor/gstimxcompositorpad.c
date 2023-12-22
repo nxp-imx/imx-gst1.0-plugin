@@ -611,17 +611,30 @@ gst_imxcompositor_pad_prepare_frame (GstVideoAggregatorPad * pad, GstVideoAggreg
 
   if (cpad->sink_pool_update) {
     memset (&cpad->align, 0, sizeof(GstVideoAlignment));
-    if (cpad->sink_pool && gst_buffer_pool_is_active (cpad->sink_pool)) {
-      GstStructure *config = gst_buffer_pool_get_config (cpad->sink_pool);
+    if (cpad->sink_pool) {
+      if (gst_buffer_pool_is_active (cpad->sink_pool)) {
+        GstStructure *config = gst_buffer_pool_get_config (cpad->sink_pool);
 
-      if (gst_buffer_pool_config_has_option (config,
-          GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
-        gst_buffer_pool_config_get_video_alignment (config, &cpad->align);
-        GST_DEBUG_OBJECT (pad, "input pool has alignment (%d, %d) , (%d, %d)",
-            cpad->align.padding_left, cpad->align.padding_top,
-            cpad->align.padding_right, cpad->align.padding_bottom);
+        if (gst_buffer_pool_config_has_option (config,
+            GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT)) {
+          gst_buffer_pool_config_get_video_alignment (config, &cpad->align);
+          GST_DEBUG_OBJECT (pad, "input pool has alignment (%d, %d) , (%d, %d)",
+              cpad->align.padding_left, cpad->align.padding_top,
+              cpad->align.padding_right, cpad->align.padding_bottom);
+        }
+        gst_structure_free (config);
+      } else {
+        GstVideoMeta *video_meta = gst_buffer_get_video_meta (buffer);
+        if (video_meta) {
+          cpad->align.padding_left = video_meta->alignment.padding_left;
+          cpad->align.padding_top = video_meta->alignment.padding_top;
+          cpad->align.padding_right = video_meta->alignment.padding_right;
+          cpad->align.padding_bottom = video_meta->alignment.padding_bottom;
+          GST_DEBUG_OBJECT (pad, "video meta has alignment (%d, %d) , (%d, %d)",
+              cpad->align.padding_left, cpad->align.padding_top,
+              cpad->align.padding_right, cpad->align.padding_bottom);
+        }
       }
-      gst_structure_free (config);
     } else {
       GstPhyMemMeta *phymemmeta = GST_PHY_MEM_META_GET (buffer);
       if (phymemmeta) {
