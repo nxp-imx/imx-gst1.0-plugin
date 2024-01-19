@@ -381,14 +381,6 @@ static gint get_format_conversion_loss(GstBaseTransform * base,
     }
   }
 
-  /* accept input format immediately without loss */
-  if (in_info == out_info) {
-    GST_LOG("same format %s", GST_VIDEO_FORMAT_INFO_NAME(in_info));
-    return 0;
-  }
-
-  loss = SCORE_FORMAT_CHANGE;
-
   in_flags = GST_VIDEO_FORMAT_INFO_FLAGS (in_info);
   in_flags &= ~GST_VIDEO_FORMAT_FLAG_LE;
   in_flags &= ~GST_VIDEO_FORMAT_FLAG_COMPLEX;
@@ -398,6 +390,19 @@ static gint get_format_conversion_loss(GstBaseTransform * base,
   out_flags &= ~GST_VIDEO_FORMAT_FLAG_LE;
   out_flags &= ~GST_VIDEO_FORMAT_FLAG_COMPLEX;
   out_flags &= ~GST_VIDEO_FORMAT_FLAG_UNPACK;
+
+  if ((out_flags & COLORSPACE_MASK) == GST_VIDEO_FORMAT_FLAG_YUV
+      && imxvct->composition_meta_enable) {
+    return G_MAXINT32;
+  }
+
+  /* accept input format immediately without loss */
+  if (in_info == out_info) {
+    GST_LOG("same format %s", GST_VIDEO_FORMAT_INFO_NAME(in_info));
+    return 0;
+  }
+
+  loss = SCORE_FORMAT_CHANGE;
 
   if ((out_flags & PALETTE_MASK) != (in_flags & PALETTE_MASK)) {
     loss += SCORE_PALETTE_CHANGE;
