@@ -1049,6 +1049,7 @@ Imx2DDevice * imx_pxp_create(Imx2DDeviceType  device_type)
   device->get_capabilities    = imx_pxp_get_capabilities;
   device->get_supported_in_fmts  = imx_pxp_get_supported_in_fmts;
   device->get_supported_out_fmts = imx_pxp_get_supported_out_fmts;
+  device->get_alignment       = NULL;
 
   return device;
 }

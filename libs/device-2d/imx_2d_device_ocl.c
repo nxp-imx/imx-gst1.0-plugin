@@ -33,6 +33,7 @@ typedef struct {
   OCL_BUFFER src_buf;
   OCL_BUFFER dst_buf;
   OCL_MEMORY_TYPE mem_type;
+  OCL_ALIGN_FLAG align_flag;
 } Imx2DDeviceOcl;
 
 typedef struct {
@@ -452,6 +453,13 @@ static gint imx_ocl_convert (Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *s
   OCL_SetParam(ocl->ocl_handle, OCL_PARAM_INDEX_OUTPUT_FORMAT, &ocl->dst_fmt);
 
   ret = OCL_Convert(ocl->ocl_handle, &ocl->src_buf, &ocl->dst_buf);
+
+  if (ocl->align_flag == OCL_ALIGN_FLAG_DOWNSCALE
+      && ocl->dst_fmt.format == OCL_FORMAT_RGB888) {
+    gst_buffer_resize (dst->outbuf, 0, dst->crop.w * dst->crop.h * 3);
+    GST_TRACE("resize buffer: w:%d, h:%d",dst->crop.w, dst->crop.h);
+  }
+
 err:
 
   GST_TRACE ("finish\n");
@@ -585,6 +593,56 @@ static gboolean imx_ocl_check_conversion (GstCaps *input_caps, GstCaps *output_c
   return FALSE;
 }
 
+static gboolean imx_ocl_get_alignment (Imx2DDevice* device, GstVideoInfo *in_info,
+  GstVideoInfo *out_info, Imx2DAlignInfo *align_info)
+{
+  OCL_ALIGN_FLAG align_flag = OCL_ALIGN_FLAG_DEFAULT;
+  OCL_ALIGN_INFO ocl_align;
+  gboolean ret = FALSE;
+  OCL_RESULT result;
+
+  if (!device || !in_info || !out_info || !align_info)
+    return FALSE;
+
+  Imx2DDeviceOcl *ocl = (Imx2DDeviceOcl *) (device->priv);
+  memset (align_info, 0, sizeof (Imx2DAlignInfo));
+  const OclFmtMap *in_map = imx_ocl_get_format_map(GST_VIDEO_INFO_FORMAT(in_info));
+  const OclFmtMap *out_map = imx_ocl_get_format_map(GST_VIDEO_INFO_FORMAT(out_info));
+  if (!in_map || ! out_map) {
+    GST_INFO ("Can't get supported format map");
+    return ret;
+  }
+
+  if (GST_VIDEO_INFO_WIDTH (in_info) != GST_VIDEO_INFO_WIDTH (out_info)
+      || GST_VIDEO_INFO_HEIGHT (in_info) != GST_VIDEO_INFO_HEIGHT (out_info)) {
+    align_flag = OCL_ALIGN_FLAG_DOWNSCALE;
+    ocl->align_flag = align_flag;
+  } else {
+    ocl->align_flag = align_flag;
+    return ret;
+  }
+
+  result = OCL_QueryAlignmentInfo (align_flag, &ocl_align);
+  if (result != OCL_SUCCESS) {
+    GST_INFO ("ocl query align info, result: %d", result);
+    return ret;
+  } else {
+    align_info->width_align = ocl_align.width_align;
+    align_info->height_align = ocl_align.height_align;
+    align_info->size_align = ocl_align.size_align;
+    ret = TRUE;
+  }
+
+  GST_INFO ("get align, ocl fmt:%d to %d, %dx%d to %dx%d, "
+      "down scale:%d, output align(w,h,size):%d,%d,%d",
+      in_map->ocl_pixel_format, out_map->ocl_pixel_format,
+      GST_VIDEO_INFO_WIDTH (in_info), GST_VIDEO_INFO_HEIGHT (in_info),
+      GST_VIDEO_INFO_WIDTH (out_info), GST_VIDEO_INFO_HEIGHT (out_info),
+      align_flag, align_info->width_align,
+      align_info->height_align, align_info->size_align);
+  return ret;
+}
+
 static GList* imx_ocl_get_supported_in_fmts (Imx2DDevice* device)
 {
   return imx_ocl_get_supported_fmts (OCL_PORT_TYPE_INPUT);
@@ -642,6 +700,7 @@ Imx2DDevice * imx_ocl_create (Imx2DDeviceType  device_type)
   device->get_supported_in_fmts  = imx_ocl_get_supported_in_fmts;
   device->get_supported_out_fmts = imx_ocl_get_supported_out_fmts;
   device->check_conversion       = imx_ocl_check_conversion;
+  device->get_alignment       = imx_ocl_get_alignment;
 
   return device;
 }

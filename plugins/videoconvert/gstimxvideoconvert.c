@@ -1315,20 +1315,41 @@ gst_imx_video_convert_filter_meta (GstBaseTransform * trans, GstQuery * query,
 }
 
 static void
-imx_video_convert_set_pool_alignment(GstCaps *caps, GstBufferPool *pool)
+imx_video_convert_set_pool_alignment(GstImxVideoConvert *imxvct, GstCaps *caps, GstBufferPool *pool, gboolean update_align)
 {
   GstVideoInfo info;
   GstVideoAlignment alignment;
+  Imx2DAlignInfo align_info;
   GstStructure *config = gst_buffer_pool_get_config(pool);
+  Imx2DDevice *device = imxvct->device;
+  GstVideoFilter *filter = GST_VIDEO_FILTER_CAST(imxvct);
+
   gst_video_info_from_caps (&info, caps);
 
   memset (&alignment, 0, sizeof (GstVideoAlignment));
 
   gint w = GST_VIDEO_INFO_WIDTH (&info);
   gint h = GST_VIDEO_INFO_HEIGHT (&info);
-  if (!ISALIGNED (w, ALIGNMENT) || !ISALIGNED (h, ALIGNMENT)) {
-    alignment.padding_right = ALIGNTO (w, ALIGNMENT) - w;
-    alignment.padding_bottom = ALIGNTO (h, ALIGNMENT) - h;
+
+  if (update_align && device->get_alignment
+      && device->get_alignment (device, &filter->in_info, &filter->out_info, &align_info)) {
+    /* Check alignment parameters */
+    if (!align_info.width_align || !align_info.height_align) {
+      align_info.width_align = ALIGNMENT;
+      align_info.height_align = ALIGNMENT;
+    }
+
+    if (!ISALIGNED (w, align_info.width_align)
+        || !ISALIGNED (h, align_info.height_align)) {
+      alignment.padding_right = SIZE_ALIGN (w, align_info.width_align) - w;
+      alignment.padding_bottom = SIZE_ALIGN (h, align_info.height_align) - h;
+    }
+  } else {
+    if (!ISALIGNED (w, ALIGNMENT) || !ISALIGNED (h, ALIGNMENT)) {
+      alignment.padding_right = ALIGNTO (w, ALIGNMENT) - w;
+      alignment.padding_bottom = ALIGNTO (h, ALIGNMENT) - h;
+    }
+    GST_DEBUG_OBJECT (imxvct, "Set padding info by default");
   }
 
   GST_DEBUG ("pool(%p), [%d, %d]:padding_right (%d), padding_bottom (%d)",
@@ -1368,7 +1389,7 @@ imx_video_convert_buffer_pool_is_ok (GstBufferPool * pool, GstCaps * newcaps,
 
 static GstBufferPool*
 gst_imx_video_convert_create_bufferpool(GstImxVideoConvert *imxvct,
-                    GstCaps *caps, guint size, guint min, guint max)
+                    GstCaps *caps, guint size, guint min, guint max, gboolean update_align)
 {
   GstBufferPool *pool;
   GstStructure *config;
@@ -1410,7 +1431,7 @@ gst_imx_video_convert_create_bufferpool(GstImxVideoConvert *imxvct,
     }
   }
 
-  imx_video_convert_set_pool_alignment(caps, pool);
+  imx_video_convert_set_pool_alignment(imxvct, caps, pool, update_align);
 
   GST_LOG ("created a buffer pool (%p).", pool);
   return pool;
@@ -1463,7 +1484,7 @@ imx_video_convert_propose_allocation(GstBaseTransform *transform,
     GST_IMX_CONVERT_UNREF_POOL(imxvct->in_pool);
     GST_DEBUG_OBJECT(imxvct, "creating new input pool");
     pool = gst_imx_video_convert_create_bufferpool(imxvct, caps, size, 1,
-                                                   IMX_VCT_IN_POOL_MAX_BUFFERS);
+                                                   IMX_VCT_IN_POOL_MAX_BUFFERS, FALSE);
     imxvct->in_pool = pool;
     imxvct->pool_config_update = TRUE;
 
@@ -1501,6 +1522,8 @@ static gboolean imx_video_convert_decide_allocation(GstBaseTransform *transform,
   GstVideoInfo vinfo;
   gboolean new_pool = TRUE;
   GstAllocator *allocator = NULL;
+  Imx2DAlignInfo align_info;
+  GstVideoFilter *filter = GST_VIDEO_FILTER_CAST(transform);
 
   gst_query_parse_allocation(query, &outcaps, NULL);
   gst_video_info_init(&vinfo);
@@ -1538,7 +1561,15 @@ static gboolean imx_video_convert_decide_allocation(GstBaseTransform *transform,
   }
 
   size = MAX(size, vinfo.size);
-  size = PAGE_ALIGN(size);
+
+  if (imxvct->device->get_alignment
+      && imxvct->device->get_alignment (imxvct->device, &filter->in_info, &filter->out_info, &align_info)
+      && align_info.size_align) {
+    size = SIZE_ALIGN(size, align_info.size_align);
+  } else {
+    size = PAGE_ALIGN(size);
+    GST_DEBUG_OBJECT (imxvct, "Set size alignment by default");
+  }
 
   if (max == 0) {
     if (min < 3)
@@ -1553,13 +1584,13 @@ static gboolean imx_video_convert_decide_allocation(GstBaseTransform *transform,
     GST_IMX_CONVERT_UNREF_POOL(imxvct->self_out_pool);
     GST_DEBUG_OBJECT(imxvct, "creating new output pool");
     pool = gst_imx_video_convert_create_bufferpool(imxvct, outcaps, size,
-                                                   min, max);
+                                                   min, max, TRUE);
     imxvct->self_out_pool = pool;
     config = gst_buffer_pool_get_config (pool);
     gst_buffer_pool_set_active(pool, TRUE);
   } else {
     // check the requirement of output alignment
-    imx_video_convert_set_pool_alignment(outcaps, pool);
+    imx_video_convert_set_pool_alignment(imxvct, outcaps, pool, TRUE);
   }
 
   imxvct->out_pool = pool;
@@ -1808,7 +1839,7 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
       GST_IMX_CONVERT_UNREF_POOL(imxvct->in_pool);
       GST_DEBUG_OBJECT(imxvct, "creating new input pool");
       imxvct->in_pool = gst_imx_video_convert_create_bufferpool(imxvct, caps,
-          in_info.size, 1, IMX_VCT_IN_POOL_MAX_BUFFERS);
+          in_info.size, 1, IMX_VCT_IN_POOL_MAX_BUFFERS, FALSE);
     }
 
     gst_caps_unref (caps);
@@ -2128,6 +2159,9 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
     src.mem->user_data = (gpointer *)_get_cached_phyaddr (gst_buffer_peek_memory (input_buf, 1));
   if (!dst.mem->paddr)
     dst.mem->paddr = _get_cached_phyaddr (gst_buffer_peek_memory (outbuf, 0));
+
+  /* For OpenCL-based 2d device, need get outbuf and handle it in some cases */
+  dst.outbuf = outbuf;
 
   gint64 start_time = g_get_monotonic_time ();
   //convert

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 NXP
+ * Copyright 2023-2024 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -29,6 +29,7 @@
 * NV12 to RGB24. Support input buffer of BT601 and BT709, limited and full range.
 * YUYV to RGB24. Support input buffer of BT601 and BT709, limited and full range.
 * NV15TILE_TO_NV12.
+* RGBA32 to RGB24.
 *
 * width and height should be alignment to 4 bytes when convert from RGBA32 to NV12.
 * or convert from NV12/YUYV to RGB24 format.
@@ -142,6 +143,12 @@ typedef struct ocl_fmt_plane_info{
     int plane_size[OCL_MAX_PLANE_NUM];//out
 }OCL_FORMAT_PLANE_INFO;
 
+typedef struct ocl_align_info{
+    int width_align;
+    int height_align;
+    int size_align;
+}OCL_ALIGN_INFO;
+
 typedef void* OCL_HANDLE;
 
 typedef enum ocl_param_index{
@@ -149,6 +156,7 @@ typedef enum ocl_param_index{
     OCL_PARAM_INDEX_OUTPUT_FORMAT,
     OCL_PARAM_INDEX_RUN_TIME,
     OCL_PARAM_INDEX_FORMAT_PLANE_INFO,
+    OCL_PARAM_INDEX_ALIGN_INFO,
 }OCL_PARAM_INDEX;
 
 /*
@@ -185,6 +193,20 @@ OCL_RESULT OCL_QuerySupportFormat(OCL_PORT port, int * num_of_fmt, OCL_PIXEL_FOR
  * @return value in OCL_RESULT.
  */
 OCL_RESULT OCL_QuerySupportMap(int * num_of_group, OCL_PIXEL_FORMAT_GROUP ** fmt_group);
+
+typedef enum ocl_align_flag
+{
+    OCL_ALIGN_FLAG_DEFAULT = 0,
+    OCL_ALIGN_FLAG_DOWNSCALE = 1 << 0,
+}OCL_ALIGN_FLAG;
+/**
+ * Function to query alignment infomation based on given input and output formats
+ *
+ * @param flag [in] extra flag when query the information
+ * @param out [out] pointer to OCL_ALIGN_INFO array which contain alignment information.
+ * @return value in OCL_RESULT.
+ */
+OCL_RESULT OCL_QueryAlignmentInfo(OCL_ALIGN_FLAG flag, OCL_ALIGN_INFO * out);
 
 typedef enum ocl_open_flag
 {

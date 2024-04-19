@@ -29,6 +29,7 @@
 #define ALIGNMENT (16)
 #define ISALIGNED(a, b) (!(a & (b-1)))
 #define ALIGNTO(a, b) ((a + (b-1)) & (~(b-1)))
+#define SIZE_ALIGN(size, align)    ((size+align-1)/(align)*(align))
 
 typedef enum {
   IMX_2D_DEVICE_G2D,
@@ -161,6 +162,12 @@ typedef struct _Imx2DVideoWarp {
   GstStructure *extra_controls;
 } Imx2DVideoWarp;
 
+typedef struct _Imx2DAlignInfo {
+  guint width_align;
+  guint height_align;
+  guint size_align;
+} Imx2DAlignInfo;
+
 typedef struct _Imx2DFrame {
   PhyMemBlock           *mem;
   gint                  fd[4];
@@ -169,6 +176,7 @@ typedef struct _Imx2DFrame {
   Imx2DRotationMode     rotate;
   Imx2DInterlaceType    interlace_type;
   gint                  alpha;
+  GstBuffer             *outbuf;
 } Imx2DFrame;
 
 typedef struct _Imx2DDevice  Imx2DDevice;
@@ -202,6 +210,7 @@ struct _Imx2DDevice {
   Imx2DDeinterlaceMode (*get_deinterlace)         (Imx2DDevice* device);
   gboolean (*check_conversion) (GstCaps *input_caps, GstCaps *output_caps);
   gboolean (*config_warp_info) (Imx2DDevice* device, Imx2DVideoWarp *video_warp);
+  gboolean (*get_alignment) (Imx2DDevice* device, GstVideoInfo *in_info, GstVideoInfo *out_info, Imx2DAlignInfo *align_info);
 };
 
 typedef struct _Imx2DDeviceInfo {
