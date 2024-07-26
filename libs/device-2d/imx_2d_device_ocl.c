@@ -885,6 +885,7 @@ Imx2DDevice * imx_ocl_create (Imx2DDeviceType  device_type)
   device->check_conversion       = imx_ocl_check_conversion;
   device->get_alignment       = imx_ocl_get_alignment;
   device->config_warp_info    = imx_ocl_config_warp_info;
+  device->get_supported_fmts_of_capability = NULL;
 
   return device;
 }

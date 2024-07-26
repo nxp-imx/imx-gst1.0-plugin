@@ -947,6 +947,31 @@ static gboolean imx_g2d_config_warp_info (Imx2DDevice *device, Imx2DVideoWarp *v
   return TRUE;
 }
 
+static GList* imx_g2d_get_supported_fmts_of_capability(Imx2DDevice* device, Imx2DDeviceCap cap)
+{
+  GList* list = NULL;
+  const G2dFmtMap *map;
+  if (HAS_DPU()) {
+    map = g2d_fmts_map_dpu;
+  } else {
+    map = g2d_fmts_map;
+  }
+  while (map->bpp > 0) {
+    if (map->gst_video_format != GST_VIDEO_FORMAT_UNKNOWN) {
+      if (cap == IMX_2D_DEVICE_CAP_ALPHA
+        && map->gst_video_format == GST_VIDEO_FORMAT_I420
+        && HAS_DPU()) {
+        map++;
+        continue;
+      }
+      list = g_list_append(list, (gpointer)(map->gst_video_format));
+    }
+    map++;
+  }
+
+  return list;
+}
+
 Imx2DDevice * imx_g2d_create(Imx2DDeviceType  device_type)
 {
   Imx2DDevice * device = g_slice_alloc(sizeof(Imx2DDevice));
@@ -979,6 +1004,7 @@ Imx2DDevice * imx_g2d_create(Imx2DDeviceType  device_type)
   device->get_supported_out_fmts = imx_g2d_get_supported_out_fmts;
   device->check_conversion    = imx_g2d_check_conversion;
   device->config_warp_info    = imx_g2d_config_warp_info;
+  device->get_supported_fmts_of_capability = imx_g2d_get_supported_fmts_of_capability;
   device->get_alignment       = NULL;
 
   return device;

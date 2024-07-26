@@ -182,6 +182,7 @@ enum {
 };
 
 static GstElementClass *parent_class = NULL;
+static GstCaps* imx_compositor_caps_from_fmt_list(GList* list, gboolean is_input);
 
 static void gst_imxcompositor_finalize (GObject * object)
 {
@@ -431,6 +432,8 @@ gst_imxcompositor_sink_query (GstAggregator * agg, GstAggregatorPad * bpad,
       GstCaps *filter, *caps;
       GstCaps *srccaps;
       GstCaps *sink_template;
+      Imx2DDevice *device = imxcomp->device;
+      GstImxCompositorPad *imxcompo_pad = GST_IMXCOMPOSITOR_PAD (bpad);
 
       gst_query_parse_caps (query, &filter);
 
@@ -454,7 +457,16 @@ gst_imxcompositor_sink_query (GstAggregator * agg, GstAggregatorPad * bpad,
             "pixel-aspect-ratio", NULL);
       }
 
-      sink_template = gst_pad_get_pad_template_caps (GST_PAD (bpad));
+      /* Need check the formats if perform alpha blending */
+      if (imxcompo_pad->alpha != 1.0
+        && device->get_supported_fmts_of_capability) {
+        GList *list = device->get_supported_fmts_of_capability(device, IMX_2D_DEVICE_CAP_ALPHA);
+        sink_template = imx_compositor_caps_from_fmt_list(list, TRUE);
+        g_list_free(list);
+      } else {
+        sink_template = gst_pad_get_pad_template_caps (GST_PAD (bpad));
+      }
+
       filtered_caps = gst_caps_intersect(srccaps, sink_template);
 
       GST_LOG_OBJECT(bpad, "srccaps: %" GST_PTR_FORMAT, srccaps);

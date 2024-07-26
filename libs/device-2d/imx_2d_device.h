@@ -212,6 +212,7 @@ struct _Imx2DDevice {
   gboolean (*check_conversion) (Imx2DDevice *device, GstCaps *input_caps, GstCaps *output_caps);
   gboolean (*config_warp_info) (Imx2DDevice* device, Imx2DVideoWarp *video_warp);
   gboolean (*get_alignment) (Imx2DDevice* device, GstVideoInfo *in_info, GstVideoInfo *out_info, Imx2DAlignInfo *align_info);
+  GList*               (*get_supported_fmts_of_capability)   (Imx2DDevice* device, Imx2DDeviceCap cap);
 };
 
 typedef struct _Imx2DDeviceInfo {
