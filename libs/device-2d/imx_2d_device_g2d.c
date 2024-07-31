@@ -117,6 +117,22 @@ static G2dFmtMap g2d_fmts_map_dpu[] = {
     {GST_VIDEO_FORMAT_UNKNOWN, -1,          0}
 };
 
+static G2dFmtMap g2d_fmts_warp_map[] = {
+    {GST_VIDEO_FORMAT_RGB16,  G2D_RGB565,   16},
+    {GST_VIDEO_FORMAT_RGBx,   G2D_RGBX8888, 32},
+    {GST_VIDEO_FORMAT_RGBA,   G2D_RGBA8888, 32},
+    {GST_VIDEO_FORMAT_BGRA,   G2D_BGRA8888, 32},
+    {GST_VIDEO_FORMAT_BGRx,   G2D_BGRX8888, 32},
+    {GST_VIDEO_FORMAT_BGR16,  G2D_BGR565,   16},
+    {GST_VIDEO_FORMAT_ARGB,   G2D_ARGB8888, 32},
+    {GST_VIDEO_FORMAT_ABGR,   G2D_ABGR8888, 32},
+    {GST_VIDEO_FORMAT_xRGB,   G2D_XRGB8888, 32},
+    {GST_VIDEO_FORMAT_xBGR,   G2D_XBGR8888, 32},
+    {GST_VIDEO_FORMAT_UYVY,   G2D_UYVY,     16},
+    {GST_VIDEO_FORMAT_YUY2,   G2D_YUYV,     16},
+    {GST_VIDEO_FORMAT_UNKNOWN, -1,          0}
+};
+
 static const G2dFmtMap * imx_g2d_get_format(GstVideoFormat format)
 {
   const G2dFmtMap *map;
@@ -793,6 +809,23 @@ static gboolean imx_g2d_check_conversion (Imx2DDevice *device, GstCaps *input_ca
     GST_INFO ("No valid input or output format, input caps %" GST_PTR_FORMAT
         ", output_caps %" GST_PTR_FORMAT, input_caps, output_caps);
     return TRUE;
+  }
+
+  /* Check warp conversion if needed */
+  Imx2DDeviceG2d *g2d = (Imx2DDeviceG2d *) (device->priv);
+  if (g2d->video_warp.enable) {
+    const G2dFmtMap *map = g2d_fmts_warp_map;
+
+    while(map->bpp > 0) {
+      if (map->gst_video_format == in_map->gst_video_format)
+        break;
+      map++;
+    }
+    if (map->bpp <= 0) {
+      GST_INFO ("warp format (%s) is not supported.",
+          gst_video_format_to_string(in_map->gst_video_format));
+      return FALSE;
+    }
   }
 
   /* Check the specified conversion map */
