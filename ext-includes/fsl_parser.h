@@ -168,7 +168,6 @@ enum
     PARSER_READ_MODE_TRACK_BASED /* Track-based sample reading.*/
 };
 
-
 /*********************************************************************
  * Video Scan type
  * a. Progressive
@@ -300,7 +299,7 @@ typedef enum FSL_PARSER_USER_DATA_TYPE
     USER_DATA_DESCRIPTION,    /* movie description */
     USER_DATA_TRACKNUMBER,    /* track number */
     USER_DATA_TOTALTRACKNUMBER,    /* total track number */
-    USER_DATA_LOCATION,       /* geographic location */
+    USER_DATA_LOCATION,       /* geographic location */  
 
     /* add more? */
     USER_DATA_CHAPTER_MENU,     /* Chapter Menu information */
@@ -569,7 +568,7 @@ typedef struct _TrackInfo
     uint32 m_dwTrackNo; //global track No
     uint32 m_dwPID;     //PID(packet ID)
     uint8 m_byLan[3];   //language
-    uint32 m_dwReserved[16];
+    uint32 m_dwReserved[16];    
 }TrackInfo;
 
 //single program map table
@@ -578,7 +577,7 @@ typedef struct _PMTInfo
     uint32 m_dwChannel; //program_number in spec, for a broadcast channel.
     uint32 m_dwPID;     //PID(packet ID)
     uint32 m_dwReserved[8];
-    uint32 m_dwTrackNum;
+    uint32 m_dwTrackNum;    
     TrackInfo *m_ptTrackInfo;
 }PMTInfo;
 
@@ -640,12 +639,21 @@ typedef struct
 
 typedef struct
 {
+    uint32 left;
+    uint32 top;
+    uint32 right;
+    uint32 bottom;
+}Crop;
+
+typedef struct
+{
     uint32 isDefault;
     uint32 csdSize;
     uint8 *hvcc;
     uint8 *av1c;
     uint32 iccSize;
     uint8 *icc;
+    Crop crop;
     // for thumbnail
     uint32 thumbnailWidth;
     uint32 thumbnailHeight;
@@ -976,8 +984,8 @@ typedef int32 (*FslParserGetAudioPresentationInfo)(FslParserHandle parserHandle,
                                                 uint32 * spokenSubtitlesAvailable,
                                                 uint32 * dialogueEnhancementAvailable);
 
-typedef int32 (*FslParserFlush)( FslParserHandle parserHandle,
-                                uint32 trackNum);
+/* optional */
+typedef int32 (*FslParserFlush)( FslParserHandle parserHandle, uint32 trackNum);
 
 
 /************************************************************************************************************
@@ -1040,7 +1048,6 @@ enum /* API function ID */
     PARSER_API_GET_AUDIO_BLOCK_ALIGN        = 65,
     PARSER_API_GET_AUDIO_CHANNEL_MASK       = 66,
     PARSER_API_GET_AUDIO_BITS_PER_FRAME     = 67,
-
     PARSER_API_GET_AUDIO_PRESENTATION_NUM   = 68,
     PARSER_API_GET_AUDIO_PRESENTATION_INFO  = 69,
     PARSER_API_GET_AUDIO_MPEGH_INFO         = 70,
