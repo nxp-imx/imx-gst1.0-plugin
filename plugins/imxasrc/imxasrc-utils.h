@@ -20,8 +20,8 @@
 #ifndef _IMXASRC_UTILS_H
 #define _IMXASRC_UTILS_H
 
-#include <alsa/asoundlib.h>
 #include <gst/audio/audio.h>
+#include <stdint.h>
 
 typedef struct ring_buffer_struct {
   int block_size;

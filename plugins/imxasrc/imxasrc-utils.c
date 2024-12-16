@@ -17,6 +17,7 @@
  * Boston, MA 02110-1335, USA.
  */
 
+#include <alsa/asoundlib.h>
 #include "imxasrc-utils.h"
 
 int ring_buffer_create(RingBuffer *ringbuffer, int block_size, int num_blocks)

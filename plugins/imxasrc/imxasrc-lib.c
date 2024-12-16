@@ -19,12 +19,13 @@
 
 #include <gst/gst.h>
 #include <sys/ioctl.h>
-#include <alsa/asoundlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <sound/compress_offload.h>
 #include "imxasrc-lib.h"
-#include <linux/mxc_asrc.h>
 
-#define ASRC_DEVICE_NAME ("/dev/mxc_asrc")
-#define ASRC_DMA_BUF_SIZE (4096 * 4)
 /* maximum buffer time in ring buffer is 200ms */
 #define MAX_RING_BUFFER_TIME 200
 /* silence time in ring buffer is 20ms */
@@ -54,55 +55,23 @@ ensure_debug_category (void)
 #define ensure_debug_category() /* NOOP */
 #endif /* GST_DISABLE_GST_DEBUG */
 
-/*
- * Function: get the output length of asrc by giving the input data length
- * , input rate and output rate.
- * The returned length is not accurate, but the method used in this way can
- * work well with DMA used in asrc.
- * To make sure the output length is enought to store the target audio data,
- * a tail will be added for output buffer of storing the whole audio data and
- * each asrc converting data.
- * input_format and output_format is added since the new ASRC in i.mx8MN has
- * the resample function like convert 16 bit input to 24 bit output.
- */
-int imx_asrc_get_output_buffer_size(int input_buffer_size,
-        int input_sample_rate, int output_sample_rate,
-        snd_pcm_format_t input_format,
-        snd_pcm_format_t output_format)
-{
-  int i = 0;
-  int outbuffer_size = 0;
-  int outsample = output_sample_rate;
-
-  while (outsample >= input_sample_rate)
-  {
-    ++i;
-    outsample -= input_sample_rate;
-  }
-  outbuffer_size = i * input_buffer_size;
-  i = 1;
-  while (((input_buffer_size >> i) > 2) && (outsample != 0))
-  {
-    if (((outsample << 1) - input_sample_rate) >= 0)
-    {
-      outsample = (outsample << 1) - input_sample_rate;
-      outbuffer_size += (input_buffer_size >> i);
-    }
-    else
-    {
-      outsample = outsample << 1;
-    }
-    i++;
-  }
-  outbuffer_size = (outbuffer_size >> 3) << 3;
-  outbuffer_size = outbuffer_size * snd_pcm_format_physical_width(output_format) / snd_pcm_format_physical_width(input_format);
-
-  return outbuffer_size;
-}
-
 int imx_asrc_open(ASRCConfig *asrc)
 {
-  asrc->fd = open(ASRC_DEVICE_NAME, O_RDWR);
+  char path[64];
+  int i;
+
+  for (i = 0; i < 10; i++) {
+    memset(path, 0, 64);
+    sprintf(path, "/dev/snd/comprC%uD0", i);
+    if (access(path, F_OK) == 0)
+      break;
+  }
+  if (i == 10) {
+    GST_ERROR ("no asrc sound card found\n");
+    return -1;
+  }
+
+  asrc->fd = open(path, O_RDWR);
 
   if (asrc->fd < 0)
   {
@@ -116,7 +85,6 @@ int imx_asrc_open(ASRCConfig *asrc)
 void imx_asrc_close(ASRCConfig *asrc)
 {
   close(asrc->fd);
-  ioctl(asrc->fd, ASRC_RELEASE_PAIR, asrc->pair_index);
 
   ring_buffer_destroy(&asrc->ring_buffer);
 
@@ -126,11 +94,13 @@ void imx_asrc_close(ASRCConfig *asrc)
 /* Request one available ASRC CONTEXT/PAIR then configure it */
 int imx_asrc_config(ASRCConfig *asrc)
 {
+  struct snd_compr_codec_caps codec_caps = {};
+  struct snd_compr_caps caps;
+  struct snd_compr_params params;
+  int i, j;
   int err = 0;
   int block_size;
   int num_blocks;
-  struct asrc_req req;
-  struct asrc_config config;
   uint8_t *silence;
   size_t silence_size;
 
@@ -140,51 +110,84 @@ int imx_asrc_config(ASRCConfig *asrc)
     return -1;
   }
 
-  asrc->input_dma_size = ASRC_DMA_BUF_SIZE;
-  asrc->output_dma_size = imx_asrc_get_output_buffer_size(
-                            asrc->input_dma_size,
-                            asrc->audio_info.input_sample_rate,
-                            asrc->audio_info.output_sample_rate,
-                            asrc->audio_info.input_format,
-                            asrc->audio_info.output_format);
-
-  req.chn_num = asrc->audio_info.channels;
-  /* load the requested asrc PAIR information to req */
-  err = ioctl(asrc->fd, ASRC_REQ_PAIR, &req);
-  if (err < 0)
-  {
-    GST_ERROR ("Req ASRC pair FAILED");
+  if ((err = ioctl(asrc->fd, SNDRV_COMPRESS_GET_CAPS, &caps)) < 0) {
+    GST_ERROR("get caps FAILED: %d\n", err);
     return err;
   }
-  if (req.index == 0)
-    GST_DEBUG("Pair A requested");
-  else if (req.index == 1)
-    GST_DEBUG("Pair B requested");
-  else if (req.index == 2)
-    GST_DEBUG("Pair C requested");
-  else if (req.index == 3)
-    GST_DEBUG("Pair D requested");
 
-  /* get the supported formats for requested PAIR */
-  asrc->supported_in_format = req.supported_in_format;
-  asrc->supported_out_format = req.supported_out_format;
-
-  config.pair = req.index;
-  config.channel_num = req.chn_num;
-  config.dma_buffer_size = asrc->input_dma_size;
-  config.input_sample_rate = asrc->audio_info.input_sample_rate;
-  config.output_sample_rate = asrc->audio_info.output_sample_rate;
-  config.input_format = asrc->audio_info.input_format;
-  config.output_format = asrc->audio_info.output_format;
-  config.inclk = INCLK_NONE;
-  config.outclk = OUTCLK_ASRCK1_CLK;
-  asrc->pair_index = req.index;
-  err = ioctl(asrc->fd, ASRC_CONFIG_PAIR, &config);
-  if (err < 0)
-  {
-    GST_ERROR ("ioctl ASRC_CONFIG_PAIR failed");
+  codec_caps.codec = SND_AUDIOCODEC_PCM;
+  if ((err = ioctl(asrc->fd, SNDRV_COMPRESS_GET_CODEC_CAPS, &codec_caps)) < 0) {
+    GST_ERROR ("get codec caps FAILED: %d\n", err);
     return err;
   }
+
+  for (i = 0; i < codec_caps.num_descriptors; i++) {
+    if (codec_caps.descriptor[i].formats != asrc->audio_info.input_format)
+      continue;
+
+    for (j = 0; j < codec_caps.descriptor[i].num_sample_rates; j++) {
+      if (codec_caps.descriptor[i].sample_rates[j] == asrc->audio_info.input_sample_rate)
+        break;
+    }
+
+    if (j == codec_caps.descriptor[i].num_sample_rates)
+      continue;
+
+    if (asrc->audio_info.output_sample_rate >= codec_caps.descriptor[i].src.out_sample_rate_min &&
+        asrc->audio_info.output_sample_rate <= codec_caps.descriptor[i].src.out_sample_rate_max)
+      break;
+  }
+
+  if (i == codec_caps.num_descriptors) {
+    GST_ERROR ("caps don't support\n");
+    return err;
+  }
+
+  params.buffer.fragment_size = 4096;
+  params.buffer.fragments = 1;
+  params.codec.id = SND_AUDIOCODEC_PCM;
+  params.codec.ch_in  = asrc->audio_info.channels;
+  params.codec.ch_out = asrc->audio_info.channels;
+  params.codec.format = asrc->audio_info.input_format;
+  params.codec.sample_rate = asrc->audio_info.input_sample_rate;
+  params.codec.pcm_format = asrc->audio_info.output_format;
+  params.codec.options.src_d.out_sample_rate = asrc->audio_info.output_sample_rate;
+  if ((err = ioctl(asrc->fd, SNDRV_COMPRESS_SET_PARAMS, &params)) < 0) {
+    GST_ERROR("set params FAILED\n");
+    return err;
+  }
+
+  if ((err = ioctl(asrc->fd, SNDRV_COMPRESS_TASK_CREATE, &asrc->task)) < 0) {
+    GST_ERROR("task create FAILED %d\n", err);
+    return err;
+  }
+
+  asrc->status.seqno = asrc->task.seqno;
+
+  asrc->bufin_start = mmap(NULL,
+                           512 * 1024, /* set by the driver */
+                           PROT_READ | PROT_WRITE,
+                           MAP_SHARED,
+                           asrc->task.input_fd,
+                           0);
+  if (asrc->bufin_start == MAP_FAILED) {
+    GST_ERROR ("MMAP IN err\n");
+    return err;
+  }
+  /* empty capture buffer */
+  memset(asrc->bufin_start, 0, 512 * 1024);
+  asrc->bufout_start = mmap(NULL,
+                           512 * 1024, /* set by the driver */
+                           PROT_READ | PROT_WRITE,
+                           MAP_SHARED,
+                           asrc->task.output_fd,
+                           0);
+  if (asrc->bufout_start == MAP_FAILED) {
+    GST_ERROR("MMAP OUT err\n");
+    return err;
+  }
+  /* empty capture buffer */
+  memset(asrc->bufout_start, 0, 512 * 1024);
 
   /* create ring buffer and feed silence data */
   block_size = asrc->out_bps * asrc->audio_info.channels;
@@ -208,24 +211,9 @@ int imx_asrc_config(ASRCConfig *asrc)
 
 int imx_asrc_start(ASRCConfig *asrc)
 {
-  int err;
-  err = ioctl(asrc->fd, ASRC_START_CONV, &asrc->pair_index);
-  if (err < 0)
-  {
-    GST_ERROR ("ioctl ASRC_START_CONV failed");
-    return err;
-  }
+  int err = 0;
 
   return err;
-}
-
-size_t imx_asrc_get_out_len(ASRCConfig *asrc_config, size_t in_len)
-{
-  return imx_asrc_get_output_buffer_size(in_len,
-              asrc_config->audio_info.input_sample_rate,
-              asrc_config->audio_info.output_sample_rate,
-              get_alsa_pcm_format(asrc_config->audio_info.input_format),
-              get_alsa_pcm_format(asrc_config->audio_info.output_format));
 }
 
 size_t imx_asrc_get_out_frames(ASRCConfig *asrc_config, size_t in_frames)
@@ -233,45 +221,45 @@ size_t imx_asrc_get_out_frames(ASRCConfig *asrc_config, size_t in_frames)
   return ring_buffer_avail(&asrc_config->ring_buffer);
 }
 
-int imx_asrc_resample(ASRCConfig *asrc_config, gpointer in[],
+int imx_asrc_resample(ASRCConfig *asrc, gpointer in[],
     size_t in_frames, gpointer out[], size_t out_frames)
 {
-  struct asrc_convert_buffer asrc_buf;
   size_t in_chunk, out_chunk;
   uint8_t *in_p = in[0];
   uint8_t *out_p = out[0];
-  uint8_t *temp_buffer;
   int err;
   int num_blocks_in;
 
-  out_chunk = imx_asrc_get_out_frames(asrc_config, in_frames);
+  out_chunk = imx_asrc_get_out_frames(asrc, in_frames);
   if (out_frames < out_chunk) {
     GST_ERROR ("no enough frames to get");
     return -1;
   }
 
-  ring_buffer_get(&asrc_config->ring_buffer, out_frames, out_p);
+  ring_buffer_get(&asrc->ring_buffer, out_frames, out_p);
 
-  in_chunk = in_frames * asrc_config->in_bps * asrc_config->audio_info.channels;
-  out_chunk = imx_asrc_get_out_len(asrc_config, in_chunk);
-  /* increase tail size to make sure temp buffer has enough space for ASRC output */
-  temp_buffer = malloc(out_chunk + TAIL_SIZE);
+  in_chunk = in_frames * asrc->in_bps * asrc->audio_info.channels;
+  memcpy(asrc->bufin_start, in_p, in_chunk);
+  asrc->task.input_size = in_chunk;
 
-  asrc_buf.input_buffer_length = in_chunk;
-  asrc_buf.input_buffer_vaddr = in_p;
-  asrc_buf.output_buffer_length = out_chunk + TAIL_SIZE;
-  asrc_buf.output_buffer_vaddr = temp_buffer;
-  err = ioctl(asrc_config->fd, ASRC_CONVERT, &asrc_buf);
-  if (err < 0)
-  {
-    GST_ERROR ("ioctl ASRC_CONVERT failed");
+  if ((err = ioctl(asrc->fd, SNDRV_COMPRESS_TASK_START, &asrc->task)) < 0) {
+      GST_ERROR ("task start FAILED\n");
+      return err;
+  }
+
+  if ((err = ioctl(asrc->fd, SNDRV_COMPRESS_TASK_STOP, &asrc->task.seqno)) < 0) {
+    GST_ERROR ("task stop FAILED\n");
     return err;
   }
 
-  num_blocks_in = asrc_buf.output_buffer_length / asrc_config->ring_buffer.block_size;
-  ring_buffer_put(&asrc_config->ring_buffer, num_blocks_in, temp_buffer);
+  if ((err = ioctl(asrc->fd, SNDRV_COMPRESS_TASK_STATUS, &asrc->status)) < 0) {
+    GST_ERROR ("task status FAILED\n");
+    return err;
+  }
+
+  num_blocks_in = asrc->status.output_size / asrc->ring_buffer.block_size;
+  ring_buffer_put(&asrc->ring_buffer, num_blocks_in, asrc->bufout_start);
   GST_DEBUG("asrc convert: in %ld frames, out %d frames\n", in_frames, num_blocks_in);
 
-  free(temp_buffer);
   return err;
 }

@@ -20,8 +20,7 @@
 #ifndef _IMXASRC_LIB_H
 #define _IMXASRC_LIB_H
 
-#include <alsa/asoundlib.h>
-#include <linux/mxc_asrc.h>
+#include <sound/compress_offload.h>
 #include "imxasrc-utils.h"
 
 typedef struct _ASRCConfig ASRCConfig;
@@ -49,6 +48,11 @@ struct _ASRCConfig {
   int pair_index;
   int supported_in_format;
   int supported_out_format;
+
+  void *bufin_start;
+  void *bufout_start;
+  struct snd_compr_task task;
+  struct snd_compr_task_status status;
 
   RingBuffer ring_buffer;
 };
