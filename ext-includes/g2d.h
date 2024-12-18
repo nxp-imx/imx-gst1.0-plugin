@@ -40,6 +40,8 @@
  *	2020-08-25         Petr Cach         1.6            support BGR888, support BT_601FR, BT_709FR
  *	2021-12-02         Li Xianzhong      2.0            Add g2d fence sync extension
  *	2024-07-12         Guangliu Ding     2.2            support RGBA1010102 and GRAY8
+ *	2024-11-13         Guangliu Ding     2.3            support deinterlace/48bit address/dct api
+
 */
 
 #ifndef __G2D_H__
@@ -50,7 +52,7 @@ extern "C"  {
 #endif
 
 #define G2D_VERSION_MAJOR   2
-#define G2D_VERSION_MINOR   1
+#define G2D_VERSION_MINOR   3
 #define G2D_VERSION_PATCH   0
 
 enum g2d_format
@@ -152,8 +154,11 @@ enum g2d_cache_mode
 
 enum g2d_hardware_type
 {
-    G2D_HARDWARE_2D           = 0,//default type
-    G2D_HARDWARE_VG           = 1,
+    G2D_HARDWARE_2D           = 0,//GPU 2D
+    G2D_HARDWARE_VG           = 1,//GPU VG
+    G2D_HARDWARE_DPU_V1       = 2,//DPU V1
+    G2D_HARDWARE_DPU_V2       = 3,//DPU V2
+    G2D_HARDWARE_PXP          = 4,//PXP
 };
 
 enum g2d_status
@@ -167,7 +172,7 @@ enum g2d_status
 #include <sys/types.h>
 typedef off64_t g2d_phys_addr_t;
 #else
-typedef unsigned int     g2d_phys_addr_t;
+typedef unsigned long g2d_phys_addr_t;
 #endif
 
 struct g2d_surface

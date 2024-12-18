@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 2013-2016 Freescale Semiconductor, Inc.
- *  Copyright 2017-2022 NXP
+ *  Copyright 2017-2022, 2024 NXP
  */
 /*
 * This library is free software; you can redistribute it and/or
@@ -52,6 +52,7 @@ enum g2d_tiling
     G2D_SUPERTILED          = 0x4,
     G2D_AMPHION_TILED       = 0x8,
     G2D_AMPHION_INTERLACED  = 0x10,
+    G2D_INTERLACED          = G2D_AMPHION_INTERLACED,
     G2D_TILED_STATUS        = 0x20,
     G2D_AMPHION_TILED_10BIT = 0x40,
 };
@@ -122,6 +123,19 @@ int g2d_create_fence_fd(void *handle);
  * @return int   0 if successful; -1 if an error occured.
  */
 int g2d_set_warp_coordinates(void *handle, struct g2d_warp_coordinates *coord);
+
+/**
+ * @brief Get coordinates plane for warp/dewarp operations from DCT Tool binary.
+ * @param handle A g2d handle.
+ * @param file_name The path to DCT Tool binary containing all the
+ *               coordinate plane parameters.
+ * @param coord_buf A pointer to a g2d buffer for coordinates plane.
+ * @param coord  A pointer to a g2d_warp_coordinates structure containing all the
+ *               coordinate plane parameters to be initialized.
+ * @return int   0 if successful; -1 if an error occured.
+ */
+int g2d_get_warp_coordinates_from_dct_file(void *handle, const char *file_name,
+        struct g2d_buf *coord_buf, struct g2d_warp_coordinates *coord);
 
 #ifdef __cplusplus
 }
