@@ -38,7 +38,7 @@ endif
 if cc.has_header('linux/videodev2.h')
   have_v4l2 = true
 endif
-if cc.has_header('linux/mxc_asrc.h') and cc.has_header('alsa/asoundlib.h')
+if cc.has_header('sound/compress_offload.h') and cc.has_header('sound/compress_params.h')
   have_asrc=true
 endif
 
