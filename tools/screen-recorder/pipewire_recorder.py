@@ -11,7 +11,7 @@ import http.server
 import signal
 from enum import Enum
 
-VERSION_STR = "PIPEWIRE_RECORDER_00.00.05"
+VERSION_STR = "PIPEWIRE_RECORDER_00.00.06"
 
 # Return result
 class Ret(Enum):
@@ -23,11 +23,11 @@ class Ret(Enum):
 # Configure and enable pipewire backend
 class PipewireBackend:
     def is_exist (self):
-        pipewire_path = "/usr/lib/libweston-14/pipewire-backend.so"
-        if os.path.exists (pipewire_path) and os.path.isfile(pipewire_path):
-            return True
-        else:
-            return False
+        file_name = "pipewire-backend.so"
+        for root, dirs, files in os.walk("/usr/lib/"):
+            if file_name in files:
+                return True
+        return False
 
     def set_parameters(self, is_add):
         ret = Ret.OK
@@ -187,10 +187,17 @@ class PipewireServer:
 # Screen recorder base class
 class ScreenRecorder:
     keepalive_time = 33
-    def get_recorder_id(self):
+    work_path = "/tmp/pipewire_recorder"
+    def get_video_recorder_id(self):
         str = os.popen ('pw-top -b -n 1 | grep weston.pipewire | awk -F " " \'{print $2}\'').read()
         id = str.split("\n")
         return id[0]
+
+    def get_audio_recorder_id(self):
+        str = os.popen ('pw-top -b -n 1 | grep alsa_output.platform-sound | grep stereo-fallback | awk -F " " \'{print $2}\'').read()
+        id = str.split("\n")
+        return id[0]
+
     def get_local_ip(self):
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -200,15 +207,33 @@ class ScreenRecorder:
             s.close()
         return local_ip
 
-    def start (self, device):
+    def start (self, device, record_audio):
         # Try to configure backend and enable it
         ret = device.enable()
         # Get recorder id only if backend is valid
         if ret == Ret.OK:
-            self.recorder_id = self.get_recorder_id()
-            if self.recorder_id == "":
+            self.video_recorder_id = self.get_video_recorder_id()
+            if self.video_recorder_id == "":
                 ret = Ret.ERROR
-                print ("ERROR: failed to get pipeiwre recorder id!")
+                print ("ERROR: failed to get video recorder id!")
+
+            if record_audio:
+                self.audio_recorder_id = self.get_audio_recorder_id()
+                if self.audio_recorder_id == "":
+                    ret = Ret.ERROR
+                    print ("ERROR: failed to get audio recorder id!")
+                else :
+                    os.system (f"wpctl set-default {self.audio_recorder_id}")
+                    print (f"Set the default audio sink by wpctl, sink id: {self.audio_recorder_id}")
+
+            if ret == Ret.OK:
+                try:
+                    if not os.path.isdir(self.work_path):
+                        os.mkdir(self.work_path)
+                        #print (f"create directory to store files: {self.work_path}")
+                except OSError as e:
+                    print(f"ERROR: {e}, failed to create directory: {self.work_path}")
+
         return ret
 
     def stop (self):
@@ -218,19 +243,24 @@ class ScreenRecorder:
         all_files = os.listdir(path)
         for file in all_files:
             if fnmatch.fnmatch(file, file_name):
-                os.remove (file)
+                path_file = os.path.join(path, file)
+                os.remove (path_file)
+                print (f"Remove recording file: {path_file}")
 
 # Record screen data to the file
 class FileRecorder (ScreenRecorder):
     process = ""
-    def start (self, device):
-        if super().start(device) == Ret.OK:
+    def start (self, device, record_audio):
+        if super().start(device, record_audio) == Ret.OK:
             # Start recording and store it to the file
             current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-            FILE_PATH = f"screen_record_{current_time}.mkv"
-            record_cmd = f"gst-launch-1.0 pipewiresrc path={self.recorder_id} keepalive-time={self.keepalive_time} ! imxvideoconvert_g2d ! v4l2h264enc extra-controls=\"encode, video_bitrate=10000000\" ! h264parse ! queue ! matroskamux ! filesink location={FILE_PATH} >>/dev/null 2>&1"
+            FILE_PATH = f"{self.work_path}/screen_record_{current_time}.mkv"
+            if record_audio:
+                record_cmd = f"gst-launch-1.0 pipewiresrc path={self.video_recorder_id} keepalive-time={self.keepalive_time} provide-clock=false ! imxvideoconvert_g2d ! v4l2h264enc extra-controls=\"encode, video_bitrate=10000000\" ! h264parse ! queue ! mux. pipewiresrc path={self.audio_recorder_id} use-bufferpool=false provide-clock=false ! audio/x-raw,format=S16LE,rate=48000,channels=2 ! queue ! lamemp3enc ! mpegaudioparse ! queue ! mux. matroskamux name=mux ! filesink location={FILE_PATH} >>/dev/null 2>&1"
+            else:
+                record_cmd = f"gst-launch-1.0 pipewiresrc path={self.video_recorder_id} keepalive-time={self.keepalive_time} ! imxvideoconvert_g2d ! v4l2h264enc extra-controls=\"encode, video_bitrate=10000000\" ! h264parse ! queue ! matroskamux ! filesink location={FILE_PATH} >>/dev/null 2>&1"
             self.process = subprocess.Popen(record_cmd, shell=True)
-            print ("Start recording to the file")
+            print (f"Start recording to the file, location: {FILE_PATH}")
             return Ret.OK
         else:
             print ("ERROR: failed to start recording to the file")
@@ -249,22 +279,25 @@ class HlsRecorder (ScreenRecorder):
     hls_process = ""
     port = 9999
     
-    def start (self, device):
-        if super().start(device) == Ret.OK:
+    def start (self, device, record_audio):
+        if super().start(device, record_audio) == Ret.OK:
             # Clear out the remaining files if they exist
-            work_path = os.getcwd()
-            self.clear_file (work_path, self.hls_playlist)
-            self.clear_file (work_path, f"{self.hls_segment}*.ts")
+            self.clear_file (self.work_path, self.hls_playlist)
+            self.clear_file (self.work_path, f"{self.hls_segment}*.ts")
 
             # Start http server
-            http_server_cmd = f"nohup python3 -m http.server {self.port} --directory {work_path} >>/dev/null 2>&1"
+            http_server_cmd = f"nohup python3 -m http.server {self.port} --directory {self.work_path} >>/dev/null 2>&1"
             self.http_process = subprocess.Popen(http_server_cmd, shell=True)
             
             # Start recording by HLS
             server_ip = self.get_local_ip()
-            record_cmd = f"gst-launch-1.0 pipewiresrc path={self.recorder_id} keepalive-time={self.keepalive_time} ! imxvideoconvert_g2d ! v4l2h264enc extra-controls=\"encode, video_bitrate=10000000\" ! h264parse ! queue ! mpegtsmux ! hlssink playlist-root=http://{server_ip}:{self.port} playlist-location={self.hls_playlist} location={self.hls_segment}_%05d.ts target-duration=1 max-files=5 >>/dev/null 2>&1"
+            if record_audio:
+                record_cmd = f"gst-launch-1.0 pipewiresrc path={self.video_recorder_id} keepalive-time={self.keepalive_time} provide-clock=false ! imxvideoconvert_g2d ! v4l2h264enc extra-controls=\"encode, video_bitrate=10000000\" ! h264parse ! queue ! mux. pipewiresrc path={self.audio_recorder_id} use-bufferpool=false provide-clock=false ! audio/x-raw,format=S16LE,rate=48000,channels=2 ! queue ! lamemp3enc ! mpegaudioparse ! queue ! mux. mpegtsmux name=mux ! hlssink playlist-root=http://{server_ip}:{self.port} playlist-location={self.work_path}/{self.hls_playlist} location={self.work_path}/{self.hls_segment}_%05d.ts target-duration=1 max-files=5 >>/dev/null 2>&1"
+            else:
+                record_cmd = f"gst-launch-1.0 pipewiresrc path={self.video_recorder_id} keepalive-time={self.keepalive_time} ! imxvideoconvert_g2d ! v4l2h264enc extra-controls=\"encode, video_bitrate=10000000\" ! h264parse ! queue ! mpegtsmux ! hlssink playlist-root=http://{server_ip}:{self.port} playlist-location={self.work_path}/{self.hls_playlist} location={self.work_path}/{self.hls_segment}_%05d.ts target-duration=1 max-files=5 >>/dev/null 2>&1"
             self.hls_process = subprocess.Popen(record_cmd, shell=True)
             print (f"Start recording as HLS server. Play URI: http://{server_ip}:{self.port}/{self.hls_playlist}")
+            print (f"Recording file directory: {self.work_path}")
             return Ret.OK
         else:
             print ("ERROR: failed to start recording as HLS server")
@@ -279,33 +312,35 @@ class HlsRecorder (ScreenRecorder):
 
         # Clear out the remaining files
         time.sleep(1)
-        work_path = os.getcwd()
-        self.clear_file (work_path, self.hls_playlist)
-        self.clear_file (work_path, f"{self.hls_segment}*.ts")
+        self.clear_file (self.work_path, self.hls_playlist)
+        self.clear_file (self.work_path, f"{self.hls_segment}*.ts")
 
 # Record screen data to RTSP stream
 class RtspRecorder (ScreenRecorder):
+    rtsp_server_path = "/usr/bin"
     rtsp_server = "test-launch"
     rtsp_process = ""
 
-    def rtsp_server_is_exist (self, server_name):
-        all_files = os.listdir()
+    def rtsp_server_is_exist (self, path, server_name):
+        all_files = os.listdir(path)
         for file in all_files:
             if fnmatch.fnmatch(file, server_name):
                 return True
         return False
     
-    def start (self, device):
-        if super().start(device) == Ret.OK:
+    def start (self, device, record_audio):
+        if super().start(device, record_audio) == Ret.OK:
             # Install server if needed
-            if self.rtsp_server_is_exist(self.rtsp_server) == False:
-                os.system (f"wget http://lsv03893.swis.in-blr01.nxp.com/jaredHu/{self.rtsp_server}")
-                current_path = os.getcwd()
-                os.system (f"chmod +x {current_path}/{self.rtsp_server}")
-            
+            if self.rtsp_server_is_exist(self.rtsp_server_path, self.rtsp_server) == False:
+                print (f"ERROR: {self.rtsp_server} is not found. Please install it to {self.rtsp_server_path}/")
+                return Ret.ERROR
+
             # Start recording 
             server_ip = self.get_local_ip()
-            record_cmd = f"./{self.rtsp_server} \"pipewiresrc path={self.recorder_id} keepalive-time={self.keepalive_time} ! imxvideoconvert_g2d ! v4l2h264enc ! h264parse ! queue ! rtph264pay name=pay0 pt=96 >>/dev/null 2>&1\""
+            if record_audio:
+                record_cmd = f"{self.rtsp_server_path}/{self.rtsp_server} \"pipewiresrc path={self.video_recorder_id} keepalive-time={self.keepalive_time} provide-clock=false ! imxvideoconvert_g2d ! v4l2h264enc extra-controls=encode,video_bitrate=10000000 ! h264parse ! queue ! mux. pipewiresrc path={self.audio_recorder_id} use-bufferpool=false provide-clock=false ! audio/x-raw,format=S16LE,rate=48000,channels=2 ! queue ! lamemp3enc ! mpegaudioparse ! queue ! mux. mpegtsmux name=mux ! rtpmp2tpay name=pay0 >>/dev/null 2>&1\""
+            else:
+                record_cmd = f"{self.rtsp_server_path}/{self.rtsp_server} \"pipewiresrc path={self.video_recorder_id} keepalive-time={self.keepalive_time} ! imxvideoconvert_g2d ! v4l2h264enc extra-controls=encode,video_bitrate=10000000 ! h264parse ! queue ! mpegtsmux ! rtpmp2tpay name=pay0 >>/dev/null 2>&1\""
             self.rtsp_process = subprocess.Popen(record_cmd, shell=True)
             print (f"Start recording as RTSP server. Play URI: rtsp://{server_ip}:8554/test")
             return Ret.OK
@@ -318,19 +353,18 @@ class RtspRecorder (ScreenRecorder):
             self.rtsp_process.terminate()
         print ("Stop recording as a RTSP server")
 
-        # Clear out the remaining files
-        if self.rtsp_server_is_exist(self.rtsp_server) == True:
-            self.clear_file (os.getcwd(), f"{self.rtsp_server}")
-
 # Record screen data to RTP stream
 class RtpRecorder (ScreenRecorder):
     rtp_process = ""
 
-    def start (self, device, receiver_ip):
-        if super().start(device) == Ret.OK:
+    def start (self, device, receiver_ip, record_audio):
+        if super().start(device, record_audio) == Ret.OK:
             # Start recording 
             server_ip = self.get_local_ip()
-            record_cmd = f"gst-launch-1.0 pipewiresrc path={self.recorder_id} keepalive-time={self.keepalive_time} ! imxvideoconvert_g2d ! v4l2h264enc extra-controls=\"encode, video_bitrate=10000000\" ! h264parse ! queue ! mpegtsmux ! rtpmp2tpay ! udpsink host={receiver_ip} port=1234 sync=false async=false >>/dev/null 2>&1"
+            if record_audio:
+                record_cmd = f"gst-launch-1.0 pipewiresrc path={self.video_recorder_id} keepalive-time={self.keepalive_time} provide-clock=false ! imxvideoconvert_g2d ! v4l2h264enc extra-controls=\"encode, video_bitrate=10000000\" ! h264parse ! queue ! mux. pipewiresrc path={self.audio_recorder_id} use-bufferpool=false provide-clock=false ! audio/x-raw,format=S16LE,rate=48000,channels=2 ! queue ! lamemp3enc ! mpegaudioparse ! queue ! mux. mpegtsmux name=mux ! rtpmp2tpay ! udpsink host={receiver_ip} port=1234 >>/dev/null 2>&1"
+            else:
+                record_cmd = f"gst-launch-1.0 pipewiresrc path={self.video_recorder_id} keepalive-time={self.keepalive_time} ! imxvideoconvert_g2d ! v4l2h264enc extra-controls=\"encode, video_bitrate=10000000\" ! h264parse ! queue ! mpegtsmux ! rtpmp2tpay ! udpsink host={receiver_ip} port=1234 sync=false async=false >>/dev/null 2>&1"
             self.rtp_process = subprocess.Popen(record_cmd, shell=True)
             print (f"Start recording as RTP server. Play URI: rtp://@{receiver_ip}:1234")
             return Ret.OK
@@ -344,20 +378,21 @@ class RtpRecorder (ScreenRecorder):
         print ("Stop recording as a RTP server")
 
 if __name__ == "__main__":
-    arg_parser = argparse.ArgumentParser(description='Start screen recording on i.MX95 board')
-    arg_parser.add_argument('--rtsp_record', type=int, default=0, help='record as RTSP server. 1:enable(by default), 0:disable')
-    arg_parser.add_argument('--hls_record', type=int, default=1, help='record as HLS live server. 1:enable, 0:disable(by default)')
-    arg_parser.add_argument('--file_record', type=int, default=0, help='record to file. 1:enable, 0:disable(by default)')
-    arg_parser.add_argument('--rtp_record', type=str, default="", help='record as RTP server. Need to enter receiver ip')
-    arg_parser.add_argument('--restore_params', type=int, default=0, help='restore weston parameters when the script exists')
-    arg_parser.add_argument('-v', '--verbose', action='store_true', help='detail information')
+    arg_parser = argparse.ArgumentParser(description='Start screen recording. Record as HLS live server if the record type is not selected')
+    arg_parser.add_argument('--rtsp_record', type=int, default=0, help='record as RTSP server. RTSP_RECORD is 1(enable) or 0(disable by default)')
+    arg_parser.add_argument('--hls_record', type=int, default=0, help='record as HLS live server. HLS_RECORD is 1(enable) or 0(disable by default)')
+    arg_parser.add_argument('--file_record', type=int, default=0, help='record to file. FILE_RECORD is 1(enable) or 0(disable by default)')
+    arg_parser.add_argument('--rtp_record', type=str, default="", help='record as RTP server. RTP_RECORD is receiver IP address')
+    arg_parser.add_argument('--restore_params', type=int, default=0, help='restore weston parameters when the script exists. RESTORE_PARAMS is 1(enable) or 0(disable by default)')
+    arg_parser.add_argument('--audio_record', type=int, default=0, help='record audio simultaneously. AUDIO_RECORD is 1(enable) or 0(disable by default)')
 
     print (VERSION_STR)
     args = arg_parser.parse_args()
     ret = Ret.OK
+
     if (args.rtsp_record == 0 and args.hls_record == 0 and args.file_record == 0 and args.rtp_record == ""):
-        print ("ERROR: no function is enabled, please check the input parameters!")
-        ret = Ret.ERROR
+        args.hls_record = 1
+        print ("No recording type is selected, select HLS recording.")
 
     if (ret == Ret.OK):
         # Check and enable pipewire service if needed
@@ -371,18 +406,18 @@ if __name__ == "__main__":
         ret = Ret.ERROR
         if args.rtsp_record:
             rtsp_record = RtspRecorder()
-            ret = rtsp_record.start(pipewire_backend)
+            ret = rtsp_record.start(pipewire_backend, args.audio_record)
         if args.hls_record:
             hls_record = HlsRecorder()
-            if hls_record.start(pipewire_backend) == Ret.OK:
+            if hls_record.start(pipewire_backend, args.audio_record) == Ret.OK:
                 ret = Ret.OK
         if args.file_record:
             file_record = FileRecorder()
-            if file_record.start(pipewire_backend) == Ret.OK:
+            if file_record.start(pipewire_backend, args.audio_record) == Ret.OK:
                 ret = Ret.OK
         if args.rtp_record != "":
             rtp_record = RtpRecorder()
-            if rtp_record.start(pipewire_backend, args.rtp_record) == Ret.OK:
+            if rtp_record.start(pipewire_backend, args.rtp_record, args.audio_record) == Ret.OK:
                 ret = Ret.OK
 
         try:
