@@ -163,6 +163,8 @@ static PxpFmtMap pxp_out_fmts_map_v2[] = {
     {GST_VIDEO_FORMAT_UNKNOWN, -1,          0}
 };
 
+static gboolean is_format_has_alpha(guint pxp_format);
+
 static const PxpFmtMap * imx_pxp_get_format(GstVideoFormat format,
                                             const PxpFmtMap *map)
 {
@@ -488,6 +490,7 @@ static gint imx_pxp_convert(Imx2DDevice *device,
       MIN(src->crop.w, pxp->config.proc_data.srect.width);
   pxp->config.proc_data.srect.height =
       MIN(src->crop.h, pxp->config.proc_data.srect.height);
+  pxp->config.proc_data.combine_enable = 0;
 
   pxp->config.s0_param.paddr = (dma_addr_t)src->mem->paddr;
   if (src->fd[1] >= 0)
@@ -568,6 +571,7 @@ static gint imx_pxp_blend_without_alpha(Imx2DDevice *device,
   pxp->config.proc_data.srect.top = src->crop.y;
   pxp->config.proc_data.srect.width = MIN(src->crop.w, src->info.w);
   pxp->config.proc_data.srect.height = MIN(src->crop.h, src->info.h);
+  pxp->config.proc_data.combine_enable = 0;
   pxp->config.s0_param.paddr = (dma_addr_t)src->mem->paddr;
   if (src->fd[1] >= 0)
     pxp->config.s0_param.paddr_u = (dma_addr_t)src->mem->user_data;
@@ -597,10 +601,12 @@ static gint imx_pxp_overlay(Imx2DDevice *device,
   guint orig_dst_s;
   guint orig_dst_fmt;
   guint orig_src_fmt;
-  guint BPP = 4;
+  guint out_bpp = 4, in_bpp = 4;
   const PxpFmtMap *fmt_map = NULL;
   const PxpFmtMap *out_map = NULL;
+  const PxpFmtMap *in_map = NULL;
   const GstVideoFormatInfo *src_finfo;
+  struct pxp_alpha *s0_alpha, *s1_alpha;
 
   if (!device || !device->priv || !dst || !src || !dst->mem || !src->mem)
     return -1;
@@ -622,20 +628,23 @@ static gint imx_pxp_overlay(Imx2DDevice *device,
       return -1;
   }
 
-  if (imx_chip_code() >= CC_MX943)
+  if (imx_chip_code() >= CC_MX943) {
     out_map = pxp_out_fmts_map_v2;
-  else
+    in_map = pxp_in_fmts_map_v2;
+  } else {
     out_map = pxp_out_fmts_map_v1;
+    in_map = pxp_in_fmts_map_v1;
+  }
 
   fmt_map = imx_pxp_get_format(dst->info.fmt, out_map);
   if (fmt_map)
-    BPP = fmt_map->bpp/8 + (fmt_map->bpp%8 ? 1 : 0);
+    out_bpp = fmt_map->bpp/8 + (fmt_map->bpp%8 ? 1 : 0);
 
   if (pxp->ov_temp.vaddr
-      && pxp->ov_temp.size < (dst->crop.w * dst->crop.h * BPP)) {
+      && pxp->ov_temp.size < (dst->crop.w * dst->crop.h * out_bpp)) {
     imx_pxp_free_mem(device, &pxp->ov_temp);
-    pxp->ov_temp.size = dst->crop.w * dst->crop.h * BPP;
-    GST_LOG ("reallocte memory %" G_GSIZE_FORMAT ", BPP=%d", pxp->ov_temp.size, BPP);
+    pxp->ov_temp.size = dst->crop.w * dst->crop.h * out_bpp;
+    GST_LOG ("reallocte memory %" G_GSIZE_FORMAT ", out_bpp=%d", pxp->ov_temp.size, out_bpp);
     if (imx_pxp_alloc_mem(device, &pxp->ov_temp) < 0)
       return -1;
   }
@@ -685,6 +694,7 @@ static gint imx_pxp_overlay(Imx2DDevice *device,
     pxp->config.proc_data.drect.width = 16;
     pxp->config.proc_data.drect.height = 16;
     pxp->config.out_param.paddr = (dma_addr_t)dst->mem->paddr;
+    pxp->config.proc_data.combine_enable = 0;
 
     imx_pxp_do_channel(pxp);
     pxp->first_frame_done = TRUE;
@@ -700,6 +710,7 @@ static gint imx_pxp_overlay(Imx2DDevice *device,
   pxp->config.proc_data.srect.top = dst->crop.y;
   pxp->config.proc_data.srect.width = MIN(dst->crop.w, orig_dst_w-dst->crop.x);
   pxp->config.proc_data.srect.height = MIN(dst->crop.h, orig_dst_h-dst->crop.y);
+  pxp->config.proc_data.combine_enable = 0;
 
   GST_TRACE ("pxp temp src : %dx%d,%d(%d,%d-%d,%d), format=%x",
       pxp->config.s0_param.width, pxp->config.s0_param.height,
@@ -739,15 +750,14 @@ static gint imx_pxp_overlay(Imx2DDevice *device,
           return -1;
       }
 
-      guint BPP = 2;
-      if (orig_src_fmt == PXP_PIX_FMT_RGB32
-          || orig_src_fmt == PXP_PIX_FMT_BGRA32)
-        BPP = 4;
+      fmt_map = imx_pxp_get_format(src->info.fmt, in_map);
+      if (fmt_map)
+        in_bpp = fmt_map->bpp/8 + (fmt_map->bpp%8 ? 1 : 0);
 
       if (pxp->rgb_temp.vaddr
-          && pxp->rgb_temp.size < (orig_dst_w * orig_dst_h * BPP)) {
+          && pxp->rgb_temp.size < (orig_dst_w * orig_dst_h * in_bpp)) {
         imx_pxp_free_mem(device, &pxp->rgb_temp);
-        pxp->rgb_temp.size = orig_dst_w * orig_dst_h * BPP;
+        pxp->rgb_temp.size = orig_dst_w * orig_dst_h * in_bpp;
         GST_LOG ("reallocte memory %" G_GSIZE_FORMAT, pxp->rgb_temp.size);
         if (imx_pxp_alloc_mem(device, &pxp->rgb_temp) < 0)
           return -1;
@@ -875,7 +885,9 @@ static gint imx_pxp_overlay(Imx2DDevice *device,
   pxp->config.ol_param[0].global_override = FALSE;
   pxp->config.ol_param[0].width = dst->crop.w;
   pxp->config.ol_param[0].height = dst->crop.h;
-  pxp->config.ol_param[0].combine_enable = TRUE;
+  if (src->alpha < 0xFF) {
+    pxp->config.ol_param[0].combine_enable = TRUE;
+  }
 
   GST_TRACE ("pxp overlay : %dx%d,%d(%d,%d-%d,%d), format=%x",
       pxp->config.ol_param[0].width, pxp->config.ol_param[0].height,
@@ -907,9 +919,25 @@ static gint imx_pxp_overlay(Imx2DDevice *device,
   pxp->config.proc_data.drect.width = dst->crop.w;
   pxp->config.proc_data.drect.height = dst->crop.h;
   pxp->config.out_param.paddr = (dma_addr_t)dst->mem->paddr +
-                        (dst->crop.y * dst->info.w + dst->crop.x) * BPP;
+                        (dst->crop.y * dst->info.w + dst->crop.x) * out_bpp;
   pxp->config.out_param.width = pxp->config.proc_data.drect.width;
   pxp->config.out_param.height = pxp->config.proc_data.drect.height;
+
+  if (is_format_has_alpha (orig_src_fmt)) {
+    pxp->config.proc_data.combine_enable = 1;
+    s0_alpha = &pxp->config.s0_param.alpha;
+    s1_alpha = &pxp->config.ol_param[0].alpha;
+
+    s1_alpha->alpha_mode  = ALPHA_MODE_STRAIGHT;
+    s1_alpha->global_alpha_mode = GLOBAL_ALPHA_MODE_OFF;
+    s1_alpha->color_mode  = COLOR_MODE_STRAIGHT;
+    s0_alpha->factor_mode = FACTOR_MODE_ONE;
+
+    s0_alpha->alpha_mode  = ALPHA_MODE_STRAIGHT;
+    s0_alpha->global_alpha_mode = GLOBAL_ALPHA_MODE_OFF;
+    s0_alpha->color_mode  = COLOR_MODE_STRAIGHT;
+    s1_alpha->factor_mode = FACTOR_MODE_INVERSED;
+  }
 
   GST_TRACE ("pxp dest : %dx%d,%d(%d,%d-%d,%d), format=%x",
       pxp->config.out_param.width, pxp->config.out_param.height,
@@ -922,7 +950,11 @@ static gint imx_pxp_overlay(Imx2DDevice *device,
 }
 
 static gboolean is_format_has_alpha(guint pxp_format) {
-  return (pxp_format == PXP_PIX_FMT_BGRA32 || pxp_format == PXP_PIX_FMT_VUY444);
+  return (pxp_format == PXP_PIX_FMT_BGRA32
+          || pxp_format == PXP_PIX_FMT_ARGB32
+          || pxp_format == PXP_PIX_FMT_RGBA32
+          || pxp_format == PXP_PIX_FMT_ABGR32
+          || pxp_format == PXP_PIX_FMT_VUY444);
 }
 
 static gint imx_pxp_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
