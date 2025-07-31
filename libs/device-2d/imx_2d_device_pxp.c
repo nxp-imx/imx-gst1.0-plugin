@@ -483,6 +483,17 @@ static gint imx_pxp_convert(Imx2DDevice *device,
   Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
   memset(&pxp->config.ol_param[0], 0, sizeof(struct pxp_layer_param));
 
+  /* pxp doesn't support odd crop, remove one pixel for odd src crop
+   * add one pixel for odd dst crop */
+  if (src->crop.w % 2)
+    src->crop.w -= 1;
+  if (src->crop.h % 2)
+    src->crop.h -= 1;
+  if (dst->crop.w % 2)
+    dst->crop.w += 1;
+  if (dst->crop.h % 2)
+    dst->crop.h += 1;
+
   // Set input crop
   pxp->config.proc_data.srect.left = src->crop.x;
   pxp->config.proc_data.srect.top = src->crop.y;
@@ -969,6 +980,17 @@ static gint imx_pxp_blend(Imx2DDevice *device, Imx2DFrame *dst, Imx2DFrame *src)
     return -1;
 
   Imx2DDevicePxp *pxp = (Imx2DDevicePxp *) (device->priv);
+
+  /* pxp doesn't support odd crop, remove one pixel for odd src crop
+   * add one pixel for odd dst crop */
+  if (src->crop.w % 2)
+    src->crop.w -= 1;
+  if (src->crop.h % 2)
+    src->crop.h -= 1;
+  if (dst->crop.w % 2)
+    dst->crop.w += 1;
+  if (dst->crop.h % 2)
+    dst->crop.h += 1;
 
   if (src->alpha < 0xFF
       || is_format_has_alpha(pxp->config.s0_param.pixel_fmt)) {
