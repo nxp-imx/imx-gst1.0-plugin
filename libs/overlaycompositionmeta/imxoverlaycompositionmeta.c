@@ -245,6 +245,11 @@ void imx_video_overlay_composition_add_caps(GstCaps *caps)
     guint num = gst_caps_get_size(caps);
     for (i=0; i<num; i++) {
       has_f = gst_caps_get_features(caps, i);
+      if (has_f && gst_caps_features_contains(has_f,
+          GST_CAPS_FEATURE_MEMORY_DMABUF)) {
+        continue;
+      }
+
       if (!has_f || !gst_caps_features_contains(has_f,
           GST_CAPS_FEATURE_MEMORY_SYSTEM_MEMORY)
           || !gst_caps_features_contains(has_f,

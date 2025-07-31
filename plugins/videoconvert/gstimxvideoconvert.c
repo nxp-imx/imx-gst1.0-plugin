@@ -400,10 +400,10 @@ static GstCaps* imx_video_convert_transform_caps(GstBaseTransform *transform,
                      GstPadDirection direction, GstCaps *caps, GstCaps *filter)
 {
   GstImxVideoConvert *imxvct = (GstImxVideoConvert *) (transform);
-  GstCaps *tmp, *tmp2, *result;
+  GstCaps *tmp, *tmp2, *result, *drm_caps;
   GstStructure *st;
-  gint i, n, caps_index;
-  GstCapsFeatures *has_f, *f;
+  gint i, n;
+  GstCapsFeatures *f;
 
   GST_DEBUG("transform caps: %" GST_PTR_FORMAT, caps);
   GST_DEBUG("filter: %" GST_PTR_FORMAT, filter);
@@ -414,7 +414,6 @@ static GstCaps* imx_video_convert_transform_caps(GstBaseTransform *transform,
   tmp = gst_caps_new_empty();
   n = gst_caps_get_size(caps);
 
-  caps_index = 0;
   for (i = 0; i < n; i++) {
     st = gst_caps_get_structure(caps, i);
 
@@ -455,31 +454,18 @@ static GstCaps* imx_video_convert_transform_caps(GstBaseTransform *transform,
           GST_TYPE_FRACTION_RANGE, 1, G_MAXINT32, G_MAXINT32, 1, NULL);
     }
 
-    gst_caps_append_structure(tmp, st);
-
     /* Check and append DRM feature if needed */
     if (!g_strcmp0 (gst_structure_get_string (st, "format"), "DMA_DRM")) {
-      has_f = gst_caps_get_features(caps, i);
-      if (has_f && gst_caps_features_contains(has_f,
-          GST_CAPS_FEATURE_MEMORY_DMABUF)) {
-        f =
-          gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DMABUF, NULL);
-        gst_caps_set_features (tmp, caps_index, f);
-      }
+      drm_caps = gst_caps_new_empty();
+      gst_caps_append_structure(drm_caps, st);
+      f = gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DMABUF, NULL);
+      gst_caps_set_features(drm_caps, 0, f);
+      gst_caps_append (tmp, drm_caps);
     } else {
-      /* Check and append overlay composition feature if needed */
-      has_f = gst_caps_get_features(caps, i);
-      if (has_f && gst_caps_features_contains(has_f,
-          GST_CAPS_FEATURE_MEMORY_SYSTEM_MEMORY)
-          && gst_caps_features_contains(has_f,
-              GST_CAPS_FEATURE_META_GST_VIDEO_OVERLAY_COMPOSITION)) {
-        f = gst_caps_features_new(GST_CAPS_FEATURE_MEMORY_SYSTEM_MEMORY,
-            GST_CAPS_FEATURE_META_GST_VIDEO_OVERLAY_COMPOSITION, NULL);
-        gst_caps_set_features (tmp, caps_index, f);
-      }
+      gst_caps_append_structure(tmp, st);
     }
-    caps_index++;
   }
+  imx_video_overlay_composition_add_caps (tmp);
 
   GST_DEBUG("transformed: %" GST_PTR_FORMAT, tmp);
 
