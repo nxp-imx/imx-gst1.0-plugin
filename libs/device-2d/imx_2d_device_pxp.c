@@ -936,18 +936,21 @@ static gint imx_pxp_overlay(Imx2DDevice *device,
 
   if (is_format_has_alpha (orig_src_fmt)) {
     pxp->config.proc_data.combine_enable = 1;
-    s0_alpha = &pxp->config.s0_param.alpha;
-    s1_alpha = &pxp->config.ol_param[0].alpha;
+    /* FIXME: seems imx943 don't need this code, will try to fix later */
+    if (imx_chip_code() < CC_MX943) {
+      s0_alpha = &pxp->config.s0_param.alpha;
+      s1_alpha = &pxp->config.ol_param[0].alpha;
 
-    s1_alpha->alpha_mode  = ALPHA_MODE_STRAIGHT;
-    s1_alpha->global_alpha_mode = GLOBAL_ALPHA_MODE_OFF;
-    s1_alpha->color_mode  = COLOR_MODE_STRAIGHT;
-    s0_alpha->factor_mode = FACTOR_MODE_ONE;
+      s1_alpha->alpha_mode  = ALPHA_MODE_STRAIGHT;
+      s1_alpha->global_alpha_mode = GLOBAL_ALPHA_MODE_OFF;
+      s1_alpha->color_mode  = COLOR_MODE_STRAIGHT;
+      s0_alpha->factor_mode = FACTOR_MODE_ONE;
 
-    s0_alpha->alpha_mode  = ALPHA_MODE_STRAIGHT;
-    s0_alpha->global_alpha_mode = GLOBAL_ALPHA_MODE_OFF;
-    s0_alpha->color_mode  = COLOR_MODE_STRAIGHT;
-    s1_alpha->factor_mode = FACTOR_MODE_INVERSED;
+      s0_alpha->alpha_mode  = ALPHA_MODE_STRAIGHT;
+      s0_alpha->global_alpha_mode = GLOBAL_ALPHA_MODE_OFF;
+      s0_alpha->color_mode  = COLOR_MODE_STRAIGHT;
+      s1_alpha->factor_mode = FACTOR_MODE_INVERSED;
+    }
   }
 
   GST_TRACE ("pxp dest : %dx%d,%d(%d,%d-%d,%d), format=%x",
