@@ -1,0 +1,84 @@
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "spdxVersion": "SPDX-2.3",
+  "creationInfo": {
+    "created": "2025-08-24T08:08:12Z",
+    "creators": [
+      "Organization: NXP"
+    ],
+    "licenseListVersion": "3.20"
+  },
+  "name": "imx-gst1.0-plugin-LF_6.12.34_2.1.0",
+  "dataLicense": "CC0-1.0",
+  "documentNamespace": "https://nxp.com/spdx/197151bf-850f-47a2-84bc-0ded6dc9c108",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-package-197151bf-850f-47a2-84bc-0ded6dc9c108",
+      "name": "imx-gst1.0-plugin",
+      "versionInfo": "LF_6.12.34_2.1.0",
+      "licenseConcluded": "(LGPL-2.1-or-later)",
+      "licenseDeclared": "(LGPL-2.1-or-later)",
+      "downloadLocation": "https://github.com/nxp-imx/imx-gst1.0-plugin -b lf-6.12.34-2.1.0",
+      "originator": "Organization: NXP",
+      "supplier": "NOASSERTION",
+      "externalRefs": [],
+      "filesAnalyzed": false
+    },
+    {
+      "SPDXID": "SPDXRef-package-cdca1008-6a47-47c1-9a9f-efd281077b7f",
+      "name": "GStreamer",
+      "versionInfo": "1.26.0",
+      "licenseConcluded": "LGPL-2.1-or-later",
+      "licenseDeclared": "(GPL-3.0-or-later OR LGPL-2.1-or-later OR LGPL-2.0-or-later)",
+      "homepage": "https://gstreamer.freedesktop.org/",
+      "downloadLocation": "NOASSERTION",
+      "originator": "Organization: freedesktop_org",
+      "supplier": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "SECURITY",
+          "referenceLocator": "cpe:2.3:a:debian_package:gstreamer1.0-plugins-good:1.26.0:1:*:*:*:*:*:*",
+          "referenceType": "cpe23Type"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceLocator": "cpe:2.3:a:debian_package:gstreamer1.0-qt5:1.26.0:1:*:*:*:*:*:*",
+          "referenceType": "cpe23Type"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceLocator": "cpe:2.3:a:debian_package:gst-plugins-good1.0:1.26.0:1:*:*:*:*:*:*",
+          "referenceType": "cpe23Type"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceLocator": "cpe:2.3:a:debian_package:gstreamer1.0-qt6:1.26.0:1:*:*:*:*:*:*",
+          "referenceType": "cpe23Type"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceLocator": "cpe:2.3:a:debian_package:gstreamer1.0-gtk3:1.26.0:1:*:*:*:*:*:*",
+          "referenceType": "cpe23Type"
+        },
+        {
+          "referenceCategory": "OTHER",
+          "referenceLocator": "5c13e612-36d9-451e-b5a3-e247d4e2536b",
+          "referenceType": "BlackDuck-ComponentOrigin"
+        }
+      ],
+      "filesAnalyzed": false
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-package-197151bf-850f-47a2-84bc-0ded6dc9c108"
+    },
+    {
+      "spdxElementId": "SPDXRef-package-197151bf-850f-47a2-84bc-0ded6dc9c108",
+      "relationshipType": "DYNAMIC_LINK",
+      "relatedSpdxElement": "SPDXRef-package-cdca1008-6a47-47c1-9a9f-efd281077b7f"
+    }
+  ]
+}
