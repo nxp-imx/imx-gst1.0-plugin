@@ -1160,6 +1160,7 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
   GstBuffer *pad_buffer = NULL;
   guint i, n_mem;
   GstDmabufMeta *dmabuf_meta;
+  GstPhyMemMeta *pmeta;
   guint64 drm_modifier = 0;
 
 #if GST_CHECK_VERSION(1, 16, 0)
@@ -1175,21 +1176,33 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
 #endif
 
   video_meta = gst_buffer_get_video_meta (pad_buffer);
-  if (video_meta) {
-  src->info.fmt = GST_VIDEO_INFO_FORMAT(&(ppad->info));
-  src->info.w = video_meta->width +
-                pad->align.padding_left + pad->align.padding_right;
-  src->info.h = video_meta->height +
-                pad->align.padding_top + pad->align.padding_bottom;
-  src->info.stride = video_meta->stride[0];
-  } else {
-  src->info.fmt = GST_VIDEO_INFO_FORMAT(&(ppad->info));
-  src->info.w = ppad->info.width +
-                pad->align.padding_left + pad->align.padding_right;
-  src->info.h = ppad->info.height +
-                pad->align.padding_top + pad->align.padding_bottom;
-  src->info.stride = ppad->info.stride[0];
+  pmeta = GST_PHY_MEM_META_GET (pad_buffer);
+
+  if(pmeta && video_meta) {
+    src->info.w = video_meta->width + pmeta->x_padding;
+    src->info.h = video_meta->height + pmeta->y_padding;
+    src->info.stride = video_meta->stride[0];
   }
+  else if(pmeta && !video_meta) {
+    src->info.w = ppad->info.width + pmeta->x_padding;
+    src->info.h = ppad->info.height + pmeta->y_padding;
+    src->info.stride = ppad->info.stride[0];
+  }
+  else if (video_meta) {
+    src->info.w = video_meta->width +
+                  pad->align.padding_left + pad->align.padding_right;
+    src->info.h = video_meta->height +
+                  pad->align.padding_top + pad->align.padding_bottom;
+    src->info.stride = video_meta->stride[0];
+  } else {
+    src->info.w = ppad->info.width +
+                  pad->align.padding_left + pad->align.padding_right;
+    src->info.h = ppad->info.height +
+                  pad->align.padding_top + pad->align.padding_bottom;
+    src->info.stride = ppad->info.stride[0];
+  }
+
+  src->info.fmt = GST_VIDEO_INFO_FORMAT(&(ppad->info));
 
   /* For tiled format, the stride value is the tile number and need to convert to the byte size */
   if (GST_VIDEO_FORMAT_INFO_IS_TILED(ppad->info.finfo)) {
