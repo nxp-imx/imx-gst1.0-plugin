@@ -58,6 +58,8 @@ typedef struct _GstImxVideoConvert {
   gboolean videocrop_meta_enable;
   Imx2DVideoWarp video_warp;
   gboolean keep_ratio;
+  Imx2DMethod method;
+  guint padding_color;
   gint64 total_time;
   gint64 total_frames;
 } GstImxVideoConvert;

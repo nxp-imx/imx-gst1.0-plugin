@@ -59,6 +59,7 @@ static OclFmtMap ocl_fmts_map[] = {
     {GST_VIDEO_FORMAT_BGR, OCL_FORMAT_BGR888, 24},
     {GST_VIDEO_FORMAT_BGRx, OCL_FORMAT_BGRX8888, 32},
     {GST_VIDEO_FORMAT_NV16, OCL_FORMAT_NV16, 16},
+    {GST_VIDEO_FORMAT_RGBP, OCL_FORMAT_RGBP888, 24},
     {GST_VIDEO_FORMAT_UNKNOWN, -1, 0}
 };
 
@@ -800,6 +801,25 @@ static gint imx_ocl_blend_finish (Imx2DDevice *device)
 static gint imx_ocl_fill_color (Imx2DDevice *device, Imx2DFrame *src,
                                 Imx2DFrame *dst, guint RGBA8888)
 {
+  Imx2DDeviceOcl *ocl;
+  guint r, g, b, a;
+
+  if (!device || !device->priv)
+    return -1;
+
+  ocl = (Imx2DDeviceOcl *) (device->priv);
+  r = RGBA8888 & 0x000000FF;
+  g = (RGBA8888 & 0x0000FF00) >> 8;
+  b = (RGBA8888 & 0x00FF0000) >> 16;
+  a = (RGBA8888 & 0xFF000000) >> 24;
+  /* OpenCL converter expects padding value in ARGB order */
+  ocl->dst_fmt.padding_value = (a << 24) + (r << 16) + (g << 8) + b;
+
+  /* NOTE: OCL does not support an explicit fill operation here.
+   * The padding color is stored in dst_fmt.padding_value and will be
+   * applied internally by OCL_Convert() during the next convert call.
+   * The function MUST be called before imx_ocl_convert() to take effect.
+   */
   return 0;
 }
 
@@ -870,6 +890,36 @@ static gboolean imx_ocl_config_warp_info (Imx2DDevice *device, Imx2DVideoWarp *v
   return TRUE;
 }
 
+static gboolean imx_ocl_set_method (Imx2DDevice* device, Imx2DMethod method)
+{
+  Imx2DDeviceOcl *ocl;
+  OCL_METHOD ocl_method;
+
+  if (!device || !device->priv)
+    return FALSE;
+
+  ocl = (Imx2DDeviceOcl *) (device->priv);
+  if (!ocl->ocl_handle)
+    return FALSE;
+
+  switch (method) {
+    case IMX_2D_METHOD_NONE:
+      ocl_method = OCL_METHOD_NULL;
+      break;
+    case IMX_2D_METHOD_UINT8_TO_INT8:
+      ocl_method = OCL_METHOD_UINT8_TO_INT8;
+      break;
+    default:
+      return FALSE;
+  }
+
+  if (OCL_SUCCESS != OCL_SetParam (ocl->ocl_handle, OCL_PARAM_INDEX_METHOD, &ocl_method)) {
+    return FALSE;
+  }
+  GST_TRACE ("set ocl method: %d", ocl_method);
+  return TRUE;
+}
+
 Imx2DDevice * imx_ocl_create (Imx2DDeviceType  device_type)
 {
   Imx2DDevice * device = g_slice_alloc(sizeof(Imx2DDevice));
@@ -903,6 +953,7 @@ Imx2DDevice * imx_ocl_create (Imx2DDeviceType  device_type)
   device->check_conversion       = imx_ocl_check_conversion;
   device->get_alignment       = imx_ocl_get_alignment;
   device->config_warp_info    = imx_ocl_config_warp_info;
+  device->set_method          = imx_ocl_set_method;
   device->get_supported_fmts_of_capability = NULL;
 
   return device;

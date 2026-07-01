@@ -1223,6 +1223,7 @@ Imx2DDevice * imx_pxp_create(Imx2DDeviceType  device_type)
   device->get_alignment       = NULL;
   device->config_warp_info    = imx_pxp_config_warp_info;
   device->get_supported_fmts_of_capability = NULL;
+  device->set_method          = NULL;
 
   return device;
 }

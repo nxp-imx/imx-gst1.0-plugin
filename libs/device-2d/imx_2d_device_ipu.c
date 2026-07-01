@@ -1068,6 +1068,7 @@ Imx2DDevice * imx_ipu_create(Imx2DDeviceType  device_type)
   device->get_alignment       = NULL;
   device->config_warp_info    = imx_ipu_config_warp_info;
   device->get_supported_fmts_of_capability = NULL;
+  device->set_method          = NULL;
 
   return device;
 }

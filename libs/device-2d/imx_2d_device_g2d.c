@@ -1036,6 +1036,7 @@ Imx2DDevice * imx_g2d_create(Imx2DDeviceType  device_type)
   device->config_warp_info    = imx_g2d_config_warp_info;
   device->get_supported_fmts_of_capability = imx_g2d_get_supported_fmts_of_capability;
   device->get_alignment       = imx_g2d_get_alignment;
+  device->set_method          = NULL;
 
   return device;
 }

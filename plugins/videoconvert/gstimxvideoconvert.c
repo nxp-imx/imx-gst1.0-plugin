@@ -51,6 +51,7 @@
 #define GST_IMX_VIDEO_WARP_DEFAULT                   FALSE
 #define GST_IMX_VIDEO_WARP_MAP_DEFAULT               IMX_2D_WARP_MAP_NULL
 #define GST_IMX_VIDEO_KEEP_RATIO_DEFAULT             FALSE
+#define GST_IMX_METHOD_DEFAULT                       IMX_2D_METHOD_NONE
 
 #define DEFAULT_IMXVIDEOCONVERT_BACKGROUND   0x00000000
 
@@ -82,7 +83,9 @@ enum {
   PROP_VIDEO_WARP_ENABLE,
   PROP_VIDEO_WARP_COORD_FILE,
   PROP_VIDEO_WARP_EXTRA_CONTROLS,
-  PROP_KEEP_RATIO
+  PROP_KEEP_RATIO,
+  PROP_METHOD,
+  PROP_PADDING_COLOR
 };
 
 static GstElementClass *parent_class = NULL;
@@ -134,6 +137,23 @@ GType gst_imx_video_convert_deinterlace_get_type(void) {
   return gst_imx_video_convert_deinterlace_type;
 }
 
+GType gst_imx_video_convert_method_get_type(void) {
+  static GType gst_imx_video_convert_method_type = 0;
+
+  if (!gst_imx_video_convert_method_type) {
+    static GEnumValue method_values[] = {
+      {IMX_2D_METHOD_NONE, "No method", "none"},
+      {IMX_2D_METHOD_UINT8_TO_INT8, "uint8 to int8", "uint8-to-int8"},
+      {0, NULL, NULL },
+    };
+
+    gst_imx_video_convert_method_type =
+        g_enum_register_static("ImxVideoConvertMethod", method_values);
+  }
+
+  return gst_imx_video_convert_method_type;
+}
+
 static void gst_imx_video_convert_set_property (GObject * object,
     guint prop_id, const GValue * value, GParamSpec * pspec)
 {
@@ -181,6 +201,19 @@ static void gst_imx_video_convert_set_property (GObject * object,
       break;
     case PROP_KEEP_RATIO:
       imxvct->keep_ratio = g_value_get_boolean(value);
+      break;
+    case PROP_METHOD:
+      Imx2DMethod new_method = g_value_get_enum(value);
+      if (device->set_method) {
+        if (!device->set_method (device, new_method)) {
+          GST_WARNING_OBJECT (imxvct, "failed to set method");
+          break;
+        }
+        imxvct->method = new_method;
+      }
+      break;
+    case PROP_PADDING_COLOR:
+      imxvct->padding_color = g_value_get_uint(value);
       break;
     case PROP_VIDEO_WARP_EXTRA_CONTROLS:
       const GstStructure *config = gst_value_get_structure (value);
@@ -233,6 +266,12 @@ static void gst_imx_video_convert_get_property (GObject * object,
       break;
     case PROP_KEEP_RATIO:
       g_value_set_boolean(value, imxvct->keep_ratio);
+      break;
+    case PROP_METHOD:
+      g_value_set_enum(value, imxvct->method);
+      break;
+    case PROP_PADDING_COLOR:
+      g_value_set_uint(value, imxvct->padding_color);
       break;
     case PROP_VIDEO_WARP_EXTRA_CONTROLS:
       gst_value_set_structure (value, imxvct->video_warp.extra_controls);
@@ -2306,7 +2345,7 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
     if (device->fill) {
       if(((out_flags & COLORSPACE_MASK) == GST_VIDEO_FORMAT_FLAG_YUV &&
           device->device_type == IMX_2D_DEVICE_G2D) ||
-          device->fill (device, &src, &dst, DEFAULT_IMXVIDEOCONVERT_BACKGROUND) < 0) {
+          device->fill (device, &src, &dst, imxvct->padding_color) < 0) {
         GST_LOG("fill color background by device failed");
         need_sw_fill = TRUE;
       }
@@ -2328,7 +2367,7 @@ static GstFlowReturn imx_video_convert_transform(GstBaseTransform * trans, GstBu
           GST_LOG("map background buffer %p size %" G_GSIZE_FORMAT, dst.mem->vaddr, dst.mem->size);
         }
       }
-      imx_2d_device_fill_background (&dst, DEFAULT_IMXVIDEOCONVERT_BACKGROUND);
+      imx_2d_device_fill_background (&dst, imxvct->padding_color);
 
       if (need_unmap)
         gst_buffer_unmap (outbuf, &map);
@@ -2631,6 +2670,17 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   }
 
+  if (in_plugin->device_type == IMX_2D_DEVICE_OCL) {
+    g_object_class_install_property (gobject_class, PROP_METHOD,
+        g_param_spec_enum("method", "Method",
+          "Methods supported by the device for processing image data. "
+          "For example, uint8-to-int8 method converts unsigned [0,255] "
+          "pixel values to signed [-128,127] range for machine learning.",
+          gst_imx_video_convert_method_get_type(),
+          GST_IMX_METHOD_DEFAULT,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  }
+
   if (capabilities & IMX_2D_DEVICE_CAP_WARP) {
     g_object_class_install_property (gobject_class, PROP_VIDEO_WARP_ENABLE,
         g_param_spec_boolean("video-warp-enable", "video warp enable",
@@ -2654,6 +2704,15 @@ gst_imx_video_convert_class_init (GstImxVideoConvertClass * klass)
       g_param_spec_boolean ("keep-ratio", "Keep Aspect Ratio",
         "Keep the video aspect ratio after resize",
         GST_IMX_VIDEO_KEEP_RATIO_DEFAULT,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_PADDING_COLOR,
+      g_param_spec_uint ("padding-color", "Padding Color",
+        "Padding color outside crop region "
+        "(0xAABBGGRR where RR=red, GG=green, BB=blue, AA=alpha). "
+        "Only effective when keep-ratio is enabled.",
+        0, G_MAXUINT32,
+        DEFAULT_IMXVIDEOCONVERT_BACKGROUND,
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   in_plugin->destroy(dev);
@@ -2715,6 +2774,8 @@ gst_imx_video_convert_init (GstImxVideoConvert * imxvct)
       imxvct->video_warp.enable = GST_IMX_VIDEO_WARP_DEFAULT;
       imxvct->video_warp.map_format = GST_IMX_VIDEO_WARP_MAP_DEFAULT;
       imxvct->keep_ratio = GST_IMX_VIDEO_KEEP_RATIO_DEFAULT;
+      imxvct->method = IMX_2D_METHOD_NONE;
+      imxvct->padding_color = DEFAULT_IMXVIDEOCONVERT_BACKGROUND;
       imxvct->total_time = 0;
       imxvct->total_frames = 0;
     }

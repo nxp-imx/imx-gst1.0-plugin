@@ -117,6 +117,11 @@ typedef struct {
   Imx2DColorMatrixType matrix;
 } Imx2DColorimetry;
 
+typedef enum {
+  IMX_2D_METHOD_NONE = 0,
+  IMX_2D_METHOD_UINT8_TO_INT8 = 1,
+} Imx2DMethod;
+
 typedef struct {
   GstVideoFormat in_fmt;
   GstVideoFormat out_fmt;
@@ -216,6 +221,7 @@ struct _Imx2DDevice {
   gboolean (*config_warp_info) (Imx2DDevice* device, Imx2DVideoWarp *video_warp);
   gboolean (*get_alignment) (Imx2DDevice* device, GstVideoInfo *in_info, GstVideoInfo *out_info, Imx2DAlignInfo *align_info);
   GList*               (*get_supported_fmts_of_capability)   (Imx2DDevice* device, Imx2DDeviceCap cap);
+  gboolean (*set_method) (Imx2DDevice* device, Imx2DMethod method);
 };
 
 typedef struct _Imx2DDeviceInfo {
