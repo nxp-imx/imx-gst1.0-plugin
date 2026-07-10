@@ -27,6 +27,7 @@
 
 #include <gst/gst.h>
 #include <gst/video/videooverlay.h>
+#include <gst/video/video-event.h>
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
@@ -235,6 +236,16 @@ typedef struct _gRecorderEngine
   gint64 max_file_duration;
   guint fragment_duration;
 
+  /* State used by the keyframe-aligned file-split probe.
+   * All fields are protected by split_lock because the buffer probe fires
+   * on the streaming thread while other accesses could occur on different
+   * threads (e.g. the application thread or a GLib main loop callback). */
+  GMutex split_lock;
+  gint64 current_file_bytes;
+  GstClockTime current_file_start_ts;
+  gboolean waiting_for_keyframe;
+  guint force_key_unit_count;
+
   gchar *preview_caps_name;
 
   /* X window variables */
@@ -403,6 +414,296 @@ create_encording_profile (gRecorderEngine *recorder)
   }
 
   return (GstEncodingProfile *) container;
+}
+
+static gboolean
+file_split_threshold_reached (gRecorderEngine *recorder, GstBuffer *buf)
+{
+  if (recorder->max_file_size > 0 &&
+      recorder->current_file_bytes >= recorder->max_file_size)
+    return TRUE;
+
+  if (recorder->max_file_duration > 0 &&
+      GST_BUFFER_PTS_IS_VALID (buf) &&
+      GST_CLOCK_TIME_IS_VALID (recorder->current_file_start_ts)) {
+    GstClockTime elapsed = GST_BUFFER_PTS (buf) - recorder->current_file_start_ts;
+    if (elapsed >= (GstClockTime) recorder->max_file_duration * GST_SECOND)
+      return TRUE;
+  }
+
+  return FALSE;
+}
+
+/*
+ * Pad probe installed on the muxer's video sink pad (inside encodebin).
+ * At this point buffers are individual encoded frames and carry the
+ * DELTA_UNIT flag reliably.
+ *
+ * Strategy (next-file=3 / KEY_UNIT_EVENT on multifilesink):
+ *   - Track encoded bytes and PTS-based duration for the current segment.
+ *   - When the configured threshold is exceeded, send an upstream
+ *     force-key-unit event so the encoder emits a fresh IDR/keyframe.
+ *   - Mark waiting_for_keyframe=TRUE to suppress further threshold checks.
+ *   - When the next keyframe arrives, send a downstream force-key-unit
+ *     event toward multifilesink (via the muxer src pad) so it closes
+ *     the current file and opens the next one starting from that keyframe.
+ */
+static GstPadProbeReturn
+file_split_probe (GstPad * pad, GstPadProbeInfo * info, gpointer udata)
+{
+  gRecorderEngine *recorder = (gRecorderEngine *) udata;
+  GstBuffer *buf;
+  gboolean is_keyframe;
+  guint fku_count = 0;
+  GstClockTime pts;
+  gboolean do_upstream_fku = FALSE;
+  gboolean do_downstream_fku = FALSE;
+
+  if (!(GST_PAD_PROBE_INFO_TYPE (info) & GST_PAD_PROBE_TYPE_BUFFER))
+    return GST_PAD_PROBE_OK;
+
+  buf = GST_PAD_PROBE_INFO_BUFFER (info);
+  is_keyframe = !GST_BUFFER_FLAG_IS_SET (buf, GST_BUFFER_FLAG_DELTA_UNIT);
+  pts = GST_BUFFER_PTS (buf);
+
+  g_mutex_lock (&recorder->split_lock);
+
+  /* Latch the segment start timestamp on the very first keyframe of the
+   * recording. Subsequent segments are latched after each split (below).
+   * Only keyframes are used as anchor points so that duration measurement
+   * stays aligned to actual GOP boundaries. */
+  if (!GST_CLOCK_TIME_IS_VALID (recorder->current_file_start_ts) && is_keyframe) {
+    recorder->current_file_start_ts = pts;
+    GST_DEBUG ("first keyframe, segment start PTS %" GST_TIME_FORMAT,
+        GST_TIME_ARGS (pts));
+  }
+
+  if (recorder->waiting_for_keyframe) {
+    if (is_keyframe) {
+      /* The encoder has delivered the requested IDR. Embed the current
+       * count value in the downstream FKU so mux_src_event_probe can let
+       * it through while dropping the mpegtsmux automatic echo (count=0). */
+      fku_count = ++recorder->force_key_unit_count;
+      do_downstream_fku = TRUE;
+
+      recorder->waiting_for_keyframe = FALSE;
+      recorder->current_file_bytes = 0;
+      recorder->current_file_start_ts = pts;
+      GST_DEBUG ("IDR received, splitting segment at PTS %" GST_TIME_FORMAT
+          ", FKU count=%u", GST_TIME_ARGS (pts), fku_count);
+    }
+    /* Continue accumulating bytes even while waiting for the IDR so the
+     * byte counter reflects the true encoded size of the segment. */
+  }
+
+  if (!recorder->waiting_for_keyframe &&
+      file_split_threshold_reached (recorder, buf)) {
+    /* Threshold reached: request an IDR from the encoder. */
+    do_upstream_fku = TRUE;
+    recorder->waiting_for_keyframe = TRUE;
+    GST_DEBUG ("threshold reached at PTS %" GST_TIME_FORMAT
+        ", bytes=%" G_GINT64_FORMAT ", requesting IDR",
+        GST_TIME_ARGS (pts), recorder->current_file_bytes);
+  }
+
+  g_mutex_unlock (&recorder->split_lock);
+
+  /* Send events outside the lock to avoid potential deadlocks when
+   * GStreamer's pad machinery takes internal locks during event delivery. */
+  if (do_downstream_fku) {
+    GstElement *muxer = GST_PAD_PARENT (pad);
+    GstPad *mux_src = muxer ? gst_element_get_static_pad (muxer, "src") : NULL;
+    if (mux_src) {
+      gst_pad_push_event (mux_src,
+          gst_video_event_new_downstream_force_key_unit (
+              pts, pts, pts, TRUE, fku_count));
+      gst_object_unref (mux_src);
+    }
+  }
+
+  if (do_upstream_fku) {
+    GstPad *peer = gst_pad_get_peer (pad);
+    if (peer) {
+      gst_pad_send_event (peer,
+          gst_video_event_new_upstream_force_key_unit (GST_CLOCK_TIME_NONE,
+              TRUE, 0));
+      gst_object_unref (peer);
+    }
+  }
+
+  return GST_PAD_PROBE_OK;
+}
+
+/*
+ * Buffer probe on the muxer src pad.
+ * Counts actual TS output bytes into current_file_bytes so the split
+ * threshold is compared against the real on-disk file size (including TS
+ * packetization overhead and PAT/PMT/PCR packets) rather than raw ES bytes.
+ * Protected by split_lock shared with file_split_probe.
+ */
+static GstPadProbeReturn
+mux_src_buffer_probe (GstPad * pad, GstPadProbeInfo * info, gpointer udata)
+{
+  gRecorderEngine *recorder = (gRecorderEngine *) udata;
+  gsize size = 0;
+
+  if (GST_PAD_PROBE_INFO_TYPE (info) & GST_PAD_PROBE_TYPE_BUFFER) {
+    size = gst_buffer_get_size (GST_PAD_PROBE_INFO_BUFFER (info));
+  } else if (GST_PAD_PROBE_INFO_TYPE (info) & GST_PAD_PROBE_TYPE_BUFFER_LIST) {
+    GstBufferList *list = GST_PAD_PROBE_INFO_BUFFER_LIST (info);
+    guint i, n = gst_buffer_list_length (list);
+    for (i = 0; i < n; i++)
+      size += gst_buffer_get_size (gst_buffer_list_get (list, i));
+  }
+
+  if (size > 0) {
+    g_mutex_lock (&recorder->split_lock);
+    recorder->current_file_bytes += size;
+    g_mutex_unlock (&recorder->split_lock);
+  }
+
+  return GST_PAD_PROBE_OK;
+}
+
+/*
+ * Event probe on the muxer src pad.
+ * mpegtsmux automatically echoes every upstream force-key-unit as a downstream
+ * force-key-unit when it starts a new IDR access unit.  The upstream event we
+ * send carries count=0; its echo therefore also has count=0.  Our own
+ * downstream FKU (pushed from file_split_probe) uses force_key_unit_count >= 1.
+ * This probe drops only count==0 echoes to prevent a double file split.
+ */
+static GstPadProbeReturn
+mux_src_event_probe (GstPad * pad, GstPadProbeInfo * info, gpointer udata)
+{
+  if (GST_PAD_PROBE_INFO_TYPE (info) & GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM) {
+    GstEvent *event = GST_PAD_PROBE_INFO_EVENT (info);
+    if (GST_EVENT_TYPE (event) == GST_EVENT_CUSTOM_DOWNSTREAM &&
+        gst_video_event_is_force_key_unit (event)) {
+      GstClockTime running_time, timestamp, stream_time;
+      gboolean all_headers;
+      guint count;
+      gst_video_event_parse_downstream_force_key_unit (event,
+          &timestamp, &stream_time, &running_time, &all_headers, &count);
+      if (count == 0) {
+        GST_DEBUG ("dropping mpegtsmux FKU echo (count=0) to prevent double file split");
+        return GST_PAD_PROBE_DROP;
+      }
+    }
+  }
+  return GST_PAD_PROBE_OK;
+}
+
+/*
+ * One-shot probe installed on every muxer sink pad by setup_file_split_probe().
+ * Called from the streaming thread on the first buffer, at which point pad
+ * caps are guaranteed to be negotiated (gst_pad_get_current_caps() is valid).
+ * If the pad carries a video media type the real file_split_probe (and the
+ * mux_src_event_probe) are installed and this probe removes itself.
+ * Non-video pads simply remove this probe without doing anything else.
+ */
+static GstPadProbeReturn
+autodetect_video_pad_probe (GstPad * pad, GstPadProbeInfo * info,
+    gpointer udata)
+{
+  gRecorderEngine *recorder = (gRecorderEngine *) udata;
+  GstCaps *caps;
+  const gchar *name = NULL;
+
+  caps = gst_pad_get_current_caps (pad);
+  if (caps) {
+    name = gst_structure_get_name (gst_caps_get_structure (caps, 0));
+    gst_caps_unref (caps);
+  }
+
+  if (!name || !g_str_has_prefix (name, "video/")) {
+    /* Not a video pad. Byte counting is done at the mux src pad
+     * (mux_src_buffer_probe) so no per-pad probe is needed here. */
+    GST_DEBUG ("autodetect: pad %s:%s is audio/other (%s), removing probe",
+        GST_DEBUG_PAD_NAME (pad), name ? name : "(no caps)");
+    return GST_PAD_PROBE_REMOVE;
+  }
+
+  /* This is the video pad. Install the real split probe on it. */
+  GST_DEBUG ("autodetect: pad %s:%s is video (%s), installing split probe",
+      GST_DEBUG_PAD_NAME (pad), name);
+
+  recorder->current_file_bytes = 0;
+  recorder->current_file_start_ts = GST_CLOCK_TIME_NONE;
+  recorder->waiting_for_keyframe = FALSE;
+  recorder->force_key_unit_count = 0;
+
+  gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_BUFFER,
+      file_split_probe, recorder, NULL);
+  GST_DEBUG ("file_split_probe installed on pad %s:%s",
+      GST_DEBUG_PAD_NAME (pad));
+
+  /* Install event probe on the muxer src pad to drop the automatic
+   * downstream FKU echo (count=0) that mpegtsmux emits for each IDR,
+   * preventing a double file-split when we push our own FKU event. */
+  {
+    GstElement *muxer = GST_ELEMENT (gst_pad_get_parent (pad));
+    if (muxer) {
+      GstPad *mux_src = gst_element_get_static_pad (muxer, "src");
+      if (mux_src) {
+        /* Count actual TS output bytes for accurate file-size tracking. */
+        gst_pad_add_probe (mux_src,
+            GST_PAD_PROBE_TYPE_BUFFER | GST_PAD_PROBE_TYPE_BUFFER_LIST,
+            mux_src_buffer_probe, recorder, NULL);
+        GST_DEBUG ("mux_src_buffer_probe installed on pad %s:%s",
+            GST_DEBUG_PAD_NAME (mux_src));
+        gst_pad_add_probe (mux_src,
+            GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, mux_src_event_probe,
+            recorder, NULL);
+        GST_DEBUG ("mux_src_event_probe installed on pad %s:%s",
+            GST_DEBUG_PAD_NAME (mux_src));
+        gst_object_unref (mux_src);
+      }
+      gst_object_unref (muxer);
+    }
+  }
+
+  /* Remove this autodetect probe; file_split_probe takes over. */
+  return GST_PAD_PROBE_REMOVE;
+}
+
+/*
+ * Install autodetect_video_pad_probe on every muxer sink pad.
+ * Called after the pipeline reaches READY so the muxer element already
+ * exists. The probes defer actual video-pad identification to the
+ * streaming thread where pad caps are guaranteed to be valid (see
+ * autodetect_video_pad_probe above).
+ */
+static void
+setup_file_split_probe (gRecorderEngine *recorder)
+{
+  GstElement *muxer;
+  GstIterator *it;
+  GValue item = G_VALUE_INIT;
+  gint n_probes = 0;
+
+  muxer = gst_bin_get_by_name (GST_BIN (recorder->camerabin), "muxer");
+  if (!muxer) {
+    GST_WARNING ("muxer element not found, file-split probe not installed");
+    return;
+  }
+
+  it = gst_element_iterate_sink_pads (muxer);
+  while (gst_iterator_next (it, &item) == GST_ITERATOR_OK) {
+    GstPad *p = g_value_get_object (&item);
+    gst_pad_add_probe (p, GST_PAD_PROBE_TYPE_BUFFER,
+        autodetect_video_pad_probe, recorder, NULL);
+    GST_DEBUG ("autodetect probe installed on pad %s:%s",
+        GST_DEBUG_PAD_NAME (p));
+    n_probes++;
+    g_value_reset (&item);
+  }
+  gst_iterator_free (it);
+
+  if (n_probes == 0)
+    GST_WARNING ("muxer has no sink pads, file-split probe not installed");
+
+  gst_object_unref (muxer);
 }
 
 static GstPadProbeReturn
@@ -1121,9 +1422,9 @@ setup_pipeline (gRecorderEngine *recorder)
       setup_pipeline_element_bin (recorder->camerabin, "viewfinder-filter", 
           recorder->viewfinder_filter, NULL);
 
-  if (recorder->max_files && recorder->max_file_size) {
+  if ((recorder->max_files && recorder->max_file_size) || recorder->max_file_duration) {
     if (recorder->container_format != RE_OUTPUT_FORMAT_TS) {
-      g_print ("set_file_count() only supported for TS container.");
+      g_print ("file splitting only supported for TS container.");
       return RE_RESULT_PARAMETER_INVALID;
     }
 
@@ -1131,22 +1432,11 @@ setup_pipeline (gRecorderEngine *recorder)
       setup_pipeline_element (recorder->camerabin, "video-sink", "multifilesink",
           NULL);
     g_object_get (recorder->camerabin, "video-sink", &recorder->video_sink, NULL);
-    g_object_set (recorder->video_sink, "next-file", 4, NULL);
-    g_object_set (recorder->video_sink, "max-file-size", recorder->max_file_size, NULL);
-    g_object_set (recorder->video_sink, "max-files", recorder->max_files, NULL);
-    g_object_set (recorder->video_sink, "async", FALSE, NULL);
-  } else if (recorder->max_file_duration) {
-    if (recorder->container_format != RE_OUTPUT_FORMAT_TS) {
-      g_print ("set_max_file_duration() only supported for TS container.");
-      return RE_RESULT_PARAMETER_INVALID;
-    }
-
-    res &=
-      setup_pipeline_element (recorder->camerabin, "video-sink", "multifilesink",
-          NULL);
-    g_object_get (recorder->camerabin, "video-sink", &recorder->video_sink, NULL);
-    g_object_set (recorder->video_sink, "next-file", 5, NULL);
-    g_object_set (recorder->video_sink, "max-file-duration", recorder->max_file_duration * GST_SECOND, NULL);
+    /* next-file=3: KEY_UNIT_EVENT - split on downstream force-key-unit event.
+     * The probe in setup_file_split_probe() drives the actual split timing. */
+    g_object_set (recorder->video_sink, "next-file", 3, NULL);
+    if (recorder->max_files)
+      g_object_set (recorder->video_sink, "max-files", recorder->max_files, NULL);
     g_object_set (recorder->video_sink, "async", FALSE, NULL);
   } else if (recorder->host) {
     if (recorder->container_format != RE_OUTPUT_FORMAT_TS) {
@@ -1265,6 +1555,13 @@ setup_pipeline (gRecorderEngine *recorder)
   }
   GST_INFO_OBJECT (recorder->camerabin, "camera ready");
   set_muxer_property (recorder);
+
+  /* Install autodetect probes on muxer sink pads now that the muxer
+   * element exists (pipeline is in READY). The probes identify the video
+   * pad on the first real buffer (streaming thread), where caps are valid.
+   * Only needed when multifilesink is used with size/duration splitting. */
+  if (recorder->video_sink && (recorder->max_file_size || recorder->max_file_duration))
+    setup_file_split_probe (recorder);
 
   if (GST_STATE_CHANGE_FAILURE ==
       gst_element_set_state (recorder->camerabin, GST_STATE_PLAYING)) {
@@ -2380,6 +2677,9 @@ static REresult init(RecorderEngineHandle handle)
   recorder->max_files = 0;
   recorder->max_file_size = 0;
   recorder->max_file_duration = 0;
+  recorder->current_file_bytes = 0;
+  recorder->current_file_start_ts = GST_CLOCK_TIME_NONE;
+  recorder->waiting_for_keyframe = FALSE;
 
   recorder->preview_caps_name = NULL;
 
@@ -2403,6 +2703,7 @@ static REresult init(RecorderEngineHandle handle)
   recorder->audio_output_caps = NULL;
 
   g_mutex_init (&recorder->lock);
+  g_mutex_init (&recorder->split_lock);
 
   recorder->state = RE_STATE_INITED;
   recorder->container_format = RE_OUTPUT_FORMAT_DEFAULT;
@@ -2653,6 +2954,7 @@ static REresult delete_it(RecorderEngineHandle handle)
     recorder->viewfinder_caps_str = NULL;
   }
 
+  g_mutex_clear (&recorder->split_lock);
   g_mutex_clear (&recorder->lock);
   g_slice_free (gRecorderEngine, recorder);
   g_slice_free (RecorderEngine, h);
