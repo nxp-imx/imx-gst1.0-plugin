@@ -849,6 +849,10 @@ gst_imxcompositor_negotiated_caps (GstAggregator * vagg, GstCaps * caps)
           gst_imxcompositor_set_pool_alignment(caps, pool);
           if (min < IMX_COMPOSITOR_OUTPUT_POOL_MIN_BUFFERS)
             min = IMX_COMPOSITOR_OUTPUT_POOL_MIN_BUFFERS;
+          /* FIXME: apply 2 more buffer to workaround LF-18301 overlay tearing issue */
+          if (imx_soc_has_feature ("g2d-dpuv2")) {
+            min = min + 2;
+          }
           max = IMX_COMPOSITOR_OUTPUT_POOL_MAX_BUFFERS;
           gst_buffer_pool_config_set_params (config, caps, size, min, max);
           gst_buffer_pool_set_config (pool, config);
@@ -883,9 +887,14 @@ gst_imxcompositor_negotiated_caps (GstAggregator * vagg, GstCaps * caps)
 
   /* downstream doesn't provide a pool or the pool has no ability to allocate
    * physical memory buffers, we need create new pool */
+  /* FIXME: apply 2 more buffer to workaround LF-18301 overlay tearing issue */
+  min = IMX_COMPOSITOR_OUTPUT_POOL_MIN_BUFFERS;
+  if (imx_soc_has_feature ("g2d-dpuv2")) {
+    min = IMX_COMPOSITOR_OUTPUT_POOL_MIN_BUFFERS + 2;
+  }
   GST_DEBUG_OBJECT(imxcomp, "creating new output pool");
   pool = gst_imxcompositor_create_bufferpool(imxcomp, caps, size,
-      IMX_COMPOSITOR_OUTPUT_POOL_MIN_BUFFERS,
+      min,
       IMX_COMPOSITOR_OUTPUT_POOL_MAX_BUFFERS);
   if (pool) {
     if (imxcomp->self_out_pool != imxcomp->out_pool) {
@@ -899,7 +908,7 @@ gst_imxcompositor_negotiated_caps (GstAggregator * vagg, GstCaps * caps)
     gst_buffer_pool_set_active(pool, TRUE);
     GST_DEBUG_OBJECT(imxcomp, "pool config:  outcaps: %" GST_PTR_FORMAT "  "
         "size: %u  min buffers: %u  max buffers: %u", caps, size,
-        IMX_COMPOSITOR_OUTPUT_POOL_MIN_BUFFERS,
+        min,
         IMX_COMPOSITOR_OUTPUT_POOL_MAX_BUFFERS);
     imxcomp->negotiated = TRUE;
     imxcomp->out_pool_update = TRUE;
